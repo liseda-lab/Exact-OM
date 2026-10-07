@@ -169,6 +169,65 @@ def test_binary_cache_does_not_invent_a_comparative_choice(tmp_path):
     assert "comparative choices" in result["unavailable"]["trust_source"]
 
 
+def test_benchmark_scope_is_explicit_and_preserves_full_population_and_label_policy(tmp_path):
+    path, _ = forced_trace(tmp_path)
+    trace = json.loads(path.read_text())
+    for record in trace["records"]:
+        for candidate in record["candidates"]:
+            candidate.pop("llm_grouped_decision")
+    trace["source_universe"] += ["unjudged", "empty", "exact"]
+    trace["records"] += [
+        {"Src": "unjudged", "candidates": [{"target": "a", "S_base": 0.9, "U": 0.2}]},
+        {"Src": "empty", "candidates": []},
+        {"Src": "exact", "candidates": [{"target": "t", "protected_exact": True}]},
+    ]
+    path.write_text(json.dumps(trace))
+    kwargs = {
+        "reference_role": "development",
+        "negative_label_policy": "unknown",
+        "budget": 2,
+    }
+    refs = [{"Src": "good", "Tgt": "t", "Relation": "<"}, {"Src": "harm", "Tgt": "a"}]
+    original = build_oracle_artifacts(path, refs, tmp_path / "p", **kwargs)
+    amended = build_oracle_artifacts(
+        path, refs, tmp_path / "p", outcome_semantics="benchmark_reference", **kwargs
+    )
+    assert original["identity"] != amended["identity"]
+    assert "oracle_observed" not in original["artifacts"]
+    assert set(amended["artifacts"]) == {
+        "trust_shipped",
+        "trust_constant",
+        "oracle_observed",
+        "oracle_perfect",
+    }
+    assert set(amended["unavailable"]) == {"trust_source"}
+    assert amended["source_count"] == 6
+    assert amended["sampled_source_count"] == 3
+    assert amended["teacher_binding"]["source_universe"] == trace["source_universe"]
+    assert amended["teacher_binding"]["frozen_extraction_policy"] == trace["policy"]
+    observed, perfect = (
+        json.loads(Path(amended["artifacts"][name]).read_text())
+        for name in ("oracle_observed", "oracle_perfect")
+    )
+    assert observed["selected_sources"] == perfect["selected_sources"] == ["good", "nil"]
+    assert observed["negative_label_policy"] == perfect["negative_label_policy"] == "unknown"
+    assert any(row["Src"] == "unjudged" for row in observed["population_rows"])
+    assert observed["teacher_binding"]["nil_sources"] == []
+    assert "confirmed_label" not in observed["population_rows"][0]
+    for source, probabilities in observed["decision_probs"].items():
+        assert probabilities.keys() == perfect["decision_probs"][source].keys()
+    assert observed["training_use_permitted"] is False
+    assert observed["global_f1_optimality_claim"] is False
+    with pytest.raises(ValueError, match="ignored-pair"):
+        build_oracle_artifacts(
+            path,
+            refs + [{"Src": "good", "Tgt": "a", "Relation": "?"}],
+            tmp_path / "p",
+            outcome_semantics="benchmark_reference",
+            **kwargs
+        )
+
+
 def test_unscored_protected_exact_pairs_stay_outside_replay_population(tmp_path):
     path, _ = forced_trace(tmp_path)
     trace = json.loads(path.read_text())
@@ -286,6 +345,62 @@ def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
         "oracle_perfect" in metadata["unavailable"]
     )  # training semantics never license report negatives
     assert materialize_followup(source, suite, [item], {}).raw_hash() == bound.raw_hash()
+    # The amended diagnostic preserves the very same producer, including the off
+    # control; neither final selection nor confirm-stage use can consume labels.
+    from exact.experiments.schema import ArmConfig, SelectionConfig
+
+    benchmark = replace(
+        source,
+        config=source.config.model_copy(
+            update={
+                "experiment_id": "E25-oracles",
+                "selection": SelectionConfig(decisions=[]),
+                "frozen_constants": {"outcome_semantics": "benchmark_reference"},
+                "arms": [
+                    ArmConfig(id=name, role=role, deployable=False, stages=["screen"])
+                    for name, role in (
+                        ("decision_off", "baseline"),
+                        ("oracle_observed", "oracle"),
+                        ("oracle_perfect", "oracle"),
+                    )
+                ],
+            }
+        ),
+    )
+    amended = materialize_followup(benchmark, suite, [item], {})
+    assert amended.base_config_path == config_path
+    assert amended.config.arms[0].overlay["llm"]["experiment"]["gate"]["mode"] == "off"
+    assert all(arm.stages == ["screen"] for arm in amended.config.arms)
+    amended_metadata = amended.config.frozen_constants["resolved_oracle_policy"]
+    assert amended_metadata["source_count"] == 3
+    assert amended_metadata["outcome_semantics"] == "benchmark_reference"
+    assert amended_metadata["unavailable"] == {}
+    assert amended_metadata["manifest_sha256"] != metadata["manifest_sha256"]
+    assert amended.config.screen.tasks[0].overlay == {"data": producer["data"]}
+    for section, change in (
+        ("matching", {"threshold": 0.42}),
+        ("matching", {"cardinality": 2}),
+        ("matching", {"fusion": {"beta": 0.2}}),
+    ):
+        task = benchmark.config.screen.tasks[0].model_copy(
+            update={"overlay": harness.deep_merge(overlay, {section: change})}
+        )
+        unsafe = replace(
+            benchmark,
+            config=benchmark.config.model_copy(
+                update={"screen": benchmark.config.screen.model_copy(update={"tasks": [task]})}
+            ),
+        )
+        with pytest.raises(ValueError, match="changes frozen producer"):
+            materialize_followup(unsafe, suite, [item], {})
+    for change in (
+        {"selection": source.config.selection},
+        {"arms": [benchmark.config.arms[0].model_copy(update={"deployable": True})]},
+        {"arms": [benchmark.config.arms[0].model_copy(update={"stages": ["confirm"]})]},
+    ):
+        unsafe = replace(benchmark, config=benchmark.config.model_copy(update=change))
+        with pytest.raises(ValueError, match="development-only"):
+            materialize_followup(unsafe, suite, [item], {})
     changed = tmp_path / "changed.sources.txt"
     changed.write_text("good\n")
     task = source.config.screen.tasks[0].model_copy(

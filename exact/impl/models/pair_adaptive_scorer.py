@@ -620,10 +620,45 @@ class PairAdaptiveSemanticScorer(
                 and payload.get("protocol") == "forced_cached_trust"
                 and payload.get("label_independent_selection") is True
             )
-            if not label_independent_trust and payload["negative_label_policy"] not in {
-                "complete_reference",
-                "confirmed_negatives",
-            }:
+            benchmark_reference = payload.get("outcome_semantics") == "benchmark_reference"
+            if benchmark_reference:
+                expected_protocol = {
+                    "oracle_replay": "benchmark_reference_observed_cached",
+                    "oracle_perfect": "benchmark_reference_perfect_fixed_sources",
+                }[mode]
+                teacher = payload.get("teacher_binding")
+                if (
+                    payload.get("mode") != mode
+                    or payload.get("protocol") != expected_protocol
+                    or payload.get("no_training_use") is not True
+                    or payload.get("training_use_permitted") is not False
+                    or payload.get("global_f1_optimality_claim") is not False
+                    or payload.get("ignored_reference_pairs") != []
+                    or payload.get("ignored_pair_policy") != "reject_nonempty"
+                    or not isinstance(teacher, dict)
+                    or teacher.get("reference_role")
+                    not in {
+                        "development",
+                        "dev",
+                        "validation",
+                        "valid",
+                        "diagnostic",
+                        "oracle",
+                        "research_development",
+                    }
+                ):
+                    raise ValueError(
+                        "Benchmark oracle requires explicit development-only diagnostic provenance"
+                    )
+            if (
+                not label_independent_trust
+                and not benchmark_reference
+                and payload["negative_label_policy"]
+                not in {
+                    "complete_reference",
+                    "confirmed_negatives",
+                }
+            ):
                 raise ValueError("Oracle replay requires safe development outcome labels")
             return
 

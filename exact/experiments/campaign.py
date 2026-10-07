@@ -257,6 +257,7 @@ class CampaignStep(StrictConfigModel):
     external_selection: Optional[InputBinding] = None
     selection: SelectionConfig
     design: DesignConfig
+    frozen_constants: dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("id", "family", "case")
     @classmethod
@@ -265,6 +266,28 @@ class CampaignStep(StrictConfigModel):
 
     @model_validator(mode="after")
     def bounded(self) -> "CampaignStep":
+        constants = self.frozen_constants
+        if set(constants) - {"outcome_semantics", "inapplicable_arms"}:
+            raise ValueError("Campaign constants cannot override generated protocol metadata")
+        if "outcome_semantics" in constants and (
+            self.id != "E25-oracles"
+            or self.family != "E25"
+            or not isinstance(constants["outcome_semantics"], str)
+            or constants["outcome_semantics"] not in {"verified_labels", "benchmark_reference"}
+        ):
+            raise ValueError("Outcome semantics are restricted to the E25 oracle diagnostic")
+        if "inapplicable_arms" in constants:
+            omitted = constants["inapplicable_arms"]
+            if (
+                self.id != "E25-trust"
+                or self.family != "E25"
+                or not isinstance(omitted, dict)
+                or set(omitted) != {"trust_source"}
+                or not isinstance(omitted["trust_source"], str)
+                or not omitted["trust_source"].strip()
+                or any(arm.id in omitted for arm in self.arms)
+            ):
+                raise ValueError("Inapplicable E25 source-first arm requires an explicit exclusion")
         if self.external_acceptance is not None and (
             self.id != "E00"
             or self.family != "E00"
@@ -1140,6 +1163,7 @@ def materialize_campaign(path: Path, directory: Path, *, stage: str) -> Any:
             "design": step.design.model_dump(mode="json"),
             "negative_label_policy": case.negative_policy,
             "frozen_constants": {
+                **step.frozen_constants,
                 "evaluation_diagnostics": {
                     f"{case_id}-{mode}": {
                         "role": lock.cases[case_id].role,

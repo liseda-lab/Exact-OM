@@ -29,6 +29,9 @@ def build_oracle_artifacts(
     budget: int = 200,
     confirmed_negatives: Iterable[tuple[str, str]] = (),
     nil_sources: Iterable[str] = (),
+    outcome_semantics: str = "verified_labels",
+    ignored_pairs: Iterable[tuple[str, str]] = (),
+    scoring_binding: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Freeze observed/perfect oracle and three trust arms from cached evidence.
 
@@ -37,6 +40,9 @@ def build_oracle_artifacts(
     source-choice or outcome-label inputs produce explicit unavailable entries.
     No models, router, or hosted client are instantiated.
     """
+    if outcome_semantics not in {"verified_labels", "benchmark_reference"}:
+        raise ValueError("Unknown oracle outcome semantics")
+    ignored = {(str(source), str(target)) for source, target in ignored_pairs}
     if reference_role not in {
         "development",
         "dev",
@@ -84,7 +90,13 @@ def build_oracle_artifacts(
         source, target = row.get("SrcEntity", row.get("Src")), row.get("TgtEntity", row.get("Tgt"))
         if source is None or target is None:
             raise ValueError("E25 positive reference rows require source and target IDs")
-        references.add((str(source), str(target)))
+        pair = (str(source), str(target))
+        if str(row.get("Relation", row.get("relation", "="))).strip() == "?":
+            ignored.add(pair)
+        else:
+            references.add(pair)
+    if outcome_semantics == "benchmark_reference" and ignored:
+        raise ValueError("Benchmark replay does not support ignored-pair scoring semantics")
     negatives = {(str(source), str(target)) for source, target in confirmed_negatives}
     nil = sorted(set(map(str, nil_sources)))
     if references & negatives or set(nil) & {source for source, _ in references}:
@@ -167,6 +179,11 @@ def build_oracle_artifacts(
         "nil_sources": nil,
         "sampled_sources": sorted(selected),
         "unscored_protected_pairs": sorted(unscored_protected_pairs),
+        "source_universe": list(trace["source_universe"]),
+        "frozen_extraction_policy": trace["policy"],
+        "outcome_semantics": outcome_semantics,
+        "scoring_binding": dict(scoring_binding or {}),
+        "ignored_pairs_sha256": fingerprint(sorted(ignored)),
     }
     threshold_value = llm.get("pair_threshold")
     if threshold_value is None:
@@ -220,7 +237,10 @@ def build_oracle_artifacts(
         artifact = destination / (name + ".json")
         freeze_json(artifact, payload)
         artifacts[name] = str(artifact)
-    if negative_label_policy not in {"complete_reference", "confirmed_negatives"}:
+    if outcome_semantics == "verified_labels" and negative_label_policy not in {
+        "complete_reference",
+        "confirmed_negatives",
+    }:
         for name in ("oracle_observed", "oracle_perfect"):
             unavailable[name] = (
                 "outcome-selected oracle requires complete or explicitly confirmed development labels"
@@ -238,6 +258,8 @@ def build_oracle_artifacts(
             constant_weight=0.5,
             teacher_binding=teacher,
             nil_sources=nil,
+            outcome_semantics=outcome_semantics,
+            ignored_pairs=ignored,
         )
         perfect = perfect_intervention(
             population,
@@ -251,6 +273,8 @@ def build_oracle_artifacts(
             constant_weight=0.5,
             teacher_binding=teacher,
             nil_sources=nil,
+            outcome_semantics=outcome_semantics,
+            ignored_pairs=ignored,
         )
         for name, payload in (("oracle_observed", observed), ("oracle_perfect", perfect)):
             artifact = destination / (name + ".json")
@@ -266,6 +290,11 @@ def build_oracle_artifacts(
         "valid_response_sources": valid_sources,
         "invalid_responses": invalid,
         "no_llm_invocations": True,
+        "outcome_semantics": outcome_semantics,
+        "source_count": len(source_rows),
+        "sampled_source_count": len(selected),
+        "training_use_permitted": False,
+        "global_f1_optimality_claim": False,
     }
     freeze_json(destination / "manifest.json", manifest)
     return manifest
@@ -285,6 +314,15 @@ def materialize_followup(source, suite, manifests, selections):
 
     if source.config.experiment_id not in {"E25-trust", "E25-oracles"}:
         return source
+    outcome_semantics = source.config.frozen_constants.get("outcome_semantics", "verified_labels")
+    if outcome_semantics == "benchmark_reference" and (
+        source.config.selection.decisions
+        or any(arm.deployable for arm in source.config.arms)
+        or any("confirm" in arm.stages for arm in source.config.arms)
+    ):
+        raise ValueError(
+            "Benchmark E25 replay is development-only and cannot select deployable arms"
+        )
     complete = [
         item
         for item in manifests
@@ -335,6 +373,7 @@ def materialize_followup(source, suite, manifests, selections):
         or stage.source_cap != item.get("source_cap")
         or stage.tasks[0].split_role != "development"
         or stage.tasks[0].id != item.get("task_id")
+        or (stage.tasks[0].source_cap or stage.source_cap) != item.get("source_cap")
     ):
         raise ValueError(
             "Cached E25 replay must preserve the forced run's source cap, seed and development scope"
@@ -364,6 +403,34 @@ def materialize_followup(source, suite, manifests, selections):
             values.append(sha256_path(Path(data.get("root") or ".") / path) if path else None)
         if values[0] != values[1]:
             raise ValueError(f"Cached E25 changed its frozen {key} input")
+    train_hashes = []
+    for config in (producer, consumer):
+        data = config["data"]
+        path = data.get("refs", {}).get("train")
+        train_hashes.append(sha256_file(Path(data.get("root") or ".") / path) if path else None)
+    if train_hashes[0] != train_hashes[1]:
+        raise ValueError("Cached E25 changed its frozen training/null reference")
+    # The harness applies task overlays after the base configuration. Validate
+    # their scientific effect before pinning the producer, or a task could change
+    # acceptance/cardinality despite using a correctly bound replay artifact.
+    task_config = ConfigModel.from_mapping(deep_merge(producer, stage.tasks[0].overlay)).model_dump(
+        mode="json", by_alias=True
+    )
+    for section in producer:
+        if section not in {"data", "output"} and task_config[section] != producer[section]:
+            raise ValueError(f"Cached E25 task changes frozen producer {section}")
+    relocated_data = {"root", "source", "target", "source_universe", "candidates", "refs"}
+    if any(
+        task_config["data"].get(key) != value
+        for key, value in producer["data"].items()
+        if key not in relocated_data
+    ) or any(
+        getattr(stage.tasks[0], key) not in {None, producer["data"].get(key)}
+        for key in ("track", "task")
+    ):
+        raise ValueError("Cached E25 task changes frozen producer data settings")
+    if source.config.generate_rationales:
+        raise ValueError("Cached E25 cannot generate rationales")
     root = Path(producer["data"].get("root") or ".")
     refs = producer["data"].get("refs") or {}
     reference = root / refs[role]
@@ -372,6 +439,30 @@ def materialize_followup(source, suite, manifests, selections):
     sources = set(trace["source_universe"])
     source_column = "SrcEntity" if "SrcEntity" in frame else "Src"
     frame = frame.loc[frame[source_column].astype(str).isin(sources)]
+    scoring_binding = {
+        "evaluation": producer["evaluation"],
+        "reference_sha256": sha256_file(reference),
+        "producer_config_sha256": sha256_file(config_path),
+        "pair_relation_semantics": "reference_pair_membership",
+    }
+    ignored_pairs = []
+    if outcome_semantics == "benchmark_reference":
+        if producer["evaluation"]["backends"] != ["builtin"]:
+            raise ValueError("Benchmark replay currently requires the frozen builtin evaluator")
+        # Builtin evaluation subtracts training-reference pairs. This scoped
+        # diagnostic cannot silently grade such pairs as errors or successes.
+        null_reference = refs.get("train")
+        if null_reference:
+            null_path = root / null_reference
+            nulls = read_table(null_path)
+            src = "SrcEntity" if "SrcEntity" in nulls else "Src"
+            tgt = "TgtEntity" if "TgtEntity" in nulls else "Tgt"
+            ignored_pairs = list(
+                nulls.loc[nulls[src].astype(str).isin(sources), [src, tgt]].itertuples(
+                    index=False, name=None
+                )
+            )
+            scoring_binding["null_reference_sha256"] = sha256_file(null_path)
     # A training-pool negative policy never licenses missing development labels.
     # Only explicit labels in the reporting pool can support the outcome oracle.
     negatives = []
@@ -395,9 +486,13 @@ def materialize_followup(source, suite, manifests, selections):
         negative_label_policy=policy,
         confirmed_negatives=negatives,
         budget=200,
+        outcome_semantics=outcome_semantics,
+        ignored_pairs=ignored_pairs,
+        scoring_binding=scoring_binding,
     )
     declaration = source.config.model_dump(mode="json")
     declaration["base_config"] = str(config_path)
+    declaration["screen"]["tasks"][0]["overlay"] = {"data": producer["data"]}
     for arm in declaration["arms"]:
         name = arm["id"]
         if name in artifacts["unavailable"]:
@@ -426,6 +521,9 @@ def materialize_followup(source, suite, manifests, selections):
         "manifest_sha256": sha256_file(destination / artifacts["identity"] / "manifest.json"),
         "unavailable": artifacts["unavailable"],
         "no_new_hosted_requests": True,
+        "outcome_semantics": outcome_semantics,
+        "source_count": artifacts["source_count"],
+        "sampled_source_count": artifacts["sampled_source_count"],
     }
     resolved = ExperimentConfig.model_validate(declaration)
     path = destination / (

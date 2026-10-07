@@ -1,15 +1,28 @@
-"""No-call E25 diagnostics over frozen, safely labeled source interventions."""
+"""No-call E25 diagnostics with explicit verified-label or benchmark outcomes."""
 
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 from .fitting import fingerprint, safe_training_labels
 
 NONE = "__NONE__"
 
 
-def _inventory(population, reference_pairs, negative_label_policy, nil_sources=()):
+def _inventory(
+    population,
+    reference_pairs,
+    negative_label_policy,
+    nil_sources=(),
+    *,
+    outcome_semantics="verified_labels",
+    ignored_pairs=(),
+):
+    if outcome_semantics not in {"verified_labels", "benchmark_reference"}:
+        raise ValueError("Unknown oracle outcome semantics")
+    if tuple(ignored_pairs):
+        raise ValueError("Oracle replay does not support ignored-pair scoring semantics")
     if not {"Src", "Tgt", "S_base", "U"}.issubset(population):
         raise ValueError("Oracle replay requires frozen Src/Tgt/S_base/U evidence")
     if any(
@@ -20,11 +33,26 @@ def _inventory(population, reference_pairs, negative_label_policy, nil_sources=(
         raise ValueError("Oracle population scores/uncertainties must be finite")
     if population.duplicated(["Src", "Tgt"]).any():
         raise ValueError("Oracle population contains duplicate candidate pairs")
+    if population[["Src", "Tgt"]].isna().any().any() or any(
+        not str(value) or str(value) == NONE
+        for row in population[["Src", "Tgt"]].values
+        for value in row
+    ):
+        raise ValueError("Oracle population requires real nonempty source/candidate identities")
     reference_pairs = {(str(source), str(target)) for source, target in reference_pairs}
     nil_sources = set(map(str, nil_sources))
     if nil_sources & {source for source, _ in reference_pairs}:
         raise ValueError("Explicit NIL sources conflict with positive references")
     population = population.copy()
+    if outcome_semantics == "benchmark_reference":
+        # This branch never supplies invented labels to the training-label helper.
+        # No recorded positive means no credited emitted pair, not ontology-wide NIL.
+        groups = {str(source): group for source, group in population.groupby("Src", sort=True)}
+        reference_sources = {source for source, _ in reference_pairs}
+        reference = reference_pairs | {
+            (source, NONE) for source in groups if source not in reference_sources
+        }
+        return groups, reference, []
     if negative_label_policy == "confirmed_negatives" and nil_sources:
         population.loc[population.Src.astype(str).isin(nil_sources), "confirmed_label"] = 0
     # Reserved NONE is a source label, never a displayed candidate or synthesized answer.
@@ -53,7 +81,16 @@ def _winner(scores, threshold):
 
 
 def _outcome(
-    group, probabilities, choice, reference, *, threshold, beta, fusion_weight, constant_weight
+    group,
+    probabilities,
+    choice,
+    reference,
+    *,
+    threshold,
+    beta,
+    fusion_weight,
+    constant_weight,
+    outcome_semantics="verified_labels",
 ):
     source = str(group.iloc[0].Src)
     baseline = {str(row.Tgt): float(row.S_base) for row in group.itertuples()}
@@ -78,14 +115,25 @@ def _outcome(
         after = _winner(mixed, threshold)
     before_correct = (source, before if before is not None else NONE) in reference
     after_correct = (source, after if after is not None else NONE) in reference
-    return {
+    result = {
         "source": source,
         "baseline_choice": before,
         "intervention_choice": after,
-        "baseline_correct": before_correct,
-        "intervention_correct": after_correct,
-        "net_correction": int(after_correct) - int(before_correct),
     }
+    if outcome_semantics == "benchmark_reference":
+        result.update(
+            baseline_reference_match=before_correct,
+            intervention_reference_match=after_correct,
+            net_reference_gain=int(after_correct) - int(before_correct),
+            reference_abstention=(source, NONE) in reference,
+        )
+    else:
+        result.update(
+            baseline_correct=before_correct,
+            intervention_correct=after_correct,
+            net_correction=int(after_correct) - int(before_correct),
+        )
+    return result
 
 
 def _payload(
@@ -105,6 +153,7 @@ def _payload(
     fusion_weight,
     constant_weight,
     teacher_binding,
+    outcome_semantics="verified_labels",
 ):
     if fusion_weight not in {"beta_u", "constant", "source_first"}:
         raise ValueError("Oracle replay requires a frozen supported integration rule")
@@ -113,7 +162,7 @@ def _payload(
         .sort_values(["Src", "Tgt"], kind="mergesort")
         .to_dict("records")
     )
-    return {
+    payload = {
         "schema_version": 1,
         "kind": "llm_oracle_replay",
         "mode": mode,
@@ -146,6 +195,23 @@ def _payload(
         },
         "interpretation": "source_independent_fixed_acceptance_diagnostic",
     }
+    if outcome_semantics == "benchmark_reference":
+        payload.update(
+            outcome_semantics=outcome_semantics,
+            no_training_use=True,
+            training_use_permitted=False,
+            global_f1_optimality_claim=False,
+            probability_semantics=(
+                "synthetic_reference_membership"
+                if mode == "oracle_perfect"
+                else "observed_cached_model_probability"
+            ),
+            reference_abstention_semantics="no_recorded_positive_not_natural_nil",
+            scoring_scope="source_local_fixed_threshold_reference_outcome",
+            ignored_reference_pairs=[],
+            ignored_pair_policy="reject_nonempty",
+        )
+    return payload
 
 
 def observed_response_oracle(
@@ -161,6 +227,8 @@ def observed_response_oracle(
     constant_weight=0.5,
     teacher_binding=None,
     nil_sources=(),
+    outcome_semantics="verified_labels",
+    ignored_pairs=(),
 ):
     """Select at most budget cached interventions by observed correction minus harm.
 
@@ -170,11 +238,18 @@ def observed_response_oracle(
     if not 0 <= budget <= 200:
         raise ValueError("Oracle intervention budget must be between zero and 200 sources")
     groups, reference, excluded = _inventory(
-        population, reference_pairs, negative_label_policy, nil_sources
+        population,
+        reference_pairs,
+        negative_label_policy,
+        nil_sources,
+        outcome_semantics=outcome_semantics,
+        ignored_pairs=ignored_pairs,
     )
     records = {}
     for record in observed_records:
         source = str(record["source"])
+        if outcome_semantics == "benchmark_reference" and source not in groups:
+            raise ValueError("Observed source is outside the frozen candidate population")
         if source in records:
             raise ValueError("Oracle replay contains duplicate observed source decisions")
         records[source] = record
@@ -206,11 +281,13 @@ def observed_response_oracle(
                 beta=beta,
                 fusion_weight=fusion_weight,
                 constant_weight=constant_weight,
+                outcome_semantics=outcome_semantics,
             )
         )
-    ordered = sorted(outcomes, key=lambda row: (-row["net_correction"], row["source"]))
+    gain = "net_reference_gain" if outcome_semantics == "benchmark_reference" else "net_correction"
+    ordered = sorted(outcomes, key=lambda row: (-row[gain], row["source"]))
     # Under a maximum intervention budget, a harmful call is never compulsory.
-    selected = [row["source"] for row in ordered if row["net_correction"] >= 0][:budget]
+    selected = [row["source"] for row in ordered if row[gain] >= 0][:budget]
     return _payload(
         population,
         selected,
@@ -219,7 +296,11 @@ def observed_response_oracle(
         outcomes,
         excluded,
         mode="oracle_replay",
-        protocol="observed_cached",
+        protocol=(
+            "benchmark_reference_observed_cached"
+            if outcome_semantics == "benchmark_reference"
+            else "observed_cached"
+        ),
         budget=budget,
         negative_label_policy=negative_label_policy,
         threshold=threshold,
@@ -227,6 +308,7 @@ def observed_response_oracle(
         fusion_weight=fusion_weight,
         constant_weight=constant_weight,
         teacher_binding=teacher_binding,
+        outcome_semantics=outcome_semantics,
     )
 
 
@@ -243,10 +325,17 @@ def perfect_intervention(
     constant_weight=0.5,
     teacher_binding=None,
     nil_sources=(),
+    outcome_semantics="verified_labels",
+    ignored_pairs=(),
 ):
     """Perfect probabilities on exactly the observed oracle's selected sources/support."""
     groups, reference, excluded = _inventory(
-        population, reference_pairs, negative_label_policy, nil_sources
+        population,
+        reference_pairs,
+        negative_label_policy,
+        nil_sources,
+        outcome_semantics=outcome_semantics,
+        ignored_pairs=ignored_pairs,
     )
     selected = list(selected_sources)
     if (
@@ -258,6 +347,15 @@ def perfect_intervention(
     probabilities, choices, outcomes = {}, {}, []
     for source in selected:
         group = groups[source]
+        if source not in displayed_candidates:
+            raise ValueError("Perfect intervention lacks observed candidate support")
+        if outcome_semantics == "benchmark_reference":
+            observed = displayed_candidates[source]
+            if not isinstance(observed, Mapping) or any(
+                not math.isfinite(float(value)) or not 0 <= float(value) <= 1
+                for value in observed.values()
+            ):
+                raise ValueError("Benchmark perfect support requires observed finite probabilities")
         targets = set(displayed_candidates[source])
         if not targets or not targets <= set(group.Tgt.astype(str)):
             raise ValueError("Perfect intervention candidate support differs from observed support")
@@ -280,6 +378,7 @@ def perfect_intervention(
                 beta=beta,
                 fusion_weight=fusion_weight,
                 constant_weight=constant_weight,
+                outcome_semantics=outcome_semantics,
             )
         )
     return _payload(
@@ -290,7 +389,11 @@ def perfect_intervention(
         outcomes,
         excluded,
         mode="oracle_perfect",
-        protocol="perfect_fixed_sources",
+        protocol=(
+            "benchmark_reference_perfect_fixed_sources"
+            if outcome_semantics == "benchmark_reference"
+            else "perfect_fixed_sources"
+        ),
         budget=len(selected),
         negative_label_policy=negative_label_policy,
         threshold=threshold,
@@ -298,4 +401,5 @@ def perfect_intervention(
         fusion_weight=fusion_weight,
         constant_weight=constant_weight,
         teacher_binding=teacher_binding,
+        outcome_semantics=outcome_semantics,
     )

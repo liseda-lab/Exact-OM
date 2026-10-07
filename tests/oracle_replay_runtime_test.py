@@ -10,7 +10,10 @@ from exact.impl.models.selector.oracle_replay import (
 from tests.pair_adaptive_experiments_test import _scorer, _TinyDataset
 
 
-def test_cached_observed_and_fixed_perfect_replay_never_call_hosted_roles(tmp_path, monkeypatch):
+@pytest.mark.parametrize("outcome_semantics", ["verified_labels", "benchmark_reference"])
+def test_cached_observed_and_fixed_perfect_replay_never_call_hosted_roles(
+    tmp_path, monkeypatch, outcome_semantics
+):
     dataset = _TinyDataset()
     inputs = {
         "src_iris": ["s", "s"],
@@ -36,25 +39,33 @@ def test_cached_observed_and_fixed_perfect_replay_never_call_hosted_roles(tmp_pa
             "U": raw["U"].tolist(),
         }
     )
+    outcome_options = {
+        "outcome_semantics": outcome_semantics,
+        "negative_label_policy": (
+            "unknown" if outcome_semantics == "benchmark_reference" else "complete_reference"
+        ),
+        "teacher_binding": {
+            "dataset_signature": dataset.dataset_signature,
+            "reference_role": "valid",
+        },
+    }
     observed = observed_response_oracle(
         population,
         [{"source": "s", "valid": True, "pair_probabilities": {"a": 0.1, "t": 0.9}, "choice": "t"}],
         {("s", "t")},
         budget=1,
-        negative_label_policy="complete_reference",
         fusion_weight="constant",
         constant_weight=0.5,
-        teacher_binding={"dataset_signature": dataset.dataset_signature},
+        **outcome_options,
     )
     perfect = perfect_intervention(
         population,
         {("s", "t")},
         observed["selected_sources"],
         displayed_candidates=observed["decision_probs"],
-        negative_label_policy="complete_reference",
         fusion_weight="constant",
         constant_weight=0.5,
-        teacher_binding={"dataset_signature": dataset.dataset_signature},
+        **outcome_options,
     )
     for state in (observed, perfect):
         path = tmp_path / (state["mode"] + ".json")
@@ -104,3 +115,62 @@ def test_cached_observed_and_fixed_perfect_replay_never_call_hosted_roles(tmp_pa
         other.attach_dataset(dataset)
         with pytest.raises(ValueError, match="frozen response"):
             other(**inputs)
+
+
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("outcome_semantics", None),
+        ("protocol", "observed_cached"),
+        ("protocol", "benchmark_reference_perfect_fixed_sources"),
+        ("no_training_use", None),
+        ("no_training_use", False),
+        ("training_use_permitted", True),
+        ("global_f1_optimality_claim", True),
+        ("ignored_reference_pairs", [["s", "a"]]),
+        ("ignored_pair_policy", None),
+        ("teacher_binding", None),
+        ("teacher_binding", {"reference_role": "test"}),
+        ("teacher_binding", {"reference_role": "final"}),
+        ("teacher_binding", {"reference_role": "train"}),
+    ],
+)
+def test_benchmark_runtime_rejects_missing_or_incompatible_diagnostic_contract(
+    tmp_path, monkeypatch, field, value
+):
+    from exact.impl.models.pair_adaptive_scorer import PairAdaptiveSemanticScorer
+
+    frame = pd.DataFrame({"Src": ["s"], "Tgt": ["a"], "S_base": [0.8], "U": [1.0]})
+    state = observed_response_oracle(
+        frame,
+        [{"source": "s", "valid": True, "pair_probabilities": {"a": 0.0}}],
+        set(),
+        budget=1,
+        negative_label_policy="unknown",
+        outcome_semantics="benchmark_reference",
+        teacher_binding={"reference_role": "valid"},
+    )
+    if value is None:
+        state.pop(field, None)
+    else:
+        state[field] = value
+    path = tmp_path / "invalid.json"
+    path.write_text(json.dumps(state))
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("Invalid oracle artifact attempted a hosted call")
+
+    for method in (
+        "generate_pair_briefs_batched",
+        "llm_grouped_decision_probs",
+        "llm_yesno_probs_batched",
+    ):
+        monkeypatch.setattr(PairAdaptiveSemanticScorer, method, unexpected)
+    with pytest.raises(ValueError, match="[Oo]racle"):
+        scorer = _scorer(
+            llm_experiment_config={
+                "enabled": True,
+                "gate": {"mode": "oracle_replay", "artifact": str(path)},
+            }
+        )
+        scorer.attach_dataset(_TinyDataset())
