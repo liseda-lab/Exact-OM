@@ -617,3 +617,31 @@ budgets; superseded descriptors and both source identities remain bound.
 Original errors, all costs, all 2,880 scheduled rows and the same-cause retry
 limit remain. This corrects execution and does not establish scientific gates
 or semantic quality. Final reporting must identify the implementation revision.
+
+## Robustness receipt audit prerequisite
+
+After all 180 evidence/omission slices, a separately frozen receipt-only audit
+retains all 2,880 arm rows, 320 variants, 64 base cases and 32 parent groups. It
+binds original validation, primary and schema attempts, shared native validation,
+all replacement descendants, nonce/step/exit receipts, frozen source/runtime,
+output manifests, row payloads, search ledgers and settled charges. The six
+reconciled failure rows remain unknown without replay, including both cleanup
+failures in slice 24. Omission and activation-sensitive removal corrections
+remain distinct source regimes; original errors, guards and costs are preserved.
+
+Published final pools are independently checked for predeclared candidate and
+vocabulary exclusion. Missing pools retain unknown intervention scope. Final
+vocabulary exclusion does not establish complete retrieved menus: separate full
+menu snapshots were not persisted. Known selected scores require a saved native
+authorizing selection, matching label and original query identity. This audit
+makes no native call, acquires no label and does not extend the query basis.
+
+The actual audit worker receipt, separate completed conflict-overlap and fresh
+query-scope audits, and the final failure-inclusive parent-paired report remain
+registered obligations. That report uses 2,000 parent bootstrap resamples with
+seed 20261003 and descriptive 95% intervals. Common-inventory evidence remains
+separate and diagnostic; unregistered additional control or diagnostic studies
+remain deferred under the preliminary-scope amendment. Receipt integrity does
+not establish strongest-symbolic comparisons, research gates or learning
+efficiency. Preparation and the audit worker are charged separately, without
+resetting any original scientific budget or cost.
