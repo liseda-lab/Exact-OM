@@ -198,7 +198,8 @@
         "Screen-reader and manual keyboard passes, formative usability sessions and tutorial/case burden re-estimation.",
         "Tutorial material in src/study/v2/tutorialContent.ts is a proposal for the backend owner to freeze; no publication may certify it as a frontend fallback."
       ],
-      "implementation_status": "partial"
+      "implementation_status": "partial",
+      "historical_status_note": "Receipt from the earlier frontend-before-backend phase; current follow-up status is in integration_followup_20261003."
     }
   },
   "gates": {
@@ -439,7 +440,11 @@
     "execution_lock": "data/explanation-framework/prepared-combined/execution-47388b7e7a83f4afd4d7a4d649d7faf769a7f84271242211da531f5b604075f1.json",
     "frontend_verification": "docs/verification/explanation-frontend-e2e.md",
     "frontend_corrective_handoff": "docs/verification/explanation-frontend-corrections.md",
-    "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json"
+    "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json",
+    "current_corrective_assignment": "specs/explanation-framework/17-integration-corrective-programme.md",
+    "backend_integration_assignment": "specs/explanation-framework/18-backend-integration-corrections.md",
+    "frontend_integration_assignment": "specs/explanation-framework/19-frontend-integration-corrections.md",
+    "integration_review": "specs/explanation-framework/evidence/integration-review-20261003.md"
   },
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
@@ -449,5 +454,305 @@
     "Participant recruitment, invitations to people and live study launch",
     "Optional whole-ontology inference, complete KGA and production repair"
   ],
-  "implementation_status": "complete"
+  "implementation_status": "partial",
+  "corrective_programme_20261003": {
+    "status": "backend_implemented_release_gates_unverified",
+    "scope": "Specifications14/16 backend corrections and integration with the corrected frontend. Historical gates and evidence above retain their original meaning.",
+    "report": "docs/verification/explanation-backend-corrections-20261003.md",
+    "receipt": "docs/verification/explanation-backend-corrections-20261003.json",
+    "contract": "docs/verification/explanation-study-v2-backend-contract.md",
+    "protocol": "exact-study/2.0",
+    "legacy_sessions": "Original v1 canonical bytes and resume behavior preserved; no human-session migration.",
+    "verified": [
+      "synthetic native ontology preparation",
+      "SQLite regression",
+      "PostgreSQL concurrency/crash/restart/restore",
+      "real HTTPS PostgreSQL browser completion",
+      "frontend production build and typecheck",
+      "minimal image copied-source cold import"
+    ],
+    "remaining": [
+      "real-package current release integration",
+      "built Docker image and deployed redeploy/restore",
+      "historical original pinned DOID and import-closure admission gates",
+      "manual accessibility/usability and duration pilot",
+      "real case adjudication and owner consent/information approval",
+      "Render readiness"
+    ],
+    "live_publication": false,
+    "recruitment": false,
+    "deployment": false,
+    "followup_note": "Historical implementation receipt. Independent review at 2d9715b reopened R01-R04; see integration_followup_20261003. Earlier verified claims are not current joint closure."
+  },
+  "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
+  "integration_followup_20261003": {
+    "status": "R14_R15_verified_R16_unresolved_R03_blocked_on_J10_manual_audit",
+    "reviewed_commit": "2d9715b",
+    "authority": "specs/explanation-framework/17-integration-corrective-programme.md",
+    "evidence": "specs/explanation-framework/evidence/integration-review-20261003.md",
+    "contract": "specs/explanation-framework/protocol/integration-followup.json",
+    "sequence": [
+      "backend_contract_implementation_and_handoff",
+      "frontend_integration",
+      "joint_acceptance"
+    ],
+    "issues": {
+      "R01": {
+        "priority": 1,
+        "owner": "backend_then_frontend",
+        "status": "joint_verified",
+        "acceptance": [
+          "J01",
+          "J02",
+          "J03"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": true,
+        "evidence": [
+          "tests/explanation_integration_contract_test.py",
+          "tests/explanation_study_workspace_test.py"
+        ],
+        "frontend_status": "frontend_verified",
+        "reopened_by": [
+          "R06",
+          "R07",
+          "R11"
+        ]
+      },
+      "R02": {
+        "priority": 1,
+        "owner": "frontend_with_backend_contract",
+        "status": "joint_verified",
+        "acceptance": [
+          "J04",
+          "J05"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": true,
+        "evidence": [
+          "tests/explanation_integration_contract_test.py::test_page_readiness_is_local_and_does_not_restart_case_clock",
+          "tests/explanation_telemetry_policy_test.py"
+        ],
+        "frontend_status": "frontend_verified",
+        "reopened_by": [
+          "R08",
+          "R09",
+          "R10"
+        ]
+      },
+      "R03": {
+        "priority": 2,
+        "owner": "backend_then_frontend",
+        "status": "blocked",
+        "acceptance": [
+          "J06",
+          "J07",
+          "J09",
+          "J10"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": false,
+        "evidence": [
+          "tests/explanation_integration_position_test.py",
+          "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
+        ],
+        "frontend_status": "frontend_verified",
+        "blocked_by": "J10 manual screen-reader and keyboard audit not performed",
+        "reopened_by": [
+          "R12",
+          "R14"
+        ]
+      },
+      "R04": {
+        "priority": 2,
+        "owner": "backend_with_frontend_consumer",
+        "status": "joint_verified",
+        "acceptance": [
+          "J08",
+          "J09"
+        ],
+        "backend_status": "backend_verified",
+        "joint_verified": true,
+        "evidence": [
+          "tests/explanation_integration_timing_test.py"
+        ],
+        "frontend_status": "frontend_verified"
+      },
+      "R05": {
+        "priority": 3,
+        "owner": "frontend",
+        "status": "fixed_and_verified",
+        "summary": "Cytoscape inline <style> blocked by the study CSP; rule moved to app.css",
+        "evidence": [
+          "explanations_visualizer/e2e/study-v2-backend.spec.ts"
+        ]
+      },
+      "R06": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "status": "fixed_and_verified",
+        "summary": "Entity card limited truncatable categories to their first page and claimed completeness",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
+        ]
+      },
+      "R07": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "status": "fixed_and_verified",
+        "summary": "Study hierarchy could not open a searched entity's full context",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
+        ]
+      },
+      "R08": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "status": "fixed_and_verified",
+        "summary": "Malformed cached response reused by Retry",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
+        ]
+      },
+      "R09": {
+        "priority": 1,
+        "owner": "frontend",
+        "reopens": "R02",
+        "status": "fixed_and_verified",
+        "summary": "Render readiness required entity cards for every component configuration",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261003.md",
+          "docs/verification/explanation-integration-frontend-followup.md"
+        ]
+      },
+      "R10": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F20",
+        "status": "fixed_and_verified",
+        "summary": "A superseded scope access check blocked a recovered case",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004.md",
+          "docs/verification/explanation-integration-frontend-followup-2.md"
+        ]
+      },
+      "R11": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F21",
+        "status": "fixed_and_verified",
+        "summary": "Continued parents lost their entity type during navigation",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004.md",
+          "docs/verification/explanation-integration-frontend-followup-2.md"
+        ]
+      },
+      "R12": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R03",
+        "requirement": "F21",
+        "status": "fixed_and_verified",
+        "summary": "Tutorial and v1 card parents lost navigation: the frozen-resource adapter supplied untyped parents",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004-3.md",
+          "docs/verification/explanation-integration-frontend-followup-3.md"
+        ]
+      },
+      "R13": {
+        "priority": 3,
+        "owner": "frontend",
+        "evidence_for": "R02",
+        "status": "fixed_and_verified",
+        "summary": "A recovery test read recorded traffic before the case_ready acknowledgement was recorded",
+        "evidence": [
+          "specs/explanation-framework/evidence/frontend-integration-review-20261004-3.md",
+          "docs/verification/explanation-integration-frontend-followup-3.md"
+        ]
+      },
+      "R14": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified",
+        "summary": "Implicit entity kind completed v2 tutorial actions",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
+      },
+      "R15": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified_at_reproduced_boundary",
+        "summary": "Interrupted response acquired false terminal body and h11 length error",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
+      },
+      "R16": {
+        "priority": 2,
+        "owner": "backend_integration",
+        "status": "unresolved_not_reproduced",
+        "summary": "Historical intermittent page.reload stall",
+        "evidence": [
+          "docs/verification/explanation-integration-backend-final-review.md",
+          "docs/verification/explanation-integration-backend-final-receipt.json"
+        ]
+      }
+    },
+    "implementation_acceptance": "R14_R15_corrected_and_verified_full_acceptance_open_for_R16_and_J10",
+    "historical_evidence_preserved": true,
+    "launch_gates_waived": false,
+    "live_publication": false,
+    "recruitment": false,
+    "deployment": false,
+    "backend_implementation_commit": "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f",
+    "backend_handoff": "docs/verification/explanation-integration-backend-handoff.md",
+    "backend_receipt": "docs/verification/explanation-integration-backend-receipt.json",
+    "runtime_extension": "study-integration/1",
+    "frontend_implementation_commit": "6895bc64a04bf43a68deb51266cea4fa797c9610",
+    "frontend_handoff": "docs/verification/explanation-integration-frontend-handoff.md",
+    "frontend_receipt": "docs/verification/explanation-integration-frontend-receipt.json",
+    "acceptance_record": "docs/verification/explanation-integration-acceptance.md",
+    "acceptance_receipt": "docs/verification/explanation-integration-acceptance-receipt.json",
+    "followup_handoff": "docs/verification/explanation-integration-frontend-followup.md",
+    "followup_receipt": "docs/verification/explanation-integration-frontend-followup-receipt.json",
+    "followup_commit": "23aa74f",
+    "second_followup_handoff": "docs/verification/explanation-integration-frontend-followup-2.md",
+    "second_followup_receipt": "docs/verification/explanation-integration-frontend-followup-2-receipt.json",
+    "second_followup_commit": "eb4f955",
+    "third_followup_handoff": "docs/verification/explanation-integration-frontend-followup-3.md",
+    "third_followup_receipt": "docs/verification/explanation-integration-frontend-followup-3-receipt.json",
+    "third_followup_commit": "1808ed0",
+    "backend_final_review": "docs/verification/explanation-integration-backend-final-review.md",
+    "backend_final_receipt": "docs/verification/explanation-integration-backend-final-receipt.json",
+    "backend_final_runtime_commit": "8d5054ba8bca49ba3951d558bba05a6fe73985be",
+    "backend_final_reviewed_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a"
+  },
+  "backend_final_review_20261004": {
+    "reviewed_checkout": "2646d1f5d620f9a88f40308cbb6974b464c7a91e",
+    "implementation_commits": [
+      "fa03f97b8384e2c2e347b6031e3019fd8c2447cb",
+      "8d5054ba8bca49ba3951d558bba05a6fe73985be"
+    ],
+    "diagnostics_commit": "9bdd9ab44ad1bfbb866dade25c6c32a60daba50a",
+    "review": "docs/verification/explanation-integration-backend-final-review.md",
+    "receipt": "docs/verification/explanation-integration-backend-final-receipt.json",
+    "conclusions": {
+      "implementation": "R14 and reproduced R15 corrected/reviewed/verified; R16 unresolved",
+      "joint_acceptance": "Affected automated matrix and fresh journey passed; full acceptance open for R16/J10",
+      "launch_readiness": "Not established; no gates waived"
+    },
+    "frontend_implementation_followup_required": false,
+    "release_gates_waived": false
+  }
 }

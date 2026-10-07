@@ -1,9 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { actionsFor, requirementsFor } from "./tutorialProgress.ts";
+import { actionsFor, requirementsFor, evidenceFor } from "./tutorialProgress.ts";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { LESSONS } from "./v2/tutorialContent.ts";
+import { LESSONS, TUTORIAL_RESOURCE, tutorialPublic } from "./v2/tutorialContent.ts";
 
 const lesson = (id: string) => LESSONS.find((item: { lesson_id: string }) => item.lesson_id === id)!;
 
@@ -29,4 +29,15 @@ test("answer-control and report lessons distinguish none, insufficient, partial 
   assert.deepEqual(actionsFor({ kind: "report", consulted: true, methods: 2 }), ["report_multiple_methods"]);
   assert.deepEqual(actionsFor({ kind: "report", consulted: false, methods: 0 }), ["report_no_methods"]);
   assert.deepEqual(actionsFor({ kind: "workspace", action: { type: "locate_fact", factId: "f", inList: false } }), []);
+});
+
+test("backend requirement evidence preserves typed identities and the actual answer", () => {
+  const tutorial = tutorialPublic([]);
+  const candidate = tutorial.case.candidates[2];
+  assert.deepEqual(evidenceFor(lesson("identity"), { kind: "inspect", position: 3, returning: false }, tutorial, [TUTORIAL_RESOURCE], null), [{ requirement_id: "identity.inspect", action: "inspect_other_candidate", candidate_id: candidate.candidate_id }]);
+  const entity = tutorial.case.source;
+  assert.deepEqual(evidenceFor(lesson("context"), { kind: "workspace", action: { type: "hierarchy_focus", side: "source", iri: entity.iri, kind: entity.kind, via: "return" } }, tutorial, [TUTORIAL_RESOURCE], null), [{ requirement_id: "context.return", action: "return_to_compared", entity }]);
+  assert.deepEqual(evidenceFor(lesson("answers"), { kind: "rank", event: "response_type_change", element: "none_of_these", detailsOpen: false }, tutorial, [TUTORIAL_RESOURCE], { response_type: "none_of_these", ranked_candidate_ids: [] }), [{ requirement_id: "answers.none", action: "choose_none", response_type: "none_of_these", ranked_candidate_ids: [] }]);
+  const report = evidenceFor(lesson("baseline"), { kind: "report", consulted: true, methods: 2, methodCodes: ["queries_scripts", "reasoner"] }, tutorial, [TUTORIAL_RESOURCE], null);
+  assert.deepEqual(report[0].methods, ["queries_scripts", "reasoner"]);
 });

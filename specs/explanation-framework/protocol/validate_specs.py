@@ -148,6 +148,89 @@ def validate_study_documents(documents, require, errors, counts):
         errors.append(f"Study specification validation: {error}")
 
 
+def validate_integration_followup(documents, require):
+    """Check the agreed follow-up design, not implementation or release readiness."""
+    followup = documents.get("protocol/integration-followup.json", {})
+    sequence = ["backend_contract_implementation_and_handoff", "frontend_integration",
+                "joint_acceptance"]
+    require(followup.get("status") == "design_only_not_current_runtime_config"
+            and followup.get("runtime_extension") == "study-integration/1",
+            "Integration follow-up must identify a design-only versioned extension")
+    require(followup.get("sequence") == sequence,
+            "Follow-up requires backend handoff before frontend integration and joint acceptance")
+    blueprint = documents.get("protocol/development.json", {})
+    require(blueprint.get("corrective_iteration", {}).get("sequence_scope")
+            == "initial_2026_10_02_correction_only"
+            and blueprint.get("integration_followup", {}).get("sequence") == sequence
+            and blueprint.get("integration_followup", {}).get("waives_backend_or_launch_gates") is False,
+            "Development blueprint must distinguish historical and current correction sequences")
+    parallel = followup.get("parallel", {})
+    require(all(parallel.get(field) is True for field in (
+                "isolated_checkouts_required", "shared_file_owner_required", "merge_backend_first"))
+            and parallel.get("waives_handoff_or_joint_acceptance") is False,
+            "Parallel work must preserve ownership, handoff and integration gates")
+    acceptance = {f"J{i:02}" for i in range(1, 13)}
+    issues = followup.get("issues", {})
+    require(set(issues) == {"R01", "R02", "R03", "R04"}
+            and set(followup.get("joint_acceptance_ids", [])) == acceptance
+            and all(v.get("acceptance") and set(v["acceptance"]) <= acceptance
+                    for v in issues.values()),
+            "All four reopened findings require valid joint acceptance references")
+    workspace = followup.get("workspace", {})
+    require(workspace.get("v2_explanation_descriptor_required") is True
+            and workspace.get("v2_prepared_excerpt_fallback_allowed") is False
+            and "baseline_descriptor" in workspace and workspace["baseline_descriptor"] is None
+            and workspace.get("scope_is_authorization") is False
+            and workspace.get("legacy_v1_adapter_preserved") is True,
+            "Workspace discovery cannot use a silent v2 fallback or weaken baseline isolation")
+    readiness = followup.get("readiness", {})
+    require(readiness.get("candidate_initial_context_count") == 5
+            and all(readiness.get(field) is True for field in (
+                "source_context_required", "admitted_initial_profiles_and_comparisons_required",
+                "usable_render_required"))
+            and all(readiness.get(field) is False for field in (
+                "lazy_all_ontology_prefetch_required", "request_failure_is_absence",
+                "premature_submission_allowed", "hidden_tab_automatically_pauses")),
+            "Readiness must cover bounded case content without inventing absence or timing")
+    position = followup.get("tutorial_position", {})
+    require(position.get("views") == ["lesson", "assessment"]
+            and position.get("omitted_patch") == "preserve"
+            and position.get("explicit_null_patch") == "reject_422"
+            and position.get("position_only_mutation_allowed") is True
+            and position.get("save_destination_not_previous_view") is True
+            and position.get("frozen_content_rewritten") is False,
+            "Tutorial position must distinguish assessment, preserve omissions and save the destination")
+    exports = followup.get("exports", {})
+    require(exports.get("corrected_analysis_schema") == "exact-study-analysis/3"
+            and exports.get("corrected_csv_schema") == "exact-study-csv/3"
+            and all(exports.get(field) is True for field in (
+                "v2_admin_explicit_selection_required", "saved_export_bytes_preserved",
+                "source_protocol_versions_preserved")),
+            "Corrected export versions must preserve frozen source and archived evidence")
+    require(exports.get("observations_unit") == "page_seconds"
+            and exports.get("cross_page_monotonic_offsets_comparable") is False
+            and exports.get("coverage_status") == "not_established"
+            and all(field in exports and exports[field] is None for field in (
+                "unique_elapsed_coverage_seconds", "unobserved_elapsed_seconds"))
+            and exports.get("active_duration_known") is False,
+            "Raw page observations must not claim unique elapsed coverage or active duration")
+    policy = followup.get("preserved_protocol", {})
+    require(policy.get("protege_required") is False
+            and policy.get("external_use_required") is False
+            and policy.get("multiple_methods_allowed") is True
+            and policy.get("method_changes_between_cases_allowed") is True
+            and policy.get("reporting_unit") == "source_plus_candidate_set_case"
+            and policy.get("assessment_items") == 5
+            and policy.get("server_owned_completion") is True,
+            "Follow-up cannot change external-method freedom, reporting unit or training gates")
+    evidence = followup.get("evidence", {})
+    require(evidence.get("real_service_browser_required") is True
+            and evidence.get("fresh_full_tutorial_journey_required") is True
+            and evidence.get("mock_success_is_joint_acceptance") is False
+            and evidence.get("waives_backend_or_launch_gates") is False,
+            "Follow-up requires real joint evidence without waiving existing launch gates")
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path)
@@ -225,6 +308,7 @@ def main():
             errors.append(f"Schema/fixture validation: {error}")
 
     validate_study_documents(documents, require, errors, counts)
+    validate_integration_followup(documents, require)
 
     blueprint = documents.get("protocol/development.json", {})
     require(blueprint.get("status") == "design_only_not_current_runtime_config",

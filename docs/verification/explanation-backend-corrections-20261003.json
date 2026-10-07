@@ -1,0 +1,267 @@
+{
+  "schema_version": "exact-backend-corrective-verification/1",
+  "recorded_at": "2026-10-03T12:56:25.738485+00:00",
+  "base_commit": "8f27e9f041f49f19061c7b87dccb8e6580c6959b",
+  "revision_scope": "Backend corrective implementation and frontend integration; source_snapshot binds verified file contents. See adjacent handoff for limits.",
+  "synthetic_only": true,
+  "status": "implemented_release_gates_unverified",
+  "fixture": {
+    "contract_version": "exact-study/2.0",
+    "protocol_versions": {
+      "setup": "setup/2",
+      "tutorial": "tutorial/2.0-native-2",
+      "assessment": "assessment/2",
+      "forms": "exact-study-forms/2",
+      "information": "synthetic-information-v2",
+      "resource_policy": "synthetic-study-v2",
+      "software": "exact-explain-ui-1.2",
+      "export": "exact-study-analysis/2"
+    },
+    "policy_hash": "sha256:a33b58e971cf075a057f67085e134af69dd861e641c852cd3e14fd8b89ebbed4",
+    "publication_file_sha256": "f18d79ad198fcb97ddb3062a96614384db204b3c780dc31798795b709086c20e",
+    "generator": "python -m tools.build_explanation_v2_fixture <empty-directory>"
+  },
+  "checks": {
+    "sqlite_regression": {
+      "tests": [
+        "tests/explanation_context_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_corrective_library_test.py",
+        "tests/explanation_export_policy_test.py",
+        "tests/explanation_framework_test.py",
+        "tests/explanation_frontend_form_order_test.py",
+        "tests/explanation_frontend_serving_test.py",
+        "tests/explanation_handoff_test.py",
+        "tests/explanation_http_runtime_test.py",
+        "tests/explanation_portable_run_test.py",
+        "tests/explanation_preparation_test.py",
+        "tests/explanation_read_models_test.py",
+        "tests/explanation_recovery_test.py",
+        "tests/explanation_sqlite_safety_test.py",
+        "tests/explanation_study_image_contents_test.py",
+        "tests/explanation_study_resource_test.py",
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_study_workspace_test.py",
+        "tests/explanation_telemetry_policy_test.py"
+      ],
+      "flags": [
+        "-q",
+        "--disable-warnings",
+        "--maxfail=2"
+      ],
+      "environment": "EXACT_STUDY_TEST_* unset; study/native-preparation dependencies installed; loopback sockets enabled for HTTP tests.",
+      "status": "passed",
+      "passed": 260,
+      "skipped": 2,
+      "warnings": 1,
+      "seconds": 160.02,
+      "skip_reason": "Legacy and v2 PostgreSQL-only recovery checks; both passed in the separate PostgreSQL run."
+    },
+    "postgresql": {
+      "status": "passed",
+      "passed": 40,
+      "skipped": 0,
+      "seconds": 64.51,
+      "version": "PostgreSQL 16.2",
+      "tests": [
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_corrective_http_test.py"
+      ],
+      "coverage": [
+        "concurrency",
+        "crash before and after commit",
+        "server restart",
+        "legacy and v2 backup/restore into separate databases",
+        "immutable export equality"
+      ]
+    },
+    "https_browser": {
+      "status": "passed",
+      "passed": 1,
+      "seconds": 27.5,
+      "test": "explanations_visualizer/e2e/study-v2-backend.spec.ts",
+      "transport": "loopback HTTPS with self-signed certificate, no Origin rewriting",
+      "database": "PostgreSQL",
+      "viewport": [
+        1280,
+        720
+      ],
+      "coverage": [
+        "tool-neutral setup",
+        "six tutorial lessons",
+        "typed interaction acknowledgement",
+        "five server-graded core items and incorrect-answer retry",
+        "tutorial reload",
+        "consultation draft reload",
+        "both assigned conditions",
+        "four scored synthetic cases",
+        "final questionnaire and completed receipt",
+        "zero failed POST/PUT responses",
+        "zero page errors",
+        "automated axe checks at selected states"
+      ]
+    },
+    "frontend_unit": {
+      "status": "passed",
+      "passed": 49
+    },
+    "typescript": {
+      "status": "passed"
+    },
+    "next_production_build": {
+      "status": "passed"
+    },
+    "minimal_study_source_layout": {
+      "status": "passed",
+      "passed": 1,
+      "scope": "Cold imports of exact Dockerfile COPY source layout; not a built image",
+      "blocked_imports": [
+        "exact",
+        "torch",
+        "pyowl_core",
+        "transformers",
+        "sentence_transformers"
+      ]
+    },
+    "runtime_schemas": {
+      "status": "passed",
+      "command": "python -m tools.freeze_explanation_contracts --check"
+    },
+    "specification_artifacts": {
+      "status": "passed",
+      "json_files": 26,
+      "schema_fixtures": 13,
+      "local_links": 131,
+      "study_schedules": 8,
+      "scoring_oracles": 9
+    },
+    "documented_wire_examples": {
+      "status": "passed",
+      "examples": 2,
+      "models": [
+        "SetupV2",
+        "TimingAcknowledgementV2"
+      ]
+    },
+    "formatting": {
+      "status": "passed",
+      "python_files": 32,
+      "checks": [
+        "isort",
+        "black",
+        "git diff --check"
+      ]
+    }
+  },
+  "legacy_recovery_receipt": {
+    "artifact_type": "study_recovery_verification",
+    "schema_version": 1,
+    "executed_at": "2026-10-03T12:37:46.733256+00:00",
+    "synthetic_only": true,
+    "database": "postgres (PostgreSQL) 16.2",
+    "verified": [
+      "actual_server_restart",
+      "reusable_invitation",
+      "same_assignment_and_submission",
+      "same_acknowledgements_history_and_events",
+      "pg_dump_and_pg_restore_into_separate_database",
+      "same_immutable_export"
+    ],
+    "verified_row_counts": {
+      "sessions": 1,
+      "mutations": 6,
+      "history": 6,
+      "events": 2,
+      "timing_segments": 1
+    },
+    "backup_sha256": "bb6d235fef1e3ce6193550a924c42454f8aec4fe7546de15770c8e37ddb51141",
+    "backup_size_bytes": 10343088,
+    "immutable_export_sha256": "1b9de4b60cdf91ca78761f0982e6c0ed095613dbfa29fb17d55aa0ea48acc189",
+    "retention": "Private ignored local test artifacts; no production retention claim"
+  },
+  "not_verified": [
+    "tests/explanation_decisions_test.py and tests/explanation_replay_test.py require unavailable torch",
+    "real backend-release package absent in current checkout",
+    "Docker daemon unavailable: built-image cold start and redeploy not run",
+    "original pinned DOID admission/import closure historical gates remain",
+    "manual screen-reader/accessibility and usability study",
+    "duration pilot",
+    "real case adjudication",
+    "owner information/consent approval",
+    "Render deployment and recruitment"
+  ],
+  "changes_published": false,
+  "temporary_services": "Loopback HTTPS and disposable PostgreSQL stopped after verification; private test config and database backups excluded from repository.",
+  "source_snapshot": {
+    "algorithm": "sha256",
+    "scope": "Changed implementation, tests, tools, runtime schemas and deployment files; docs and unrelated archive excluded",
+    "files": {
+      "deploy/render/exact_study.Dockerfile": "23ee0f528106eac366326771ee916986dcdea4fa8d30f86a71a5fb8bcde5a7a6",
+      "exact_inspect/artifacts.py": "ba0887f341f1c31b725f4d12d71c583812f10d9b4f6fbe898f1195e9f3d11a3e",
+      "exact_inspect/context.py": "5f04fd6babcf4d9a6b7573b86a39e77a170b9ff0bba0ec799e441dc68c322504",
+      "exact_inspect/context_export.py": "76fe644a60ff6e97e3c7d11e4258989b166710fa351d17be86a0062f2fb2821d",
+      "exact_inspect/contracts.py": "14be5138499d5fb8e63372be987fa07570f37dfcf09bb6d76826c18ed9699fef",
+      "exact_inspect/decisions.py": "d4856451a7778afa030649c4acd40c7f5a216a8e1006fc73f1932add03dfc97d",
+      "exact_inspect/service.py": "ef53671b4bb75ef5a3e124cec48c5db8c9eafa25329c66dd9155f90b6701462c",
+      "exact_inspect/study/__main__.py": "24d234d077b59b3b5298d14ce4a005bdb7cfa0f24782e07d50ce77216895f93c",
+      "exact_inspect/study/administration.py": "a90c79db615ab24ac0debb704f28ade368415a70ea72a2e03081a7fc4c8c680c",
+      "exact_inspect/study/api.py": "e3c67edfefdfa6dba87df6ad7d3e768bc2e199b2a955f01ceb9b9b185006faec",
+      "exact_inspect/study/exports.py": "1fe437dac5e31a4914d4968e5064e0ca66175a7de50d05dac57a7bd8d2f884f8",
+      "exact_inspect/study/forms.py": "6cc90ca40e792ba90715ec8c1310913b91bafd814210d4eeb354a5aeaaad869f",
+      "exact_inspect/study/models.py": "f0715dd53cfdcc844f3fd7632f5a5a7ce0af6b197f725e505162cc6c698e0e8c",
+      "exact_inspect/study/resources.py": "a106256ebe4727afa92aa66836a5b9aeb62ff88b4ce60a0c302491ff0c05a9ce",
+      "exact_inspect/study/store.py": "a63d9b84b465c928aeb64eff9fc538c2aac800b66df4a55873fcbeb4f6a16d52",
+      "exact_inspect/study/telemetry.py": "b23fa261f76e68df2594fe536455f6239098c2a156bc0cdde4dcac5acb21b4ba",
+      "exact_inspect/study/tutorial.py": "9c82ce3cc49b1717339d0bf86409480f0d77691d73f6ed7be435bff81de5b778",
+      "exact_inspect/study/v2_models.py": "83b7597c750ca913f90d31cdd10ece19851ec26f799403086dea398390067ac6",
+      "exact_inspect/study/workspace.py": "a6b6c49e9dcf1b4ab390533d905bf9f66fda5e9b078a52e0c6edf2a31886be46",
+      "explanations_visualizer/e2e/study-v2-backend.spec.ts": "7d1956f61481295addfd71841e5714c336bb5508250459a535d6d26ee6f53734",
+      "explanations_visualizer/src/components/admin/AdminApp.tsx": "3873aa1edad143ba6f6e8ebd065e385fc2a9d25f427cb8263c9d868ba8743b4d",
+      "explanations_visualizer/src/components/explore/BrowseView.tsx": "728db602905d7cfad4b29caafee14ffadbed32c58b964d24c553558e3addb84e",
+      "explanations_visualizer/src/components/explore/EntityCard.tsx": "82ab4cbe03b9c5ed29235226eac9d8bb6b4d6a8e0321572a2a08d52c43eaa111",
+      "explanations_visualizer/src/components/library/LibraryView.tsx": "621d5614cf0a2538c75808d536437ffa4b9ce077758223691e8b920101c9656b",
+      "explanations_visualizer/src/components/study/CaseView.tsx": "44affe91996f2f7045e44ef5650e854a3baa8c5dc44f34c7e591e6efacae3364",
+      "explanations_visualizer/src/components/study/ParticipantApp.tsx": "9a2a0902a3ee378600632423a6cf04f5a268a99de6bcce8c6789c89046eb6d7b",
+      "explanations_visualizer/src/components/study/Tutorial.tsx": "1db15260d31c357f7f8b5e8bf8a07454b54a43af55186bd086ee16f3e1ff8cbe",
+      "explanations_visualizer/src/components/workspace/PairWorkspace.tsx": "0d35baa9f86ca09a94ceefc99b4d43a3db9b97e3c7fad5b6c9f266ccddc084b5",
+      "explanations_visualizer/src/lib/labelSource.tsx": "0c1f32eb675e4d377e814be046f923289d80046bcbc6935ff1b3a352ad7ced10",
+      "explanations_visualizer/src/lib/labels.ts": "3f15f3d06c00c2ae843371bc866a8ed32436e6d200bced95d8ebdade2bed0edc",
+      "explanations_visualizer/src/lib/types.ts": "7c65d2f9605f11120f846568ca246afb6f4914f084aa05fae73dd52ca296ea05",
+      "explanations_visualizer/src/lib/workspace/WorkspaceContext.tsx": "32faf43378915c21f103c74ade44f910ccd50febe6d5365923bc54850669094a",
+      "explanations_visualizer/src/lib/workspace/apiSource.test.ts": "7dac486c5ee37ccf5e81066d15700c980d067496928e7d5e713347242950b56e",
+      "explanations_visualizer/src/lib/workspace/apiSource.ts": "6132bc886a5633900c5c5fafeb504750ee0e8fbd0ca467f52ebf87d355e05d39",
+      "explanations_visualizer/src/lib/workspace/types.ts": "eed8c38000d920a02b170be56c67baadf61876c4a6ffdf5f2e107d175b075a6b",
+      "explanations_visualizer/src/study/telemetry.ts": "3678259e88d99208e503a86fc4444a0edf0ac129643dc95d565753f5db20d506",
+      "explanations_visualizer/src/study/tutorialProgress.test.ts": "c3cb5e5eabc30f6966235d1c670aaecbabfaeb7e581fec6c036a24de9e252150",
+      "explanations_visualizer/src/study/tutorialProgress.ts": "3b889919f85cb971874882b854282cc7196c7f7fae17a94026bdfe2690daead2",
+      "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "0c6837e23f267b8820c0eea762ae5107532c8eeef79ae82740b90121bcb48158",
+      "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "377adad61c90efb788bea90e6c40ec7f5a6f9b0a3b99390b00b7ea23623909bc",
+      "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+      "specs/explanation-framework/protocol/study.runtime-openapi.json": "cd502336b2a7ff2f44a537cb381d2ac87623f29dd5a1c1cf35f295c0b4e40526",
+      "tests/explanation_context_test.py": "6f21f481f370cdb715d1a307434ebf67636c793caed10578b1a2af5295ba1b2d",
+      "tests/explanation_corrective_http_test.py": "83a4e116df30c361f42ba995c7ff93d0d15bdfc95c36c0c8eca18794e31bafed",
+      "tests/explanation_corrective_library_test.py": "c3ba111b588be621116310a276cddb89f3e737dec6e2a8946ab09765ea1ee49a",
+      "tests/explanation_preparation_test.py": "3eef492b58c23010eb0f44f69d2a9b26114f2d73b74361d07b1a35d1083f07f7",
+      "tests/explanation_study_image_contents_test.py": "a5e05216c3d207222efea1bd5e769bd3e08d7540ec78e7e0042d5a2be0ea4a01",
+      "tests/explanation_study_resource_test.py": "2d8d12f8487e50bc57d750a9d1c1258f34c07d2dff558eb427ad8b3211216d75",
+      "tests/explanation_study_test.py": "6ccfc3714b8d34266a1dcd05f2d238ab0b111aca4d5500d8230d0358ffb4e630",
+      "tests/explanation_study_v2_fixtures.py": "dec2f3458a4b56b5390986ea0bf3930f58be032b48093e68a74d844077cd3ed4",
+      "tests/explanation_study_v2_test.py": "5fd3e5f7d16d31c2d49aa9abd840d3fca644e1a34bc3c894f77fc8a795b4b489",
+      "tests/explanation_study_workspace_test.py": "e151f189b76a9bcacb9413e69085fce2674b97ad8ca313bda5194b5e52c78256",
+      "tests/explanation_telemetry_policy_test.py": "99090bbf2726ded26d10319cdf8654ee182ea62cf3aa4779c73de82eedb4dec0",
+      "tools/build_explanation_v2_fixture.py": "35860c607b317783dfdd420eea989c34fd920a78b5cdb9f4f339a33f798b3f0d",
+      "tools/fixtures/study_tutorial_v2.json": "998c62fa19a3fa2aab85d81a3c4de984e819e4105acd47dc46b94e337ca7863b",
+      "tools/freeze_explanation_contracts.py": "c947b3d300769649f226b056e05948894b6d12199735214aebe90d64258b32dc",
+      "tools/serve_explanation_v2_e2e.py": "7e9390c7e5db18990c47d2809cf02a055acd1b7ceacdc20d0ca3e461fbfb1935"
+    },
+    "manifest_sha256": "c90f08e2daa510fcf1e1a9e5a176abc2ab7daba1e9d822b5a43a92b8fe34f7a4"
+  },
+  "resolved_integration_findings": [
+    "Synthetic tutorial placeholder claim IDs hid citations in the frontend; replaced with stable scoped IDs and conflicting reuse is rejected at admission.",
+    "The preparation regression test injected pre-generation templates without finalized IDs; it now uses the existing generation/content hash rule.",
+    "Researcher revision listing now reads frozen setup/export versions from protocol_versions.",
+    "Browser test now observes the consultation commit before querying the next assigned condition."
+  ]
+}

@@ -1,0 +1,281 @@
+{
+  "schema": "exact-study-integration-followup/1",
+  "status": "design_only_not_current_runtime_config",
+  "reviewed_commit": "2d9715b",
+  "authority": "../17-integration-corrective-programme.md",
+  "backend_assignment": "../18-backend-integration-corrections.md",
+  "frontend_assignment": "../19-frontend-integration-corrections.md",
+  "sequence": [
+    "backend_contract_implementation_and_handoff",
+    "frontend_integration",
+    "joint_acceptance"
+  ],
+  "parallel": {
+    "isolated_checkouts_required": true,
+    "shared_file_owner_required": true,
+    "merge_backend_first": true,
+    "waives_handoff_or_joint_acceptance": false
+  },
+  "runtime_extension": "study-integration/1",
+  "issues": {
+    "R01": {
+      "priority": 1,
+      "owner": "backend_then_frontend",
+      "status": "joint_verified",
+      "acceptance": [
+        "J01",
+        "J02",
+        "J03"
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": true,
+      "frontend_status": "frontend_verified",
+      "reopened_by": [
+        "R06",
+        "R07",
+        "R11"
+      ]
+    },
+    "R02": {
+      "priority": 1,
+      "owner": "frontend_with_backend_contract",
+      "status": "joint_verified",
+      "acceptance": [
+        "J04",
+        "J05"
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": true,
+      "frontend_status": "frontend_verified",
+      "reopened_by": [
+        "R08",
+        "R09",
+        "R10"
+      ]
+    },
+    "R03": {
+      "priority": 2,
+      "owner": "backend_then_frontend",
+      "status": "blocked",
+      "acceptance": [
+        "J06",
+        "J07",
+        "J09",
+        "J10"
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": false,
+      "frontend_status": "frontend_verified",
+      "blocked_by": "J10 manual screen-reader and keyboard audit not performed",
+      "reopened_by": [
+        "R12",
+        "R14"
+      ]
+    },
+    "R04": {
+      "priority": 2,
+      "owner": "backend_with_frontend_consumer",
+      "status": "joint_verified",
+      "acceptance": [
+        "J08",
+        "J09"
+      ],
+      "backend_status": "backend_verified",
+      "joint_verified": true,
+      "frontend_status": "frontend_verified"
+    }
+  },
+  "joint_acceptance_ids": [
+    "J01",
+    "J02",
+    "J03",
+    "J04",
+    "J05",
+    "J06",
+    "J07",
+    "J08",
+    "J09",
+    "J10",
+    "J11",
+    "J12"
+  ],
+  "workspace": {
+    "v2_explanation_descriptor_required": true,
+    "v2_prepared_excerpt_fallback_allowed": false,
+    "baseline_descriptor": null,
+    "scope_is_authorization": false,
+    "legacy_v1_adapter_preserved": true
+  },
+  "readiness": {
+    "source_context_required": true,
+    "candidate_initial_context_count": 5,
+    "admitted_initial_profiles_and_comparisons_required": true,
+    "usable_render_required": true,
+    "lazy_all_ontology_prefetch_required": false,
+    "request_failure_is_absence": false,
+    "premature_submission_allowed": false,
+    "hidden_tab_automatically_pauses": false
+  },
+  "tutorial_position": {
+    "views": [
+      "lesson",
+      "assessment"
+    ],
+    "omitted_patch": "preserve",
+    "explicit_null_patch": "reject_422",
+    "position_only_mutation_allowed": true,
+    "save_destination_not_previous_view": true,
+    "frozen_content_rewritten": false
+  },
+  "exports": {
+    "corrected_analysis_schema": "exact-study-analysis/3",
+    "corrected_csv_schema": "exact-study-csv/3",
+    "v2_admin_explicit_selection_required": true,
+    "saved_export_bytes_preserved": true,
+    "source_protocol_versions_preserved": true,
+    "observations_unit": "page_seconds",
+    "cross_page_monotonic_offsets_comparable": false,
+    "coverage_status": "not_established",
+    "unique_elapsed_coverage_seconds": null,
+    "unobserved_elapsed_seconds": null,
+    "active_duration_known": false
+  },
+  "preserved_protocol": {
+    "protege_required": false,
+    "multiple_methods_allowed": true,
+    "method_changes_between_cases_allowed": true,
+    "external_use_required": false,
+    "reporting_unit": "source_plus_candidate_set_case",
+    "assessment_items": 5,
+    "server_owned_completion": true
+  },
+  "evidence": {
+    "real_service_browser_required": true,
+    "fresh_full_tutorial_journey_required": true,
+    "mock_success_is_joint_acceptance": false,
+    "waives_backend_or_launch_gates": false
+  },
+  "implementation_evidence": "../../../docs/verification/explanation-integration-backend-receipt.json",
+  "frontend_implementation_evidence": "../../../docs/verification/explanation-integration-frontend-receipt.json",
+  "acceptance_evidence": "../../../docs/verification/explanation-integration-acceptance-receipt.json",
+  "post_implementation_findings": {
+    "review": "../evidence/frontend-integration-review-20261003.md",
+    "reviewed_commit": "8755431",
+    "findings": {
+      "R05": {
+        "priority": 3,
+        "owner": "frontend",
+        "status": "fixed_and_verified",
+        "summary": "Cytoscape inline style under the study CSP"
+      },
+      "R06": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F16",
+        "status": "fixed_and_verified"
+      },
+      "R07": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F17",
+        "status": "fixed_and_verified"
+      },
+      "R08": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F18",
+        "status": "fixed_and_verified"
+      },
+      "R09": {
+        "priority": 1,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F19",
+        "status": "fixed_and_verified"
+      },
+      "R10": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R02",
+        "requirement": "F20",
+        "status": "fixed_and_verified",
+        "summary": "A superseded scope access check blocked a recovered case"
+      },
+      "R11": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R01",
+        "requirement": "F21",
+        "status": "fixed_and_verified",
+        "summary": "Continued parents lost their entity type during navigation"
+      },
+      "R12": {
+        "priority": 2,
+        "owner": "frontend",
+        "reopens": "R03",
+        "requirement": "F21",
+        "status": "fixed_and_verified",
+        "summary": "Tutorial and v1 card parents lost navigation: the frozen-resource adapter supplied untyped parents"
+      },
+      "R13": {
+        "priority": 3,
+        "owner": "frontend",
+        "evidence_for": "R02",
+        "status": "fixed_and_verified",
+        "summary": "A recovery test read recorded traffic before the case_ready acknowledgement was recorded"
+      },
+      "R14": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified",
+        "summary": "Implicit entity kind completed v2 tutorial actions"
+      },
+      "R15": {
+        "priority": 2,
+        "owner": "backend",
+        "status": "fixed_and_verified_at_reproduced_boundary",
+        "summary": "Interrupted response acquired false terminal body and h11 length error"
+      },
+      "R16": {
+        "priority": 2,
+        "owner": "backend_integration",
+        "status": "unresolved_not_reproduced",
+        "summary": "Historical intermittent page.reload stall"
+      }
+    },
+    "followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-receipt.json",
+    "second_review": "../evidence/frontend-integration-review-20261004.md",
+    "second_followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-2-receipt.json",
+    "third_review": "../evidence/frontend-integration-review-20261004-3.md",
+    "third_followup_evidence": "../../../docs/verification/explanation-integration-frontend-followup-3-receipt.json",
+    "backend_final_review": "../../../docs/verification/explanation-integration-backend-final-review.md",
+    "backend_final_evidence": "../../../docs/verification/explanation-integration-backend-final-receipt.json"
+  },
+  "tutorial_action_identity": {
+    "entity_kind_required_when_entity_supplied": true,
+    "allowed_kinds": [
+      "class",
+      "object_property",
+      "data_property",
+      "individual"
+    ],
+    "omitted_null_unknown_kind": "reject_422_before_mutation",
+    "wrong_typed_identity": "reject_422_atomically",
+    "legacy_publication_and_resource_defaults_preserved": true,
+    "old_implicit_retry": "reject_422; explicit original normalized kind preserves canonical replay"
+  },
+  "interrupted_response_integrity": {
+    "producer_body_and_end_messages_preserved": true,
+    "original_cancellation_propagated": true,
+    "content_length_and_csp_preserved": true,
+    "historical_reload_stall_causation_established": false,
+    "unresolved_finding": "R16"
+  },
+  "full_acceptance_open_for": [
+    "R16 historical reload stall disposition",
+    "J10 manual keyboard and screen-reader audit"
+  ]
+}

@@ -1,0 +1,493 @@
+{
+  "tutorial": {
+    "tutorial_id": "exact-explain-tutorial",
+    "version": "tutorial/2.0-draft-1",
+    "synthetic": true,
+    "intro": "This tutorial uses an invented practice case in the same tools as the study. Nothing here is scored, and every name, fact, score and description in it is made up. Your progress is saved, so you can pause and come back on any device with your private link.",
+    "lessons": [
+      {
+        "lesson_id": "identity",
+        "title": "The source and its candidates",
+        "view": "explanation",
+        "steps": [
+          "This practice case uses two small invented ontologies. The source concept comes from one; the five candidates come from the other.",
+          "Candidates are listed in the system’s initial order, with a matching score. The initial position is a suggestion, not an answer: your rank is whatever you decide.",
+          "Inspect a different candidate, then go back to one you inspected before. Inspecting a candidate never ranks it."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "identity.inspect",
+            "action": "inspect_other_candidate",
+            "label": "Inspect a candidate other than the first"
+          },
+          {
+            "requirement_id": "identity.return",
+            "action": "return_to_candidate",
+            "label": "Return to a candidate you inspected before"
+          }
+        ]
+      },
+      {
+        "lesson_id": "context",
+        "title": "Context: parents, children and missing information",
+        "view": "explanation",
+        "steps": [
+          "Open Hierarchy. The source and the candidate each have their own browser.",
+          "Search the source ontology for “crate” and choose a result. Then open one of its parents and one of its children.",
+          "The source concept has two parents (multiple inheritance). Some candidates have no definition; the page says so instead of leaving a gap, and missing information is not a contradiction.",
+          "Use “Return to …” to come back to the compared entity."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "context.search",
+            "action": "search_entity",
+            "label": "Find an entity with search"
+          },
+          {
+            "requirement_id": "context.parent",
+            "action": "navigate_parent",
+            "label": "Open a parent"
+          },
+          {
+            "requirement_id": "context.child",
+            "action": "navigate_child",
+            "label": "Open a child"
+          },
+          {
+            "requirement_id": "context.return",
+            "action": "return_to_compared",
+            "label": "Return to the compared entity"
+          }
+        ]
+      },
+      {
+        "lesson_id": "evidence",
+        "title": "Where each statement comes from",
+        "view": "explanation",
+        "steps": [
+          "Statements marked “Original” come from the ontology. Generated text sits in a dashed “Generated” frame and cites the records it rests on.",
+          "Open a citation under a generated description to see the exact original record.",
+          "In a card, use “Show original axiom” to see a restriction in its original form.",
+          "Open Evidence and select a feature (“Show in graph”), or use “Show where it appears” from a citation, to find the same record in the list."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "evidence.citation",
+            "action": "open_citation",
+            "label": "Open a citation"
+          },
+          {
+            "requirement_id": "evidence.axiom",
+            "action": "open_original_axiom",
+            "label": "Show an original axiom"
+          },
+          {
+            "requirement_id": "evidence.locate",
+            "action": "locate_in_evidence_list",
+            "label": "Find a record in the evidence list"
+          }
+        ]
+      },
+      {
+        "lesson_id": "graph",
+        "title": "The optional evidence graph",
+        "view": "explanation",
+        "optional": true,
+        "steps": [
+          "The evidence graph shows the same items as the evidence list. The list is a complete alternative if you prefer it.",
+          "Select a line in the graph to read what it means, or select an item in the list. Try zoom or “Fit all”.",
+          "With the graph or list open, add or move a candidate in your practice answer: the view stays where it was."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "graph.inspect",
+            "action": "inspect_graph_or_list",
+            "label": "Inspect a line in the graph or an item in the list"
+          },
+          {
+            "requirement_id": "graph.view",
+            "action": "change_graph_view",
+            "label": "Zoom or fit the graph",
+            "alternatives": [
+              "inspect_graph_or_list"
+            ]
+          },
+          {
+            "requirement_id": "graph.rank",
+            "action": "rank_with_details_open",
+            "label": "Change your practice answer with the graph or list open"
+          }
+        ]
+      },
+      {
+        "lesson_id": "answers",
+        "title": "Your answer",
+        "view": "explanation",
+        "steps": [
+          "Add the candidates you consider equivalent, best first. Move one, remove one and use Undo.",
+          "Try “Keep initial order”, then make a partial ranking of one to four candidates and check it.",
+          "Try “None of these” and “Insufficient information”: they are different answers. An empty answer is never submitted.",
+          "This source keeps its qualifiers: a closed lid, only round pieces, at least two pieces. A broader or narrower candidate is not the same meaning."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "answers.add",
+            "action": "add_rank",
+            "label": "Add a candidate"
+          },
+          {
+            "requirement_id": "answers.move",
+            "action": "move_rank",
+            "label": "Move a candidate"
+          },
+          {
+            "requirement_id": "answers.remove",
+            "action": "remove_rank",
+            "label": "Remove a candidate"
+          },
+          {
+            "requirement_id": "answers.undo",
+            "action": "undo_rank",
+            "label": "Undo a change"
+          },
+          {
+            "requirement_id": "answers.keep",
+            "action": "keep_initial_order",
+            "label": "Use “Keep initial order”"
+          },
+          {
+            "requirement_id": "answers.partial",
+            "action": "check_partial_ranking",
+            "label": "Check a partial ranking"
+          },
+          {
+            "requirement_id": "answers.none",
+            "action": "choose_none",
+            "label": "Choose “None of these”"
+          },
+          {
+            "requirement_id": "answers.insufficient",
+            "action": "choose_insufficient",
+            "label": "Choose “Insufficient information”"
+          }
+        ]
+      },
+      {
+        "lesson_id": "baseline",
+        "title": "The block without explanations, and your methods",
+        "view": "baseline",
+        "steps": [
+          "In one block of cases the study shows only names, IRIs and scores. You can inspect the ontologies in any way you like, or not at all.",
+          "Copy an IRI, and open “Ontology files” to find the two downloads. Downloading is optional.",
+          "After each case you will say which outside methods, if any, you used for it. Practise one report with two methods and one report with No."
+        ],
+        "requirements": [
+          {
+            "requirement_id": "baseline.copy",
+            "action": "copy_iri",
+            "label": "Copy an IRI"
+          },
+          {
+            "requirement_id": "baseline.downloads",
+            "action": "locate_downloads",
+            "label": "Find the two downloads"
+          },
+          {
+            "requirement_id": "baseline.multi",
+            "action": "report_multiple_methods",
+            "label": "Practise a report with two or more methods"
+          },
+          {
+            "requirement_id": "baseline.no",
+            "action": "report_no_methods",
+            "label": "Practise a report with No"
+          }
+        ]
+      }
+    ],
+    "assessment": [
+      {
+        "question_id": "score_meaning",
+        "title": "Matching scores",
+        "prompt": "A candidate is first in the initial order and has the highest matching score. What does this tell you?",
+        "kind": "single",
+        "options": [
+          {
+            "code": "advice",
+            "label": "The matcher suggests it; I should inspect the evidence."
+          },
+          {
+            "code": "certain",
+            "label": "It must be equivalent."
+          },
+          {
+            "code": "probability",
+            "label": "The score is necessarily a probability of being correct."
+          }
+        ],
+        "lesson_id": "identity"
+      },
+      {
+        "question_id": "equivalence_scope",
+        "title": "Same meaning?",
+        "prompt": "In a practice ontology, the source means red circles. The candidate means circles of any colour and explicitly includes blue circles. Are these the same concept?",
+        "kind": "single",
+        "options": [
+          {
+            "code": "same",
+            "label": "Yes."
+          },
+          {
+            "code": "broader",
+            "label": "No, the candidate is broader."
+          },
+          {
+            "code": "unrelated",
+            "label": "No, they are unrelated."
+          }
+        ],
+        "lesson_id": "answers"
+      },
+      {
+        "question_id": "response_states",
+        "title": "Three kinds of answer",
+        "prompt": "Match each situation to the answer it describes.",
+        "kind": "match",
+        "rows": [
+          {
+            "row_id": "judged_none",
+            "label": "You judged that none of the displayed candidates is equivalent."
+          },
+          {
+            "row_id": "cannot_judge",
+            "label": "You cannot make a justified judgment."
+          },
+          {
+            "row_id": "not_answered",
+            "label": "You have not chosen or submitted an answer."
+          }
+        ],
+        "row_options": [
+          {
+            "code": "none_of_these",
+            "label": "None of these"
+          },
+          {
+            "code": "insufficient_evidence",
+            "label": "Insufficient information"
+          },
+          {
+            "code": "unanswered",
+            "label": "An empty, unsubmitted draft"
+          }
+        ],
+        "lesson_id": "answers"
+      },
+      {
+        "question_id": "evidence_origin",
+        "title": "Where information comes from",
+        "prompt": "Match each kind of information to its origin.",
+        "kind": "match_and_single",
+        "rows": [
+          {
+            "row_id": "statement",
+            "label": "A statement in the ontology"
+          },
+          {
+            "row_id": "feature",
+            "label": "A feature selected or projected by Exact"
+          },
+          {
+            "row_id": "summary",
+            "label": "A prepared generated summary"
+          }
+        ],
+        "row_options": [
+          {
+            "code": "original",
+            "label": "Original ontology fact"
+          },
+          {
+            "code": "matcher",
+            "label": "Matcher evidence"
+          },
+          {
+            "code": "generated",
+            "label": "Generated text"
+          }
+        ],
+        "part_b": {
+          "prompt": "The candidate has no definition in the loaded scope. Does that alone establish a contradiction with the source?",
+          "options": [
+            {
+              "code": "yes",
+              "label": "Yes"
+            },
+            {
+              "code": "no",
+              "label": "No"
+            }
+          ]
+        },
+        "lesson_id": "evidence"
+      },
+      {
+        "question_id": "external_methods",
+        "title": "Outside inspection",
+        "prompt": "Which statements are true? Select all that apply.",
+        "kind": "multiple",
+        "options": [
+          {
+            "code": "optional",
+            "label": "Inspecting the ontologies outside the study pages is optional."
+          },
+          {
+            "code": "combine_change",
+            "label": "I may combine methods and change them between cases."
+          },
+          {
+            "code": "per_case",
+            "label": "After each source-and-candidates case, I report the methods I actually used."
+          },
+          {
+            "code": "protege_required",
+            "label": "I must use Protégé."
+          },
+          {
+            "code": "locked",
+            "label": "I must keep one method for the whole study."
+          }
+        ],
+        "lesson_id": "baseline"
+      }
+    ],
+    "case": {
+      "source": {
+        "ontology_version_id": "synthetic:practice-ontology-a/1",
+        "iri": "https://example.org/practice/a#ClosedRoundPieceCrate",
+        "kind": "class"
+      },
+      "source_label": "closed crate of round pieces",
+      "candidates": [
+        {
+          "candidate_id": "practice-c1",
+          "entity": {
+            "ontology_version_id": "synthetic:practice-ontology-b/1",
+            "iri": "https://example.org/practice/b#CrateWithRoundPiece",
+            "kind": "class"
+          },
+          "label": "crate with a round piece",
+          "score": 0.91,
+          "score_meaning": "Illustrative practice score. In scored cases a matching score is the matcher's suggestion, never a probability of being correct.",
+          "display_position": 1
+        },
+        {
+          "candidate_id": "practice-c2",
+          "entity": {
+            "ontology_version_id": "synthetic:practice-ontology-b/1",
+            "iri": "https://example.org/practice/b#ClosedRoundPieceCollectionCrate",
+            "kind": "class"
+          },
+          "label": "closed round-piece collection crate",
+          "score": 0.88,
+          "score_meaning": "Illustrative practice score. In scored cases a matching score is the matcher's suggestion, never a probability of being correct.",
+          "display_position": 2
+        },
+        {
+          "candidate_id": "practice-c3",
+          "entity": {
+            "ontology_version_id": "synthetic:practice-ontology-b/1",
+            "iri": "https://example.org/practice/b#ClosedTwoPieceCrate",
+            "kind": "class"
+          },
+          "label": "closed two-piece crate",
+          "score": 0.84,
+          "score_meaning": "Illustrative practice score. In scored cases a matching score is the matcher's suggestion, never a probability of being correct.",
+          "display_position": 3
+        },
+        {
+          "candidate_id": "practice-c4",
+          "entity": {
+            "ontology_version_id": "synthetic:practice-ontology-b/1",
+            "iri": "https://example.org/practice/b#Crate",
+            "kind": "class"
+          },
+          "label": "crate",
+          "score": 0.8,
+          "score_meaning": "Illustrative practice score. In scored cases a matching score is the matcher's suggestion, never a probability of being correct.",
+          "display_position": 4
+        },
+        {
+          "candidate_id": "practice-c5",
+          "entity": {
+            "ontology_version_id": "synthetic:practice-ontology-b/1",
+            "iri": "https://example.org/practice/b#OpenRoundPieceCrate",
+            "kind": "class"
+          },
+          "label": "open round-piece crate",
+          "score": 0.77,
+          "score_meaning": "Illustrative practice score. In scored cases a matching score is the matcher's suggestion, never a probability of being correct.",
+          "display_position": 5
+        }
+      ],
+      "explanation_refs": [
+        "practice-explanations"
+      ],
+      "ontology_resources": []
+    }
+  },
+  "grading": {
+    "score_meaning": {
+      "response": {
+        "choice": "advice"
+      },
+      "correct_feedback": "Right. The initial position and the matching score are recorded advice from the matcher. Neither proves equivalence, and the score is not a calibrated probability.",
+      "incorrect_feedback": "Not quite. A first-place, high-scoring candidate can still be wrong, and the score is not a probability of being correct. Treat it as a suggestion and inspect the evidence."
+    },
+    "equivalence_scope": {
+      "response": {
+        "choice": "broader"
+      },
+      "correct_feedback": "Right. Circles of any colour include red circles but also blue ones, so the candidate is broader. Overlap or a broader category is not the same meaning.",
+      "incorrect_feedback": "Not quite. Compare the two definitions: the candidate also covers blue circles, so it is broader than the source. A broader or overlapping concept is related, but it is not equivalent."
+    },
+    "response_states": {
+      "response": {
+        "matches": {
+          "judged_none": "none_of_these",
+          "cannot_judge": "insufficient_evidence",
+          "not_answered": "unanswered"
+        }
+      },
+      "correct_feedback": "Right. None of these is an explicit judgment, Insufficient information says you cannot judge, and an empty draft is not a submitted answer.",
+      "incorrect_feedback": "Not quite. None of these is a judgment that no candidate is equivalent. Insufficient information means you cannot make a justified judgment. An empty draft has not been answered or submitted at all."
+    },
+    "evidence_origin": {
+      "response": {
+        "matches": {
+          "statement": "original",
+          "feature": "matcher",
+          "summary": "generated"
+        },
+        "part_b": "no"
+      },
+      "correct_feedback": "Right. Each kind of information keeps its origin, and information missing from the loaded scope does not prove incompatibility.",
+      "incorrect_feedback": "Not quite. Statements in the ontology are original facts, features Exact selected are matcher evidence, and prepared summaries are generated text that cites original facts. A missing, filtered or unprepared definition is not a contradiction."
+    },
+    "external_methods": {
+      "response": {
+        "choices": [
+          "optional",
+          "combine_change",
+          "per_case"
+        ]
+      },
+      "correct_feedback": "Right. Outside inspection is optional, you can combine and change methods, and you report what you actually used after each case.",
+      "incorrect_feedback": "Not quite. No tool is required, and you can change methods from case to case. After each case you report the methods you actually used for that source and its candidates, not for each candidate separately."
+    }
+  },
+  "ontology_documents": {
+    "synthetic:practice-ontology-a/1": "Prefix(:=<https://example.org/practice/a#>)\nPrefix(rdfs:=<http://www.w3.org/2000/01/rdf-schema#>)\nOntology(<https://example.org/practice/a>\n  Declaration(Class(<https://example.org/practice/a#Object>))\n  Declaration(Class(<https://example.org/practice/a#Container>))\n  Declaration(Class(<https://example.org/practice/a#Crate>))\n  Declaration(Class(<https://example.org/practice/a#LiddedObject>))\n  Declaration(Class(<https://example.org/practice/a#Piece>))\n  Declaration(Class(<https://example.org/practice/a#RoundPiece>))\n  Declaration(Class(<https://example.org/practice/a#LidState>))\n  Declaration(Class(<https://example.org/practice/a#ClosedLidState>))\n  Declaration(Class(<https://example.org/practice/a#ClosedRoundPieceCrate>))\n  Declaration(Class(<https://example.org/practice/a#WoodenCrate>))\n  Declaration(Class(<https://example.org/practice/a#OpenCrate>))\n  Declaration(ObjectProperty(<https://example.org/practice/a#contains>))\n  Declaration(ObjectProperty(<https://example.org/practice/a#hasLidState>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#Object> \"object\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#Object> \"Anything that can be handled as a single thing.\"@en)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#Container> \"container\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#Container> \"An object whose purpose is to hold other objects.\"@en)\n  SubClassOf(<https://example.org/practice/a#Container> <https://example.org/practice/a#Object>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#Crate> \"crate\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#Crate> \"A rigid container with a lid.\"@en)\n  SubClassOf(<https://example.org/practice/a#Crate> <https://example.org/practice/a#Container>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#LiddedObject> \"lidded object\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#LiddedObject> \"An object that has a lid.\"@en)\n  SubClassOf(<https://example.org/practice/a#LiddedObject> <https://example.org/practice/a#Object>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#Piece> \"piece\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#Piece> \"A small separate object.\"@en)\n  SubClassOf(<https://example.org/practice/a#Piece> <https://example.org/practice/a#Object>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#RoundPiece> \"round piece\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#RoundPiece> \"A piece whose outline is round.\"@en)\n  SubClassOf(<https://example.org/practice/a#RoundPiece> <https://example.org/practice/a#Piece>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#LidState> \"lid state\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#LidState> \"Whether a lid is open or closed.\"@en)\n  SubClassOf(<https://example.org/practice/a#LidState> <https://example.org/practice/a#Object>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#ClosedLidState> \"closed lid state\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#ClosedLidState> \"The state of a lid that is shut.\"@en)\n  SubClassOf(<https://example.org/practice/a#ClosedLidState> <https://example.org/practice/a#LidState>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#ClosedRoundPieceCrate> \"closed crate of round pieces\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#ClosedRoundPieceCrate> \"A crate whose lid is closed, that holds at least two pieces, and all of whose contents are round pieces.\"@en)\n  AnnotationAssertion(<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> <https://example.org/practice/a#ClosedRoundPieceCrate> \"sealed round-piece crate\"@en)\n  SubClassOf(<https://example.org/practice/a#ClosedRoundPieceCrate> <https://example.org/practice/a#Crate>)\n  SubClassOf(<https://example.org/practice/a#ClosedRoundPieceCrate> <https://example.org/practice/a#LiddedObject>)\n  SubClassOf(<https://example.org/practice/a#ClosedRoundPieceCrate> ObjectSomeValuesFrom(<https://example.org/practice/a#hasLidState> <https://example.org/practice/a#ClosedLidState>))\n  SubClassOf(<https://example.org/practice/a#ClosedRoundPieceCrate> ObjectAllValuesFrom(<https://example.org/practice/a#contains> <https://example.org/practice/a#RoundPiece>))\n  SubClassOf(<https://example.org/practice/a#ClosedRoundPieceCrate> ObjectMinCardinality(2 <https://example.org/practice/a#contains> <https://example.org/practice/a#Piece>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#WoodenCrate> \"wooden crate\"@en)\n  SubClassOf(<https://example.org/practice/a#WoodenCrate> <https://example.org/practice/a#Crate>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#OpenCrate> \"open crate\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/a#OpenCrate> \"A crate whose lid is open.\"@en)\n  SubClassOf(<https://example.org/practice/a#OpenCrate> <https://example.org/practice/a#Crate>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#contains> \"contains\"@en)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/a#hasLidState> \"has lid state\"@en)\n)\n",
+    "synthetic:practice-ontology-b/1": "Prefix(:=<https://example.org/practice/b#>)\nPrefix(rdfs:=<http://www.w3.org/2000/01/rdf-schema#>)\nOntology(<https://example.org/practice/b>\n  Declaration(Class(<https://example.org/practice/b#Item>))\n  Declaration(Class(<https://example.org/practice/b#Container>))\n  Declaration(Class(<https://example.org/practice/b#Crate>))\n  Declaration(Class(<https://example.org/practice/b#RoundItem>))\n  Declaration(Class(<https://example.org/practice/b#LidState>))\n  Declaration(Class(<https://example.org/practice/b#Closed>))\n  Declaration(Class(<https://example.org/practice/b#Open>))\n  Declaration(Class(<https://example.org/practice/b#CrateWithRoundPiece>))\n  Declaration(Class(<https://example.org/practice/b#ClosedRoundPieceCollectionCrate>))\n  Declaration(Class(<https://example.org/practice/b#ClosedTwoPieceCrate>))\n  Declaration(Class(<https://example.org/practice/b#OpenRoundPieceCrate>))\n  Declaration(ObjectProperty(<https://example.org/practice/b#holds>))\n  Declaration(ObjectProperty(<https://example.org/practice/b#lidState>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#Item> \"item\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#Item> \"A physical thing.\"@en)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#Container> \"container\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#Container> \"An item used to hold other items.\"@en)\n  SubClassOf(<https://example.org/practice/b#Container> <https://example.org/practice/b#Item>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#Crate> \"crate\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#Crate> \"A box-like container with a lid.\"@en)\n  AnnotationAssertion(<http://www.geneontology.org/formats/oboInOwl#hasExactSynonym> <https://example.org/practice/b#Crate> \"crate\"@en)\n  SubClassOf(<https://example.org/practice/b#Crate> <https://example.org/practice/b#Container>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#RoundItem> \"round item\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#RoundItem> \"An item with a round outline.\"@en)\n  SubClassOf(<https://example.org/practice/b#RoundItem> <https://example.org/practice/b#Item>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#LidState> \"lid state\"@en)\n  SubClassOf(<https://example.org/practice/b#LidState> <https://example.org/practice/b#Item>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#Closed> \"closed\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#Closed> \"A lid state in which the lid is shut.\"@en)\n  SubClassOf(<https://example.org/practice/b#Closed> <https://example.org/practice/b#LidState>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#Open> \"open\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#Open> \"A lid state in which the lid is not shut.\"@en)\n  SubClassOf(<https://example.org/practice/b#Open> <https://example.org/practice/b#LidState>)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#CrateWithRoundPiece> \"crate with a round piece\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#CrateWithRoundPiece> \"A crate that holds some round item. Its other contents and lid position are not specified.\"@en)\n  SubClassOf(<https://example.org/practice/b#CrateWithRoundPiece> <https://example.org/practice/b#Crate>)\n  SubClassOf(<https://example.org/practice/b#CrateWithRoundPiece> ObjectSomeValuesFrom(<https://example.org/practice/b#holds> <https://example.org/practice/b#RoundItem>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#ClosedRoundPieceCollectionCrate> \"closed round-piece collection crate\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#ClosedRoundPieceCollectionCrate> \"A crate with a closed lid that holds at least two items, every one of which is round.\"@en)\n  SubClassOf(<https://example.org/practice/b#ClosedRoundPieceCollectionCrate> <https://example.org/practice/b#Crate>)\n  SubClassOf(<https://example.org/practice/b#ClosedRoundPieceCollectionCrate> ObjectSomeValuesFrom(<https://example.org/practice/b#lidState> <https://example.org/practice/b#Closed>))\n  SubClassOf(<https://example.org/practice/b#ClosedRoundPieceCollectionCrate> ObjectAllValuesFrom(<https://example.org/practice/b#holds> <https://example.org/practice/b#RoundItem>))\n  SubClassOf(<https://example.org/practice/b#ClosedRoundPieceCollectionCrate> ObjectMinCardinality(2 <https://example.org/practice/b#holds> <https://example.org/practice/b#Item>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#ClosedTwoPieceCrate> \"closed two-piece crate\"@en)\n  AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <https://example.org/practice/b#ClosedTwoPieceCrate> \"A closed crate that holds exactly two round items.\"@en)\n  SubClassOf(<https://example.org/practice/b#ClosedTwoPieceCrate> <https://example.org/practice/b#Crate>)\n  SubClassOf(<https://example.org/practice/b#ClosedTwoPieceCrate> ObjectSomeValuesFrom(<https://example.org/practice/b#lidState> <https://example.org/practice/b#Closed>))\n  SubClassOf(<https://example.org/practice/b#ClosedTwoPieceCrate> ObjectExactCardinality(2 <https://example.org/practice/b#holds> <https://example.org/practice/b#RoundItem>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#OpenRoundPieceCrate> \"open round-piece crate\"@en)\n  SubClassOf(<https://example.org/practice/b#OpenRoundPieceCrate> <https://example.org/practice/b#Crate>)\n  SubClassOf(<https://example.org/practice/b#OpenRoundPieceCrate> ObjectSomeValuesFrom(<https://example.org/practice/b#lidState> <https://example.org/practice/b#Open>))\n  SubClassOf(<https://example.org/practice/b#OpenRoundPieceCrate> ObjectAllValuesFrom(<https://example.org/practice/b#holds> <https://example.org/practice/b#RoundItem>))\n  SubClassOf(<https://example.org/practice/b#OpenRoundPieceCrate> ObjectMinCardinality(2 <https://example.org/practice/b#holds> <https://example.org/practice/b#Item>))\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#holds> \"holds\"@en)\n  AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <https://example.org/practice/b#lidState> \"lid state\"@en)\n)\n"
+  }
+}

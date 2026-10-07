@@ -246,7 +246,18 @@ SubClassOf(<urn:child> <urn:parent>)
                 },
                 "entities": [entity.model_dump() for entity in pair],
                 "grounding_status": "validated",
-                "claims": [claim.model_dump() for claim in comparison_templates(packet)],
+                "claims": [
+                    {
+                        **claim.model_dump(),
+                        "claim_id": canonical_hash(
+                            {
+                                "packet": canonical_hash(packet),
+                                "claim": claim.model_dump(exclude={"claim_id"}),
+                            }
+                        ),
+                    }
+                    for claim in comparison_templates(packet)
+                ],
             }
         )
     resource = build_explanation_resource(
@@ -551,3 +562,16 @@ def test_practice_content_is_frozen_public_state_and_legacy_hashes_stay_stable(t
     payload["definition"]["practice_cases"][0]["instructions"] = "Changed content"
     with pytest.raises(StudyError, match="immutable"):
         store.publish(Publish.model_validate(payload))
+
+
+def test_claim_identity_cannot_collapse_different_scopes_but_exact_repeats_remain_valid(tmp_path):
+    resource, _ = comparison_resource(tmp_path)
+    original = resource.model_dump(mode="json")
+    assert len(original["pair_comparison"]) >= 2
+    duplicate = copy.deepcopy(original)
+    duplicate["pair_comparison"].append(copy.deepcopy(duplicate["pair_comparison"][0]))
+    ExplanationResource.model_validate(duplicate)
+    conflicting = copy.deepcopy(original)
+    conflicting["pair_comparison"][1]["claim_id"] = conflicting["pair_comparison"][0]["claim_id"]
+    with pytest.raises(ValueError, match="Conflicting claim identity"):
+        ExplanationResource.model_validate(conflicting)

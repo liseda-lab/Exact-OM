@@ -1,9 +1,11 @@
 # Implementation inventory and package boundaries
 
 > The inventory and bootstrap ownership below are historical. For the implemented products'
-> current corrections, use [14](14-corrective-programme.md),
-> [15](15-frontend-corrections.md) and [16](16-backend-corrections.md), including their
-> frontend-led corrective design sequence and unchanged evidence/launch gates.
+> current corrections after review at `2d9715b`, use
+> [17](17-integration-corrective-programme.md), [18](18-backend-integration-corrections.md)
+> and [19](19-frontend-integration-corrections.md): backend first, frontend integration,
+> then joint acceptance. Specs 14–16 retain their product/study decisions; their initial
+> frontend-led design phase is complete. Evidence and launch gates remain unchanged.
 
 **Observed status at `e81865a`, 2026-09-19. All B/F acceptance gates are pending.** Verify symbols at current HEAD before work; do not assume this inventory is timeless.
 

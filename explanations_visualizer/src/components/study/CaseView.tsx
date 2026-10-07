@@ -2,31 +2,29 @@
 
 // One scored case. The server decides which case and condition this is and which resources
 // exist; the baseline never receives explanation data. The explanation condition renders
-// the same shared workspace as the exploration app over participant-safe data. Drafts save
-// as you work, submitting is explicit and final, and the case timer starts only once the
-// required content is usable.
+// the same shared workspace as the exploration app over its authorized scope. Ranking and
+// submission are enabled, and the case timer starts, only once this presentation's required
+// content is validated and rendered (19 F12); a failure blocks the case with a retry and
+// keeps the answer. Drafts save as you work; submitting is explicit and final.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
+import { Skeleton } from "@/components/common/ErrorNote";
 import { CaseLayout, answerSummaryOf } from "@/components/study/CaseLayout";
+import { RenderProbe, useCaseContent, WorkspaceBoundary, type CaseReadiness } from "@/components/study/caseContent";
 import { IdentityCard } from "@/components/study/IdentityCard";
 import { AnswerPanel, CandidateRows, useRanking, type RankingCandidate, type RankingValue } from "@/components/study/RankingPanel";
 import { ResourceAccessButton, ResourceList } from "@/components/study/Resources";
 import { TutorialHelpButton } from "@/components/study/Tutorial";
 import { ALL_COMPONENTS, PairWorkspace, type Component, type Focus } from "@/components/workspace/PairWorkspace";
-import { describeError, getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
 import type { EntityRef } from "@/lib/types";
-import { createApiSource } from "@/lib/workspace/apiSource";
-import { indexResources } from "@/lib/workspace/resourceIndex";
-import { createResourceSource } from "@/lib/workspace/resourceSource";
-import type { WorkspaceAction, WorkspaceSource } from "@/lib/workspace/types";
+import type { WorkspaceAction } from "@/lib/workspace/types";
 import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
 import { orderedKeys } from "@/study/formOrder";
 import type { StudySession } from "@/study/session";
 import type { Telemetry } from "@/study/telemetry";
-import type { ExplanationResource, PublicAsset, StudyCase, StudyState } from "@/study/types";
+import type { PublicAsset, StudyCase, StudyState } from "@/study/types";
 import { workspaceEvent } from "@/study/workspaceEvents";
 
 /** Components frozen in the final questionnaire's rating matrix are the ones shown. */
@@ -62,78 +60,99 @@ function readViewed(presentationId: string): Set<string> {
   }
 }
 
+/** Loading progress or a blocking failure with its causes and a retry. */
+function ReadinessNote({ readiness, onRetry }: { readiness: CaseReadiness; onRetry: () => void }) {
+  if (readiness.kind === "usable") return null;
+  if (readiness.kind !== "blocked")
+    return (
+      <p className="note case-readiness" role="status">
+        {readiness.kind === "loading" && readiness.total > 1 ? `Loading this case's information (${readiness.done} of ${readiness.total})…` : "Loading this case's information…"} You can rank once it has loaded.
+      </p>
+    );
+  return (
+    <div className="note note-bad case-readiness" role="alert">
+      <p>
+        <strong>{readiness.title}</strong> Your answer so far is kept, and nothing is submitted. You cannot submit this case until it loads.
+      </p>
+      <ul>
+        {readiness.failures.map((failure, index) => (
+          <li key={`${failure.label}-${index}`}>
+            {failure.label}: {failure.detail}
+          </li>
+        ))}
+      </ul>
+      <p className="meta">
+        {readiness.cause === "session"
+          ? "If you opened the study in another tab or device, continue there, or reload this page."
+          : "Retry now, or use Pause at the top and come back later with your private link. If it keeps failing, contact the study team."}
+      </p>
+      <button type="button" className="btn btn-sm" onClick={onRetry}>
+        Retry loading this case
+      </button>
+    </div>
+  );
+}
+
+/** Baseline cases need no workspace; they are usable once their identity cards render. */
+function BaselineRendered({ attempt, onRendered }: { attempt: number; onRendered: (attempt: number) => void }) {
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => onRendered(attempt));
+    return () => cancelAnimationFrame(frame);
+  }, [attempt, onRendered]);
+  return null;
+}
+
 export function CaseView({ state, session, telemetry, timingEnabled = true }: { state: StudyState; session: StudySession; telemetry: Telemetry; timingEnabled?: boolean }) {
-  const caseKey = `${state.current_case_id}|${state.current_presentation_id}`;
-  const [studyCase, setStudyCase] = useState<StudyCase | null>(null);
-  const [caseError, setCaseError] = useState<unknown>(null);
-  const [resources, setResources] = useState<ExplanationResource[] | null>(null);
-  const [resourceError, setResourceError] = useState<string | null>(null);
   const [value, setValue] = useState<RankingValue>({ responseType: null, ranked: [] });
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [viewed, setViewed] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
-  const [reload, setReload] = useState(0);
-  const [contentReady, setContentReady] = useState(false);
   const [tab, setTab] = useState<string | null>(null);
   const [sourceFocus, setSourceFocus] = useState<Focus | null>(null);
   const [targetFocus, setTargetFocus] = useState<Record<string, Focus | null>>({});
   const edited = useRef(false);
   const loadStarted = useRef(performance.now());
 
-  // Load the server-assigned case, then any condition-permitted explanation resources.
-  useEffect(() => {
-    let cancelled = false;
-    loadStarted.current = performance.now();
-    setStudyCase(null);
-    setResources(null);
-    setCaseError(null);
-    setResourceError(null);
-    setContentReady(false);
-    (async () => {
-      try {
-        const current = await getJson<StudyCase>("/api/v1/study/cases/current");
-        if (cancelled) return;
-        setStudyCase(current);
-        const saved = state.ranking && state.ranking.presentation_id === current.presentation_id ? state.ranking : null;
-        setValue(saved ? { responseType: saved.response_type, ranked: saved.ranked_candidate_ids } : { responseType: null, ranked: [] });
-        const first = current.candidates.find((candidate) => candidate.display_position === 1)?.candidate_id ?? null;
-        setInspecting(first);
-        const seen = readViewed(current.presentation_id);
-        if (first) seen.add(first);
-        setViewed(seen);
-        if (current.condition === "explanation" && current.workspace?.scope_id) {
-          // A scoped workspace (16 B1) is ready only once the source's context actually loads.
-          try {
-            await getJson(`/api/v1/study/workspace/${encodeURIComponent(current.workspace.scope_id)}/entity-context`, { ontology_version_id: current.source.ontology_version_id, iri: current.source.iri, kind: current.source.kind });
-          } catch (error) {
-            if (!cancelled) setResourceError(`The case information could not be loaded: ${describeError(error)} Reconnect and retry before answering this case.`);
-            return;
-          }
-        } else if (current.condition === "explanation" && current.explanation_refs.length) {
-          try {
-            const loaded = await Promise.all(current.explanation_refs.map((ref) => getJson<ExplanationResource>(`/api/v1/study/resources/${encodeURIComponent(ref)}`)));
-            if (!cancelled) setResources(loaded);
-          } catch (error) {
-            if (!cancelled) setResourceError(`The prepared explanations could not be loaded: ${describeError(error)} Reconnect and retry before answering this case.`);
-            return;
-          }
-        }
-        if (!cancelled) setContentReady(true);
-      } catch (error) {
-        if (!cancelled) setCaseError(error);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-    // The case identity is the only trigger; restoring from state happens once per case.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [caseKey, reload]);
+  const components = useMemo(() => frozenComponents(state), [state]);
+  // Stable across autosaves: every state update brings a new resources array.
+  const resourcesRef = useRef(state.ontology_resources);
+  resourcesRef.current = state.ontology_resources;
+  const caseRef = useRef<StudyCase | null>(null);
+  const ontologyLabel = useCallback((ontology: string) => (caseRef.current ? ontologyLabelFor(resourcesRef.current, caseRef.current)(ontology) : "Ontology"), []);
+  const caseLabels = useCallback((current: StudyCase) => {
+    const labels: Record<string, string> = { [`${current.source.ontology_version_id}|${current.source.iri}`]: current.source_label };
+    current.candidates.forEach((candidate) => (labels[`${candidate.entity.ontology_version_id}|${candidate.entity.iri}`] = candidate.label));
+    return labels;
+  }, []);
+  const content = useCaseContent({ state, components, ontologyName: ontologyLabel, caseLabels });
+  const { studyCase, source, readiness } = content;
+  caseRef.current = studyCase;
+  const usable = readiness.kind === "usable";
 
+  // Restore the saved draft and reading aids once per presentation.
+  const restoredFor = useRef<string | null>(null);
   useEffect(() => {
-    if (contentReady && !submitting && timingEnabled) telemetry.markCaseReady(performance.now() - loadStarted.current);
-  }, [contentReady, submitting, timingEnabled, telemetry.markCaseReady]);
+    if (!studyCase || restoredFor.current === studyCase.presentation_id) return;
+    restoredFor.current = studyCase.presentation_id;
+    const saved = state.ranking && state.ranking.presentation_id === studyCase.presentation_id ? state.ranking : null;
+    if (!edited.current) setValue(saved ? { responseType: saved.response_type, ranked: saved.ranked_candidate_ids } : { responseType: null, ranked: [] });
+    const first = [...studyCase.candidates].sort((a, b) => a.display_position - b.display_position)[0]?.candidate_id ?? null;
+    setInspecting(first);
+    const seen = readViewed(studyCase.presentation_id);
+    if (first) seen.add(first);
+    setViewed(seen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studyCase]);
+
+  // The case timer starts only when this page's required content is usable and rendered.
+  const presentationId = studyCase?.presentation_id ?? null;
+  useEffect(() => {
+    telemetry.setCaseUsable(usable ? presentationId : null);
+    if (usable && !submitting && timingEnabled) telemetry.markCaseReady(performance.now() - loadStarted.current);
+  }, [usable, submitting, timingEnabled, presentationId, telemetry.markCaseReady, telemetry.setCaseUsable]);
+  useEffect(() => () => telemetry.setCaseUsable(null), [telemetry.setCaseUsable]);
+
   useEffect(() => {
     if (edited.current || !studyCase) return;
     const saved = state.ranking;
@@ -178,6 +197,8 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
 
   const submit = async () => {
     if (!studyCase || !state.current_case_id || submitting) return;
+    // Submit only an answer given against usable content for this exact presentation.
+    if (!usable || studyCase.presentation_id !== state.current_presentation_id || studyCase.study_revision !== state.study_revision) return;
     setSubmitting(true);
     telemetry.emit("submit");
     try {
@@ -194,40 +215,6 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     }
   };
 
-  const components = useMemo(() => frozenComponents(state), [state]);
-  const caseLabels = useMemo(() => {
-    const labels: Record<string, string> = {};
-    if (studyCase) {
-      labels[`${studyCase.source.ontology_version_id}|${studyCase.source.iri}`] = studyCase.source_label;
-      studyCase.candidates.forEach((candidate) => {
-        labels[`${candidate.entity.ontology_version_id}|${candidate.entity.iri}`] = candidate.label;
-      });
-    }
-    return labels;
-  }, [studyCase]);
-  // Stable across autosaves: every state update brings a new resources array.
-  const resourcesRef = useRef(state.ontology_resources);
-  resourcesRef.current = state.ontology_resources;
-  const ontologyLabel = useCallback((ontology: string) => (studyCase ? ontologyLabelFor(resourcesRef.current, studyCase)(ontology) : "Ontology"), [studyCase]);
-
-  // One workspace source per presentation: nothing from another case or session can appear.
-  const source: WorkspaceSource | null = useMemo(() => {
-    if (!studyCase || studyCase.condition !== "explanation") return null;
-    const key = `study|${state.session_id}|${studyCase.presentation_id}`;
-    if (studyCase.workspace?.scope_id) {
-      return createApiSource({ key, base: `/api/v1/study/workspace/${encodeURIComponent(studyCase.workspace.scope_id)}`, ontologyName: (id) => ontologyLabel(id) });
-    }
-    if (!resources) return null;
-    return createResourceSource({
-      key,
-      kind: "study_resource",
-      index: indexResources(resources, { extraLabels: caseLabels }),
-      navigation: "prepared",
-      scopeNote: "Only the information prepared for this case is available here.",
-      ontologyName: (id) => ontologyLabel(id),
-    });
-  }, [studyCase, resources, caseLabels, ontologyLabel, state.session_id]);
-
   const onAction = useCallback(
     (action: WorkspaceAction) => {
       const mapped = workspaceEvent(action);
@@ -238,21 +225,23 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
 
   const rankingCandidates: RankingCandidate[] = useMemo(
     () =>
-      (studyCase?.candidates ?? []).map((candidate) => ({
-        id: candidate.candidate_id,
-        position: candidate.display_position,
-        label: candidate.label,
-        identifier: curie(candidate.entity.iri),
-        score: candidate.score.toFixed(2),
-        scoreMeaning: candidate.score_meaning,
-      })),
+      [...(studyCase?.candidates ?? [])]
+        .sort((a, b) => a.display_position - b.display_position)
+        .map((candidate) => ({
+          id: candidate.candidate_id,
+          position: candidate.display_position,
+          label: candidate.label,
+          identifier: curie(candidate.entity.iri),
+          score: candidate.score.toFixed(2),
+          scoreMeaning: candidate.score_meaning,
+        })),
     [studyCase],
   );
   const controller = useRanking({
     candidates: rankingCandidates,
     value,
     locked,
-    disabled: !contentReady,
+    disabled: !usable,
     submitting,
     resetKey: handledConflict.current,
     onChange: (next, event, element) => {
@@ -263,10 +252,12 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     },
   });
 
-  if (caseError) return <ErrorNote error={caseError} what="This case could not be loaded" />;
-  if (!studyCase) return <Skeleton lines={6} />;
+  if (!studyCase) return readiness.kind === "blocked" ? <ReadinessNote readiness={readiness} onRetry={content.retry} /> : <Skeleton lines={6} />;
 
   const explanation = studyCase.condition === "explanation";
+  // Generated descriptions exist only for the source and its five candidates; never request others.
+  const focal = new Set([studyCase.source, ...studyCase.candidates.map((candidate) => candidate.entity)].map((entity) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`));
+  const isFocal = (entity: EntityRef) => focal.has(`${entity.ontology_version_id}|${entity.kind}|${entity.iri}`);
   const inspected = studyCase.candidates.find((candidate) => candidate.candidate_id === inspecting) ?? studyCase.candidates[0];
   const inspect = (id: string) => {
     setInspecting(id);
@@ -288,35 +279,40 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     </div>
   );
 
+  // While blocked the workspace is not shown: nothing re-reads a failed dependency behind the
+  // participant's back, and Retry is the one path that refetches it (19 F18). The answer,
+  // inspected candidate, focus, tab and cached usable content are all kept.
   const workspace = explanation ? (
-    resourceError ? (
-      <p className="note note-bad" role="alert">
-        {resourceError}{" "}
-        <button type="button" className="btn btn-sm" onClick={() => setReload((count) => count + 1)}>
-          Retry explanations
-        </button>
-      </p>
-    ) : source ? (
+    source && readiness.kind !== "blocked" ? (
       <WorkspaceProvider source={source} onAction={onAction}>
-        <PairWorkspace
-          pair={{ source: studyCase.source, target: inspected.entity, candidateId: inspected.candidate_id }}
-          viewKey={`${studyCase.presentation_id}|${inspected.candidate_id}`}
-          ontologyLabel={ontologyLabel}
-          components={components}
-          tab={tab}
-          onTab={setTab}
-          navigation={{
-            source: sourceFocus,
-            target: targetFocus[inspected.candidate_id] ?? null,
-            set: (side, focus) => (side === "source" ? setSourceFocus(focus) : setTargetFocus((current) => ({ ...current, [inspected.candidate_id]: focus }))),
-          }}
-          header={question}
-          cardTitles={{ source: "Source concept", target: `Candidate · initial position ${inspected.display_position}` }}
-          compactCards
-        />
+        <WorkspaceBoundary key={content.attempt} onError={content.renderFailed}>
+          <PairWorkspace
+            pair={{ source: studyCase.source, target: inspected.entity, candidateId: inspected.candidate_id }}
+            viewKey={`${studyCase.presentation_id}|${inspected.candidate_id}`}
+            ontologyLabel={ontologyLabel}
+            components={components}
+            tab={tab}
+            onTab={setTab}
+            navigation={{
+              source: sourceFocus,
+              target: targetFocus[inspected.candidate_id] ?? null,
+              set: (side, focus) => (side === "source" ? setSourceFocus(focus) : setTargetFocus((current) => ({ ...current, [inspected.candidate_id]: focus }))),
+            }}
+            header={question}
+            cardTitles={{ source: "Source concept", target: `Candidate · initial position ${inspected.display_position}` }}
+            compactCards
+            profileAllowed={isFocal}
+          />
+          {readiness.kind === "rendering" && (
+            <RenderProbe source={studyCase.source} target={inspected.entity} components={components} attempt={readiness.attempt} onRendered={content.rendered} onStalled={() => content.renderFailed(new Error("The case display did not finish."))} />
+          )}
+        </WorkspaceBoundary>
       </WorkspaceProvider>
     ) : (
-      <Skeleton lines={6} />
+      <div className="pair-workspace">
+        {question({ source: studyCase.source_label, target: inspected.label })}
+        {readiness.kind !== "blocked" && <Skeleton lines={6} />}
+      </div>
     )
   ) : (
     <div className="pair-workspace baseline-workspace">
@@ -333,6 +329,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
         <ResourceList resources={state.ontology_resources} compact onDownload={(asset) => telemetry.emit("external_resource_link", { component: "downloads", element: asset })} />
         <p className="meta">Time you spend inspecting before you submit counts as part of this case. Switching windows does not pause anything.</p>
       </section>
+      {readiness.kind === "rendering" && <BaselineRendered attempt={readiness.attempt} onRendered={content.rendered} />}
     </div>
   );
 
@@ -358,9 +355,10 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
               )}
             </div>
             <ResourceAccessButton resources={state.ontology_resources} onOpen={() => telemetry.emit("resources_open", { component: "downloads" })} onDownload={(asset) => telemetry.emit("external_resource_link", { component: "downloads", element: asset })} />
-            {state.tutorial && <TutorialHelpButton tutorial={state.tutorial} onOpen={() => telemetry.emit("help_open", { component: "tutorial_help" })} />}
+            {state.tutorial && <TutorialHelpButton tutorial={state.tutorial} onOpen={() => telemetry.emit("help_open", { component: "tutorial_help", scope: "help" })} />}
           </div>
         }
+        status={usable ? null : <ReadinessNote readiness={readiness} onRetry={content.retry} />}
         rows={<CandidateRows controller={controller} inspecting={inspected.candidate_id} viewed={viewed} onInspect={inspect} compact />}
         answer={<AnswerPanel id="case-answer" controller={controller} onSubmit={submit} submitting={submitting} pendingNote={pendingNote} compact />}
         workspace={workspace}

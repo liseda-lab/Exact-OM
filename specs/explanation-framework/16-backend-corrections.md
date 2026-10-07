@@ -1,6 +1,14 @@
 # Backend corrective assignment
 
-**2026-10-02 — implementation pending.** Read [14](14-corrective-programme.md) for
+> **Current follow-up:** review at `2d9715b` reopened discovery, readiness, tutorial-position
+> and timing-export issues. Start with [17](17-integration-corrective-programme.md) and
+> [18](18-backend-integration-corrections.md), delivering backend contracts before frontend
+> integration. The delivered work and historical evidence below do not close those findings.
+
+**Implemented 2026-10-03; release acceptance remains partly gated.** See the
+[dated backend handoff](../../docs/verification/explanation-backend-corrections-20261003.md)
+and [v2 contract](../../docs/verification/explanation-study-v2-backend-contract.md).
+Read [14](14-corrective-programme.md) for
 protocol decisions and priorities, then [15](15-frontend-corrections.md) for interaction
 requirements. This assignment supplies the shared workspace safely, removes the mandatory
 Protégé gate, makes training/reporting durable and preserves study validity and recovery.
@@ -9,9 +17,9 @@ Protégé gate, makes training/reporting durable and preserves study validity an
 
 Frontend leads the initial workflow/component design. Backend can start verified isolated
 fixes immediately, but freeze schemas, route behavior and examples with that design before
-full integration. The interfaces below are **planned**, not available API documentation.
-The existing `protocol/study.runtime-openapi.json` and runtime schema remain snapshots of
-the implemented service until regenerated from implemented models.
+full integration. The interfaces below describe the corrective requirements; exact implemented
+shapes are frozen in `protocol/study.runtime-openapi.json`, the publication/resource/tutorial
+runtime schemas and the linked v2 contract. These snapshots have been regenerated from code.
 
 Use `exact-study/2.0` for new publications: changed setup gating, ordered forms, durable
 tutorial/assessment and consultation drafts are semantic changes, not a cosmetic UI patch.
@@ -40,7 +48,7 @@ a second ontology engine. Query prebuilt SQLite/indexed resources; no runtime OW
 import fetching, model loading, generation or unrestricted filesystem paths. Keep the
 minimal study deployment independent of matcher/GPU/native-parser dependencies.
 
-Proposed route family: `/api/v1/study/workspace/{scope_id}/…`, with operations for:
+Implemented route family: `/api/v1/study/workspace/{scope_id}/…`, with operations for:
 
 | Operation | Required behavior |
 |---|---|
@@ -124,7 +132,7 @@ referenced facts and accessibility-equivalent task paths at publication. Reject 
 production v2 publication missing required lessons/questions/resources; empty practice
 or a built-in client fallback is insufficient.
 
-Planned mutation routes, using existing transactional mutation conventions:
+Implemented mutation routes, using existing transactional mutation conventions:
 
 | Route | Semantics |
 |---|---|

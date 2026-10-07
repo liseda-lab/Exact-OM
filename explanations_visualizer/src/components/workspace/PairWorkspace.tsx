@@ -5,12 +5,16 @@
 // navigation, evidence list, evidence graph). The exploration app, the explanation study
 // condition and the tutorial render this same composition through their own data source.
 // State ownership: the shell owns the pair, the open detail view and hierarchy focus; this
-// component owns only transient inspection (selected evidence, open fact dialog). The
-// graph view belongs to `viewKey` and survives re-renders and tab switches.
+// component owns only transient inspection (selected evidence, open fact dialog, the full
+// context of a browsed entity). The graph view belongs to `viewKey` and survives re-renders
+// and tab switches. "Open full context" shows the shared card for any browsed entity over the
+// same source (19 F17): original facts only when `original_context` is admitted, a generated
+// description only when `entity_description` is admitted and the shell allows it.
 
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { Dialog } from "@/components/common/Dialog";
 import { Tabs } from "@/components/common/Tabs";
 import { ComparisonPanel } from "@/components/explore/ComparisonPanel";
 import { EntityCard } from "@/components/explore/EntityCard";
@@ -19,7 +23,7 @@ import { EvidenceList } from "@/components/explore/EvidenceList";
 import type { CitedFact } from "@/components/explore/GeneratedBlock";
 import { HierarchyBrowser, type FocusVia } from "@/components/explore/HierarchyBrowser";
 import { FactInspectorProvider } from "@/components/workspace/FactInspector";
-import type { EntityContext, EntityKind } from "@/lib/types";
+import type { EntityContext, EntityKind, EntityRef } from "@/lib/types";
 import type { PairScope, Side } from "@/lib/workspace/types";
 import { SidesProvider, useEntityContext, useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
@@ -85,6 +89,7 @@ export function PairWorkspace({
   hierarchyFooter,
   cardTitles,
   compactCards = false,
+  profileAllowed = () => true,
 }: {
   pair: PairScope;
   viewKey: string;
@@ -100,6 +105,8 @@ export function PairWorkspace({
   hierarchyFooter?: React.ReactNode;
   cardTitles?: { source?: string; target?: string };
   compactCards?: boolean;
+  /** Whether a generated description may be read for an entity (the study restricts it to focal entities). */
+  profileAllowed?: (entity: EntityRef) => boolean;
 }) {
   const workspace = useWorkspace();
   const report = useWorkspaceAction();
@@ -111,6 +118,7 @@ export function PairWorkspace({
   const evidenceOpen = tab === "evidence" || tab === "graph";
   const evidence = usePairEvidence(evidenceOpen ? pair : null);
   const [selectedEvidence, setSelectedEvidence] = useState<string | null>(null);
+  const [contextFor, setContextFor] = useState<{ side: Side; entity: EntityRef } | null>(null);
   useEffect(() => setSelectedEvidence(null), [viewKey]);
 
   const builtIn: Record<string, { label: string; show: boolean }> = {
@@ -127,15 +135,20 @@ export function PairWorkspace({
     navigation.set(side, { iri, kind });
     report({ type: "hierarchy_focus", side, iri, kind, via });
   };
-  const openFromCard = (side: Side) => (iri: string) => {
-    const ctx = side === "source" ? sourceCtx.data : targetCtx.data;
-    const entity = side === "source" ? source : target;
-    const parent = ctx?.parents.items.some((fact) => fact.value?.term_type === "iri" && fact.value.iri === iri);
-    if (!components.has("hierarchy")) return;
-    navigation.set(side, { iri, kind: parent ? entity.kind : "class" });
-    report({ type: "hierarchy_focus", side, iri, kind: parent ? entity.kind : "class", via: "card" });
+  // Card links carry the recorded typed entity; a side's browser stays within its ontology (19 F21).
+  const openFromCard = (side: Side) => (entity: EntityRef) => {
+    const ontology = (side === "source" ? source : target).ontology_version_id;
+    if (!components.has("hierarchy") || entity.ontology_version_id !== ontology) return;
+    navigation.set(side, { iri: entity.iri, kind: entity.kind });
+    report({ type: "hierarchy_focus", side, iri: entity.iri, kind: entity.kind, via: "card" });
     onTab("hierarchy");
     report({ type: "tab_open", tab: "hierarchy" });
+  };
+
+  const openContext = (side: Side) => (iri: string, kind: EntityKind) => {
+    const entity = { ontology_version_id: (side === "source" ? source : target).ontology_version_id, iri, kind };
+    setContextFor({ side, entity });
+    report({ type: "context_open", side, iri });
   };
 
   const names = { source: sourceCtx.data?.preferred_label.value ?? null, target: targetCtx.data?.preferred_label.value ?? null };
@@ -199,6 +212,7 @@ export function PairWorkspace({
                               pinnedIri={entity.iri}
                               pinnedKind={entity.kind}
                               onFocus={focusFrom(side)}
+                              onOpenContext={components.has("original_context") ? openContext(side) : undefined}
                               reasonerStatus={workspace.capabilities.reasoner}
                               headingLevel={3}
                             />
@@ -225,6 +239,23 @@ export function PairWorkspace({
             </section>
           )}
 
+          {contextFor && (
+            <FullContextDialog
+              side={contextFor.side}
+              entity={contextFor.entity}
+              ontologyLabel={ontologyLabel(contextFor.entity.ontology_version_id)}
+              cite={cite}
+              showProfile={components.has("entity_description") && profileAllowed(contextFor.entity)}
+              onClose={() => setContextFor(null)}
+              onOpenEntity={(entity) => {
+                if (entity.ontology_version_id !== contextFor.entity.ontology_version_id) return;
+                navigation.set(contextFor.side, { iri: entity.iri, kind: entity.kind });
+                report({ type: "hierarchy_focus", side: contextFor.side, iri: entity.iri, kind: entity.kind, via: "card" });
+                setContextFor(null);
+              }}
+            />
+          )}
+
           {limitations.length > 0 && (
             <details className="limits card">
               <summary>Limits of the prepared information ({limitations.length})</summary>
@@ -238,5 +269,41 @@ export function PairWorkspace({
         </div>
       </FactInspectorProvider>
     </SidesProvider>
+  );
+}
+
+/** The shared full-context card for a browsed entity, over the workspace's own source. */
+function FullContextDialog({
+  side,
+  entity,
+  ontologyLabel,
+  cite,
+  showProfile,
+  onClose,
+  onOpenEntity,
+}: {
+  side: Side;
+  entity: EntityRef;
+  ontologyLabel: string;
+  cite: (factId: string) => CitedFact | undefined;
+  showProfile: boolean;
+  onClose: () => void;
+  onOpenEntity: (entity: EntityRef) => void;
+}) {
+  const context = useEntityContext(entity);
+  return (
+    <Dialog title="Full context" onClose={onClose} wide>
+      <FactInspectorProvider>
+        <EntityCard
+          side={side}
+          entity={entity}
+          context={context}
+          ontologyLabel={ontologyLabel}
+          cite={cite}
+          showProfile={showProfile}
+          onOpenEntity={onOpenEntity}
+        />
+      </FactInspectorProvider>
+    </Dialog>
   );
 }

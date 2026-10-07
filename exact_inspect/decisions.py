@@ -668,6 +668,7 @@ class DecisionStore:
             "scope": scope,
             "status": "available" if total else "absent_in_scope",
             "reason": None,
+            "order": "pair_id_ascending" if table == "pairs" else "source_id_ascending",
         }
 
     def sources(self, *, limit=20, cursor=None, policy_hash=None):

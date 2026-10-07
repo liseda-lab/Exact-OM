@@ -16,12 +16,22 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "action",
-        choices=["publish", "invitations", "progress", "export", "reissue", "revoke", "close"],
+        choices=[
+            "list",
+            "publish",
+            "invitations",
+            "progress",
+            "export",
+            "reissue",
+            "revoke",
+            "close",
+        ],
     )
     parser.add_argument("--study")
     parser.add_argument("--session")
     parser.add_argument("--publication", type=Path)
     parser.add_argument("--count", type=int, default=1)
+    parser.add_argument("--cursor", help="Continue a bounded revision listing")
     parser.add_argument(
         "--live",
         action="store_true",
@@ -30,13 +40,23 @@ def main():
     parser.add_argument("--include-test", action="store_true")
     parser.add_argument("--include-keys", action="store_true")
     parser.add_argument("--format", choices=["json", "csv"], default="json")
+    parser.add_argument(
+        "--analysis-schema",
+        choices=["exact-study-analysis/1", "exact-study-analysis/2", "exact-study-analysis/3"],
+        help="Derived analysis schema; omission uses the frozen source export version. /2 retains historical timing semantics; use /3 for corrected v2 observations.",
+    )
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     origin = os.environ["EXACT_STUDY_ORIGIN"].rstrip("/")
     if not origin.startswith("https://"):
         parser.error("Researcher API requires HTTPS")
     body, method = {}, "POST"
-    if args.action == "publish":
+    if args.action == "list":
+        method = "GET"
+        route = "/admin/studies" + (
+            "?" + urllib.parse.urlencode({"cursor": args.cursor}) if args.cursor else ""
+        )
+    elif args.action == "publish":
         if not args.publication:
             parser.error("publish requires --publication")
         body = json.loads(args.publication.read_text())
@@ -65,6 +85,11 @@ def main():
                     "include_test": str(args.include_test).lower(),
                     "include_keys": str(args.include_keys).lower(),
                     "format": args.format,
+                    **(
+                        {"analysis_schema": args.analysis_schema}
+                        if args.analysis_schema is not None
+                        else {}
+                    ),
                 }
             )
     request = urllib.request.Request(

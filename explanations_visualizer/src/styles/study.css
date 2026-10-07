@@ -1280,3 +1280,15 @@
     display: block;
   }
 }
+
+/* Case readiness (19 F12): loading progress or a blocking failure above both columns. */
+.case-readiness { margin: 0 0 1rem; }
+.case-readiness ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+.case-readiness p { margin: 0.25rem 0; }
+
+/* Assessment question navigation; each item stays on the same page. */
+.question-nav { list-style: none; margin: 0.75rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.question-nav li { min-width: 0; }
+.question-nav .btn { max-width: 100%; white-space: normal; text-align: left; }
+.question-nav .btn.current { border-color: var(--ink); font-weight: 600; }
+#tutorial-heading:focus-visible, .assessment-item h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }

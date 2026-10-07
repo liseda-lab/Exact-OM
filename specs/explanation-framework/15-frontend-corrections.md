@@ -1,6 +1,10 @@
 # Frontend corrective assignment
 
-**2026-10-02 — implementation pending.** Read [14](14-corrective-programme.md) first;
+**Initial assignment: 2026-10-02; implementations delivered, integration findings remain.**
+For the next work read [17](17-integration-corrective-programme.md) and
+[19](19-frontend-integration-corrections.md) first, after the backend handoff from 18.
+The original F0 workflow design phase below is historical and must not be restarted as a gate.
+Read [14](14-corrective-programme.md) for the preserved product/study decisions;
 its protocol decisions and issue register are normative. Coordinate contract changes with
 [16](16-backend-corrections.md). Own the interaction design and shared workspace across
 the main exploration app, public demo, tutorial and explanation-study condition.

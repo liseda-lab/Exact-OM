@@ -6,14 +6,19 @@
 import { Fragment, useMemo } from "react";
 
 import { curie } from "@/lib/iri";
+import type { EntityKind } from "@/lib/types";
 import { useLabelLookup } from "@/lib/labelSource";
 import { collectIris, hasReading, iriOf, isNamed } from "@/lib/owl";
 
 export { hasReading };
 
 type Lookup = (iri: string) => { value: string | null; status: string } | undefined;
+/** Opens a typed entity; a term is navigable only when its kind is recorded (19 F21). */
+type OpenTerm = (iri: string, kind: EntityKind) => void;
 
-function Term({ iri, lookup, property = false, onOpen }: { iri: string; lookup: Lookup; property?: boolean; onOpen?: (iri: string) => void }) {
+const KIND_OF: Record<string, EntityKind> = { Class: "class", NamedIndividual: "individual", ObjectProperty: "object_property", DataProperty: "data_property" };
+
+function Term({ iri, lookup, property = false, kind = null, onOpen }: { iri: string; lookup: Lookup; property?: boolean; kind?: EntityKind | null; onOpen?: OpenTerm }) {
   const label = lookup(iri);
   const text = label?.value ?? curie(iri);
   const missing = !label?.value && label?.status !== "loading";
@@ -24,9 +29,9 @@ function Term({ iri, lookup, property = false, onOpen }: { iri: string; lookup: 
       {missing && <span className="owl-unlabelled">{note}</span>}
     </>
   );
-  if (onOpen && !property) {
+  if (onOpen && !property && kind) {
     return (
-      <button type="button" className="owl-link" title={iri} onClick={() => onOpen(iri)}>
+      <button type="button" className="owl-link" title={iri} onClick={() => onOpen(iri, kind)}>
         {content}
       </button>
     );
@@ -34,15 +39,16 @@ function Term({ iri, lookup, property = false, onOpen }: { iri: string; lookup: 
   return <span title={iri}>{content}</span>;
 }
 
-function render(node: unknown, lookup: Lookup, onOpen: ((iri: string) => void) | undefined, depth: number): React.ReactNode {
+function render(node: unknown, lookup: Lookup, onOpen: OpenTerm | undefined, depth: number): React.ReactNode {
   if (!node || typeof node !== "object") return String(node ?? "");
   const record = node as Record<string, unknown>;
   const type = String(record.type ?? "");
   if (isNamed(record)) {
     const iri = iriOf(record)!;
     const property = type.endsWith("Property");
-    return <Term iri={iri} lookup={lookup} property={property} onOpen={onOpen} />;
+    return <Term iri={iri} lookup={lookup} property={property} kind={KIND_OF[type] ?? null} onOpen={onOpen} />;
   }
+  // A bare IRI carries no recorded type, so it is shown but never opened under a guessed kind.
   if (type === "IRI") return <Term iri={String(record.value)} lookup={lookup} onOpen={onOpen} />;
   if (type === "Literal") {
     return (
@@ -139,7 +145,7 @@ function render(node: unknown, lookup: Lookup, onOpen: ((iri: string) => void) |
   }
 }
 
-export function Expression({ node, ontology, onOpen }: { node: unknown; ontology: string; onOpen?: (iri: string) => void }) {
+export function Expression({ node, ontology, onOpen }: { node: unknown; ontology: string; onOpen?: OpenTerm }) {
   const iris = useMemo(() => Array.from(collectIris(node)), [node]);
   const lookup = useLabelLookup(ontology, iris) as Lookup;
   return <span className="owl-expression">{render(node, lookup, onOpen, 0)}</span>;

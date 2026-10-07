@@ -3,8 +3,11 @@
 // A meaning card for one entity. Source and target cards are the same component with equal
 // prominence; every section states its own availability instead of silently disappearing.
 // The card reads through the active workspace, so exploration, study and tutorial share it.
+// Every displayed category continues from its own cursor (19 F16): definitions, alternate
+// definitions, synonyms, defining facts, parents and other recorded facts say how many are
+// shown, never claim completeness while more exist, and load further pages on request.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconCopy, SideMarker } from "@/components/common/Icons";
@@ -12,9 +15,11 @@ import { EmptyReason } from "@/components/common/StatusText";
 import { GeneratedProfile, type CitedFact } from "@/components/explore/GeneratedBlock";
 import { AxiomBlock } from "@/components/owl/AxiomBlock";
 import { curie, predicateName, sideTitle } from "@/lib/iri";
+import { shownText } from "@/lib/continuation";
 import { useLabelLookup } from "@/lib/labelSource";
 import { seedLabel } from "@/lib/labels";
-import type { EntityContext, EntityRef, Fact } from "@/lib/types";
+import type { EntityContext, EntityRef, Fact, Page } from "@/lib/types";
+import { useContinuation, type Continued } from "@/components/explore/useContinuation";
 import type { AsyncState } from "@/lib/useAsync";
 import { useExplanation, useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
@@ -95,6 +100,98 @@ function scopeText(ctx: EntityContext): string {
   return ctx.completeness.scope === "root" ? "root document; imports not loaded" : "resolved import closure";
 }
 
+const factKey = (fact: Fact) => fact.fact_id;
+const NOUNS: Record<string, { one: string; many: string }> = {
+  definitions: { one: "definition", many: "definitions" },
+  alternate_definitions: { one: "alternate definition", many: "alternate definitions" },
+  synonyms: { one: "synonym", many: "synonyms" },
+  parents: { one: "parent", many: "parents" },
+  restrictions: { one: "restriction", many: "restrictions" },
+  types: { one: "type", many: "types" },
+  assertions: { one: "assertion", many: "assertions" },
+  domains: { one: "domain", many: "domains" },
+  ranges: { one: "range", many: "ranges" },
+  characteristics: { one: "characteristic", many: "characteristics" },
+};
+const nounFor = (category: string) => NOUNS[category] ?? { one: (MORE_NAMES[category] ?? category).toLowerCase().replace(/s$/, ""), many: (MORE_NAMES[category] ?? category).toLowerCase() };
+
+/** Reads further pages of one fact category from the active source, when it can. */
+function useFactPages(entity: EntityRef, category: string, page: Page<Fact> | undefined): Continued<Fact> {
+  const source = useWorkspace();
+  const load = useCallback((cursor: string, signal: AbortSignal) => source.facts!(entity, category, cursor, signal), [source, entity, category]);
+  return useContinuation(page, source.facts ? load : null, factKey);
+}
+
+/** Shown/total counts, then a continuation, a local failure with retry, or an honest limit. */
+function Continuation<T>({ state, noun }: { state: Continued<T>; noun: { one: string; many: string } }) {
+  if (state.complete && !state.error) return null;
+  return (
+    <div className="continuation">
+      <span className="meta">{shownText(state.items.length, state.total, state.hasMore, noun)}</span>
+      {state.error ? <ErrorNote error={state.error} onRetry={state.loadMore} what={`More ${noun.many}`} /> : null}
+      {state.hasMore &&
+        (state.available ? (
+          <button type="button" className="btn btn-sm" disabled={state.loading} aria-busy={state.loading || undefined} onClick={state.loadMore}>
+            {state.loading ? "Loading…" : `Load more ${noun.many}`}
+          </button>
+        ) : (
+          <span className="meta">More are recorded but are not available in this view.</span>
+        ))}
+    </div>
+  );
+}
+
+function FactLiteral({ fact, className }: { fact: Fact; className: string }) {
+  return (
+    <p data-fact-id={fact.fact_id} className={className} lang={fact.value?.term_type === "literal" ? fact.value.language ?? undefined : undefined}>
+      {literalText(fact) ?? "Structured value: open the original axiom."}
+    </p>
+  );
+}
+
+/** One recorded fact category under "Other recorded facts". */
+function MoreCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (entity: EntityRef) => void }) {
+  const pages = useFactPages(entity, category, page);
+  return (
+    <div className="more-category">
+      <h4>
+        {MORE_NAMES[category]} <span className="meta">{pages.total != null ? `${pages.items.length} of ${pages.total}` : `${pages.items.length} shown${pages.hasMore ? " · more exist" : ""}`}</span>
+      </h4>
+      {pages.items.map((fact) =>
+        literalText(fact) ? (
+          <p key={fact.fact_id} data-fact-id={fact.fact_id} className="more-literal">
+            {literalText(fact)} <span className="meta">· {predicateName(fact.predicate_iri)}</span>
+          </p>
+        ) : (
+          <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
+        ),
+      )}
+      <Continuation state={pages} noun={nounFor(category)} />
+    </div>
+  );
+}
+
+/** One defining-fact category (restrictions, types, …) with its own continuation. */
+function DefiningCategory({ category, page, entity, onOpenEntity }: { category: string; page: Page<Fact>; entity: EntityRef; onOpenEntity?: (entity: EntityRef) => void }) {
+  const pages = useFactPages(entity, category, page);
+  return (
+    <div className="defining-category" data-category={category}>
+      {pages.items.map((fact) => (
+        <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
+      ))}
+      <Continuation state={pages} noun={nounFor(category)} />
+    </div>
+  );
+}
+
+/** A parent from any page, with the complete typed entity the service recorded (19 F21). */
+interface ParentItem {
+  key: string;
+  entity: EntityRef | null;
+  iri: string;
+  factId: string | null;
+}
+
 export function EntityCard({
   side,
   entity,
@@ -112,11 +209,13 @@ export function EntityCard({
   context: AsyncState<EntityContext>;
   ontologyLabel: string;
   cite: (factId: string) => CitedFact | undefined;
-  onOpenEntity?: (iri: string) => void;
+  /** Receives the complete typed entity (ontology, IRI, kind), never a bare IRI. */
+  onOpenEntity?: (entity: EntityRef) => void;
   compact?: boolean;
   titleOverride?: string;
   /** Study publications admit components individually; absent ones are not rendered at all. */
   showOriginal?: boolean;
+  /** Also gates the request: an unshown description is never read (it may be restricted). */
   showProfile?: boolean;
 }) {
   const [allSynonyms, setAllSynonyms] = useState(false);
@@ -125,12 +224,39 @@ export function EntityCard({
   const report = useWorkspaceAction();
   const ctx = context.data;
   const entities = useMemo(() => [entity], [entity]);
-  const profile = useExplanation("entity_profile", entities);
+  const profile = useExplanation("entity_profile", showProfile ? entities : null);
 
-  const parentIris = useMemo(
-    () => (ctx?.parents.items ?? []).map((fact) => (fact.value?.term_type === "iri" ? fact.value.iri : null)).filter((iri): iri is string => Boolean(iri)),
+  const definitions = useFactPages(entity, "definitions", ctx?.definitions);
+  const alternate = useFactPages(entity, "alternate_definitions", ctx?.categories.alternate_definitions);
+  const synonymPages = useFactPages(entity, "synonyms", ctx?.synonyms);
+  const parentBase = useMemo(
+    () =>
+      ctx
+        ? {
+            items: ctx.parents.items.flatMap((fact): ParentItem[] => {
+              const projected = fact.hierarchy_projection?.parent ?? null;
+              const iri = projected?.iri ?? (fact.value?.term_type === "iri" ? fact.value.iri : null);
+              // Only a projection records the parent's type; a bare IRI value is shown, not opened.
+              const typed = projected ? { ontology_version_id: projected.ontology_version_id ?? entity.ontology_version_id, iri: projected.iri, kind: projected.kind } : null;
+              return iri ? [{ key: fact.hierarchy_projection?.id ?? fact.fact_id, entity: typed, iri, factId: fact.fact_id }] : [];
+            }),
+            next_cursor: ctx.parents.next_cursor,
+            total_count: ctx.parents.total_count,
+          }
+        : null,
     [ctx],
   );
+  const loadParents = useCallback(
+    (cursor: string, signal: AbortSignal) =>
+      source.hierarchy(entity, "parents", "literal_asserted", cursor, signal).then((page) => ({
+        items: page.items.map((edge): ParentItem => ({ key: edge.id, entity: { ontology_version_id: edge.parent.ontology_version_id ?? entity.ontology_version_id, iri: edge.parent.iri, kind: edge.parent.kind }, iri: edge.parent.iri, factId: null })),
+        next_cursor: page.next_cursor,
+      })),
+    [source, entity],
+  );
+  const parents = useContinuation(parentBase, loadParents, (item) => item.key);
+
+  const parentIris = useMemo(() => parents.items.map((item) => item.iri), [parents.items]);
   const parentLabel = useLabelLookup(entity.ontology_version_id, parentIris);
   useEffect(() => {
     if (ctx && source.kind === "exploration") seedLabel(entity.ontology_version_id, entity.iri, ctx.preferred_label.value);
@@ -138,14 +264,19 @@ export function EntityCard({
 
   const title = titleOverride ?? sideTitle(side, entity.kind);
   const label = ctx?.preferred_label.value;
-  const synonyms = (ctx?.synonyms.items ?? []).filter((fact) => literalText(fact) && literalText(fact) !== label);
-  const hiddenDuplicates = (ctx?.synonyms.items ?? []).filter((fact) => literalText(fact) === label);
-  const alternate = ctx?.categories.alternate_definitions;
-  const defining = DEFINING.flatMap((category) => ctx?.categories[category]?.items ?? []);
+  const synonyms = synonymPages.items.filter((fact) => literalText(fact) && literalText(fact) !== label);
+  const hiddenDuplicates = synonymPages.items.filter((fact) => literalText(fact) === label);
+  const definingCategories = DEFINING.filter((category) => (ctx?.categories[category]?.items.length ?? 0) > 0);
   const definingStatuses = DEFINING.map((category) => ctx?.categories[category]?.status).filter(Boolean) as string[];
   const definingStatus = definingStatuses.includes("absent_in_scope") ? "absent_in_scope" : definingStatuses.find((status) => status !== "available") ?? "absent_in_scope";
   const definingUnprepared = definingStatuses.some((status) => status === "not_exported");
-  const definingPartial = DEFINING.some((category) => ctx?.categories[category]?.truncated);
+  const definingTotals = definingCategories.map((category) => ctx?.categories[category]?.total_count ?? null);
+  const definingMore = definingCategories.some((category) => Boolean(ctx?.categories[category]?.next_cursor));
+  const definingMeta = !definingCategories.length
+    ? undefined
+    : definingTotals.every((value) => value != null)
+      ? `${definingTotals.reduce((sum, value) => sum! + value!, 0)} recorded`
+      : `${definingCategories.reduce((sum, category) => sum + (ctx?.categories[category]?.items.length ?? 0), 0)} on the first page${definingMore ? " · more exist" : ""}`;
   const scopeNote = ctx ? scopeText(ctx) : undefined;
   const moreCategories = MORE.filter((category) => (ctx?.categories[category]?.items.length ?? 0) > 0);
 
@@ -170,85 +301,85 @@ export function EntityCard({
 
       {ctx && showOriginal && (
         <>
-          <Section title="Definition" meta={ctx.definitions.items.length ? `Original · ${predicateName(ctx.definitions.items[0].predicate_iri)}` : undefined}>
-            {ctx.definitions.items.length ? (
-              <div className="definitions">
-                {ctx.definitions.items.map((fact) => (
-                  <p key={fact.fact_id} data-fact-id={fact.fact_id} className="definition-text" lang={fact.value?.term_type === "literal" ? fact.value.language ?? undefined : undefined}>
-                    {literalText(fact) ?? "Structured value: open the original axiom."}
-                  </p>
+          <Section title="Definition" meta={definitions.items.length ? `Original · ${predicateName(definitions.items[0].predicate_iri)}` : undefined}>
+            {definitions.items.length ? (
+              <div className="definitions" data-category="definitions">
+                {definitions.items.map((fact) => (
+                  <FactLiteral key={fact.fact_id} fact={fact} className="definition-text" />
                 ))}
-                {ctx.definitions.items.length > 1 && <p className="meta">{ctx.definitions.items.length} definitions are asserted; all are shown.</p>}
+                {definitions.complete && definitions.items.length > 1 && <p className="meta">{definitions.items.length} definitions are asserted; all are shown.</p>}
+                <Continuation state={definitions} noun={NOUNS.definitions} />
               </div>
             ) : (
               <EmptyReason status={ctx.definitions.status} what="definition" scopeNote={scopeNote} reason={ctx.definitions.reason} />
             )}
-            {alternate && alternate.items.length > 0 && (
-              <div className="alternate-definitions">
+            {alternate.items.length > 0 && (
+              <div className="alternate-definitions" data-category="alternate_definitions">
                 <span className="meta">Alternate {alternate.items.length === 1 ? "definition" : "definitions"} · {predicateName(alternate.items[0].predicate_iri)}</span>
                 {alternate.items.map((fact) => (
-                  <p key={fact.fact_id} data-fact-id={fact.fact_id} className="definition-text definition-alt">
-                    {literalText(fact)}
-                  </p>
+                  <FactLiteral key={fact.fact_id} fact={fact} className="definition-text definition-alt" />
                 ))}
+                <Continuation state={alternate} noun={NOUNS.alternate_definitions} />
               </div>
             )}
           </Section>
 
-          <Section title="Also called" meta={synonyms.length ? `${synonyms.length} ${synonyms.length === 1 ? "synonym" : "synonyms"}${ctx.synonyms.truncated ? " · more exist" : ""}` : undefined}>
-            {synonyms.length ? (
-              <>
-                <ul className="chip-list">
-                  {(allSynonyms ? synonyms : synonyms.slice(0, 6)).map((fact) => (
-                    <li key={fact.fact_id} data-fact-id={fact.fact_id} className="chip" title={predicateName(fact.predicate_iri)}>
-                      {literalText(fact)}
-                      <span className="chip-meta">{fact.synonym_scope ? `${fact.synonym_scope}` : predicateName(fact.predicate_iri).replace(/ synonym$/, "")}</span>
-                    </li>
-                  ))}
-                </ul>
-                {synonyms.length > 6 && (
-                  <button type="button" className="btn btn-sm" aria-expanded={allSynonyms} onClick={() => setAllSynonyms((value) => !value)}>
-                    {allSynonyms ? "Show fewer" : `Show ${synonyms.length - 6} more`}
-                  </button>
-                )}
-              </>
-            ) : hiddenDuplicates.length > 0 ? (
-              <p className="meta">Only a synonym identical to the label is recorded.</p>
-            ) : (
-              <EmptyReason status={ctx.synonyms.status} what="synonyms" scopeNote={scopeNote} reason={ctx.synonyms.reason} />
-            )}
-            {synonyms.length > 0 && hiddenDuplicates.length > 0 && (
-              <p className="meta">
-                {hiddenDuplicates.length} {hiddenDuplicates.length === 1 ? "synonym identical to the label is" : "synonyms identical to the label are"} not repeated; citations to {hiddenDuplicates.length === 1 ? "it" : "them"} still open the record.
-              </p>
-            )}
+          <Section title="Also called" meta={synonyms.length ? `${synonyms.length} ${synonyms.length === 1 ? "synonym" : "synonyms"}${synonymPages.complete ? "" : " loaded"}` : undefined}>
+            <div data-category="synonyms">
+              {synonyms.length ? (
+                <>
+                  <ul className="chip-list">
+                    {(allSynonyms ? synonyms : synonyms.slice(0, 6)).map((fact) => (
+                      <li key={fact.fact_id} data-fact-id={fact.fact_id} className="chip" title={predicateName(fact.predicate_iri)}>
+                        {literalText(fact)}
+                        <span className="chip-meta">{fact.synonym_scope ? `${fact.synonym_scope}` : predicateName(fact.predicate_iri).replace(/ synonym$/, "")}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {synonyms.length > 6 && (
+                    <button type="button" className="btn btn-sm" aria-expanded={allSynonyms} onClick={() => setAllSynonyms((value) => !value)}>
+                      {allSynonyms ? "Show fewer" : `Show ${synonyms.length - 6} more`}
+                    </button>
+                  )}
+                </>
+              ) : hiddenDuplicates.length > 0 && synonymPages.complete ? (
+                <p className="meta">Only a synonym identical to the label is recorded.</p>
+              ) : synonymPages.items.length === 0 ? (
+                <EmptyReason status={ctx.synonyms.status} what="synonyms" scopeNote={scopeNote} reason={ctx.synonyms.reason} />
+              ) : null}
+              {synonyms.length > 0 && hiddenDuplicates.length > 0 && (
+                <p className="meta">
+                  {hiddenDuplicates.length} {hiddenDuplicates.length === 1 ? "synonym identical to the label is" : "synonyms identical to the label are"} not repeated; citations to {hiddenDuplicates.length === 1 ? "it" : "them"} still open the record.
+                </p>
+              )}
+              <Continuation state={synonymPages} noun={NOUNS.synonyms} />
+            </div>
           </Section>
 
-          <Section title="Defining facts" meta={defining.length ? `${defining.length} ${definingPartial ? "shown · more exist" : "asserted"}` : undefined}>
-            {defining.length ? (
+          <Section title="Defining facts" meta={definingMeta}>
+            {definingCategories.length ? (
               <div className="fact-stack">
-                {defining.map((fact) => (
-                  <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
+                {definingCategories.map((category) => (
+                  <DefiningCategory key={category} category={category} page={ctx.categories[category]} entity={entity} onOpenEntity={onOpenEntity} />
                 ))}
               </div>
             ) : (
               <EmptyReason status={definingStatus} what="restrictions or other defining axioms" scopeNote={scopeNote} />
             )}
-            {definingUnprepared && !defining.length && definingStatus === "absent_in_scope" && <p className="meta">Some other kinds of defining axioms were not prepared for this view.</p>}
+            {definingUnprepared && !definingCategories.length && definingStatus === "absent_in_scope" && <p className="meta">Some other kinds of defining axioms were not prepared for this view.</p>}
           </Section>
 
-          <Section title="Parents" meta={parentIris.length ? `${parentIris.length} asserted${parentIris.length > 1 ? " · multiple inheritance" : ""}${ctx.parents.truncated ? " · more exist" : ""}` : undefined}>
-            {parentIris.length ? (
-              <ul className="parent-list">
-                {ctx.parents.items.map((fact) => {
-                  const iri = fact.value?.term_type === "iri" ? fact.value.iri : null;
-                  if (!iri) return null;
-                  const text = parentLabel(iri);
+          <Section title="Parents" meta={parents.items.length ? `${parents.items.length}${parents.complete ? " asserted" : parents.total != null ? ` of ${parents.total}` : " shown"}${parents.items.length > 1 || (parents.total ?? 0) > 1 ? " · multiple inheritance" : ""}` : undefined}>
+            <div data-section="parents">
+            {parents.items.length ? (
+              <ul className="parent-list" data-category="parents">
+                {parents.items.map((item) => {
+                  const text = parentLabel(item.iri);
                   return (
-                    <li key={fact.fact_id} data-fact-id={fact.fact_id}>
-                      <button type="button" className={`parent-link parent-${side}`} onClick={() => onOpenEntity?.(iri)} disabled={!onOpenEntity}>
-                        <span>{text?.value ?? curie(iri)}</span>
-                        <span className="iri">{curie(iri)}</span>
+                    <li key={item.key} data-fact-id={item.factId ?? undefined} data-edge-id={item.key} data-iri={item.iri} data-kind={item.entity?.kind}>
+                      <button type="button" className={`parent-link parent-${side}`} onClick={() => item.entity && onOpenEntity?.(item.entity)} disabled={!onOpenEntity || !item.entity}>
+                        <span>{text?.value ?? curie(item.iri)}</span>
+                        <span className="iri">{curie(item.iri)}</span>
                       </button>
                     </li>
                   );
@@ -257,28 +388,19 @@ export function EntityCard({
             ) : (
               <EmptyReason status={ctx.parents.status} what="named parent" scopeNote={scopeNote} reason={ctx.parents.reason} />
             )}
+            <Continuation state={parents} noun={NOUNS.parents} />
+            </div>
           </Section>
 
           {moreCategories.length > 0 && (
             <div className="card-section">
               <button type="button" className="btn btn-sm" aria-expanded={moreOpen} onClick={() => setMoreOpen((value) => !value)}>
-                {moreOpen ? "Hide other recorded facts" : `Other recorded facts (${moreCategories.reduce((sum, c) => sum + (ctx.categories[c]?.items.length ?? 0), 0)})`}
+                {moreOpen ? "Hide other recorded facts" : `Other recorded facts (${moreCategories.reduce((sum, c) => sum + (ctx.categories[c]?.total_count ?? ctx.categories[c]?.items.length ?? 0), 0)})`}
               </button>
               {moreOpen && (
                 <div className="fact-stack">
                   {moreCategories.map((category) => (
-                    <div key={category} className="more-category">
-                      <h4>{MORE_NAMES[category]}</h4>
-                      {ctx.categories[category].items.map((fact) =>
-                        literalText(fact) ? (
-                          <p key={fact.fact_id} data-fact-id={fact.fact_id} className="more-literal">
-                            {literalText(fact)} <span className="meta">· {predicateName(fact.predicate_iri)}</span>
-                          </p>
-                        ) : (
-                          <AxiomBlock key={fact.fact_id} ontology={entity.ontology_version_id} factId={fact.fact_id} subject={entity} onOpen={onOpenEntity} />
-                        ),
-                      )}
-                    </div>
+                    <MoreCategory key={category} category={category} page={ctx.categories[category]} entity={entity} onOpenEntity={onOpenEntity} />
                   ))}
                 </div>
               )}

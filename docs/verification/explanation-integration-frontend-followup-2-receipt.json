@@ -1,0 +1,550 @@
+{
+ "schema_version": "exact-study-integration-frontend-followup/1",
+ "recorded_at": "2026-10-04T00:35:53+00:00",
+ "status": "R10_R11_fixed_and_verified_on_synthetic_fixture_R01_R02_rejoint_verified_R03_blocked_on_J10_manual_audit",
+ "synthetic_only": true,
+ "reviewed_commit": "ad9461c",
+ "commits": {
+  "specification": "fac6056",
+  "r10": "d8b19a0",
+  "r11": "e754e77",
+  "tests_and_fixture": "eb4f955",
+  "documentation": "Subsequent commit containing this receipt; deliberately not self-referential"
+ },
+ "backend_commit": "96b76fe74afab6d2fdb6437e2ff0b1c28d9b5a3f",
+ "backend_changed": false,
+ "fixture_tooling_change": "tools/build_explanation_v2_fixture.py --paged-facts also adds paged object/data properties (default 0; existing fixtures unchanged)",
+ "generated_contracts_sha256": {
+  "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "8ab442c83f8e48cb04d95d0fa1314aadd74d0276aceab701bdab0afe8167bf71",
+  "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "377adad61c90efb788bea90e6c40ec7f5a6f9b0a3b99390b00b7ea23623909bc",
+  "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+  "specs/explanation-framework/protocol/study.runtime-openapi.json": "fc546d42e83ae9fbe9e2c9d847c82482e2d8751580864bd15f10a812eab40780"
+ },
+ "findings": {
+  "R10": {
+   "priority": 2,
+   "reopens": "R02",
+   "requirement": "F20",
+   "status": "fixed_and_verified"
+  },
+  "R11": {
+   "priority": 2,
+   "reopens": "R01",
+   "requirement": "F21",
+   "status": "fixed_and_verified"
+  }
+ },
+ "fixture": {
+  "generator": "python -m tools.build_explanation_v2_fixture <dir> --navigation-size 65 --paged-facts 26",
+  "file_count": 59,
+  "inventory_sha256": "8ba091b98755c19fe5c8a37be7d3ddfe94b59a6ee2688f3325eced98c95a96b8",
+  "publication_file_sha256": "ea747606419ae5fcb74a91241523365f259fcba6da5c468ebfafe79d0f9322ac",
+  "revisions": {
+   "synthetic-v2-15f1b131eade4c6b81dd937c88cf89e2": "dbbb73db249b91ced4be3f3292bff120dacb6610722693c8345a9b59d7ccfba3",
+   "synthetic-v2-15f1b131eade4c6b81dd937c88cf89e2-cmp": "90ccb187391b8ab9351fdd06864f125757ad122789bad41f30822477107440e6",
+   "synthetic-v2-15f1b131eade4c6b81dd937c88cf89e2-ctx": "a4fcfcbf1c666d89a3905f6a8dee546d2bbf8b0e33179f5948582894496b0359",
+   "synthetic-v2-15f1b131eade4c6b81dd937c88cf89e2-desc": "ee24f81b52b06ba37328550ad6d7100a0362f3d5acce26859ca1836118ab2faa",
+   "synthetic-v2-15f1b131eade4c6b81dd937c88cf89e2-nav": "6be76307e0a19ad659847be982f249e994f8f844a2efe8f9aacc39e753913bcb"
+  }
+ },
+ "baseline_reproduction": {
+  "commit": "ad9461c",
+  "browser": "5 of 7 new regressions failed; obsolete-presentation and obsolete-session checks passed (defensive)",
+  "r10": "released old check re-blocked the recovered case (alert count 1, expected 0)",
+  "r11_navigation_diagnostic": {
+   "baseline": {
+    "object_property": "sk=class",
+    "data_property": "sk=class"
+   },
+   "fixed": {
+    "object_property": "sk=object_property",
+    "data_property": "sk=data_property"
+   }
+  }
+ },
+ "checks": {
+  "typecheck_and_build": "passed",
+  "unit": {
+   "passed": 73,
+   "failed": 0
+  },
+  "browser": {
+   "passed": 87,
+   "skipped": 2,
+   "failed": 0,
+   "skips": "legacy.spec.ts (2): historical run directory unavailable",
+   "commit": "eb4f955",
+   "fresh_participant_journey": "passed"
+  },
+  "backend_fixture_dependent_suites": {
+   "passed": 40,
+   "skipped": 1,
+   "skips": "PostgreSQL-only v2 backup/restore"
+  },
+  "formatting": "black and isort clean on changed Python",
+  "spec_validator": "passed"
+ },
+ "environment": {
+  "build_copy": "Locked dependencies installed outside iCloud (npm ci --prefer-offline) and a scratch frontend copy rsynced from the repository before every build; the repository is the only source"
+ },
+ "tests": [
+  {
+   "id": "accessibility.spec.ts:168",
+   "title": "a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:184",
+   "title": "dialog keyboard focus wraps and returns to its trigger",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:203",
+   "title": "detail tabs support arrow-key navigation and activation",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:105",
+   "title": "desktop, light › comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:112",
+   "title": "desktop, light › ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:122",
+   "title": "desktop, light › bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:129",
+   "title": "desktop, light › study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:134",
+   "title": "desktop, light › study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:148",
+   "title": "desktop, light › researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:105",
+   "title": "desktop, dark › comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:112",
+   "title": "desktop, dark › ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:122",
+   "title": "desktop, dark › bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:129",
+   "title": "desktop, dark › study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:134",
+   "title": "desktop, dark › study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:148",
+   "title": "desktop, dark › researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:105",
+   "title": "mobile enlarged text, light › comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:112",
+   "title": "mobile enlarged text, light › ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:122",
+   "title": "mobile enlarged text, light › bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:129",
+   "title": "mobile enlarged text, light › study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:134",
+   "title": "mobile enlarged text, light › study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:148",
+   "title": "mobile enlarged text, light › researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:105",
+   "title": "mobile enlarged text, dark › comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:112",
+   "title": "mobile enlarged text, dark › ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:122",
+   "title": "mobile enlarged text, dark › bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:129",
+   "title": "mobile enlarged text, dark › study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:134",
+   "title": "mobile enlarged text, dark › study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "accessibility.spec.ts:148",
+   "title": "mobile enlarged text, dark › researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:10",
+   "title": "prepared comparison, evidence, graph and saved pair navigation",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:40",
+   "title": "every generated-text citation opens its exact original record and returns focus (C03)",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:61",
+   "title": "the graph keeps its view across tabs and draws only supported, legend-matched lines (C07, C08)",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:86",
+   "title": "run-discovery failures remain errors and can be retried",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:99",
+   "title": "a capped candidate list declares incomplete ranking coverage",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:117",
+   "title": "ontology search, independent focus, hierarchy and keyboard dialog",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:136",
+   "title": "responsive comparison and persistent theme/text preferences",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:155",
+   "title": "local library rejects corrupt input and opens a verified ZIP",
+   "status": "passed"
+  },
+  {
+   "id": "exploration.spec.ts:176",
+   "title": "public demo keeps exploration and excludes private/import routes",
+   "status": "passed"
+  },
+  {
+   "id": "fact-pagination.spec.ts:14",
+   "title": "main app: full context pages every category beyond its first page, without repeats or false completeness",
+   "status": "passed"
+  },
+  {
+   "id": "fact-pagination.spec.ts:34",
+   "title": "main app: a object property's later-page superproperty opens as a object property (R11)",
+   "status": "passed"
+  },
+  {
+   "id": "fact-pagination.spec.ts:34",
+   "title": "main app: a data property's later-page superproperty opens as a data property (R11)",
+   "status": "passed"
+  },
+  {
+   "id": "legacy.spec.ts:37",
+   "title": "saved-run API and root redirect retain the same-origin run",
+   "status": "skipped"
+  },
+  {
+   "id": "legacy.spec.ts:67",
+   "title": "saved-run canvas, filters and source navigation remain interactive",
+   "status": "skipped"
+  },
+  {
+   "id": "study-recovery.spec.ts:71",
+   "title": "a stale tab cannot save into another equal-revision session sharing the cookie",
+   "status": "passed"
+  },
+  {
+   "id": "study-recovery.spec.ts:97",
+   "title": "failed explanation content blocks ranking and pending submission does not claim success",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-backend.spec.ts:48",
+   "title": "fresh browser journey: training, both conditions, reports and completion over the scoped workspace",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:49",
+   "title": "R03 tutorial position (J06) › lesson 1 → 2 then reload without any lesson-2 action restores lesson 2, with focus on the new heading",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:63",
+   "title": "R03 tutorial position (J06) › the assessment landing, a partial draft and a focused question all survive reload",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:91",
+   "title": "R03 tutorial position (J06) › an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:111",
+   "title": "R03 tutorial position (J06) › rapid Next/Back while saves are delayed keeps the last destination, on screen and on the server",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:126",
+   "title": "R03 tutorial position (J06) › navigation while offline is kept in this tab and saved after reconnecting",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:140",
+   "title": "R03 tutorial position (J06) › a stale second tab adopts the server's position after its conflicting navigation",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:158",
+   "title": "R03 tutorial position (J06) › opening tutorial help during a scored case keeps completion, assignment and the case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:186",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › the scored case reads its scoped workspace: six contexts, admitted descriptions and comparisons, then one case_ready",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:208",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a v2 explanation case without its workspace descriptor is blocked, never served from prepared excerpts",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:226",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › capabilities for another scope are incompatible and block the case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:240",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a target-context failure blocks ranking and case_ready until a retry succeeds, reusing valid reads",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:271",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a slow fifth candidate keeps the case loading; case_ready and case timing start only after it",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:291",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a comparison failure blocks with its own label; a profile failure likewise",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:310",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:320",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a 200 response describing another entity is an invalid binding and blocks readiness",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:333",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › an optional hierarchy failure stays local and does not block submission",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:344",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a blocking failure keeps a saved partial ranking and its order through retry",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:361",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › replacing the session aborts the old case: nothing from it becomes ready",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:375",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › a second tab loads its own readiness and reports its own ready observation (J05)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:391",
+   "title": "R01/R02 scored explanation case (J01, J04, J05) › pause and resume never reopen case timing before the content is usable again",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:406",
+   "title": "J02 participant boundaries (browser subset) › a baseline case reads no workspace, and a previous explanation scope is denied after advancing",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:445",
+   "title": "J08 researcher export (browser) › v2 exports request and verify analysis 3 in JSON and CSV",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:466",
+   "title": "J08 researcher export (browser) › a returned schema other than analysis 3 is reported and not saved (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:483",
+   "title": "J10 layout and accessibility on the real service › setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (light)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:483",
+   "title": "J10 layout and accessibility on the real service › setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (dark)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:544",
+   "title": "R06/R07 study full context and fact pagination (19 F16, F17) › a searched non-focal entity's full context pages every category; closing keeps the case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:580",
+   "title": "R06/R07 study full context and fact pagination (19 F16, F17) › a focal entity's full context shows its description; a citation opens and returns; a parent navigates",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:605",
+   "title": "R08 retry refetches unusable responses (19 F18) › a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:637",
+   "title": "R08 retry refetches unusable responses (19 F18) › a slow required read finishing after another failed cannot unblock the case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:652",
+   "title": "Optional reads refused with 403 (19 F18) › a refused optional read stays local; only a refused scope blocks the case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:679",
+   "title": "R09 readiness follows the admitted components (19 F19) › pair_comparison only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:679",
+   "title": "R09 readiness follows the admitted components (19 F19) › original_context only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:679",
+   "title": "R09 readiness follows the admitted components (19 F19) › entity_description only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:679",
+   "title": "R09 readiness follows the admitted components (19 F19) › hierarchy + evidence_table + evidence_graph only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:716",
+   "title": "R09 readiness follows the admitted components (19 F19) › comparison only: a recorded absence is usable (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:755",
+   "title": "R10 access checks belong to the attempt that issued them (19 F20) › a delayed check failure cannot undo a successful retry; the draft and cached contexts survive",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:788",
+   "title": "R10 access checks belong to the attempt that issued them (19 F20) › a check still in flight from a submitted presentation cannot affect the next case",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:808",
+   "title": "R10 access checks belong to the attempt that issued them (19 F20) › a check still in flight from a replaced session cannot affect the new session",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:828",
+   "title": "R11 continued parents keep their entity type (19 F21) › study: a object property's later-page superproperty opens as a object property; the case is kept",
+   "status": "passed"
+  },
+  {
+   "id": "study-v2-integration.spec.ts:828",
+   "title": "R11 continued parents keep their entity type (19 F21) › study: a data property's later-page superproperty opens as a data property; the case is kept",
+   "status": "passed"
+  },
+  {
+   "id": "study.spec.ts:69",
+   "title": "complete HTTPS/PostgreSQL participant journey, pause, reload, timing and condition isolation",
+   "status": "passed"
+  },
+  {
+   "id": "study.spec.ts:152",
+   "title": "offline answers survive reload and reconnect before submission",
+   "status": "passed"
+  },
+  {
+   "id": "study.spec.ts:169",
+   "title": "researcher browser authentication, publication, links, progress, exports and closure",
+   "status": "passed"
+  },
+  {
+   "id": "typed-browse.spec.ts:7",
+   "title": "NCIT property search preserves kind in hierarchy, URL, reload and full context",
+   "status": "passed"
+  },
+  {
+   "id": "typed-browse.spec.ts:42",
+   "title": "an old in-flight search cannot replace the new term's real results",
+   "status": "passed"
+  }
+ ],
+ "remaining": [
+  "J10 manual screen-reader and keyboard audit (continuation controls, full-context dialog, blocked state, typed navigation)",
+  "Intermittent reload stall with study-service h11 'Too little data for declared Content-Length' on client disconnect (backend investigation, unchanged)",
+  "Bare IRI terms in original axioms are shown but not navigable (no recorded type)",
+  "Real backend-release package, Docker/Render deployment and restore, trusted HTTPS, usability/pilot, owner approvals and adjudication"
+ ],
+ "scope_controls": {
+  "push": false,
+  "deployment": false,
+  "recruitment": false,
+  "participant_contact": false,
+  "secrets_in_git": false
+ }
+}

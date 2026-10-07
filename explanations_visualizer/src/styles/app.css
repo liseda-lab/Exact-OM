@@ -1220,6 +1220,11 @@
   flex-grow: 1;
 }
 
+/* Cytoscape's container rule, kept here instead of the inline <style> it would inject. */
+.__________cytoscape_container {
+  position: relative;
+}
+
 .graph-canvas {
   width: 100%;
   height: clamp(22rem, 60vh, 40rem);

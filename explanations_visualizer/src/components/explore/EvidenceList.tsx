@@ -14,6 +14,7 @@ import { Expression, hasReading } from "@/components/owl/Expression";
 import { OriginalAxiom } from "@/components/owl/AxiomBlock";
 import { useFactInspector } from "@/components/workspace/FactInspector";
 import { axiomRelation } from "@/lib/owl";
+import type { EntityRef } from "@/lib/types";
 import type { AsyncState } from "@/lib/useAsync";
 import { interpretationText } from "@/lib/workspace/interpretation";
 import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
@@ -27,7 +28,7 @@ export function EvidenceList({
   state: AsyncState<EvidenceBundle>;
   selected?: string | null;
   onSelect?: (evidenceId: string) => void;
-  onOpenEntity?: (side: "source" | "target", iri: string) => void;
+  onOpenEntity?: (side: "source" | "target", entity: EntityRef) => void;
 }) {
   const [weights, setWeights] = useState(false);
   const [openAxiom, setOpenAxiom] = useState<string | null>(null);
@@ -100,7 +101,7 @@ export function EvidenceList({
                   {readable && relation ? (
                     <p className="fact-reading">
                       <span className="fact-relation">{relation.relation}</span>{" "}
-                      <Expression node={relation.other} ontology={item.entity.ontology_version_id} onOpen={onOpenEntity ? (iri) => onOpenEntity(item.side, iri) : undefined} />
+                      <Expression node={relation.other} ontology={item.entity.ontology_version_id} onOpen={onOpenEntity ? (iri, kind) => onOpenEntity(item.side, { ontology_version_id: item.entity.ontology_version_id, iri, kind }) : undefined} />
                     </p>
                   ) : (
                     <p className="meta">No plain-language template; the original is shown.</p>

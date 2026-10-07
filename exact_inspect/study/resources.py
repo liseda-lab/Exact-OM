@@ -228,6 +228,16 @@ def referenced_terms(facts: list[OriginalFact]) -> Iterator[tuple[str, str]]:
                 pending.extend(node)
 
 
+def validate_claim_identities(claims):
+    """IDs are client index keys; one ID cannot silently erase another scoped claim."""
+    seen = {}
+    for claim in claims:
+        value = claim.model_dump(mode="json")
+        previous = seen.setdefault(claim.claim_id, value)
+        if previous != value:
+            raise ValueError("Conflicting claim identity for different content or scope")
+
+
 class ExplanationResource(StrictModel):
     """Strict allowlist for study panels; arbitrary scorer dictionaries cannot enter."""
 
@@ -252,6 +262,7 @@ class ExplanationResource(StrictModel):
 
     @model_validator(mode="after")
     def grounded_scope(self):
+        validate_claim_identities(self.entity_profiles + self.pair_comparison)
         facts: dict[str, list[OriginalFact]] = {}
         contextual_facts = {}
         identities = {(e.ontology_version_id, e.iri, e.kind) for e in self.entities}

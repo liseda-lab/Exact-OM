@@ -308,7 +308,7 @@ class StudyDefinition(StrictModel):
 
 
 class Publish(StrictModel):
-    definition: StudyDefinition
+    definition: StudyDefinition | StudyDefinitionV2
     case_keys: list[CaseKey]
 
 
@@ -592,3 +592,9 @@ class EventAcknowledgement(StrictModel):
 
 class TimingAcknowledgement(StrictModel):
     acknowledged_segment_id: Identifier
+
+
+# Additive v2 publication dispatch leaves all legacy model defaults and bytes intact.
+from .v2_models import StudyDefinitionV2  # noqa: E402
+
+Publish.model_rebuild()

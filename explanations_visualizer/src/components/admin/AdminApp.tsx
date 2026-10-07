@@ -3,6 +3,8 @@
 // Minimal researcher administration over the authenticated admin API. The researcher token
 // is held in memory for this tab only and sent as a bearer header; it is never stored.
 // This page never sends invitations to anyone: links are shown once for you to distribute.
+// Exports name their derived schema explicitly: corrected exact-study/2.0 analyses request
+// exact-study-analysis/3 and the returned manifest is verified before anything is saved.
 
 import { useRef, useState } from "react";
 
@@ -11,6 +13,32 @@ import { IconCopy, IconDownload, IconWarning } from "@/components/common/Icons";
 import { TextSizeControl, ThemeControl } from "@/components/shell/Preferences";
 import { ApiError } from "@/lib/api";
 import { readStored, writeStored } from "@/lib/prefs";
+import { readZipEntry } from "@/lib/zipManifest";
+
+/** Researcher-visible publication metadata from the authenticated revision listing. */
+interface RevisionSummary {
+  study_revision: string;
+  contract_version: string;
+  synthetic: boolean;
+  closed: boolean;
+  tutorial_version: string | null;
+  source_export_version?: string;
+  supported_analysis_schemas?: string[];
+}
+
+export const CORRECTED_ANALYSIS = "exact-study-analysis/3";
+const ARCHIVE_SCHEMA: Record<string, string> = { "exact-study-analysis/1": "exact-study-csv/1", "exact-study-analysis/2": "exact-study-csv/2", "exact-study-analysis/3": "exact-study-csv/3" };
+
+/** Which derived analysis schema a publication's export requests (19 F14). */
+export function exportPlan(summary: RevisionSummary): { request: string | null; expected: string } | { error: string } {
+  if (summary.contract_version === "exact-study/2.0") {
+    if (!summary.supported_analysis_schemas?.includes(CORRECTED_ANALYSIS))
+      return { error: "This study service cannot derive the corrected analysis export (exact-study-analysis/3) for this revision. Nothing was exported; update the service first." };
+    return { request: CORRECTED_ANALYSIS, expected: CORRECTED_ANALYSIS };
+  }
+  if (summary.contract_version === "exact-study/1.0") return { request: null, expected: "exact-study-analysis/1" };
+  return { error: `This page does not export ${summary.contract_version} publications.` };
+}
 
 const STAGE_NAMES: [string, string][] = [
   ["welcome", "Welcome"],
@@ -76,6 +104,8 @@ function download(blob: Blob, filename: string) {
 }
 
 export function AdminApp() {
+  const [revisions, setRevisions] = useState<RevisionSummary[]>([]);
+  const [revisionCursor, setRevisionCursor] = useState<string | null>(null);
   const [token, setToken] = useState("");
   const [tokenInput, setTokenInput] = useState("");
   const [revision, setRevision] = useState(() => (typeof window === "undefined" ? "" : readStored<string>("exact.admin.revision", "")));
@@ -102,6 +132,8 @@ export function AdminApp() {
     setReissued(null);
     setSessionId("");
     setProgress(null);
+    setRevisions([]);
+    setRevisionCursor(null);
     setConfirmClose(false);
     setBusy(null);
     setMessage(null);
@@ -126,6 +158,22 @@ export function AdminApp() {
     }
   };
   const rev = encodeURIComponent(revision.trim());
+  const selected = revisions.find((item) => item.study_revision === revision.trim()) ?? null;
+
+  /** The listed metadata for a revision, paging the authenticated listing if needed. */
+  const findRevision = async (wanted: string): Promise<RevisionSummary | null> => {
+    const known = revisions.find((item) => item.study_revision === wanted);
+    if (known) return known;
+    let cursor: string | null = null;
+    for (let page = 0; page < 50; page += 1) {
+      const result: { data: { items: RevisionSummary[]; next_cursor: string | null } } = await adminRequest(token, "GET", `/api/v1/admin/studies?limit=100${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`);
+      const found = result.data.items.find((item) => item.study_revision === wanted);
+      if (found) return found;
+      cursor = result.data.next_cursor;
+      if (!cursor) return null;
+    }
+    return null;
+  };
 
   if (!token) {
     return (
@@ -198,8 +246,15 @@ export function AdminApp() {
               aria-describedby="revision-note"
             />
             <span id="revision-note" className="meta">
-              This service version cannot list studies: enter the revision exactly as published. The page remembers the last revision you used, never the token.
+              Load published revisions or enter one exactly. The page remembers the last revision you used, never the token.
             </span>
+            <button type="button" className="btn btn-sm" disabled={busy !== null} onClick={async () => {
+              const result = await run("revisions", () => adminRequest<{ items: typeof revisions; next_cursor: string | null }>(token, "GET", `/api/v1/admin/studies${revisionCursor ? `?cursor=${encodeURIComponent(revisionCursor)}` : ""}`));
+              if (result) { setRevisions((current) => revisionCursor ? [...current, ...result.data.items] : result.data.items); setRevisionCursor(result.data.next_cursor); }
+            }}>{revisionCursor ? "Load more revisions" : "Load published revisions"}</button>
+            {revisions.length > 0 && <select className="input" aria-label="Published study revision" value={revisions.some((item) => item.study_revision === revision) ? revision : ""} disabled={busy !== null} onChange={(event) => {
+              setProgress(null); setLinks([]); setReissued(null); setRevision(event.target.value); writeStored("exact.admin.revision", event.target.value);
+            }}><option value="" disabled>Select a publication</option>{revisions.map((item) => <option key={item.study_revision} value={item.study_revision}>{item.study_revision} · {item.contract_version}{item.source_export_version ? ` · source export ${item.source_export_version}` : ""} · {item.synthetic ? "synthetic" : "participant"} · {item.closed ? "closed" : "open"}{item.tutorial_version ? ` · ${item.tutorial_version}` : ""}</option>)}</select>}
           </div>
           <label className="btn file-label">
             Publish a study revision…
@@ -400,21 +455,49 @@ export function AdminApp() {
               className="btn btn-primary"
               disabled={!revision.trim() || busy !== null}
               onClick={async () => {
-                const query = new URLSearchParams({ include_test: String(includeTest), include_keys: String(includeKeys), format }).toString();
-                const result = await run("export", () => adminRequest<Record<string, unknown>>(token, "POST", `/api/v1/admin/studies/${rev}/exports?${query}`));
+                const result = await run("export", async () => {
+                  const summary = await findRevision(revision.trim());
+                  if (!summary) throw new ApiError(404, "not_listed", "This revision is not in the service's list of published revisions. Check it, or load the published revisions.");
+                  const plan = exportPlan(summary);
+                  if ("error" in plan) throw new ApiError(0, "incompatible", plan.error);
+                  const query = new URLSearchParams({ include_test: String(includeTest), include_keys: String(includeKeys), format, ...(plan.request ? { analysis_schema: plan.request } : {}) }).toString();
+                  const response = await adminRequest<Record<string, unknown>>(token, "POST", `/api/v1/admin/studies/${rev}/exports?${query}`);
+                  let manifest: { export_id?: string; schema?: string; archive_schema?: string; source_protocol_versions?: Record<string, string> } | null = null;
+                  if (response.blob) {
+                    const bytes = await readZipEntry(response.blob, "manifest.json");
+                    manifest = bytes ? JSON.parse(new TextDecoder().decode(bytes)) : null;
+                  } else manifest = (response.data.manifest ?? null) as typeof manifest;
+                  const archiveOk = !response.blob || manifest?.archive_schema === ARCHIVE_SCHEMA[plan.expected];
+                  if (manifest?.schema !== plan.expected || !archiveOk)
+                    throw new ApiError(
+                      0,
+                      "schema_mismatch",
+                      `The service returned ${manifest?.schema ?? "an export without a schema"}${response.blob ? ` (${manifest?.archive_schema ?? "no archive schema"})` : ""} instead of ${plan.expected}. It was not downloaded, so it cannot be mistaken for the requested analysis${manifest?.export_id ? ` (export ${manifest.export_id})` : ""}.`,
+                    );
+                  return { response, manifest, summary };
+                });
                 if (!result) return;
-                if (result.blob) download(result.blob, result.filename ?? `export-${Date.now()}.zip`);
-                else {
-                  const manifest = (result.data.manifest ?? {}) as { export_id?: string };
-                  download(new Blob([JSON.stringify(result.data, null, 2)], { type: "application/json" }), `${manifest.export_id ?? `export-${Date.now()}`}.json`);
-                }
-                setMessage({ tone: "ok", text: "Export created and downloaded. It is frozen with its manifest on the server." });
+                const { response, manifest, summary } = result;
+                if (response.blob) download(response.blob, response.filename ?? `${manifest?.export_id ?? `export-${Date.now()}`}.zip`);
+                else download(new Blob([JSON.stringify(response.data, null, 2)], { type: "application/json" }), `${manifest?.export_id ?? `export-${Date.now()}`}.json`);
+                const source = manifest?.source_protocol_versions?.export ?? summary.source_export_version;
+                setMessage({
+                  tone: "ok",
+                  text: `Export ${manifest?.export_id ?? ""} downloaded: derived schema ${manifest?.schema}${response.blob ? ` (${manifest?.archive_schema})` : ""} from a ${summary.contract_version} publication${source ? ` whose frozen source export version is ${source}` : ""}. It is saved with its manifest on the server.`,
+                });
               }}
             >
               Create export
             </button>
           </div>
-          <p className="muted">Exports never contain invitation links, session cookies or free-text comments. Answer keys are included only when you ask for them.</p>
+          <p className="meta" id="export-version-note">
+            {selected
+              ? `Source protocol ${selected.contract_version}${selected.source_export_version ? ` · frozen source export ${selected.source_export_version}` : ""}${selected.supported_analysis_schemas?.length ? ` · derived exports available: ${selected.supported_analysis_schemas.join(", ")}` : ""}. This page requests ${selected.contract_version === "exact-study/2.0" ? CORRECTED_ANALYSIS : "the frozen exact-study-analysis/1"}.`
+              : "exact-study/2.0 revisions are exported as the corrected exact-study-analysis/3; exact-study/1.0 revisions keep their frozen exact-study-analysis/1. The returned manifest is checked before the file is saved."}
+          </p>
+          <p className="muted">
+            Analysis 3 reports page-observation seconds from each page's own clock and leaves unique elapsed coverage unknown; it never subtracts summed page time from elapsed time. Exports never contain invitation links, session cookies or free-text comments. Answer keys are included only when you ask for them.
+          </p>
         </section>
       </main>
       {confirmClose && (

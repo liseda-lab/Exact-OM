@@ -83,6 +83,7 @@ export function isAbort(error: unknown): boolean {
 
 /** Plain-language sentence for a failed request, never a raw stack or path. */
 export function describeError(error: unknown): string {
+  if (error instanceof Error && error.name === "InvalidResponseError") return `The service's response could not be used: ${error.message} Retry to fetch it again.`;
   if (!(error instanceof ApiError)) return "Something went wrong while loading this part.";
   switch (error.code) {
     case "network_unreachable":

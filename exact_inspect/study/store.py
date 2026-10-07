@@ -134,7 +134,12 @@ class StudyStore:
             timezone.utc
         ):
             raise StudyError(410, "Study closed")
-        return row, json.loads(row["state"]), study
+        state = json.loads(row["state"])
+        if study["contract_version"] == "exact-study/2.0":
+            from .tutorial import normalize_position
+
+            normalize_position(study["tutorial"], state["tutorial_progress"])
+        return row, state, study
 
     def publish(self, publication: Publish):
         """Verify and freeze participant packages; store keys in a separate table."""
@@ -221,6 +226,23 @@ class StudyStore:
                 raise StudyError(
                     422, "Prepared resource failed policy or provenance admission"
                 ) from exc
+        from .resources import validate_claim_identities
+
+        visible_scopes = [*study["cases"]]
+        if study["contract_version"] == "exact-study/2.0":
+            visible_scopes.append(study["tutorial"]["case"])
+        for case in visible_scopes:
+            try:
+                validate_claim_identities(
+                    [
+                        claim
+                        for asset_id in case["explanation_refs"]
+                        for resource in [admitted_explanations[asset_id]]
+                        for claim in resource.entity_profiles + resource.pair_comparison
+                    ]
+                )
+            except ValueError as exc:
+                raise StudyError(422, str(exc)) from exc
         for case in study["cases"]:
             available = {admitted_ontologies[aid] for aid in case["ontology_resource_ids"]}
             required = {
@@ -251,13 +273,47 @@ class StudyStore:
                     for evidence in resource.evidence
                 ):
                     raise StudyError(422, "Explanation resource is outside its case scope")
-        study["questionnaires"] = definitions(study["components"], study["form_version"])
+        if study["contract_version"] == "exact-study/2.0":
+            from .tutorial import validate_publication
+            from .workspace import validate_publication_workspaces
+
+            try:
+                validate_publication(self, study, admitted_ontologies, admitted_explanations)
+                validate_publication_workspaces(self, study, admitted_explanations)
+            except ValueError as exc:
+                raise StudyError(422, str(exc)) from exc
+        study["questionnaires"] = definitions(
+            study["components"],
+            study["form_version"],
+            ordered=study["contract_version"] == "exact-study/2.0",
+        )
         payload = canonical(study)
         with self.transaction() as db:
             if self.postgres:
                 db.execute("SELECT pg_advisory_xact_lock(173912468)")
             for published in db.execute("SELECT payload FROM studies").fetchall():
                 previous = json.loads(published["payload"])
+                if (
+                    study["contract_version"]
+                    == previous.get("contract_version")
+                    == "exact-study/2.0"
+                ):
+                    if (
+                        previous["tutorial"]["version"] == study["tutorial"]["version"]
+                        and previous["tutorial"]["hash"] != study["tutorial"]["hash"]
+                    ):
+                        raise StudyError(
+                            409, "Tutorial version is already frozen with different content"
+                        )
+                    if previous["tutorial"]["assessment_version"] == study["tutorial"][
+                        "assessment_version"
+                    ] and any(
+                        previous["tutorial"][key] != study["tutorial"][key]
+                        for key in ("assessment", "grading")
+                    ):
+                        raise StudyError(
+                            409, "Assessment version is already frozen with different content"
+                        )
                 if (
                     previous["form_version"] == study["form_version"]
                     and previous["questionnaires"] != study["questionnaires"]
@@ -283,6 +339,11 @@ class StudyStore:
                 if stored != keys:
                     raise StudyError(409, "Published adjudication is immutable")
             else:
+                if study["contract_version"] == "exact-study/1.0" and not study["synthetic"]:
+                    raise StudyError(
+                        422,
+                        "New live publications require exact-study/2.0; existing legacy sessions remain resumable",
+                    )
                 db.execute(
                     "INSERT INTO studies(revision, payload, frozen_hash) VALUES (?, ?, ?)",
                     (study["study_revision"], payload, digest(payload)),
@@ -383,6 +444,11 @@ class StudyStore:
                     "gaps": [],
                     "missingness_reason": None,
                 }
+                if study["contract_version"] == "exact-study/2.0":
+                    from .tutorial import initial_progress
+
+                    state["tutorial_progress"] = initial_progress(study["tutorial"])
+                    state["consultation_drafts"] = {}
                 db.execute(
                     "INSERT INTO sessions(id, study_revision, generation, invite_digest, test, state) VALUES (?, ?, 1, ?, ?, ?)",
                     (sid, revision, digest(secret), int(test), canonical(state)),
@@ -446,9 +512,14 @@ class StudyStore:
     def _public_state(self, row, state, study):
         current = self._current(state)
         case_id = current["case_id"] if current else None
-        return {
+        current_downloads = None
+        if current and study["contract_version"] == "exact-study/2.0":
+            current_downloads = set(
+                next(c for c in study["cases"] if c["case_id"] == case_id)["ontology_resource_ids"]
+            )
+        result = {
             "artifact_type": "study_state",
-            "contract_version": "exact-study/1.0",
+            "contract_version": study["contract_version"],
             "study_revision": row["study_revision"],
             "session_id": row["id"],
             "revision": state["revision"],
@@ -483,10 +554,36 @@ class StudyStore:
                 }
                 for a in study["assets"]
                 if a["kind"] == "ontology"
+                and (current_downloads is None or a["asset_id"] in current_downloads)
+                and (
+                    study["contract_version"] != "exact-study/2.0"
+                    or a["asset_id"]
+                    not in {r["asset_id"] for r in study["tutorial"]["case"]["ontology_resources"]}
+                )
             ],
             "synthetic": bool(row["test"]),
             "gap_recovery": "Report external_work, break or unknown through resume after an unexpected disconnect; wall time is never assumed active.",
         }
+
+        if study["contract_version"] == "exact-study/2.0":
+            from .telemetry import declaration
+            from .tutorial import public_tutorial
+
+            submitted = list(state["consultations"].values())
+            result.update(
+                {
+                    "integration_contract": "study-integration/1",
+                    "tutorial": public_tutorial(study["tutorial"]),
+                    "tutorial_progress": state["tutorial_progress"],
+                    "consultation_draft": state["consultation_drafts"].get(case_id),
+                    "previous_consultation": (
+                        max(submitted, key=lambda x: x["submitted_at"]) if submitted else None
+                    ),
+                    "protocol_versions": study["protocol_versions"],
+                    "telemetry": declaration(),
+                }
+            )
+        return result
 
     def _allocate(self, db, row, state, study):
         # The study row is locked only at allocation; invitations alone consume no slot.
@@ -531,6 +628,10 @@ class StudyStore:
     def mutate(self, sid, generation, operation, payload, case_id=None):
         """Replay an identical acknowledged mutation before checking stale revisions."""
         data = payload.model_dump(mode="json")
+        if operation == "tutorial_progress" and "position" not in payload.model_fields_set:
+            # Old requests were hashed with all old defaults. Keep that exact
+            # canonical shape; omission/null of the legacy alias both preserve position.
+            data.pop("position", None)
         request_hash = digest(
             canonical({"operation": operation, "case_id": case_id, "payload": data})
         )
@@ -590,7 +691,70 @@ class StudyStore:
             return
         if not state["consent"] or not state["consent"]["accepted"]:
             raise StudyError(403, "Consent is required")
+        v2 = study["contract_version"] == "exact-study/2.0"
+        if operation.startswith("tutorial_"):
+            if not v2:
+                raise StudyError(409, "Tutorial assessment requires exact-study/2.0")
+            if data["tutorial_version"] != study["tutorial"]["version"]:
+                raise StudyError(409, "Tutorial version changed")
+            progress = state["tutorial_progress"]
+            if stage != "tutorial" and not (
+                progress["completed_at"]
+                and operation == "tutorial_progress"
+                and stage in {"case", "consultation", "final", "paused"}
+            ):
+                if operation == "tutorial_complete" and progress["completed_at"]:
+                    return
+                raise StudyError(409, "Tutorial is unavailable at this step")
+            from .tutorial import apply_progress, attempt, refresh_outstanding
+
+            try:
+                if operation == "tutorial_progress":
+                    apply_progress(
+                        self, study, progress, data, state.setdefault("tutorial_action_state", {})
+                    )
+                elif operation == "tutorial_assessment":
+                    attempt(study["tutorial"], progress, data, utcnow())
+                elif operation == "tutorial_complete":
+                    refresh_outstanding(study["tutorial"], progress)
+                    if progress["outstanding"]:
+                        raise StudyError(
+                            422, "Required tutorial lessons or assessment items are incomplete"
+                        )
+                    if not state["setup"].get("submitted") or not state["questionnaires"].get(
+                        "background", {}
+                    ).get("submitted"):
+                        raise StudyError(
+                            409, "Setup and background must be submitted before allocation"
+                        )
+                    progress["completed_at"] = utcnow()
+                    self._allocate(db, row, state, study)
+                else:
+                    raise StudyError(404, "Unknown tutorial operation")
+            except ValueError as exc:
+                raise StudyError(422, str(exc)) from exc
+            return
+        if operation == "setup" and v2:
+            if "setup_version" not in data:
+                raise StudyError(409, "Legacy setup cannot be used with exact-study/2.0")
+            if stage != "setup" or data["setup_version"] != study["protocol_versions"]["setup"]:
+                raise StudyError(409, "Setup version or step does not match")
+            if data["submitted"]:
+                if not (
+                    data["instructions_acknowledged"]
+                    and data["external_inspection_optional_understood"]
+                    and data["resource_access"] == "available"
+                ):
+                    raise StudyError(422, "Setup acknowledgements or resources are incomplete")
+                for asset in study["assets"]:
+                    if asset["kind"] == "ontology":
+                        self._verified_asset_path(asset)
+                state["stage"] = "background"
+            state["setup"] = {**data, "saved_at": utcnow()}
+            return
         if operation == "setup":
+            if "protege_installed" not in data:
+                raise StudyError(409, "Corrected setup cannot rewrite a legacy protocol")
             if stage not in {"setup", "practice"}:
                 raise StudyError(409, "Setup is unavailable at this step")
             state["setup"] = {
@@ -634,7 +798,7 @@ class StudyStore:
                 "saved_at": utcnow(),
             }
             if data["submitted"] and form_id == "background":
-                state["stage"] = "practice"
+                state["stage"] = "tutorial" if v2 else "practice"
             return
         if operation == "pause":
             if stage == "paused":
@@ -713,7 +877,7 @@ class StudyStore:
             now = utcnow()
             state["rankings"][case_id] = {
                 "artifact_type": "ranking_response",
-                "contract_version": "exact-study/1.0",
+                "contract_version": study["contract_version"],
                 "study_revision": row["study_revision"],
                 "session_id": row["id"],
                 "case_id": case_id,
@@ -724,7 +888,36 @@ class StudyStore:
                 "submitted_at": now if operation == "submit" else None,
             }
             return
+        if operation in {"consultation", "consultation_draft"} and v2:
+            if stage != "consultation":
+                raise StudyError(409, "Commit the ranking before consultation")
+            if (
+                data.get("presentation_id") != current["presentation_id"]
+                or data.get("form_version") != study["form_version"]
+            ):
+                raise StudyError(409, "Consultation version or presentation does not match")
+            from .v2_models import ConsultationDraftV2, ConsultationV2
+
+            model = ConsultationDraftV2 if operation == "consultation_draft" else ConsultationV2
+            try:
+                model.model_validate(
+                    {**data, "expected_revision": 0, "idempotency_key": "validation"}
+                )
+            except ValueError as exc:
+                raise StudyError(422, "Invalid consultation answer") from exc
+            now = utcnow()
+            receipt = {**data, "saved_at": now}
+            if operation == "consultation_draft":
+                state["consultation_drafts"][case_id] = receipt
+                return
+            state["consultations"][case_id] = {**receipt, "case_id": case_id, "submitted_at": now}
+            state["consultation_drafts"].pop(case_id, None)
+            state["case_index"] += 1
+            state["stage"] = "case" if self._current(state) else "final"
+            return
         if operation == "consultation":
+            if "presentation_id" in data:
+                raise StudyError(409, "Corrected consultation cannot rewrite a legacy protocol")
             if stage != "consultation":
                 raise StudyError(409, "Commit the ranking before consultation")
             state["consultations"][case_id] = {**data, "saved_at": utcnow()}
@@ -740,6 +933,8 @@ class StudyStore:
             current = self._current(state)
             if not current or state["stage"] not in {"case", "consultation", "paused"}:
                 raise StudyError(409, "No case available at this step")
+            if not (state.get("consent") or {}).get("accepted"):
+                raise StudyError(403, "Consent is required")
             case = next(c for c in study["cases"] if c["case_id"] == current["case_id"])
             allowed = {
                 k: case[k]
@@ -752,9 +947,9 @@ class StudyStore:
                     "package_version",
                 )
             }
-            return {
+            result = {
                 "artifact_type": "study_case",
-                "contract_version": "exact-study/1.0",
+                "contract_version": study["contract_version"],
                 "study_revision": row["study_revision"],
                 **allowed,
                 "presentation_id": current["presentation_id"],
@@ -763,6 +958,15 @@ class StudyStore:
                     case["explanation_refs"] if current["condition"] == "explanation" else []
                 ),
             }
+            if study["contract_version"] == "exact-study/2.0":
+                from .workspace import case_workspace_descriptor
+
+                result["workspace"] = (
+                    case_workspace_descriptor(self, study, case)
+                    if current["condition"] == "explanation"
+                    else None
+                )
+            return result
 
     def resource(self, sid, generation, asset_id):
         """Verify bytes on every read; baseline never receives explanation resources."""
@@ -778,6 +982,17 @@ class StudyStore:
             asset = assets.get(asset_id)
             if not asset:
                 raise StudyError(404, "Resource unavailable")
+            tutorial_ids = set()
+            if study["contract_version"] == "exact-study/2.0":
+                tutorial_ids = set(study["tutorial"]["case"]["explanation_refs"]) | {
+                    a["asset_id"] for a in study["tutorial"]["case"]["ontology_resources"]
+                }
+            if asset_id in tutorial_ids:
+                return (
+                    self._verified_asset_path(asset)
+                    if asset["kind"] == "ontology"
+                    else self._asset_bytes(asset)
+                ), asset["media_type"]
             if asset["kind"] == "explanation":
                 current = self._current(state)
                 if (
@@ -968,10 +1183,24 @@ class StudyStore:
                 counts[key] = counts.get(key, 0) + 1
             return {"study_revision": revision, "counts": counts}
 
-    def export(self, revision, *, include_test=False, include_keys=False):
+    def export(self, revision, *, include_test=False, include_keys=False, analysis_schema=None):
         """Freeze a reproducible anonymous analysis export; credentials never enter it."""
+        from .exports import analysis3_dictionary, observation_summary
+
         with self.transaction() as db:
             study_row, study = self._study(db, revision)
+            source_schema = study.get("protocol_versions", {}).get(
+                "export", "exact-study-analysis/1"
+            )
+            schema = source_schema if analysis_schema is None else analysis_schema
+            supported = (
+                {"exact-study-analysis/2", "exact-study-analysis/3"}
+                if study["contract_version"] == "exact-study/2.0"
+                else {"exact-study-analysis/1"}
+            )
+            if schema not in supported:
+                raise StudyError(422, "Analysis schema is unsupported for this study contract")
+            corrected_timing = schema == "exact-study-analysis/3"
             keys = json.loads(
                 db.execute(
                     "SELECT payload FROM researcher_case_keys WHERE study_revision = ?",
@@ -1000,7 +1229,7 @@ class StudyStore:
                     cid: {
                         k: v
                         for k, v in value.items()
-                        if k not in {"other_editor", "other_resource"}
+                        if k not in {"other_editor", "other_resource", "other_method"}
                     }
                     for cid, value in state["consultations"].items()
                 }
@@ -1020,7 +1249,12 @@ class StudyStore:
                     ready = [
                         e["server_received_at"]
                         for e in events
-                        if e["case_id"] == cid and e["type"] == "case_ready"
+                        if e["case_id"] == cid
+                        and e["type"] == "case_ready"
+                        and (
+                            not corrected_timing
+                            or e.get("presentation_id") == presentation["presentation_id"]
+                        )
                     ]
                     end = response.get("submitted_at") if response else None
                     elapsed = (
@@ -1033,7 +1267,9 @@ class StudyStore:
                     observed = sum(
                         (s["monotonic_end_ms"] - s["monotonic_start_ms"]) / 1000
                         for s in segments
-                        if s["case_id"] == cid and s["stage"] == "case"
+                        if s["case_id"] == cid
+                        and s["stage"] == "case"
+                        and s.get("availability") != "unavailable"
                     )
                     timing = {
                         "raw_elapsed_seconds": elapsed,
@@ -1042,12 +1278,43 @@ class StudyStore:
                             max(0, elapsed - observed) if elapsed is not None else None
                         ),
                         "active_duration_known": False,
+                        **(
+                            {
+                                "consultation_observed_seconds": sum(
+                                    (s["monotonic_end_ms"] - s["monotonic_start_ms"]) / 1000
+                                    for s in segments
+                                    if s.get("case_id") == cid
+                                    and s["stage"] == "consultation"
+                                    and s.get("availability") != "unavailable"
+                                ),
+                                "unavailable_intervals": [
+                                    s
+                                    for s in segments
+                                    if s.get("case_id") == cid
+                                    and s.get("availability") == "unavailable"
+                                ],
+                            }
+                            if study["contract_version"] == "exact-study/2.0"
+                            else {}
+                        ),
                         "gap_reports": [g for g in state["gaps"] if g["case_id"] == cid],
                         "explicit_breaks": [p for p in state["pauses"] if p["case_id"] == cid],
                     }
+                    if corrected_timing:
+                        timing.update(observation_summary(segments, stages={"case"}, case_id=cid))
+                        timing["observed_segment_seconds"] = timing["page_observation_seconds"]
                     rows.append(
                         {
                             **presentation,
+                            **(
+                                {
+                                    "consultation_timing": observation_summary(
+                                        segments, stages={"consultation"}, case_id=cid
+                                    )
+                                }
+                                if corrected_timing
+                                else {}
+                            ),
                             "candidates": case["candidates"],
                             "package_version": case["package_version"],
                             "case_kind": key["case_kind"],
@@ -1095,11 +1362,65 @@ class StudyStore:
                         "setup": {
                             k: v
                             for k, v in (state["setup"] or {}).items()
-                            if k != "protege_version"
+                            if k not in {"protege_version", "familiar_methods"}
                         },
                         "cases": rows,
                         "events": events,
                         "timing_segments": segments,
+                        **(
+                            {
+                                "tutorial_timing": observation_summary(
+                                    segments, stages={"tutorial", "practice"}
+                                )
+                            }
+                            if corrected_timing
+                            else {}
+                        ),
+                        **(
+                            {
+                                "tutorial_progress": state["tutorial_progress"],
+                                "tutorial_outcomes": {
+                                    q["question_id"]: {
+                                        "first": next(
+                                            (
+                                                a
+                                                for a in state["tutorial_progress"]["attempts"]
+                                                if a["question_id"] == q["question_id"]
+                                            ),
+                                            None,
+                                        ),
+                                        "final": next(
+                                            (
+                                                a
+                                                for a in reversed(
+                                                    state["tutorial_progress"]["attempts"]
+                                                )
+                                                if a["question_id"] == q["question_id"]
+                                            ),
+                                            None,
+                                        ),
+                                    }
+                                    for q in study["tutorial"]["assessment"]
+                                },
+                                "tutorial_observed_seconds": sum(
+                                    (s["monotonic_end_ms"] - s["monotonic_start_ms"]) / 1000
+                                    for s in segments
+                                    if s["stage"] in {"tutorial", "practice"}
+                                    and s.get("availability") != "unavailable"
+                                ),
+                                "consultation_drafts": {
+                                    cid: {
+                                        k: v
+                                        for k, v in draft.items()
+                                        if k
+                                        not in {"other_editor", "other_resource", "other_method"}
+                                    }
+                                    for cid, draft in state["consultation_drafts"].items()
+                                },
+                            }
+                            if study["contract_version"] == "exact-study/2.0"
+                            else {}
+                        ),
                     }
                 )
             content = {
@@ -1137,19 +1458,49 @@ class StudyStore:
                     "questionnaire_answer_states": "answered, skipped, not_answered; free text omitted from anonymous export",
                 },
             }
+            if study["contract_version"] == "exact-study/2.0":
+                content.update(
+                    {
+                        "protocol_versions": study["protocol_versions"],
+                        "tutorial_hash": study["tutorial"]["hash"],
+                        "resource_scope_analysis_rule": study["resource_scope_analysis_rule"],
+                    }
+                )
+                content["data_dictionary"].update(
+                    {
+                        "tutorial_outcomes": "First/final synthetic comprehension attempts and eventual completion; descriptive preparation data, not a validated expertise score",
+                        "consultation": "Per-case reported method combinations; no per-candidate attribution or causal interpretation; missing resource_scope remains unknown",
+                        "unavailable_intervals": "Rejected late/pre-ready timing observations retained explicitly; excluded from observed durations",
+                    }
+                )
+            if corrected_timing:
+                for session in sessions:
+                    session["tutorial_observed_seconds"] = session["tutorial_timing"][
+                        "page_observation_seconds"
+                    ]
+                    for case in session["cases"]:
+                        case["timing"]["consultation_observed_seconds"] = case[
+                            "consultation_timing"
+                        ]["page_observation_seconds"]
+                content["data_dictionary"].update(analysis3_dictionary())
             if include_keys:
                 content["researcher_case_keys"] = keys
             export_id, now = str(uuid4()), utcnow()
             manifest = {
                 "artifact_type": "export_manifest",
-                "contract_version": "exact-study/1.0",
+                "contract_version": study["contract_version"],
                 "export_id": export_id,
                 "created_at": now,
                 "study_revision": revision,
                 "content_sha256": digest(canonical(content)),
                 "include_test": include_test,
                 "includes_private_key_join": include_keys,
-                "schema": "exact-study-analysis/1",
+                "schema": schema,
+                **(
+                    {"source_protocol_versions": study["protocol_versions"]}
+                    if corrected_timing
+                    else {}
+                ),
                 "session_count": len(sessions),
             }
             result = {"manifest": manifest, "data": content}

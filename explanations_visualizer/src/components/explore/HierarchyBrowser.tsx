@@ -11,6 +11,8 @@ import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronDown, IconChevronUp, SideMarker } from "@/components/common/Icons";
 import { EmptyReason } from "@/components/common/StatusText";
 import { EntitySearch } from "@/components/explore/EntitySearch";
+import { useContinuation, type Continued } from "@/components/explore/useContinuation";
+import { appendPage, shownText } from "@/lib/continuation";
 import { curie, KIND_NAMES } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import type { EntityKind, HierarchyEdge } from "@/lib/types";
@@ -50,7 +52,9 @@ function ParentBranch({
   const state = useAsync(open ? `${workspace.key}|parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) =>
     workspace.hierarchy({ ontology_version_id: ontology, iri, kind }, "parents", basis, null, signal),
   );
-  const parents = (state.data?.items ?? []).filter((edge) => edge.child.iri === iri);
+  const loadMore = useCallback((cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri, kind }, "parents", basis, cursor, signal), [workspace, ontology, iri, kind, basis]);
+  const pages = useContinuation(state.data, loadMore, edgeKey);
+  const parents = pages.items.filter((edge) => edge.child.iri === iri);
   const label = useLabelLookup(ontology, [iri, ...parents.map((edge) => edge.parent.iri)]);
   return (
     <li className="tree-item">
@@ -85,9 +89,29 @@ function ParentBranch({
               ))}
             </ul>
           )}
+          <EdgeContinuation state={pages} noun={PARENT_NOUN} />
         </div>
       )}
     </li>
+  );
+}
+
+const edgeKey = (edge: HierarchyEdge) => edge.id;
+const PARENT_NOUN = { one: "parent", many: "parents" };
+
+/** A hierarchy page that continues on request; failures stay local and keep what is shown. */
+function EdgeContinuation({ state, noun }: { state: Continued<HierarchyEdge>; noun: { one: string; many: string } }) {
+  if (state.complete && !state.error) return null;
+  return (
+    <div className="continuation">
+      <span className="meta">{shownText(state.items.length, state.total, state.hasMore, noun)}</span>
+      {state.error ? <ErrorNote error={state.error} onRetry={state.loadMore} what={`More ${noun.many}`} /> : null}
+      {state.hasMore && (
+        <button type="button" className="btn btn-sm" disabled={state.loading} onClick={state.loadMore}>
+          {state.loading ? "Loading…" : `Load more ${noun.many}`}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -152,14 +176,19 @@ export function HierarchyBrowser({
     try {
       const page = await workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri, kind }, "children", basis, childCursor, controller.signal);
       if (controller.signal.aborted) return;
-      setChildPages((list) => [...list, ...page.items]);
+      setChildPages((list) => appendPage(list, page.items, edgeKey));
       setChildCursor(page.next_cursor);
     } catch (error) {
       if (!controller.signal.aborted) setChildMoreError(error);
     }
   }, [basis, childCursor, focusIri, kind, ontology, workspace]);
 
-  const parentEdges = (parents.data?.items ?? []).filter((edge) => edge.child.iri === focusIri);
+  const loadMoreParents = useCallback(
+    (cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri!, kind }, "parents", basis, cursor, signal),
+    [workspace, ontology, focusIri, kind, basis],
+  );
+  const parentPages = useContinuation(parents.data, focusIri ? loadMoreParents : null, edgeKey);
+  const parentEdges = parentPages.items.filter((edge) => edge.child.iri === focusIri);
   const label = useLabelLookup(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childPages.map((edge) => edge.child.iri)].filter(Boolean));
   const prepared = (value: Basis) =>
     workspace.kind === "exploration" ? value !== "reasoner_inferred" || reasonerStatus === "available" : workspace.capabilities.bases.includes(value);
@@ -222,7 +251,13 @@ export function HierarchyBrowser({
           <div className="browser-section">
             <div className="section-head">
               <Sub className="eyebrow">Parents</Sub>
-              {parents.data && <span className="meta">{parentEdges.length ? `${parentEdges.length}${parentEdges.length > 1 ? " · multiple inheritance" : ""}${parents.data.status === "partial" ? " · more may exist" : ""}` : ""}</span>}
+              {parents.data && (
+                <span className="meta">
+                  {parentEdges.length
+                    ? `${parentEdges.length}${parentPages.complete ? "" : parentPages.total != null ? ` of ${parentPages.total}` : " shown"}${parentEdges.length > 1 || (parentPages.total ?? 0) > 1 ? " · multiple inheritance" : ""}${parents.data.status === "partial" ? " · more may exist" : ""}`
+                    : ""}
+                </span>
+              )}
             </div>
             {parents.error ? <ErrorNote error={parents.error} onRetry={parents.reload} what="Parents" /> : null}
             {!parents.data && !parents.error ? <Skeleton lines={2} title={false} /> : null}
@@ -234,6 +269,7 @@ export function HierarchyBrowser({
                 ))}
               </ul>
             )}
+            <EdgeContinuation state={parentPages} noun={PARENT_NOUN} />
           </div>
 
           <div className={`focus-card focus-${side}`}>

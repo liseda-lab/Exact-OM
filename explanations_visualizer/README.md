@@ -13,7 +13,6 @@ itself into another profile.
 | `/participate/` | Ranking study: private link, consent, setup, background form, practice (v1) or interactive tutorial and five-item check (v2), scored cases in both conditions, per-case report, final form, completion | `study` only |
 | `/admin/` | Researcher administration: publish, progress, invitation links, replace/revoke, exports | `study` only |
 | `/legacy/` | The historical run-directory viewer, used automatically when `/` finds only the old `/api/health` backend | legacy `serve --run-dir` |
-| `/preview/participate/` | Development only: the proposed exact-study/2.0 participant flow against an in-browser synthetic service | `next dev` only; production builds contain a notice and no profile serves it |
 
 Everything reads the backend contracts in `exact_inspect` (`/api/v1/...` and
 `/api/v1/study/...`); the frontend never parses OWL, calls a model or infers equivalence.
@@ -24,6 +23,22 @@ What was built, how it was verified and the known backend issues are in the
 [real-package/PostgreSQL verification](../docs/verification/explanation-frontend-e2e.md).
 The 2026-10 corrective iteration (specs 14–16: shared workspace, tutorial, tool-neutral study)
 is recorded in the [corrective frontend handoff](../docs/verification/explanation-frontend-corrections.md).
+The integration follow-up (specs 17–19: scoped study workspace, case readiness, durable tutorial
+position, analysis-3 exports) is in the
+[integration frontend handoff](../docs/verification/explanation-integration-frontend-handoff.md)
+and the [joint acceptance record](../docs/verification/explanation-integration-acceptance.md);
+post-implementation findings R06–R09 (fact paging, study full context, retry, component-aware
+readiness) are in the [follow-up handoff](../docs/verification/explanation-integration-frontend-followup.md),
+R10–R11 (attempt-bound access checks, typed navigation) in the
+[second follow-up](../docs/verification/explanation-integration-frontend-followup-2.md), and
+R12–R13 (typed card parents in the tutorial and v1 publications, a race in a recovery test) in the
+[third follow-up](../docs/verification/explanation-integration-frontend-followup-3.md).
+
+exact-study/2.0 sessions run only against a study service that advertises
+`integration_contract: "study-integration/1"`; otherwise the page says the service needs an
+update and collects nothing. A v2 explanation case reads only its authorized
+`/api/v1/study/workspace/{scope}` routes and is answerable only once the source, all five
+candidates and the admitted descriptions and comparisons have loaded, validated and rendered.
 
 ## Design decisions
 
@@ -79,8 +94,8 @@ EXACT_DEV_BACKEND=http://127.0.0.1:8000 npm run dev
 
 `next dev` forwards `/api/*` to `EXACT_DEV_BACKEND`. For the study pages, the backend's origin
 check requires the HTTPS origin it was configured with, so test the study through a built export
-served by the study service instead. The proposed v2 participant flow can be tried without any
-study service at `/preview/participate/` under `next dev` (synthetic, browser-only).
+served by the study service instead. For exact-study/2.0, use the synthetic HTTPS/PostgreSQL
+harness described under Verification.
 
 A realistic development package (real NCIT/DOID excerpts, a clearly synthetic run and offline
 exact-excerpt generations; no network, model or provider) can be prepared with:
@@ -116,7 +131,34 @@ The prepared and study Dockerfiles in `deploy/render` build the export in a Node
 Use `npm run typecheck`, `npm run test:unit` (Node.js 24), and `npm run test:e2e`.
 The browser suite targets running prepared/study services; see the integration verification
 guide above for URLs, the synthetic HTTPS/PostgreSQL harness, and optional test inputs.
-`EXACT_E2E_PREVIEW_URL` (a `next dev` server) enables the v2 preview journey, and
 `EXACT_E2E_SEARCH_TERM` replaces the real-package search term when testing the small fixture.
+
+The exact-study/2.0 suites (`study-v2-backend.spec.ts`, the unseeded acceptance journey, and
+`study-v2-integration.spec.ts`, the seeded fault/recovery regressions) run against the real
+study service:
+
+```bash
+python -m tools.build_explanation_v2_fixture /tmp/exact-v2 --navigation-size 65
+python -m tools.serve_explanation_v2_e2e --fixture /tmp/exact-v2 \
+  --database-url postgresql://127.0.0.1:<port>/<synthetic-db> --tls-cert cert.pem --tls-key key.pem \
+  --config /tmp/exact-v2-private.json --port 18984 --frontend-dir explanations_visualizer/out
+EXACT_E2E_STUDY_V2_CONFIG=/tmp/exact-v2-private.json npx playwright test e2e/study-v2-*.spec.ts
+```
+
+Rebuild the export and restart the service together: the service hashes the pages' inline
+scripts for its CSP when it starts. For the J03 comparison with the main app, wrap the same
+frozen contexts with `python explanations_visualizer/e2e/prepare_main_app_package.py /tmp/exact-v2
+/tmp/exact-v2-main`, serve that package with `exact-inspect serve --profile local_app`, and set
+`EXACT_E2E_MAIN_APP_URL`.
+
+Add `--paged-facts 26` to the fixture build for the paging regressions: it adds a non-focal
+source class, "Paged facts source", whose categories and parents exceed the first page, and an
+object and a data property ("Paged object property", "Paged data property") whose named
+superproperties do too. For the
+main-app paging test, wrap the same contexts with `prepare_main_app_package.py …
+--extra-category alternate_definitions`, serve that package, and set `EXACT_E2E_PAGED_MAIN_APP_URL`
+and `EXACT_E2E_PAGED_SOURCE` (the fixture's source ontology version).
+
 Production uses the static `out/` export served by `exact-inspect`; `next start` is not
 compatible with this export mode.
+

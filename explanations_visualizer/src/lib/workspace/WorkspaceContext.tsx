@@ -5,7 +5,7 @@
 
 import { createContext, useCallback, useContext, useMemo } from "react";
 
-import { LabelSourceContext } from "@/lib/labelSource";
+import { LabelSourceContext, RemoteLabelSourceContext } from "@/lib/labelSource";
 import type { EntityRef } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
 import type { FactRef, Side, WorkspaceAction, WorkspaceSource } from "@/lib/workspace/types";
@@ -31,7 +31,7 @@ export function WorkspaceProvider({
       <ActionContext.Provider value={report}>{children}</ActionContext.Provider>
     </SourceContext.Provider>
   );
-  return labels ? <LabelSourceContext.Provider value={labels}>{content}</LabelSourceContext.Provider> : content;
+  return <RemoteLabelSourceContext.Provider value={source.remoteLabels}><LabelSourceContext.Provider value={labels}>{content}</LabelSourceContext.Provider></RemoteLabelSourceContext.Provider>;
 }
 
 /** Declares which ontology is the source side and which the target side of a pair. */

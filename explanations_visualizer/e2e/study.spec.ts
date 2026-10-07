@@ -149,6 +149,49 @@ test("complete HTTPS/PostgreSQL participant journey, pause, reload, timing and c
   expect(record.timing_segments.filter((segment: { stage: string }) => segment.stage === "case").length).toBeGreaterThanOrEqual(4);
 });
 
+test("v1 explanation cases open card parents with their recorded type (19 F21)", async ({ page, request }) => {
+  test.setTimeout(180_000);
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await startCases(page, request);
+  let current: Record<string, any> = {};
+  for (let index = 0; index < 3; index += 1) {
+    await expect(page.getByRole("radio", { name: /^None of these/ })).toBeEnabled();
+    current = await (await page.request.get(`${config!.origin}/api/v1/study/cases/current`)).json();
+    if (current.condition === "explanation") break;
+    await page.getByRole("radio", { name: /^Insufficient information/ }).click();
+    await page.getByRole("button", { name: "Submit answer", exact: true }).click();
+    await page.getByRole("radio", { name: "No", exact: true }).check();
+    await page.getByRole("button", { name: /^Save and (go to case|continue)/ }).click();
+  }
+  expect(current.condition).toBe("explanation");
+  // The typed parents the frozen v1 resources record for the source concept.
+  const resources = await Promise.all((current.explanation_refs as string[]).map(async (ref) => (await page.request.get(`${config!.origin}/api/v1/study/resources/${encodeURIComponent(ref)}`)).json()));
+  const key = (entity: { ontology_version_id: string; iri: string; kind: string }) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`;
+  const recorded = new Map<string, { ontology_version_id: string; iri: string; kind: string }>();
+  for (const resource of resources)
+    for (const edge of resource.hierarchy) if (edge.basis === "literal_asserted" && key(edge.child) === key(current.source)) recorded.set(edge.parent.iri, edge.parent);
+  expect(recorded.size).toBeGreaterThan(0);
+  await page.getByRole("button", { name: /^Add .* as rank 1$/ }).first().click();
+  await expect(page.locator(".save-indicator")).toContainText("Saved");
+  const card = page.locator(".entity-card-source");
+  const rows = card.locator('[data-category="parents"] li');
+  await expect(rows).toHaveCount(recorded.size);
+  const browser = page.getByRole("region", { name: "Source ontology browser" });
+  for (const parent of recorded.values()) {
+    const row = card.locator(`[data-category="parents"] li[data-iri="${parent.iri}"]`);
+    await expect(row).toHaveAttribute("data-kind", parent.kind);
+    await expect(row.getByRole("button")).toBeEnabled();
+    await row.getByRole("button").click();
+    await expect(page.getByRole("tab", { name: "Hierarchy", exact: true })).toHaveAttribute("aria-selected", "true");
+    await expect(browser.locator(".focus-card .iri")).toHaveText(parent.iri);
+    await expect(browser.locator(".focus-card .eyebrow")).toHaveText(`Focused ${parent.kind === "class" ? "class" : parent.kind.replace("_", " ")}`);
+    expect(parent.ontology_version_id).toBe(current.source.ontology_version_id);
+  }
+  await expect(page.getByRole("list", { name: "Your ranking" }).getByRole("listitem")).toHaveCount(1);
+  expect(errors).toEqual([]);
+});
+
 test("offline answers survive reload and reconnect before submission", async ({ page, request, context }) => {
   test.setTimeout(180_000);
   await startCases(page, request);

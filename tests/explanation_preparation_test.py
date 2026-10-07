@@ -10,7 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from exact_inspect.artifacts import atomic_json
-from exact_inspect.contracts import DomainError, file_hash
+from exact_inspect.contracts import DomainError, canonical_hash, file_hash
 from exact_inspect.generation import ExplanationJobs
 from exact_inspect.preparation import (
     ExecutionLock,
@@ -214,7 +214,20 @@ def test_study_adapter_preserves_originals_and_rejects_forged_comparisons(prepar
         packet = FactPacket.model_validate(json.loads(request.read_bytes())["packet"])
         result = json.loads((request.parent / "explanation.json").read_bytes())
         if packet.task == "pair_comparison":
-            result["claims"] = [claim.model_dump() for claim in comparison_templates(packet)]
+            # Templates are pre-generation content. Bind injected test claims using
+            # the same generation/content identity as ExplanationJobs' saved output.
+            result["claims"] = [
+                {
+                    **claim.model_dump(),
+                    "claim_id": canonical_hash(
+                        {
+                            "generation": result["explanation_id"],
+                            **claim.model_dump(exclude={"claim_id"}),
+                        }
+                    ),
+                }
+                for claim in comparison_templates(packet)
+            ]
         packets.append(packet)
         results.append(result)
     entities = next(p.entities for p in packets if p.task == "pair_comparison")
