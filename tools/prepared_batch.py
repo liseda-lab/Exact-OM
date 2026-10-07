@@ -982,6 +982,30 @@ def run_recipe(path):
                     tokens=0,
                     actual_usd=0,
                 )
+        if recipe.get("decision_audit_repair"):
+            from tools.recover_decision_audit import import_saved as import_audit
+
+            work = (
+                "preparation/"
+                + recipe["scientific_step"]
+                + "/audit-checkpoint/"
+                + os.environ["SLURM_STEP_ID"]
+            )
+            ledger.admit(work, group="reserve", seconds=0, forecast_known=False)
+            migration_start, migration_status = time.time(), "failed"
+            try:
+                import_audit(recipe, campaign, runtime, code)
+                migration_status = "complete"
+            finally:
+                ledger.finish(
+                    work,
+                    start=migration_start,
+                    end=time.time(),
+                    status=migration_status,
+                    requests=0,
+                    tokens=0,
+                    actual_usd=0,
+                )
         guarded_execute(campaign, root, code, check_pause=lambda: controls(supervisor, root))
         selection = runtime / "screen/selection.json"
         result = read(selection)["experiments"][recipe["scientific_step"]]

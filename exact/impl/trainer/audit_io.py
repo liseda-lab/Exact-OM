@@ -351,7 +351,9 @@ class AuditIOMixin:
             self.output_dir,
             frame,
             typed,
-            policy=policy,
+            # Use the same serialized policy as the source audit. Replay gates
+            # contain Path values; event hashing requires their JSON form.
+            policy=payload["policy"],
             pool=getattr(self.dataset, "candidate_pool_manifest", None),
             initial=getattr(self.dataset, "_candidate_stage_observations", None),
         )

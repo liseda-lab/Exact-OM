@@ -225,3 +225,33 @@ def test_lexical_controls_replay_from_serialized_distinct_candidates_and_labels(
         assert replay["baseline"] + sum(
             row["contributions"][key] for key in replay["component_names"]
         ) == pytest.approx(replay["score"], abs=1e-6)
+
+
+def test_candidate_audit_uses_source_audit_json_policy(tmp_path):
+    from copy import deepcopy
+
+    from exact.runs.decisions import digest
+
+    runner = SemanticAlignmentRunner(
+        dataset=_Dataset(), model=_Model, device=torch.device("cpu"), output_dir=tmp_path
+    )
+    frame = pd.DataFrame([{"Src": "source", "Tgt": "target", "S_final": 0.9}])
+    runner._final_candidate_frame = frame
+    runner.model.llm_experiment_config = {
+        "gate": {"mode": "oracle_replay", "artifact": tmp_path / "replay.json"},
+        "decision": {"mode": "binary"},
+    }
+    original = deepcopy(runner.model.llm_experiment_config)
+    paths = runner.save_results(
+        [EntityMapping("source", "target", score=0.9)], output_formats=["tsv-global"]
+    )
+    source = json.loads(paths["source_decisions_json"].read_text())
+    candidate = json.loads((tmp_path / "candidate_decisions.json").read_text())
+    assert candidate["policy"] == source["policy"]
+    assert candidate["policy"]["llm"]["gate"]["artifact"] == str(tmp_path / "replay.json")
+    for row in candidate["records"]:
+        observation = next(e for e in row["events"] if e["stage"] == "relation_typing")
+        assert observation["config_hash"] == digest(source["policy"])
+        assert observation["config"] == source["policy"]
+    assert runner.model.llm_experiment_config == original
+    pd.testing.assert_frame_equal(frame, runner._final_candidate_frame)
