@@ -46,12 +46,16 @@ def cells_for_repair(recipe, campaign, runtime):
     cells = harness.build_cells(
         suite, source, stage="screen", output_root=runtime.parent, inherited_overlay=inherited
     )
+    expected_arms = {
+        "E25-oracles": {"decision_off", "oracle_observed", "oracle_perfect"},
+        "E25-trust": {"trust_shipped", "trust_constant"},
+    }.get(recipe["scientific_step"])
     if (
-        recipe["scientific_step"] != "E25-oracles"
-        or {c.arm_id for c in cells} != {"decision_off", "oracle_observed", "oracle_perfect"}
-        or len(cells) != 3
+        expected_arms is None
+        or {c.arm_id for c in cells} != expected_arms
+        or len(cells) != len(expected_arms)
     ):
-        raise ValueError("Audit recovery requires the complete original three-arm comparison")
+        raise ValueError("Audit recovery requires the complete original E25 comparison")
     if any(
         c.task_id != "D0_E03-global_alignment" or c.seed != 17 or c.source_cap != 300 for c in cells
     ):

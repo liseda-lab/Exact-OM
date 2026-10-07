@@ -76,7 +76,21 @@ def test_gate_relocation_rejects_corrupt_original_fingerprint(tmp_path):
         relocate(value, new)
 
 
-def test_repair_includes_diagnostic_producer_prerequisite(monkeypatch, tmp_path):
+@pytest.mark.parametrize(
+    "experiment, arms, accepted",
+    [
+        ("E25-oracles", ["decision_off", "oracle_observed", "oracle_perfect"], True),
+        ("E25-trust", ["trust_constant", "trust_shipped"], True),
+        ("E25-trust", ["trust_shipped"], False),
+        ("E25-trust", ["trust_shipped", "trust_constant", "source_first"], False),
+        ("E25-trust", ["trust_shipped", "trust_constant", "trust_constant"], False),
+        ("E25-oracles", ["decision_off", "oracle_observed"], False),
+        ("E25-other", ["trust_shipped", "trust_constant"], False),
+    ],
+)
+def test_repair_requires_full_comparison_and_producer(
+    monkeypatch, tmp_path, experiment, arms, accepted
+):
     from dataclasses import dataclass
     from types import SimpleNamespace as NS
 
@@ -85,7 +99,7 @@ def test_repair_includes_diagnostic_producer_prerequisite(monkeypatch, tmp_path)
 
     producer = NS(id="E25-forced", external_selection={"path": "bound"})
     config = NS(
-        experiment_id="E25-oracles",
+        experiment_id=experiment,
         depends_on=[],
         frozen_constants={"campaign_v2": {"requires": ["E25-forced"]}},
     )
@@ -114,14 +128,11 @@ def test_repair_includes_diagnostic_producer_prerequisite(monkeypatch, tmp_path)
         return source, {}
 
     monkeypatch.setattr(harness, "_materialize_campaign_evidence", materialize)
-    cells = [
-        NS(arm_id=a, task_id="D0_E03-global_alignment", seed=17, source_cap=300)
-        for a in ["decision_off", "oracle_observed", "oracle_perfect"]
-    ]
+    cells = [NS(arm_id=a, task_id="D0_E03-global_alignment", seed=17, source_cap=300) for a in arms]
     monkeypatch.setattr(harness, "build_cells", lambda *a, **k: cells)
-    assert (
-        cells_for_repair(
-            {"scientific_step": "E25-oracles"}, tmp_path / "campaign", tmp_path / "runtime"
-        )[1]
-        == cells
-    )
+    arguments = ({"scientific_step": experiment}, tmp_path / "campaign", tmp_path / "runtime")
+    if accepted:
+        assert cells_for_repair(*arguments)[1] == cells
+    else:
+        with pytest.raises(ValueError, match="complete original E25 comparison"):
+            cells_for_repair(*arguments)
