@@ -87,9 +87,7 @@ def _multicase_fixture(tmp_path, phase="expansion"):
                     )
                     rows.append({"cell_id": cell_id, "artifacts": artifacts})
     record["cells"] = cells
-    record["result_set"] = _binding(
-        Path(record["result_set"]["path"]), json.dumps({"cells": rows})
-    )
+    record["result_set"] = _binding(Path(record["result_set"]["path"]), json.dumps({"cells": rows}))
     raw["cases"] = old_raw["cases"]
     raw["steps"][0] = {**step, "estimate": None}
     return path, raw, record
@@ -114,9 +112,7 @@ def test_external_selection_accepts_complete_multicase_comparison(tmp_path, phas
     assert result["current_code_prediction_compatibility"] is False
     assert len(producers) == (8 if phase == "initial" else 16)
     assert {m["task_id"] for m in producers} == {
-        f"{case}-{mode}"
-        for case in ("D0", "D1")
-        for mode in ("global_alignment", "local_ranking")
+        f"{case}-{mode}" for case in ("D0", "D1") for mode in ("global_alignment", "local_ranking")
     }
 
 
@@ -175,3 +171,61 @@ def test_external_selection_cannot_import_freeze_or_final_as_development(tmp_pat
         step["source_cap"] = None
     with pytest.raises(ValueError, match="only a completed development screen"):
         CampaignStep.model_validate(step)
+
+
+@pytest.mark.parametrize(
+    "change", [None, "selection_rules", "mode", "decisions", "policy", "overlay", "missing"]
+)
+def test_external_diagnostic_preserves_complete_status_without_policy_promotion(tmp_path, change):
+    path, raw, record = _multicase_fixture(tmp_path)
+    old_path = Path(record["campaign"]["path"])
+    old_raw = yaml.safe_load(old_path.read_text())
+    original_selection = copy.deepcopy(old_raw["steps"][0]["selection"])
+    old_raw["steps"][0]["selection"]["decisions"] = []
+    raw["steps"][0]["selection"]["decisions"] = []
+    if change == "selection_rules":
+        old_raw["steps"][0]["selection"] = original_selection
+        raw["steps"][0]["selection"] = original_selection
+    record["campaign"] = _binding(old_path, yaml.safe_dump(old_raw))
+    old, _ = load_campaign(old_path)
+    selected_path = Path(record["selection"]["path"])
+    selected = json.loads(selected_path.read_text())
+    selected.pop("selection_hash")
+    selected["suite_hash"] = campaign_identity(old, old_path.parent)
+    result = selected["experiments"]["E05"]
+    result.update(
+        status="complete",
+        decision_mode="diagnostic",
+        decisions=[],
+        published_policy_overlay={},
+        combined_selected_overlay={},
+    )
+    if change == "mode":
+        result["decision_mode"] = "independent"
+    elif change == "decisions":
+        result["decisions"] = [{"selected": "candidate"}]
+    elif change == "policy":
+        result["published_policy_overlay"] = {"selected": True}
+    elif change == "overlay":
+        result["combined_selected_overlay"] = {"selected": True}
+    elif change == "missing":
+        record["cells"].pop()
+    selected["selection_hash"] = digest(selected)
+    record["selection"] = _binding(selected_path, json.dumps(selected))
+    lock = _save(path, raw, record)
+    producers = []
+    if change is not None:
+        with pytest.raises(ValueError, match="external selection"):
+            external_selection_result(lock, lock.steps[0], tmp_path, producer_manifests=producers)
+        assert producers == []
+    else:
+        result = external_selection_result(
+            lock, lock.steps[0], tmp_path, producer_manifests=producers
+        )
+        assert result["status"] == "complete"
+        assert result["published_policy_overlay"] == {}
+        assert result["new_cells"] == 0
+        assert len(producers) == 16
+        assert {p["external_artifact_root"] for p in producers} == {
+            str(selected_path.parent.parent)
+        }

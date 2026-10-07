@@ -696,7 +696,15 @@ def external_selection_result(
     ):
         raise ValueError("external selection signature or historical design mismatch")
     result = selection["experiments"][step.id]
-    if result.get("status") not in {"selected", "screened_out"}:
+    completed_diagnostic = (
+        result.get("status") == "complete"
+        and result.get("decision_mode") == "diagnostic"
+        and not step.selection.decisions
+        and result.get("decisions") == []
+        and result.get("published_policy_overlay") == {}
+        and result.get("combined_selected_overlay") == {}
+    )
+    if result.get("status") not in {"selected", "screened_out"} and not completed_diagnostic:
         raise ValueError("external selection must be a finished development decision")
     result_set = json.loads(binding(record["result_set"]).read_text())
     rows = {row["cell_id"]: row for row in result_set["cells"]}
@@ -746,7 +754,11 @@ def external_selection_result(
     # Publish only after the entire historical comparison and evidence pass.
     # These are producer inputs, never new cells or current prediction identities.
     if producer_manifests is not None:
-        producer_manifests.extend(verified_manifests)
+        producer_root = binding(record["selection"]).parent.parent.resolve()
+        producer_manifests.extend(
+            {**manifest, "external_artifact_root": str(producer_root)}
+            for manifest in verified_manifests
+        )
     return {
         **result,
         "external_selection": step.external_selection.model_dump(mode="json"),

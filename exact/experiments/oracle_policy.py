@@ -321,7 +321,9 @@ def materialize_followup(source, suite, manifests, selections):
     if artifact_id and suite.campaign:
         from exact.experiments.recovery import ArtifactStore
 
-        store = ArtifactStore(Path(suite.campaign["root"]))
+        # Verified historical manifests retain their original artifact store;
+        # their outputs are evidence, never current-code prediction artifacts.
+        store = ArtifactStore(Path(item.get("external_artifact_root") or suite.campaign["root"]))
         record = store.verify(artifact_id)
         expected = record["outputs"].get("source_decisions.json", {}).get("sha256")
         if expected != sha256_file(trace_path):

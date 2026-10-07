@@ -252,6 +252,29 @@ def test_followup_binds_completed_recipe_and_refuses_population_or_role_changes(
         "fingerprint_payload": {"output_dir": str(output)},
     }
     bound = materialize_followup(source, suite, [item], {})
+    # Historical manifests use the producer's verified artifact store, not an
+    # empty consumer store. The trace checksum remains mandatory.
+    from exact.experiments.recovery import ArtifactStore
+    from exact.utils.provenance import sha256_file
+
+    consumer_suite = replace(suite, campaign={"root": str(tmp_path / "consumer")})
+    external = {
+        **item,
+        "external_artifact_root": str(tmp_path / "producer"),
+        "recovery": {"artifacts": {"extraction": "a" * 64}},
+    }
+    with monkeypatch.context() as guard:
+
+        def verify(store, artifact_id):
+            assert store.root == tmp_path / "producer"
+            assert artifact_id == "a" * 64
+            return {"outputs": {"source_decisions.json": {"sha256": sha256_file(trace)}}}
+
+        guard.setattr(ArtifactStore, "verify", verify)
+        materialize_followup(source, consumer_suite, [external], {})
+        guard.setattr(ArtifactStore, "verify", lambda *_: {"outputs": {}})
+        with pytest.raises(ValueError, match="immutable extraction artifact"):
+            materialize_followup(source, consumer_suite, [external], {})
     assert bound.base_config_path == config_path
     assert bound.config.screen.source_cap == source.config.screen.source_cap
     assert all(
