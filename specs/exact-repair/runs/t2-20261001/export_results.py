@@ -86,9 +86,21 @@ def main():
     models = []
     for arm in pilot["arms"]:
         source = arm["provenance"]
-        for key in ["protocol", "training_report", "completion"]:
+        for key in ["protocol", "completion"]:
             ref = source[key]
             add(ref["path"], ref["sha256"])
+        ref = source["training_report"]
+        raw = Path(ref["path"]).read_bytes()
+        if sha256(raw) != ref["sha256"]:
+            raise ValueError(f"Training report changed: {ref['path']}")
+        training = json.loads(raw)
+        rounds = training.pop("acquisition_rounds", [])
+        training["export_derivation"] = {
+            "source": ref, "omitted_fields": ["acquisition_rounds"],
+            "omitted_acquisition_round_count": len(rounds),
+            "reason": "Repeated raw acquired label payloads; metrics/history retained",
+        }
+        files[f"derived/training/{arm['id']}.json"] = json_bytes(training)
         models.append({"arm": arm["id"], "selected_epoch": source["selected_epoch"],
                        "model": source["model"], "weights_included": False})
     files["configuration/selected-models.json"] = json_bytes(models)
@@ -103,6 +115,7 @@ def main():
     # Batch manifests repeat whole-checkout hashes. Retain commands, resources,
     # package versions and every input hash, replacing only those duplicate lists.
     batches = []
+    omitted_schedules = {}
     for path in sorted((campaign / "batches").glob("*/batch.json")):
         raw = path.read_bytes()
         batch = json.loads(raw)
@@ -119,8 +132,22 @@ def main():
             if batch.get(key):
                 protocol = Path(batch[key]).resolve()
                 if protocol.is_relative_to(campaign):
-                    add(protocol, frozen.get(str(protocol)))
+                    if protocol.stat().st_size <= 256 * 1024:
+                        add(protocol, frozen.get(str(protocol)))
+                    else:
+                        # Large "protocols" are schedules with embedded corpus or
+                        # label payloads, not small model/run configuration files.
+                        raw = protocol.read_bytes()
+                        digest = sha256(raw)
+                        expected = frozen.get(str(protocol))
+                        if expected is not None and digest != expected:
+                            raise ValueError(f"Schedule changed: {protocol}")
+                        omitted_schedules[str(protocol)] = {
+                            "sha256": digest, "size_bytes": len(raw),
+                            "reason": "Large schedule retained on server; batch settings exported",
+                        }
     files["configuration/batches.json"] = json_bytes(batches)
+    files["configuration/omitted-schedules.json"] = json_bytes(omitted_schedules)
 
     commits = set()
 

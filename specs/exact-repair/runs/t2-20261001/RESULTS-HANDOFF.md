@@ -34,7 +34,7 @@ launch remain deferred. API spend in this repair campaign was zero.
 ## What is preserved
 
 The compact archive contains original final stage reports (including detailed
-rows where the reports provide them), pilot training reports, protocols,
+rows where the reports provide them), compact pilot training reports, protocols,
 attempt outcomes and history, source identities, correction acceptance checks,
 closure/accounting receipts, supervisor shutdown/publication records and CSV
 summaries. All failed, unknown and unavailable outcomes remain represented.
@@ -44,6 +44,11 @@ package versions and frozen input hashes from each batch. Only repeated hashes
 of whole code checkouts are omitted; each original batch manifest hash remains.
 `configuration/selected-models.json` records the six pilot models and hashes.
 `configuration/source-commits.json` lists campaign/batch source revisions.
+`derived/training/` retains each pilot's full training settings, loss/validation
+history, model selection and coverage, excluding the repeated raw acquisition
+label payloads. Each derived report identifies its original report hash and
+omitted field. Large batch schedules containing corpus payloads stay on the
+server; `configuration/omitted-schedules.json` records their paths and hashes.
 
 This is a results export, not a standalone replay or training-resume package.
 Raw datasets, unopened held-out payloads, caches, model weights/optimizer state,
