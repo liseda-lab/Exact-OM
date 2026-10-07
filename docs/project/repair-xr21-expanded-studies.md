@@ -709,3 +709,14 @@ validation, complete outputs and final costs are authenticated. Only then may
 local scope completion be published, pending batches emptied and remaining work
 marked terminal. Larger training/control obligations stay explicitly deferred;
 the existing deterministic notifier owns the single approval-needed idle email.
+
+The final closure authentication also checks the report worker's own 64-test
+receipt, executed commands, seven published outputs, and all original and
+replacement attempts against the live registry. It refuses closure while a
+worker, dispatch reservation, failure, or additional preparation slot remains.
+The final cost revision includes settled report and closure-maintenance charges,
+preserves every previous charge and original reservation, and reconciles worker,
+allocated CPU/GPU/memory and measured CPU totals separately. This closes only
+the local preliminary scope; the four user deferrals, missing scientific gates,
+and unapproved cluster proposal remain explicit. Original readiness reports and
+historical scope completions are retained unchanged.
