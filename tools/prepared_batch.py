@@ -6,6 +6,7 @@ import argparse
 import copy
 import fcntl
 import json
+import math
 import os
 import shlex
 import shutil
@@ -541,6 +542,106 @@ def import_controls(recipe, registry, campaign, runtime, workdir):
     return imports
 
 
+def _validate_e25_replay_world(artifact, trace):
+    """Require the complete frozen world, including empty and unjudged sources."""
+    teacher = artifact["teacher_binding"]
+    expected_sources = teacher["source_universe"]
+    actual_sources = trace["source_universe"]
+    records = trace["records"]
+    recorded_sources = [row["Src"] for row in records]
+    for values in (expected_sources, actual_sources, recorded_sources):
+        if (
+            not isinstance(values, list)
+            or any(not isinstance(value, str) or not value for value in values)
+            or len(values) != len(set(values))
+        ):
+            raise ValueError("E25 replay source identities must be nonempty and unique")
+    expected_source_set = set(expected_sources)
+    if expected_source_set != set(actual_sources) or expected_source_set != set(recorded_sources):
+        raise ValueError("E25 replay omitted or added frozen source groups")
+    if (
+        trace.get("schema_version") != 2
+        or trace.get("source_universe_status") != "declared"
+        or trace.get("stage") != "after_cardinality_and_relation_typing"
+    ):
+        raise ValueError("E25 replay lacks its declared full source world")
+    scored = {(row["Src"], row["Tgt"]): row for row in artifact["population_rows"]}
+    protected_rows = teacher["unscored_protected_pairs"]
+    protected = {tuple(pair) for pair in protected_rows}
+    if (
+        len(scored) != len(artifact["population_rows"])
+        or len(protected) != len(protected_rows)
+        or set(scored) & protected
+        or any(len(pair) != 2 or pair[0] not in expected_source_set for pair in protected)
+        or any(source not in expected_source_set for source, _ in scored)
+    ):
+        raise ValueError("E25 replay frozen candidate inventory is invalid")
+    actual = {}
+    for row in records:
+        for candidate in row["candidates"]:
+            pair = (row["Src"], candidate["target"])
+            if pair in actual:
+                raise ValueError("E25 replay duplicated a frozen candidate pair")
+            actual[pair] = candidate
+    if set(actual) != set(scored) | protected:
+        raise ValueError("E25 replay omitted or added frozen candidate pairs")
+    for pair, frozen in scored.items():
+        observed = actual[pair]
+        for field in ("S_base", "U"):
+            value, expected = observed.get(field), frozen[field]
+            if (
+                not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or not math.isfinite(float(expected))
+                or abs(float(value) - float(expected)) > 1e-6
+            ):
+                raise ValueError("E25 replay changed frozen candidate scores")
+    for pair in protected:
+        row = actual[pair]
+        if row.get("protected_exact") is not True or (
+            row.get("S_base") is not None and row.get("U") is not None
+        ):
+            raise ValueError("E25 replay changed an unscored protected exact pair")
+
+
+def validate_e25_replay_completion(scientific_step, reports, *, require_artifact=False):
+    """Check every E25 replay output against its manifest-bound gate artifact."""
+    if scientific_step not in {"E25-oracles", "E25-trust"}:
+        return
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.experiments.harness import hash_payload
+
+    artifacts = []
+    for report in reports:
+        provenance = report["fingerprint_payload"]
+        output = Path(provenance["output_dir"])
+        config = ConfigModel.load_config(output / "_inputs/resolved.config.yaml").model_dump(
+            mode="json", by_alias=True
+        )
+        if hash_payload(config) != report["resolved_config_hash"]:
+            raise ValueError("E25 replay resolved configuration changed")
+        gate = config["llm"]["experiment"]["gate"]
+        if not gate.get("artifact"):
+            if gate.get("mode") != "off":
+                raise ValueError("E25 replay lacks its frozen gate artifact")
+            artifacts.append(None)
+            continue
+        path = Path(gate["artifact"]).resolve()
+        expected = provenance["artifacts"]["llm.experiment.gate.artifact"]
+        if binding(path) != {
+            "path": str(Path(expected["path"]).resolve()),
+            "sha256": expected["sha256"],
+        }:
+            raise ValueError("E25 replay gate artifact binding changed")
+        artifact = read(path)
+        if artifact.get("kind") != "llm_oracle_replay":
+            raise ValueError("E25 replay has an unsupported gate artifact")
+        _validate_e25_replay_world(artifact, read(output / "source_decisions.json"))
+        artifacts.append(artifact)
+    if require_artifact and any(item is None for item in artifacts):
+        raise ValueError("Every amended E25 replay arm requires a frozen population artifact")
+
+
 def run_recipe(path):
     from types import SimpleNamespace
 
@@ -917,6 +1018,15 @@ def run_recipe(path):
             )
         ):
             raise ValueError("Incomplete comparison cells")
+        validate_e25_replay_completion(
+            recipe["scientific_step"],
+            reports,
+            require_artifact=(
+                recipe["scientific_step"] == "E25-trust"
+                or declared.get("frozen_constants", {}).get("outcome_semantics")
+                == "benchmark_reference"
+            ),
+        )
         write(
             root / "completion.json",
             {
@@ -1117,7 +1227,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recipe", type=Path, required=True)
     parser.add_argument("--record-exit", type=int)
-    args = parser.parse_args()
+    args = parser.parse_args(sys.argv[1:])
     if args.record_exit is not None:
         record_exit(args.recipe, args.record_exit)
         return
