@@ -94,6 +94,132 @@ def test_restart_reconciles_existing_worker_and_registration_crash(tmp_path, que
     assert len(calls) == 1
 
 
+@pytest.fixture
+def queued_recovery(tmp_path, queue):
+    registry, batch, calls = queue
+    registry['runs'] = [{
+        'id': 'failed', 'step_id': '14372.33', 'pending_recovery': batch['id'],
+        'enabled': True, 'reason': 'Retain failed attempt and its accounting',
+        'budget_path': str(tmp_path / 'historic-budget.json'),
+    }]
+    batch['recovery_for'] = 'failed'
+    save(tmp_path / 'registry.json', registry)
+    return registry, batch, calls
+
+
+@pytest.mark.parametrize('explicit_parent', [True, False])
+def test_recovery_lineage_requires_verified_registration(tmp_path, queued_recovery, explicit_parent):
+    registry, batch, calls = queued_recovery
+    if not explicit_parent:  # Existing pending-only recovery declarations remain supported.
+        batch.pop('recovery_for')
+        save(tmp_path / 'registry.json', registry)
+    observation = dispatch.inspect_runs(registry['runs'], step_states={'14372.0': 'RUNNING'})
+    assert waiting_recoveries(registry, observation) == {'failed': 'E18'}
+    assert tick(tmp_path)['status'] == 'starting'
+    assert tick(tmp_path)['status'] == 'no_ready_launch'
+    assert load(tmp_path / 'registry.json') == registry
+
+    receipt(batch)
+    steps = {'14372.0': 'RUNNING', '14372.36': 'RUNNING'}
+    assert tick(tmp_path, steps)['status'] == 'registered'
+    current = load(tmp_path / 'registry.json')
+    expected_parent = {
+        **registry['runs'][0], 'enabled': False, 'superseded_by': 'E18', 'retain_accounting': True,
+    }
+    expected_parent.pop('pending_recovery')
+    assert current['runs'][0] == expected_parent
+    assert current['runs'][1]['step_id'] == '14372.36'
+    assert current['runs'][1]['dispatch_nonce'] == batch['launch']['nonce']
+    assert current['pending_batches'] == []
+    dispatch.inspect_runs(current['runs'], step_states=steps)  # Registry invariants still hold.
+
+    # Registration is authoritative if the controller dies before writing dispatch state.
+    state = load(tmp_path / 'dispatch-state.json')
+    state['E18']['status'] = 'starting'
+    save(tmp_path / 'dispatch-state.json', state)
+    assert tick(tmp_path, steps)['status'] == 'no_ready_launch'
+    assert load(tmp_path / 'dispatch-state.json')['E18']['status'] == 'registered'
+    assert load(tmp_path / 'registry.json') == current
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('damage', ['nonce', 'nonnumeric_step'])
+def test_recovery_rejects_forged_receipt_without_promoting_parent(tmp_path, queued_recovery, damage):
+    registry, batch, calls = queued_recovery
+    assert tick(tmp_path)['status'] == 'starting'
+    proof = {'step_id': '14372.36', 'dispatch_nonce': batch['launch']['nonce']}
+    proof['dispatch_nonce' if damage == 'nonce' else 'step_id'] = (
+        'another-dispatch-nonce' if damage == 'nonce' else '14372.extern'
+    )
+    save(Path(batch['launch']['step_path']), proof)
+    tick(tmp_path, {'14372.0': 'RUNNING', '14372.36': 'RUNNING'})
+    assert load(tmp_path / 'registry.json') == registry
+    assert load(tmp_path / 'dispatch-state.json')['E18']['status'] == 'failed'
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize('damage', ['ambiguous', 'mismatched', 'missing', 'superseded'])
+def test_conflicting_queued_recovery_never_spawns(tmp_path, queued_recovery, damage):
+    registry, batch, calls = queued_recovery
+    parent = registry['runs'][0]
+    registry['runs'].append({'id': 'other', 'step_id': '14372.34', 'enabled': False})
+    if damage == 'ambiguous':
+        registry['runs'][1]['pending_recovery'] = batch['id']
+    elif damage == 'mismatched':
+        batch['recovery_for'] = 'other'
+    elif damage == 'missing':
+        parent.pop('pending_recovery')
+    else:
+        parent['superseded_by'] = 'other'
+    save(tmp_path / 'registry.json', registry)
+    assert tick(tmp_path)['status'] == 'failed'
+    assert load(tmp_path / 'registry.json') == registry
+    assert load(tmp_path / 'dispatch-state.json')['E18']['may_have_started'] is False
+    assert not calls
+
+
+@pytest.mark.parametrize('damage', ['ambiguous', 'changed', 'superseded'])
+def test_inflight_recovery_conflicts_preserve_registry(tmp_path, queued_recovery, damage):
+    registry, batch, calls = queued_recovery
+    assert tick(tmp_path)['status'] == 'starting'
+    registry['runs'].append({'id': 'other', 'step_id': '14372.34', 'enabled': False})
+    if damage == 'ambiguous':
+        registry['runs'][1]['pending_recovery'] = batch['id']
+    elif damage == 'changed':
+        registry['runs'][0]['pending_recovery'] = 'another-recovery'
+    else:
+        registry['runs'][0]['superseded_by'] = 'other'
+    save(tmp_path / 'registry.json', registry)
+    receipt(batch)
+    steps = {'14372.0': 'RUNNING', '14372.36': 'RUNNING'}
+    tick(tmp_path, steps)
+    tick(tmp_path, steps)
+    assert load(tmp_path / 'registry.json') == registry
+    assert load(tmp_path / 'dispatch-state.json')['E18']['status'] == 'failed'
+    assert len(calls) == 1
+
+
+def test_recovery_dependency_cycle_cannot_partially_mutate_registry(tmp_path, queued_recovery):
+    registry, batch, calls = queued_recovery
+    save(tmp_path / 'parent-complete.json', {'status': 'complete', 'passed': True})
+    (tmp_path / 'parent-exit').write_text('0')
+    registry['runs'].append({
+        'id': 'dependent', 'step_id': '14372.34', 'depends_on': ['failed'],
+        'completion_path': str(tmp_path / 'parent-complete.json'),
+        'exit_path': str(tmp_path / 'parent-exit'),
+    })
+    # The disabled historical prerequisite is valid; replacing it with its descendant is not.
+    registry['runs'][0]['enabled'] = False
+    batch['depends_on'] = ['dependent']
+    save(tmp_path / 'registry.json', registry)
+    assert tick(tmp_path)['status'] == 'starting'
+    receipt(batch)
+    tick(tmp_path, {'14372.0': 'RUNNING', '14372.36': 'RUNNING'})
+    assert load(tmp_path / 'registry.json') == registry
+    assert 'cycle' in dispatch.dispatch_incidents(tmp_path)[0]['reason']
+    assert len(calls) == 1
+
+
 def test_short_worker_requires_matching_terminal_receipt(tmp_path, queue):
     _, batch, calls = queue
     tick(tmp_path)

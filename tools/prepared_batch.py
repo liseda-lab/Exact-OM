@@ -113,7 +113,7 @@ def latest_account(registry):
     """Choose the cumulative lineage, rejecting forks that lose closed charges."""
     choices = []
     for row in registry["runs"]:
-        if not row.get("enabled", True):
+        if not row.get("enabled", True) and row.get("retain_accounting") is not True:
             continue
         path = Path(row["status_path"])
         if not path.exists():

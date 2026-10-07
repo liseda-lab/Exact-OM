@@ -12,7 +12,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from exact.experiments.supervision import inspect_runs, pending_batches
+from exact.experiments.supervision import _registry, inspect_runs, pending_batches
 
 
 def _read(path):
@@ -148,14 +148,37 @@ def _step(launch, allocation, steps):
     return None
 
 
+def _recovery_predecessor(registry, batch):
+    parents = [run for run in registry["runs"] if run.get("pending_recovery") == batch["id"]]
+    if len(parents) > 1:
+        raise ValueError("Queued recovery must have a single predecessor")
+    parent = parents[0] if parents else None
+    declared = batch.get("recovery_for")
+    if declared is not None and (parent is None or declared != parent["id"]):
+        raise ValueError("Queued recovery_for must match its predecessor's pending_recovery")
+    if parent is not None and parent.get("superseded_by") is not None:
+        raise ValueError("Queued recovery predecessor already has a registered successor")
+    return parent
+
+
 def _register(registry, batch, step):
     if any(run["id"] == batch["id"] for run in registry["runs"]):
         raise ValueError("Pending launch duplicates a registered run ID")
-    registry["runs"].append({
+    parent = _recovery_predecessor(registry, batch)
+    runs = [{**run} for run in registry["runs"]]
+    if parent is not None:
+        predecessor = next(run for run in runs if run["id"] == parent["id"])
+        predecessor.update(enabled=False, superseded_by=batch["id"], retain_accounting=True)
+        predecessor.pop("pending_recovery")
+    runs.append({
         **batch["launch"]["run"], "step_id": step, "enabled": True,
         "depends_on": batch.get("depends_on", []), "resources": batch.get("resources", {}),
         "dispatch_nonce": batch["launch"]["nonce"],
     })
+    # Validate the entire transition before mutating even the in-memory registry.
+    # The caller publishes registration and lineage together under the same lock.
+    _registry(runs)
+    registry["runs"] = runs
     registry["pending_batches"] = [row for row in registry["pending_batches"] if row["id"] != batch["id"]]
     for path in batch["launch"].get("pause_paths", []):
         if path not in registry.setdefault("pause_paths", []):
@@ -257,6 +280,7 @@ def dispatch_ready(directory, allocation, steps, *, supervisor_step=None, valida
             state[name] = record
             _write(state_path, state)  # Durable reservation precedes any process creation.
             try:
+                _recovery_predecessor(registry, batch)
                 launch = _validate(batch, allocation)
                 if validate_launch is not None:
                     validate_launch(launch)

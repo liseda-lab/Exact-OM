@@ -170,6 +170,58 @@ def test_latest_account_ignores_disabled_and_unmaterialized_runs(tmp_path, accou
         batch.latest_account({"runs": [disabled, missing]})
 
 
+def test_superseded_account_is_inherited_before_successor_materializes(tmp_path, account, wire):
+    earlier, _ = registered(tmp_path, "earlier", account)
+    retained = copy.deepcopy(account)
+    retained["work"]["screen/repaired/failed"] = charge("failed", requests=1, tokens=30)
+    retained["work"]["screen/repaired/unknown"] = charge("unknown", requests=1, tokens=50)
+    predecessor, source = registered(tmp_path, "source", retained, enabled=False)
+    predecessor.update(superseded_by="repair", retain_accounting=True)
+    successor = {"id": "repair", "status_path": str(tmp_path / "repair/status.json")}
+    selected, inherited = batch.latest_account({"runs": [earlier, predecessor, successor]})
+    assert (selected, inherited) == (source, retained)
+
+    destination = tmp_path / "repair/runtime"
+    batch.copy_account(selected, inherited, destination)
+    assert batch.read(destination / "budget.json") == retained
+    assert batch.read(source) == retained
+    assert batch.read(destination / "account-import.json")["source"] == batch.binding(source)
+
+
+@pytest.mark.parametrize("status", ["failed", "interrupted", "unknown"])
+@pytest.mark.parametrize("change", ["omit", "rewrite"])
+def test_superseded_account_closed_charges_cannot_be_lost(tmp_path, account, status, change):
+    account["work"]["screen/repaired/charged"] = charge(status, requests=1, tokens=50)
+    predecessor, _ = registered(tmp_path, "old", account, enabled=False)
+    predecessor.update(superseded_by="repair", retain_accounting=True)
+    fork = copy.deepcopy(account)
+    if change == "omit":
+        del fork["work"]["screen/repaired/charged"]
+    else:
+        fork["work"]["screen/repaired/charged"]["tokens"] = 0
+    for number in range(2):
+        fork["work"][f"screen/extra{number}"] = charge("complete")
+    successor, _ = registered(tmp_path, "repair", fork, mtime=200)
+    with pytest.raises(ValueError, match="Divergent cumulative accounting"):
+        batch.latest_account({"runs": [predecessor, successor]})
+
+
+def test_superseded_account_still_requires_closed_reservations(tmp_path, account):
+    account["work"]["screen/repaired/pending"] = charge("reserved")
+    predecessor, _ = registered(tmp_path, "old", account, enabled=False)
+    predecessor.update(superseded_by="repair", retain_accounting=True)
+    with pytest.raises(ValueError, match="unclosed"):
+        batch.latest_account({"runs": [predecessor]})
+
+
+@pytest.mark.parametrize("value", [False, 1, "true"])
+def test_disabled_account_retention_requires_explicit_true(tmp_path, account, value):
+    predecessor, _ = registered(tmp_path, "old", account, enabled=False)
+    predecessor.update(superseded_by="repair", retain_accounting=value)
+    with pytest.raises(ValueError, match="authoritative"):
+        batch.latest_account({"runs": [predecessor]})
+
+
 @pytest.fixture
 def wire(tmp_path, monkeypatch):
     directory = tmp_path / "source/runtime/openrouter"
