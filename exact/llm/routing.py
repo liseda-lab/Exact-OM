@@ -16,8 +16,8 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple, Union
 
 import httpx
 
-from exact.llm.ledger import RequestLedger
-from exact.llm.prompt_budget import validate_prompt_budget
+from exact.llm.ledger import RequestLedger, request_identity
+from exact.llm.prompt_budget import PromptBudgetError, validate_prompt_budget
 from exact.llm.spending_admission import HostedSpendingError, selected_policy
 from exact.utils.formatting import strip_code_fences
 
@@ -27,6 +27,18 @@ DEFAULT_OPENROUTER_MAX_RETRIES = 2
 DEFAULT_OPENROUTER_MAX_KEEPALIVE_CONNECTIONS = 20
 DEFAULT_OPENROUTER_MAX_CONNECTIONS = 100
 TRANSIENT_HTTP_STATUS_CODES = {408, 409, 429, 500, 502, 503, 504}
+HOSTED_CACHE_ONLY_ENV = "EXACT_HOSTED_CACHE_ONLY"
+
+
+class HostedCacheOnlyError(PromptBudgetError):
+    """A cached-only generation cannot proceed without a saved successful response."""
+
+
+def _hosted_cache_only() -> bool:
+    value = os.getenv(HOSTED_CACHE_ONLY_ENV)
+    if value not in {None, "0", "1"}:
+        raise HostedCacheOnlyError(f"{HOSTED_CACHE_ONLY_ENV} must be unset, '0', or '1'")
+    return value == "1"
 
 
 def _noop_logger(*args, **kwargs) -> None:
@@ -521,6 +533,7 @@ class OpenRouterClient:
         requested_seed: Optional[int],
     ) -> Dict[str, Any]:
         """Persist each wire attempt and raw response before any parser sees it."""
+        cache_only = _hosted_cache_only()
         strict = os.getenv("EXACT_EXPERIMENT_MODE") == "1"
         if strict:
             payload["provider"] = {**(payload.get("provider") or {}), "allow_fallbacks": False}
@@ -529,6 +542,10 @@ class OpenRouterClient:
         directory = self.ledger_dir or os.getenv("EXACT_OPENROUTER_LEDGER_DIR")
         url = f"{profile.api_base}/{endpoint}"
         if not directory:
+            if cache_only:
+                raise HostedCacheOnlyError(
+                    "Cached-only hosted generation requires a saved request-ledger response"
+                )
             spending = selected_policy()
             if spending and spending["policy"]["schema_version"] == 2:
                 raise HostedSpendingError(
@@ -565,7 +582,9 @@ class OpenRouterClient:
             "tokenizer_revision": profile.tokenizer_revision,
             "requested_seed": requested_seed,
         }
-        key = ledger.plan(identity)
+        # A replay-only cache miss must not even create a new planned request.
+        # Request identity is identical to the ordinary, paid-generation path.
+        key = request_identity(identity)[0] if cache_only else ledger.plan(identity)
 
         def decode(raw: bytes) -> Dict[str, Any]:
             result = _load_json_from_text(raw.decode("utf-8"))
@@ -585,6 +604,11 @@ class OpenRouterClient:
             cached = ledger.cached(key)
             if cached is not None:
                 return decode(cached)
+            if cache_only:
+                raise HostedCacheOnlyError(
+                    f"Cached-only hosted generation has no successful response for request {key}; "
+                    "new generation is prohibited"
+                )
             # Replay remains free even when an older request exceeds today's cap.
             # Rejection precedes sent/unknown states and paid retry authorization.
             validate_prompt_budget(profile, payload, endpoint, role=role)
