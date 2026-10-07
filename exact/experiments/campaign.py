@@ -1682,6 +1682,10 @@ def campaign_identity(lock: CampaignLock, root: Path) -> str:
         step.pop("readiness")
         if step.get("external_selection") is None:
             step.pop("external_selection", None)
+        # This optional metadata was introduced after completed campaign locks.
+        # Its empty default has no scientific meaning; nonempty amendments do.
+        if not step.get("frozen_constants"):
+            step.pop("frozen_constants", None)
     base = lock.base_config if lock.base_config.is_absolute() else root / lock.base_config
     value["base_config"] = {"sha256": sha256_file(base)}
 
