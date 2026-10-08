@@ -72,3 +72,10 @@ three have explicit no-new-paid-call exemptions. E14 step `14372.232` and the in
 allocation were retained. The maintenance pause is removed; deployment introduced zero paid
 calls and zero model repairs. See `deployment-verification.json` and `HANDOFF.md` for exact
 source bindings, worker adaptations, counters and remaining verification limits.
+
+## G4 source admission, 2026-10-08
+
+The user approved the exact tested G4 runner and launch. The [admission handoff](G4-SOURCE-ADMISSION-20261008.md)
+records its single-hash allowlist addition, fresh guarded-hosted receipt and numeric Slurm
+submission. All spending/prompt limits and historical charges remain unchanged. This approval
+is specific to the reviewed source; future code changes still require source admission.

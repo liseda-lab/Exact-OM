@@ -430,7 +430,10 @@ work:
   - E25
   - E07
   binding_group: freeze_and_final
-  state: pending_binding_or_dependency
+  state: running
+  queue_id: G4-run-once-followup
+  step_id: "14372.270"
+  source_admission: specs/experiments/G4-SOURCE-ADMISSION-20261008.md
   remaining_forecast_hours: null
 - step: E17
   remaining_cells: 54
