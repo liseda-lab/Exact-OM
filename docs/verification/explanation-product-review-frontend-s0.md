@@ -235,8 +235,9 @@ Under `s0/` are the fixtures, a dedicated PostgreSQL cluster (port 19083), loopb
 - local fixture: 19068;
 - v1 study harness: 19066.
 
-Services must be restarted after each build, because the CSP hashes are computed at start. This is an
-agent environment, not B07's persistent review workflow.
+Services must be restarted after each build, because the CSP hashes are computed at start.
+`s0/new-invite.sh` issues one fresh test invitation and prints its private link (loopback only; the
+certificate is self-signed). This is an agent environment, not B07's persistent review workflow.
 
 ## Remaining issues and limitations
 
