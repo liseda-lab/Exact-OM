@@ -1,0 +1,213 @@
+{
+  "status": "qualified_read_only_no_reservations_or_transmissions",
+  "manifest_sha256": "86338fbfcad62aa075519dea16fd95c076a500964ded1cdbf02ddc6ffd44cf97",
+  "request_limits": {
+    "calibration": 64,
+    "train": 352,
+    "development": 96,
+    "test": 192
+  },
+  "replacement_slots": 32,
+  "unique_original_slots": 32,
+  "confirmed_original_http_statuses": [
+    401
+  ],
+  "original_reserved_requests": 32,
+  "original_reserved_usd": 0.50512,
+  "phase_ledger_unchanged": true,
+  "paid_calls": 0,
+  "rows": [
+    {
+      "slot": "deepseek-0-0-auth-recovery-001",
+      "comparison": "deepseek-0-0",
+      "original_slot": "deepseek-0-0",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-0-1-auth-recovery-001",
+      "comparison": "deepseek-0-1",
+      "original_slot": "deepseek-0-1",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-0-0-auth-recovery-001",
+      "comparison": "qwen-0-0",
+      "original_slot": "qwen-0-0",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-0-1-auth-recovery-001",
+      "comparison": "qwen-0-1",
+      "original_slot": "qwen-0-1",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-0-0-auth-recovery-001",
+      "comparison": "glm-0-0",
+      "original_slot": "glm-0-0",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-0-1-auth-recovery-001",
+      "comparison": "glm-0-1",
+      "original_slot": "glm-0-1",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-0-0-auth-recovery-001",
+      "comparison": "sonnet_reference-0-0",
+      "original_slot": "sonnet_reference-0-0",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-0-1-auth-recovery-001",
+      "comparison": "sonnet_reference-0-1",
+      "original_slot": "sonnet_reference-0-1",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-1-0-auth-recovery-001",
+      "comparison": "deepseek-1-0",
+      "original_slot": "deepseek-1-0",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-1-1-auth-recovery-001",
+      "comparison": "deepseek-1-1",
+      "original_slot": "deepseek-1-1",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-1-0-auth-recovery-001",
+      "comparison": "qwen-1-0",
+      "original_slot": "qwen-1-0",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-1-1-auth-recovery-001",
+      "comparison": "qwen-1-1",
+      "original_slot": "qwen-1-1",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-1-0-auth-recovery-001",
+      "comparison": "glm-1-0",
+      "original_slot": "glm-1-0",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-1-1-auth-recovery-001",
+      "comparison": "glm-1-1",
+      "original_slot": "glm-1-1",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-1-0-auth-recovery-001",
+      "comparison": "sonnet_reference-1-0",
+      "original_slot": "sonnet_reference-1-0",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-1-1-auth-recovery-001",
+      "comparison": "sonnet_reference-1-1",
+      "original_slot": "sonnet_reference-1-1",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-2-0-auth-recovery-001",
+      "comparison": "deepseek-2-0",
+      "original_slot": "deepseek-2-0",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-2-1-auth-recovery-001",
+      "comparison": "deepseek-2-1",
+      "original_slot": "deepseek-2-1",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-2-0-auth-recovery-001",
+      "comparison": "qwen-2-0",
+      "original_slot": "qwen-2-0",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-2-1-auth-recovery-001",
+      "comparison": "qwen-2-1",
+      "original_slot": "qwen-2-1",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-2-0-auth-recovery-001",
+      "comparison": "glm-2-0",
+      "original_slot": "glm-2-0",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-2-1-auth-recovery-001",
+      "comparison": "glm-2-1",
+      "original_slot": "glm-2-1",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-2-0-auth-recovery-001",
+      "comparison": "sonnet_reference-2-0",
+      "original_slot": "sonnet_reference-2-0",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-2-1-auth-recovery-001",
+      "comparison": "sonnet_reference-2-1",
+      "original_slot": "sonnet_reference-2-1",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-3-0-auth-recovery-001",
+      "comparison": "deepseek-3-0",
+      "original_slot": "deepseek-3-0",
+      "http_status": 401
+    },
+    {
+      "slot": "deepseek-3-1-auth-recovery-001",
+      "comparison": "deepseek-3-1",
+      "original_slot": "deepseek-3-1",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-3-0-auth-recovery-001",
+      "comparison": "qwen-3-0",
+      "original_slot": "qwen-3-0",
+      "http_status": 401
+    },
+    {
+      "slot": "qwen-3-1-auth-recovery-001",
+      "comparison": "qwen-3-1",
+      "original_slot": "qwen-3-1",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-3-0-auth-recovery-001",
+      "comparison": "glm-3-0",
+      "original_slot": "glm-3-0",
+      "http_status": 401
+    },
+    {
+      "slot": "glm-3-1-auth-recovery-001",
+      "comparison": "glm-3-1",
+      "original_slot": "glm-3-1",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-3-0-auth-recovery-001",
+      "comparison": "sonnet_reference-3-0",
+      "original_slot": "sonnet_reference-3-0",
+      "http_status": 401
+    },
+    {
+      "slot": "sonnet_reference-3-1-auth-recovery-001",
+      "comparison": "sonnet_reference-3-1",
+      "original_slot": "sonnet_reference-3-1",
+      "http_status": 401
+    }
+  ]
+}

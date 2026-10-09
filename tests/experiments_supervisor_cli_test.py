@@ -863,10 +863,20 @@ def queued_recovery(cli, controller, tmp_path, monkeypatch):
     return policy, state, registry, batch
 
 
+@pytest.mark.parametrize("incident_kind", ["run_failed", "provider_authentication"])
 def test_verified_queued_recovery_waits_without_repair_or_false_recovery_alert(
-    cli, queued_recovery, tmp_path, monkeypatch
+    cli, queued_recovery, tmp_path, monkeypatch, incident_kind
 ):
     policy, state, registry, _ = queued_recovery
+    original_inspect = cli.inspect_runs
+
+    def inspect(*args, **kwargs):
+        observation = original_inspect(*args, **kwargs)
+        for incident in observation["incidents"]:
+            incident["kind"] = incident_kind
+        return observation
+
+    monkeypatch.setattr(cli, "inspect_runs", inspect)
     incidents = cli.inspect_runs(registry["runs"], step_states={"14372.38": "RUNNING"})["incidents"]
     incident = incidents[0]
     state["incidents"][incident["id"]] = {

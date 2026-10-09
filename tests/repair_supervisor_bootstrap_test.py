@@ -35,6 +35,52 @@ def test_policy_and_commands_preserve_venv_interpreter_symlink(tmp_path):
     assert "os.execv(" + repr(str(interpreter)) in (target / "entry.py").read_text()
 
 
+def test_successor_reuses_live_state_and_launch_owner_without_copy_or_mutation(
+    tmp_path, monkeypatch
+):
+    state = tmp_path / "state"
+    state.mkdir()
+    retained = {
+        name: '{"preserved":true}\n'
+        for name in ("registry.json", "state.json", "dispatch-state.json", "policy.json")
+    }
+    for name, content in retained.items():
+        (state / name).write_text(content)
+    config, instructions = tmp_path / "config.toml", tmp_path / "instructions.md"
+    config.write_text('model="gpt-6-astra"\n')
+    instructions.write_text("Preserve workers and budget reservations.")
+    monkeypatch.setattr(
+        bootstrap.subprocess,
+        "run",
+        lambda *a, **k: pytest.fail("Preparation cannot start processes"),
+    )
+    target = tmp_path / "successor"
+    launch = bootstrap.prepare(
+        target,
+        allocation="14451",
+        node="liseda-05",
+        code=tmp_path,
+        repository=tmp_path,
+        python=sys.executable,
+        instructions=instructions,
+        codex="/home/user/.local/bin/codex",
+        codex_config=config,
+        state_directory=state,
+    )
+    assert launch["tmux_socket"] == str(state / "tmux.sock")
+    policy = json.loads((target / "policy.json").read_text())
+    assert policy["state_directory"] == str(state)
+    assert str(state) in policy["notifications"]["command"]
+    entry = (target / "entry.py").read_text()
+    assert "--policy" in entry and str(target / "policy.json") in entry
+    assert "--directory" in entry and str(state) in entry
+    assert {name: (state / name).read_text() for name in retained} == retained
+    (state / "STOP").touch()
+    monkeypatch.setenv("SLURM_JOB_ID", "14451")
+    with pytest.raises(ValueError, match="STOP/PAUSE"):
+        bootstrap.start(target)
+
+
 def test_preparation_pins_login_model_schedule_and_owned_launch_without_starting(
     tmp_path, monkeypatch
 ):

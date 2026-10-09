@@ -59,6 +59,32 @@ def _result(outcome):
     }
 
 
+def test_provider_authentication_notifies_once_without_model_or_retry(
+    monitor, tmp_path, monkeypatch
+):
+    cli, policy, state, observation = monitor
+    observation["incidents"][0].update(
+        kind="provider_authentication", reason="HTTP401 credential rejected"
+    )
+    monkeypatch.setattr(
+        cli,
+        "authenticate",
+        lambda *args: pytest.fail("No model authentication for a provider credential blocker"),
+    )
+    monkeypatch.setattr(cli, "run_agent", lambda *args: pytest.fail("No futile model retry"))
+    sent = []
+    monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
+    for _ in range(3):
+        status = cli.check(tmp_path, policy, state, act=True)
+        assert status["status"] == "blocked"
+        notifications.flush_notifications(tmp_path, policy["notifications"])
+        state = cli.read(tmp_path / "state.json")
+    assert len(sent) == 1
+    assert state["agent_runs"] == []
+    assert state["incidents"]["failure"]["attempts"] == 0
+    assert not (tmp_path / "PAUSE").exists()
+
+
 def _milestone_account(cli, tmp_path, policy, tokens):
     policy["hosted_spending_milestone"] = {
         "id": "campaign-hosted-tokens",

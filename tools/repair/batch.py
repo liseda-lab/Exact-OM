@@ -567,6 +567,13 @@ def run(path, job_id, attempt):
         elapsed = time.monotonic() - started
         usage = resource.getrusage(resource.RUSAGE_CHILDREN)
         cpu = usage.ru_utime + usage.ru_stime
+        output_error = None
+        if code != 0:
+            try:
+                record_outputs(work, attempt)
+            except Exception as exc:
+                # Preserve the original failure and make unbound partial evidence explicit.
+                output_error = type(exc).__name__ + ": " + str(exc)
         if charged:
             charge(raw["ledger"], job, attempt, elapsed=elapsed, cpu_seconds=cpu, peak_rss_mb=peak)
         final = {
@@ -579,6 +586,7 @@ def run(path, job_id, attempt):
             "peak_rss_mb": peak,
             "finished_epoch": time.time(),
             "work": str(work),
+            **({"output_publication_error": output_error} if output_error else {}),
         }
         write_artifact(attempt / "status.json", final)
         write_artifact(attempt / "completion.json", final)

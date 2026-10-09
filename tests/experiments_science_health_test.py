@@ -92,6 +92,135 @@ def test_corrective_incomplete_denominator_is_not_qualified_failure(tmp_path):
     assert not inspected["failures"] and "denominator" in inspected["errors"][0]
 
 
+def annotation_example(tmp_path, *, legacy=False, status_code=401):
+    run, complete = example(tmp_path)
+    complete["status"] = "complete" if legacy else "failed"
+    rows = [dict(id="slot", status="unavailable" if legacy else "provider_error", artifact=None)]
+    report = dict(
+        schema="exact-repair/corrective-annotation-report/v1",
+        status="complete" if legacy else "blocked_external",
+        scheduled=1,
+        recorded=1,
+        rows=rows,
+    )
+    outputs = {}
+    if legacy:
+        receipt = put(
+            tmp_path / "work/slot/receipt.json",
+            dict(
+                status="annotation_unavailable",
+                retry_permitted=False,
+                costs_reset=False,
+                error=f"Annotation worker error: RuntimeError: OpenRouter HTTP {status_code}; request "
+                + "a" * 64
+                + " retained; reservation retained",
+            ),
+        )
+        outputs["slot/receipt.json"] = receipt["sha256"]
+    else:
+        report.update(
+            blocker=dict(
+                kind="provider_authentication",
+                status_code=status_code,
+                requires_user=True,
+                retry_permitted=False,
+                detail="Credential rejected",
+            ),
+            confirmed_failure=dict(
+                kind="authentication",
+                http_status=status_code,
+                retry_permitted=False,
+                request_id="a" * 64,
+                response_sha256="b" * 64,
+            ),
+        )
+    ref = put(tmp_path / "work/evaluation/report.json", report)
+    outputs["evaluation/report.json"] = ref["sha256"]
+    put(tmp_path / "attempt/outputs.json", outputs)
+    put(tmp_path / "attempt/completion.json", complete)
+    return run, complete
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize("status_code", [401, 403])
+def test_annotation_auth_is_one_external_blocker_even_after_nonzero_exit(
+    tmp_path, legacy, status_code
+):
+    run, complete = annotation_example(tmp_path, legacy=legacy, status_code=status_code)
+    inspected = inspect_science(run, complete)
+    assert not inspected["errors"] and not inspected["failures"]
+    assert inspected["blockers"][0]["status_code"] == status_code
+    health = inspect_runs([run], step_states={})
+    assert len(health["incidents"]) == 1
+    assert health["incidents"][0]["kind"] == "provider_authentication"
+    registry = dict(
+        runs=[run],
+        capacity=dict(cpus=2),
+        pending_batches=[
+            dict(id="independent", resources=dict(cpus=1)),
+            dict(id="dependent", resources=dict(cpus=1), depends_on=["run"]),
+        ],
+    )
+    assert [row["batch_id"] for row in pending_batches(registry, health)] == ["independent"]
+
+
+@pytest.mark.parametrize("invalid", [None, "digest", "response", "index", "method", "status"])
+def test_free_authentication_preflight_requires_bound_http_evidence(tmp_path, invalid):
+    run, complete = annotation_example(tmp_path)
+    path = tmp_path / "work/evaluation/report.json"
+    report = json.loads(path.read_text())
+    raw = json.dumps({"error": {"code": 401, "message": "Credential rejected"}})
+    proof = dict(
+        source="read_only_authentication_preflight",
+        kind="authentication",
+        http_status=401,
+        profile="annotation",
+        method="GET",
+        endpoint="https://openrouter.ai/api/v1/key",
+        generation_requests=0,
+        response_sha256=hashlib.sha256(raw.encode()).hexdigest(),
+        retry_permitted=False,
+        costs_reset=False,
+    )
+    receipt = dict(proof, raw_response=raw)
+    if invalid == "response":
+        receipt["raw_response"] = "{}"
+    elif invalid == "method":
+        receipt["method"] = proof["method"] = "POST"
+    elif invalid == "status":
+        receipt["raw_response"] = json.dumps({"error": {"code": 403}})
+        receipt["response_sha256"] = proof["response_sha256"] = hashlib.sha256(
+            receipt["raw_response"].encode()
+        ).hexdigest()
+    evidence_path = tmp_path / "work/authentication-evidence/failed.json"
+    proof["evidence"] = put(evidence_path, receipt)
+    report["confirmed_failure"] = proof
+    outputs = {"evaluation/report.json": put(path, report)["sha256"]}
+    if invalid != "index":
+        outputs["authentication-evidence/failed.json"] = proof["evidence"]["sha256"]
+    if invalid == "digest":
+        evidence_path.write_text("{}")
+    put(tmp_path / "attempt/outputs.json", outputs)
+    inspected = inspect_science(run, complete)
+    if invalid:
+        assert inspected["errors"] and not inspected.get("blockers")
+    else:
+        assert not inspected["errors"] and not inspected["failures"]
+        assert inspected["blockers"][0]["status_code"] == 401
+
+
+def test_annotation_auth_requires_hash_bound_transport_receipt(tmp_path):
+    run, complete = annotation_example(tmp_path, legacy=True)
+    (tmp_path / "work/slot/receipt.json").write_text("{}")
+    result = inspect_science(run, complete)
+    assert not result.get("blockers") and "digest mismatch" in result["errors"][0]
+
+
+def test_unqualified_provider_error_does_not_become_authentication_blocker(tmp_path):
+    run, complete = annotation_example(tmp_path, legacy=True, status_code=500)
+    assert inspect_science(run, complete) == dict(failures=[], errors=[])
+
+
 @pytest.mark.parametrize(
     "status", ["generation_timeout", "verification_timeout", "unknown", "unavailable", "evaluated"]
 )

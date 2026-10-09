@@ -56,7 +56,9 @@ def release(tmp_path, monkeypatch):
                 )
             )
             stream.writestr(
-                f"LogMap-{left}-{right}.rdf",
+                "LogMap-"
+                + "-".join("confof" if n == "confOf" else n for n in (left, right))
+                + ".rdf",
                 (
                     alignment(f"urn:{left}:A", f"urn:{right}:A")
                     if split == "train"
@@ -174,3 +176,52 @@ def test_expired_stage_does_not_begin_native_check(release, tmp_path, monkeypatc
     result = conference.qualify(manifest, "conference_2025:cmt:conference", tmp_path / "expired")
     assert result["checks"] == {}
     assert "input" not in result
+
+
+def test_publisher_confof_mapping_preserves_ids_splits_and_unavailable_history(
+    release, tmp_path, monkeypatch
+):
+    manifest, output = release
+    assert conference.publisher_matcher_member(("cmt", "confOf")) == "LogMap-cmt-confof.rdf"
+    assert conference.publisher_matcher_member(("confOf", "edas")) == "LogMap-confof-edas.rdf"
+    current = json.loads(conference.bound_bytes(manifest))
+    recovered = [
+        r for r in current["rows"] if r["split"] == "train" and "confOf" in r["ontology_names"]
+    ]
+    assert len(recovered) == 5 and all(
+        r["status"] == "ready_for_whole_source_qualification" for r in recovered
+    )
+    native = conference.construct_native(manifest, "conference_2025:cmt:confOf")
+    problem = read_record(native["problem"])
+    assert native["mapping_count"] == 1
+    assert problem.objects[0].target_entity.iri.value == "urn:confOf:A"
+    with monkeypatch.context() as old:
+        old.setattr(conference, "PUBLISHER_ONTOLOGY_TOKENS", {})
+        legacy = conference.prepare(
+            tmp_path / "previous", tmp_path / "matchers.zip", tmp_path / "legacy"
+        )
+    historical = json.loads(conference.bound_bytes(legacy))
+    missing = [
+        r
+        for r in historical["rows"]
+        if r["split"] == "train" and r["status"] == "unavailable_publisher_member"
+    ]
+    assert {r["id"] for r in missing} == {r["id"] for r in recovered}
+    assert [(r["id"], r["group_id"], r["split"], r["ontology_names"]) for r in current["rows"]] == [
+        (r["id"], r["group_id"], r["split"], r["ontology_names"]) for r in historical["rows"]
+    ]
+    before = {str(p): p.read_bytes() for p in (tmp_path / "legacy").rglob("*") if p.is_file()}
+    with pytest.raises(ValueError, match="separate successor"):
+        conference.prepare(tmp_path / "previous", tmp_path / "matchers.zip", tmp_path / "legacy")
+    assert {
+        str(p): p.read_bytes() for p in (tmp_path / "legacy").rglob("*") if p.is_file()
+    } == before
+    successor = conference.prepare(
+        tmp_path / "previous", tmp_path / "matchers.zip", tmp_path / "successor"
+    )
+    new = json.loads(conference.bound_bytes(successor))
+    assert [(r["id"], r["split"], r["status"]) for r in new["rows"]] == [
+        (r["id"], r["split"], r["status"]) for r in current["rows"]
+    ]
+    assert json.loads(conference.bound_bytes(legacy)) == historical
+    assert not (tmp_path / "successor/ontologies/ekaw.owl").exists()

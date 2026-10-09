@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import dataclasses
 import fcntl
+import hashlib
 import json
 import math
 import os
@@ -40,10 +41,51 @@ from tools.repair.expanded_corpus import immutable
 
 PHASE_LIMITS = {"calibration": 32, "train": 384, "development": 96, "test": 192}
 COMPARISON_LIMITS = {"calibration": 32, "train": 256, "development": 64, "test": 128}
+REALLOCATED_LIMITS = {"calibration": 64, "train": 352, "development": 96, "test": 192}
 
 
 class AnnotationBudgetExhausted(ValueError):
     """Expected terminal masking at a frozen cumulative quota, never a retry."""
+
+
+class ConfirmedAnnotationFailure(RuntimeError):
+    def __init__(self, evidence):
+        self.evidence = evidence
+        super().__init__(
+            f"Confirmed annotation provider failure: HTTP {evidence['http_status']}; "
+            "durable attempt and cumulative reservations retained"
+        )
+
+
+def _confirmed_provider_failure(ledger, parameters):
+    """Qualify a provider response against this exact request, without exposing credentials."""
+    with ledger._transaction() as db:
+        attempts = db.execute(
+            "SELECT a.*,r.identity FROM attempts a JOIN requests r USING(request_id) "
+            "WHERE a.status>=400 AND a.status<600"
+        ).fetchall()
+    for attempt in attempts:
+        identity = json.loads(attempt["identity"])
+        payload = identity.get("payload", {})
+        if (
+            identity.get("role") != parameters["role"]
+            or payload.get("model") != parameters["model"]
+            or canonical_hash(payload.get("messages")) != canonical_hash(parameters["messages"])
+        ):
+            continue
+        raw = bytes(attempt["raw"] or b"")
+        if not raw or hashlib.sha256(raw).hexdigest() != attempt["sha256"]:
+            raise ValueError("Provider failure receipt has invalid response provenance")
+        return dict(
+            request_id=attempt["request_id"],
+            attempt=attempt["number"],
+            http_status=attempt["status"],
+            response_sha256=attempt["sha256"],
+            kind="authentication" if attempt["status"] in {401, 403} else "provider_response",
+            retry_permitted=False,
+            costs_reset=False,
+        )
+    return None
 
 
 def _remaining_seconds(seconds, manifest):
@@ -64,8 +106,7 @@ def validate_manifest(value):
         raise ValueError("The authorized campaign ceiling is $35")
     if value["phase"] not in PHASE_LIMITS:
         raise ValueError("Unregistered annotation phase")
-    if value["request_limits"] != PHASE_LIMITS:
-        raise ValueError("Request quotas require an explicit protocol amendment")
+    _request_budget(value)
     if value["phase"] != "calibration":
         gate = value["calibration_gate"]
         if sha(gate["path"]) != gate["sha256"] or read(gate["path"])["status"] != "qualified":
@@ -87,9 +128,211 @@ def validate_manifest(value):
     return value
 
 
+def _read_bound(reference):
+    if sha(reference["path"]) != reference["sha256"]:
+        raise ValueError("Frozen request amendment evidence changed")
+    return read(reference["path"])
+
+
+def _request_budget(manifest):
+    binding = manifest.get("request_budget_amendment")
+    if binding is None:
+        if manifest["request_limits"] != PHASE_LIMITS:
+            raise ValueError("Request quotas require an explicit protocol amendment")
+        return PHASE_LIMITS, None
+    approval = _read_bound(binding["authorization"])
+    proposal = _read_bound(approval["proposal"])
+    prior = _read_bound(binding["previous_phase_state"])
+    previous_manifest = _read_bound(binding["previous_manifest"])
+    if not (
+        approval.get("schema") == "exact-repair/request-budget-amendment-authorization/v1"
+        and approval.get("status") == "approved"
+        and approval.get("approval_text")
+        and approval.get("original_request_limits")
+        == proposal.get("original_request_limits")
+        == PHASE_LIMITS
+        and approval.get("proposed_request_limits")
+        == proposal.get("proposed_request_limits")
+        == manifest["request_limits"]
+        == REALLOCATED_LIMITS
+        and approval.get("aggregate_max_requests") == 704
+        and approval.get("calibration_max_usd") == 2
+        and approval.get("campaign_max_usd")
+        == manifest["cost_ceiling_usd"]
+        == prior["cost_ceiling_usd"]
+        == 35
+        and approval.get("replacement_calibration_max_requests") == 32
+        and prior["request_limits"] == previous_manifest["request_limits"] == PHASE_LIMITS
+        and prior["lineage"] == previous_manifest["lineage_id"] == manifest["lineage_id"]
+        and Path(previous_manifest["ledger_directory"]).resolve()
+        == Path(manifest["ledger_directory"]).resolve()
+        and len(prior["reservations"]) == 32
+        and all(row["phase"] == "calibration" for row in prior["reservations"].values())
+        and math.isclose(
+            sum(row["reserved_cost_usd"] for row in prior["reservations"].values()),
+            approval["prior_reserved_exposure_usd"],
+            rel_tol=0,
+            abs_tol=1e-9,
+        )
+    ):
+        raise ValueError("Unsupported or incompatible request-budget amendment")
+    return REALLOCATED_LIMITS, dict(
+        binding=binding, approval=approval, prior=prior, previous_manifest=previous_manifest
+    )
+
+
+def _replacement_proof(manifest, slot, packet_hash, comparison_id, amendment):
+    """One successor for one exact rejected request; never an unknown-delivery retry."""
+    from exact.llm.ledger import RequestLedger
+
+    rows = [row for row in manifest["slots"] if row["id"] == slot]
+    if len(rows) != 1 or "replaces" not in rows[0]:
+        raise ValueError("Amended calibration requires one frozen replacement slot")
+    replacement = rows[0]["replaces"]
+    old_slot = replacement["slot_id"]
+    prior = amendment["prior"]["reservations"].get(canonical_hash(("calibration", old_slot)))
+    old_rows = [row for row in amendment["previous_manifest"]["slots"] if row["id"] == old_slot]
+    if (
+        slot == old_slot
+        or prior is None
+        or len(old_rows) != 1
+        or prior["packet_hash"] != packet_hash
+        or comparison_id != prior.get("comparison_id", old_slot)
+    ):
+        raise ValueError("Replacement changed original comparison or packet")
+    old_row = old_rows[0]
+    old_manifest = amendment["previous_manifest"]
+    old_profile = old_row.get("profile", old_manifest["profile"])
+    new_profile = rows[0].get("profile", manifest["profile"])
+    public = lambda profile: {
+        key: value for key, value in profile.items() if key not in {"api_key_path", "api_key_env"}
+    }
+    if public(old_manifest["profiles"][old_profile]) != public(
+        manifest["profiles"][new_profile]
+    ) or old_row.get("swapped", False) != rows[0].get("swapped", False):
+        raise ValueError("Replacement changed frozen model/provider/order")
+    receipt = _read_bound(replacement["receipt"])
+    directory = Path(replacement["receipt"]["path"]).parent
+    packet = read_record(read(directory / "packet.json"))
+    expected_identity = canonical_hash(
+        (
+            packet,
+            {**old_manifest, "profile": old_profile},
+            old_slot,
+            old_row.get("swapped", False),
+            old_row.get("comparison_id", old_slot),
+        )
+    )
+    schedule = read_record(read(directory / "schedule.json"))
+    if (
+        receipt["identity"] != expected_identity
+        or packet.content_hash != packet_hash
+        or schedule.packet != packet
+    ):
+        raise ValueError("Replacement failed-request provenance changed")
+    evidence = _confirmed_provider_failure(
+        RequestLedger(Path(manifest["ledger_directory"])), schedule.slots[0]["parameters"]
+    )
+    if evidence is None or evidence["http_status"] != 401:
+        raise ValueError("Replacement requires the original definitive HTTP401 receipt")
+    return dict(
+        original_slot=old_slot,
+        failed_attempt=evidence,
+        authorization_sha256=amendment["binding"]["authorization"]["sha256"],
+    )
+
+
+def _failure_report_fields(evidence):
+    authentication = evidence["kind"] == "authentication"
+    return dict(
+        status="blocked_external" if authentication else "failed",
+        confirmed_failure=evidence,
+        **(
+            dict(
+                blocker=dict(
+                    kind="provider_authentication",
+                    status_code=evidence["http_status"],
+                    retry_permitted=False,
+                    requires_user=True,
+                    detail="OpenRouter rejected the configured credential; update the authorized credential before an explicitly admitted resume.",
+                )
+            )
+            if authentication
+            else {}
+        ),
+    )
+
+
+def _authentication_preflight(manifest, output):
+    """Free read-only credential check; no generation or scientific reservation."""
+    from exact.llm.routing import LLMRouter
+
+    router = LLMRouter(manifest["profiles"])
+    seen = set()
+    checked = []
+    try:
+        for name in dict.fromkeys(
+            row.get("profile", manifest["profile"]) for row in manifest["slots"]
+        ):
+            profile = router.profiles[name]
+            key = router.hosted.resolve_api_key(profile)
+            if not key:
+                raise RuntimeError("Annotation credential unavailable before any transmission")
+            if (profile.api_base, key) in seen:
+                continue
+            seen.add((profile.api_base, key))  # In-memory only; never retained in artifacts.
+            left = _remaining_seconds(manifest["seconds"], manifest)
+            if left <= 2:
+                return None
+            response = router.hosted._client.request(
+                method="GET",
+                url=profile.api_base + "/key",
+                headers={"Authorization": "Bearer " + key},
+                timeout=min(10.0, left - 2),
+            )
+            receipt = dict(
+                profile=name,
+                method="GET",
+                endpoint=profile.api_base + "/key",
+                http_status=response.status_code,
+                generation_requests=0,
+                response_sha256=hashlib.sha256(response.content).hexdigest(),
+            )
+            if response.is_error:
+                evidence = dict(receipt, raw_response=response.content.decode("utf-8"))
+                evidence_path = (
+                    Path(output) / "authentication-evidence" / (canonical_hash(evidence) + ".json")
+                )
+                immutable(evidence_path, evidence)
+                receipt["evidence"] = dict(
+                    path=str(evidence_path.resolve()), sha256=sha(evidence_path)
+                )
+            checked.append(receipt)
+            write_artifact(
+                Path(output) / "authentication.json",
+                dict(schema="exact-repair/annotation-authentication/v1", checks=checked),
+            )
+            if response.is_error:
+                return dict(
+                    **receipt,
+                    kind=(
+                        "authentication"
+                        if response.status_code in {401, 403}
+                        else "provider_response"
+                    ),
+                    retry_permitted=False,
+                    costs_reset=False,
+                    source="read_only_authentication_preflight",
+                )
+        return None
+    finally:
+        router.hosted.close()
+
+
 def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
     """Fail closed after a killed sender; replacement jobs never replenish quotas."""
     path = Path(manifest["ledger_directory"]) / "phase-reservations.json"
+    limits, amendment = _request_budget(manifest)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.with_suffix(".lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -104,12 +347,25 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
                 reservations={},
             )
         )
-        if (state["lineage"], state["cost_ceiling_usd"], state["request_limits"]) != (
+        if (state["lineage"], state["cost_ceiling_usd"]) != (
             manifest["lineage_id"],
             manifest["cost_ceiling_usd"],
-            PHASE_LIMITS,
         ):
             raise ValueError("Annotation budget lineage changed")
+        if amendment:
+            binding = amendment["binding"]
+            if state["request_limits"] == PHASE_LIMITS:
+                if canonical_hash(state) != canonical_hash(amendment["prior"]):
+                    raise ValueError("Original request ledger changed before amendment")
+                state["request_limits"] = limits
+                state["request_budget_amendment"] = binding
+            if state.get("request_budget_amendment") != binding or any(
+                state["reservations"].get(key) != value
+                for key, value in amendment["prior"]["reservations"].items()
+            ):
+                raise ValueError("Request amendment would reset or modify original attempts")
+        if state["request_limits"] != limits:
+            raise ValueError("Annotation request limits changed without compatible amendment")
         identity = canonical_hash((manifest["phase"], slot))
         records = state["reservations"]
         previous = records.get(identity)
@@ -121,10 +377,26 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
             return previous["state"] == "completed"
         same = [row for row in records.values() if row["phase"] == manifest["phase"]]
         comparison_id = comparison_id or slot
+        replacement = None
+        if amendment and manifest["phase"] == "calibration":
+            replacement = _replacement_proof(manifest, slot, packet_hash, comparison_id, amendment)
+            if any(
+                row.get("replacement", {}).get("original_slot") == replacement["original_slot"]
+                for row in records.values()
+            ):
+                raise ValueError("Original rejected request already has its admitted replacement")
+            spent = sum(
+                row["reserved_cost_usd"] for row in records.values() if row.get("replacement")
+            )
+            if (
+                spent + cost
+                > amendment["approval"]["replacement_calibration_max_reserved_usd"] + 1e-9
+            ):
+                raise AnnotationBudgetExhausted("Replacement calibration exposure exhausted")
         unique = {row.get("comparison_id", row["slot"]) for row in same}
         if comparison_id not in unique and len(unique) >= COMPARISON_LIMITS[manifest["phase"]]:
             raise AnnotationBudgetExhausted("Cumulative unique comparison quota exhausted")
-        if len(same) >= PHASE_LIMITS[manifest["phase"]] or len(records) >= 704:
+        if len(same) >= limits[manifest["phase"]] or len(records) >= 704:
             raise AnnotationBudgetExhausted("Cumulative annotation request quota exhausted")
         if (
             sum(row["reserved_cost_usd"] for row in records.values()) + cost
@@ -145,6 +417,7 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
             admitted_epoch=time.time(),
             comparison_id=comparison_id,
             request_basis=canonical_hash((manifest, slot, packet_hash)),
+            **(dict(replacement=replacement) if replacement else {}),
         )
         write_artifact(path, state)
         return None  # The only state that permits a new transmission.
@@ -181,6 +454,17 @@ def annotate_packet(
         artifact = output / "labels.json"
         if receipt["status"] == "complete" and sha(artifact) != receipt["labels_sha256"]:
             raise ValueError("Committed annotation artifact changed")
+        if receipt["status"] in {"provider_error", "annotation_unavailable"}:
+            # Older workers masked HTTP failures. Revalidate their retained
+            # wire receipt before permitting any later scheduled request.
+            from exact.llm.ledger import RequestLedger
+
+            schedule = read_record(read(output / "schedule.json"))
+            failure = _confirmed_provider_failure(
+                RequestLedger(Path(manifest["ledger_directory"])), schedule.slots[0]["parameters"]
+            )
+            if failure is not None:
+                raise ConfirmedAnnotationFailure(failure)
         return artifact if receipt["status"] == "complete" else None
     # The request configuration is frozen across restart. A shorter remaining
     # slice is an unavailable slot, never a changed identity or hidden retry.
@@ -276,16 +560,20 @@ def annotate_packet(
         router.hosted.close()
         return None
     if reserve is False:
+        failure = _confirmed_provider_failure(adapter.ledger, schedule.slots[0]["parameters"])
         write_artifact(
             receipt_path,
             dict(
                 identity=identity,
-                status="unknown_delivery",
+                status="provider_error" if failure else "unknown_delivery",
+                confirmed_failure=failure,
                 costs_reset=False,
                 retry_permitted=False,
             ),
         )
         router.hosted.close()
+        if failure:
+            raise ConfirmedAnnotationFailure(failure)
         return None
     immutable(output / "packet.json", packet.to_dict())
     immutable(output / "run.json", run.to_dict())
@@ -319,17 +607,21 @@ def annotate_packet(
         return artifact
     except (ValueError, RuntimeError) as error:
         _settle_phase(manifest, slot_id, completed=False)
+        failure = _confirmed_provider_failure(adapter.ledger, schedule.slots[0]["parameters"])
         write_artifact(
             receipt_path,
             dict(
                 identity=identity,
-                status="annotation_unavailable",
+                status="provider_error" if failure else "annotation_unavailable",
                 error=str(error),
+                confirmed_failure=failure,
                 costs=adapter.summary(),
                 retry_permitted=False,
                 costs_reset=False,
             ),
         )
+        if failure is not None:
+            raise ConfirmedAnnotationFailure(failure) from error
         return None
     finally:
         router.hosted.close()
@@ -593,32 +885,60 @@ def run(manifest_path, output):
         )
     started = time.monotonic()
     rows = []
-    for row in manifest["slots"]:
+    failure = _authentication_preflight(manifest, output)
+    if failure:
+        rows = [
+            dict(id=row["id"], status="not_attempted_provider_failure", artifact=None)
+            for row in manifest["slots"]
+        ]
+        write_artifact(
+            Path(output) / "report.json",
+            dict(
+                schema="exact-repair/corrective-annotation-report/v1",
+                scheduled=len(rows),
+                recorded=len(rows),
+                rows=rows,
+                **_failure_report_fields(failure),
+            ),
+        )
+        raise ConfirmedAnnotationFailure(failure)
+    for index, row in enumerate(manifest["slots"]):
         packet_path = row["packet"]
         if sha(packet_path["path"]) != packet_path["sha256"]:
             raise ValueError("Frozen annotation packet changed")
         packet = read_record(read(packet_path["path"]))
         left = _remaining_seconds(manifest["seconds"] - (time.monotonic() - started), manifest)
-        artifact = (
-            annotate_packet(
-                packet,
-                {**manifest, "profile": row.get("profile", manifest["profile"])},
-                Path(output) / row["id"],
-                slot_id=row["id"],
-                swapped=row.get("swapped", False),
-                seconds=left,
-                comparison_id=row.get("comparison_id", row["id"]),
+        failure = None
+        try:
+            artifact = (
+                annotate_packet(
+                    packet,
+                    {**manifest, "profile": row.get("profile", manifest["profile"])},
+                    Path(output) / row["id"],
+                    slot_id=row["id"],
+                    swapped=row.get("swapped", False),
+                    seconds=left,
+                    comparison_id=row.get("comparison_id", row["id"]),
+                )
+                if left > 3
+                else None
             )
-            if left > 3
-            else None
-        )
+        except ConfirmedAnnotationFailure as error:
+            failure = error
+            artifact = None
         rows.append(
             dict(
                 id=row["id"],
-                status="complete" if artifact else "unavailable",
+                status="provider_error" if failure else "complete" if artifact else "unavailable",
                 artifact=str(artifact) if artifact else None,
+                **(dict(confirmed_failure=failure.evidence) if failure else {}),
             )
         )
+        if failure:
+            rows.extend(
+                dict(id=pending["id"], status="not_attempted_provider_failure", artifact=None)
+                for pending in manifest["slots"][index + 1 :]
+            )
         write_artifact(
             Path(output) / "report.json",
             dict(
@@ -626,9 +946,17 @@ def run(manifest_path, output):
                 scheduled=len(manifest["slots"]),
                 recorded=len(rows),
                 rows=rows,
-                status="complete" if len(rows) == len(manifest["slots"]) else "running",
+                **(
+                    _failure_report_fields(failure.evidence)
+                    if failure
+                    else dict(
+                        status="complete" if len(rows) == len(manifest["slots"]) else "running"
+                    )
+                ),
             ),
         )
+        if failure:
+            raise failure
     return rows
 
 

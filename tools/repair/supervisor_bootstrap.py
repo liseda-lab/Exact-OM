@@ -26,9 +26,13 @@ def prepare(
     codex,
     codex_config,
     recipient="pgcotovio@gmail.com",
+    state_directory=None,
 ):
     directory, code = Path(directory).resolve(), Path(code).resolve()
     directory.mkdir(parents=True, exist_ok=True)
+    state = Path(state_directory).resolve() if state_directory is not None else directory
+    if state != directory and not (state / "registry.json").is_file():
+        raise ValueError("A successor must reuse an existing registry/state directory")
     if (directory / "policy.json").exists():
         raise ValueError(
             "Supervisor policy already exists; prepare a separately reviewed deployment"
@@ -38,6 +42,7 @@ def prepare(
         allocation=str(allocation),
         node=node,
         code_root=str(code),
+        state_directory=str(state),
         repository=str(Path(repository).resolve()),
         # Preserve the venv interpreter symlink so Python finds its pyvenv.cfg.
         python=str(Path(python).absolute()),
@@ -68,7 +73,7 @@ def prepare(
             "--policy",
             str(directory / "policy.json"),
             "--directory",
-            str(directory),
+            str(state),
             "--recipient",
             recipient,
         ],
@@ -79,7 +84,7 @@ def prepare(
     entry.write_text(
         "import json, os, time\nfrom pathlib import Path\n"
         + "root=Path("
-        + repr(str(directory))
+        + repr(str(state))
         + ")\n"
         + "assert os.environ['SLURM_JOB_ID'] == "
         + repr(str(allocation))
@@ -96,7 +101,9 @@ def prepare(
                 policy["python"],
                 str(code / "tools/supervise_experiments.py"),
                 "--directory",
-                str(directory),
+                str(state),
+                "--policy",
+                str(directory / "policy.json"),
             ]
         )
         + ")\n"
@@ -132,7 +139,7 @@ def prepare(
     launch = dict(
         argv=argv,
         launcher=str(launcher),
-        tmux_socket=str(directory / "tmux.sock"),
+        tmux_socket=str(state / "tmux.sock"),
         bindings=[
             dict(path=str(path), sha256=sha(path))
             for path in (directory / "policy.json", entry, launcher)
@@ -146,7 +153,8 @@ def start(directory):
     """Explicit operational action; never remove a STOP or borrow another owner."""
     directory = Path(directory).resolve()
     policy, launch = read(directory / "policy.json"), read(directory / "launch.json")
-    if any((directory / name).exists() for name in ("STOP", "PAUSE")):
+    state = Path(policy.get("state_directory", directory))
+    if any((root / name).exists() for root in {directory, state} for name in ("STOP", "PAUSE")):
         raise ValueError("Supervisor STOP/PAUSE remains authoritative")
     if os.environ.get("SLURM_JOB_ID") != policy["allocation"]:
         raise ValueError("Start only inside the retained allocation")

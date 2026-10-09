@@ -1,0 +1,424 @@
+{
+  "approved_request_amendment_validation": {
+    "confirmed_original_http_statuses": [
+      401
+    ],
+    "manifest_sha256": "86338fbfcad62aa075519dea16fd95c076a500964ded1cdbf02ddc6ffd44cf97",
+    "original_reserved_requests": 32,
+    "original_reserved_usd": 0.50512,
+    "paid_calls": 0,
+    "phase_ledger_unchanged": true,
+    "replacement_slots": 32,
+    "request_limits": {
+      "calibration": 64,
+      "development": 96,
+      "test": 192,
+      "train": 352
+    },
+    "rows": [
+      {
+        "comparison": "deepseek-0-0",
+        "http_status": 401,
+        "original_slot": "deepseek-0-0",
+        "slot": "deepseek-0-0-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-0-1",
+        "http_status": 401,
+        "original_slot": "deepseek-0-1",
+        "slot": "deepseek-0-1-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-0-0",
+        "http_status": 401,
+        "original_slot": "qwen-0-0",
+        "slot": "qwen-0-0-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-0-1",
+        "http_status": 401,
+        "original_slot": "qwen-0-1",
+        "slot": "qwen-0-1-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-0-0",
+        "http_status": 401,
+        "original_slot": "glm-0-0",
+        "slot": "glm-0-0-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-0-1",
+        "http_status": 401,
+        "original_slot": "glm-0-1",
+        "slot": "glm-0-1-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-0-0",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-0-0",
+        "slot": "sonnet_reference-0-0-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-0-1",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-0-1",
+        "slot": "sonnet_reference-0-1-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-1-0",
+        "http_status": 401,
+        "original_slot": "deepseek-1-0",
+        "slot": "deepseek-1-0-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-1-1",
+        "http_status": 401,
+        "original_slot": "deepseek-1-1",
+        "slot": "deepseek-1-1-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-1-0",
+        "http_status": 401,
+        "original_slot": "qwen-1-0",
+        "slot": "qwen-1-0-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-1-1",
+        "http_status": 401,
+        "original_slot": "qwen-1-1",
+        "slot": "qwen-1-1-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-1-0",
+        "http_status": 401,
+        "original_slot": "glm-1-0",
+        "slot": "glm-1-0-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-1-1",
+        "http_status": 401,
+        "original_slot": "glm-1-1",
+        "slot": "glm-1-1-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-1-0",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-1-0",
+        "slot": "sonnet_reference-1-0-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-1-1",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-1-1",
+        "slot": "sonnet_reference-1-1-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-2-0",
+        "http_status": 401,
+        "original_slot": "deepseek-2-0",
+        "slot": "deepseek-2-0-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-2-1",
+        "http_status": 401,
+        "original_slot": "deepseek-2-1",
+        "slot": "deepseek-2-1-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-2-0",
+        "http_status": 401,
+        "original_slot": "qwen-2-0",
+        "slot": "qwen-2-0-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-2-1",
+        "http_status": 401,
+        "original_slot": "qwen-2-1",
+        "slot": "qwen-2-1-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-2-0",
+        "http_status": 401,
+        "original_slot": "glm-2-0",
+        "slot": "glm-2-0-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-2-1",
+        "http_status": 401,
+        "original_slot": "glm-2-1",
+        "slot": "glm-2-1-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-2-0",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-2-0",
+        "slot": "sonnet_reference-2-0-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-2-1",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-2-1",
+        "slot": "sonnet_reference-2-1-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-3-0",
+        "http_status": 401,
+        "original_slot": "deepseek-3-0",
+        "slot": "deepseek-3-0-auth-recovery-001"
+      },
+      {
+        "comparison": "deepseek-3-1",
+        "http_status": 401,
+        "original_slot": "deepseek-3-1",
+        "slot": "deepseek-3-1-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-3-0",
+        "http_status": 401,
+        "original_slot": "qwen-3-0",
+        "slot": "qwen-3-0-auth-recovery-001"
+      },
+      {
+        "comparison": "qwen-3-1",
+        "http_status": 401,
+        "original_slot": "qwen-3-1",
+        "slot": "qwen-3-1-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-3-0",
+        "http_status": 401,
+        "original_slot": "glm-3-0",
+        "slot": "glm-3-0-auth-recovery-001"
+      },
+      {
+        "comparison": "glm-3-1",
+        "http_status": 401,
+        "original_slot": "glm-3-1",
+        "slot": "glm-3-1-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-3-0",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-3-0",
+        "slot": "sonnet_reference-3-0-auth-recovery-001"
+      },
+      {
+        "comparison": "sonnet_reference-3-1",
+        "http_status": 401,
+        "original_slot": "sonnet_reference-3-1",
+        "slot": "sonnet_reference-3-1-auth-recovery-001"
+      }
+    ],
+    "status": "qualified_read_only_no_reservations_or_transmissions",
+    "unique_original_slots": 32
+  },
+  "base_commit": "500a942ecfa75437955d4908d710cd170e6bbb94",
+  "checks": [
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_contract_test.py tests/repair_october_learning_semantics_test.py tests/repair_october_learning_annotation_runner_test.py tests/repair_review_learning_test.py tests/repair_review2_labels_test.py tests/repair_semantic_fidelity_test.py tests/repair_training_v3_cli_test.py tests/repair_training_completion_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "........................................................................ [ 58%]\n....................................................                     [100%]\n124 passed, 24 warnings in 52.44s\n",
+      "log_sha256": "e05e1aeb152bd3eb73168451c3ca2b89fe87ca352423c91e3620e07d1f3c61b2"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_review_learning_test.py::test_exact_partial_phase_resume_matches_uninterrupted_model tests/repair_october_learning_contract_test.py::test_train_entry_full_schema_minibatch_exact_update_resume_and_two_passes tests/repair_october_learning_contract_test.py::test_final_dev_reserve_stops_next_optimizer_update_but_allows_scheduled_dev tests/repair_october_learning_contract_test.py::test_final_dev_reserve_protocol_routing_preserves_legacy_absence --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": ".......                                                                  [100%]\n7 passed, 6 warnings in 15.49s\n",
+      "log_sha256": "d98e8c6b8d0ad18f89cc2e87c1bbd32832fa9b6ff656989da991f757dbc69167"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": ".......                                                                  [100%]\n7 passed in 1.61s\n",
+      "log_sha256": "66bb38573d11261d43e9fe4816067177e6fec185affeae143f1019dcfa018179"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m mypy exact/repair/semantic_fidelity.py --follow-imports=silent",
+      "exit_code": 0,
+      "log": "pyproject.toml: note: unused section(s): module = ['exact.analysis.study_visualizer', 'exact.analysis.user_study.*', 'exact.core.actions.alignment', 'exact.core.actions.evaluation', 'exact.core.contracts.dataset', 'exact.core.contracts.model', 'exact.core.contracts.trainer', 'exact.core.entities.mappings.reference', 'exact.core.entities.ontology', 'exact.delivery.cli.llm_debug', 'exact.impl.datasets.contextgraph', 'exact.impl.datasets.pair_adaptive_context', 'exact.impl.evaluator', 'exact.impl.metrics.full', 'exact.impl.metrics.local', 'exact.impl.models.pair_adaptive_channels', 'exact.impl.models.pair_adaptive_evidence', 'exact.impl.models.pair_adaptive_scorer', 'exact.impl.models.scorer_common', 'exact.impl.models.selector.*', 'exact.impl.models.semantic_llm', 'exact.impl.models.semantic_scorer', 'exact.impl.trainer.audit_io', 'exact.impl.trainer.checkpointing', 'exact.impl.trainer.overlays', 'exact.impl.trainer.rationales', 'exact.impl.trainer.runner', 'exact.utils.candidate_generation', 'exact.utils.data', 'exact.utils.eval', 'exact.utils.graph_search', 'exact.utils.logs', 'study_visualizer_runtime.app']\nSuccess: no issues found in 1 source file\n",
+      "log_sha256": "748852b7974b9abeac38e413a764aba5d0dc02c02379a35644d1115943058299"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m tools.repair.qualify_learning --output /tmp/october-learning-qualifier-final --device cpu --encoder hgt --width 8 --layers 1 --heads 2 --seconds 30",
+      "exit_code": 0,
+      "log": "",
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_acquisition_test.py tests/repair_october_learning_contract_test.py::test_native_parent_with_unknown_soft_query_retains_risk_labels tests/repair_october_learning_contract_test.py::test_valid_parent_does_not_consult_soft_queries --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "...................                                                      [100%]\n19 passed in 4.93s\n",
+      "log_sha256": "f3ff6d52d5ad9c8805df98aaebc75fef9b59d368518b6582e4cf52b147ffdc10"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_report_recovery_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "..................                                                       [100%]\n18 passed, 9 warnings in 13.51s\n",
+      "log_sha256": "d86e378a77eff561ca0ee0e8b79ea5b52463601ca252ecc972dcc0f90f7b8b0f"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "........                                                                 [100%]\n8 passed in 1.87s\n",
+      "log_sha256": "695a1f78ac0c347ebe04a8b74e22541b6d0f2815e834b0f7e9fcca1938e19587"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "...................                                                      [100%]\n19 passed in 5.26s\n",
+      "log_sha256": "8173039c7ce8839a3476e7c81de1c987a1e95fd1094fe6390ae017e61e741f92"
+    }
+  ],
+  "compatibility": "Legacy mixed supervision retains old blending; new symbolic_plus_llm requires provenance_additive/v1. New protocol optional fields are omitted when absent. Changed schema/targets/source retain strict incompatible-resume rejection; no old experiment data was modified.",
+  "corrections": {
+    "COR-02": {
+      "evidence": "Actual AdamW and exact checkpoint resume for HGT/RGCN/no-graph over all 13 declared node types and 553 relations; real HGT minibatch resume; optional exposed DEV graph sweep CLI.",
+      "status": "CPU engineering qualified; production GPU qualification pending"
+    },
+    "COR-07-training": {
+      "evidence": "Auto qualified backend routing includes hard theory and soft query constructs; feasibility-only parent gate excludes unresolved soft-label completeness. Staged verified DEV uses exact returned frozen inventory and selected certificate.",
+      "status": "implemented/native qualified fixtures"
+    },
+    "COR-08": {
+      "evidence": "Valid parent with unknown soft query retains risk labels, scalar masks remain; acquisition ordering prioritizes missing TRAIN family/parent coverage; committed round schedule and eligible model pair constraints retained.",
+      "status": "implemented/native qualified fixtures"
+    },
+    "COR-09": {
+      "evidence": "Eligible interaction quartets only; positive/negative/zero targets audited; TRAIN constant-risk baseline, source/head gradient and update opportunities recorded.",
+      "status": "implemented/controlled optimizer qualified"
+    },
+    "COR-10": {
+      "evidence": "All scheduled DEV cases remain despite missing cache; frozen semantic subset preserves full logical denominator and cannot drop missing annotations; exact updates and phase resumes; explicit cumulative final DEV reserve pauses fitting without inventing a new endpoint.",
+      "status": "implemented/actual optimizer resume qualified"
+    },
+    "COR-12": {
+      "evidence": "Versioned additive symbolic plus masked weak anchors/comparisons, strict/tie gradients and symbolic preservation; repeat-rating median with unique original provenance; versioned same-family DEV selection and independent TEST guards; exact post-decode attachment; actual original+swap audited requests, shared unique comparison quota, missing audit masking, immutable replay, absolute deadline and monetary/request cap admission.",
+      "status": "implementation and mock HTTP qualified; live semantic evidence pending"
+    }
+  },
+  "cpu_optimizer_qualification": {
+    "actual_case_rows": [],
+    "actual_cases_completed": 0,
+    "actual_cases_scheduled": 0,
+    "actual_optimizer_states": 723,
+    "changed_parameters": 723,
+    "device": "cpu",
+    "elapsed_seconds": 0.7819049758836627,
+    "encoder": "hgt",
+    "exact_resume": true,
+    "first_loss": 1.9347940683364868,
+    "fitting_data_used": false,
+    "gpu_name": null,
+    "graph_schema_hash": "e8a1cd686f1e2923221d33bf166e5f8824950aaf5b94362b81ac386bcb897bda",
+    "heads": 2,
+    "held_out_opened": false,
+    "layers": 1,
+    "max_cuda_allocated_bytes": 0,
+    "max_cuda_reserved_bytes": 0,
+    "node_types": 13,
+    "optimizer_updates": 2,
+    "parameter_count": 62555,
+    "prepared": null,
+    "process_max_rss_kib": 689056,
+    "relations": 553,
+    "resumed_loss": 1.9278039932250977,
+    "schema": "exact-repair/full-schema-optimizer-qualification/v1",
+    "second_loss": 1.9278039932250977,
+    "seconds": 30.0,
+    "status": "qualified",
+    "width": 8
+  },
+  "held_out_opened": false,
+  "limitations": [
+    "RTX 5090 and RTX 2080 width128/layers3/heads4 full-schema optimizer/resume and exposed prepared-case VRAM/throughput qualification must be executed by the root deployment batch.",
+    "No actual hosted model calls were made by this implementation agent; the manifest requires the separately qualified grounded calibration gate and finite cumulative $35 ceiling.",
+    "Controlled fixtures prove correct masks, gradients and provenance; they do not establish broad real corpus semantic diversity, nonzero interaction supervision or scientific performance.",
+    "Broad suite passed 124 tests before the final typed budget-exhaustion branch and typing-only core/formatting changes; seven annotation tests including the new ceiling branch and seven exact-resume/protocol tests passed afterwards against final source.",
+    "Full root repository integration, conformance aggregation and deployment remain parent responsibilities."
+  ],
+  "methodological_notes": [
+    "Primary paired fits must use identical committed symbolic TRAIN shards, order, initialization and update endpoint; keep active model-dependent acquisition disabled or freeze its shared corpus before fitting.",
+    "A final development reserve stops further fitting when the frozen endpoint cannot be reached, records final_development_reserve_reached and preserves compatible work; it does not shift to a per-arm shorter epoch or replace predeclared semantic slots.",
+    "Default DEV post-decode reserve is 182 seconds plus 90 seconds for an order-swap audit; a 300-second audited slot leaves 28 seconds for repair. Any enlarged case budget needs a matched frozen protocol amendment informed by calibration.",
+    "Order-swap audits use an original and swapped independently charged observation, aggregate with quorum two and unanimity; missing/disagreeing audit observations abstain instead of admitting the original alone.",
+    "A live model is never passed into native bounded workers: staged generation uses a CPU checkpoint path; core owns CUDA-safe worker launching.",
+    "Acquisition recognizes both exact historical hard-plus-soft and current hard-only unqualified-parent ValueError spellings, retaining original detail and no supervision. RuntimeError and near-matching unrelated messages remain software failures. Live parent qualification still checks hard policy alone; 19 regression/native tests passed.",
+    "Historical completed-report recovery acceptance remains pinned to production predecessor and dependency hashes. Its synthetic integration fixture now models both hashes and omitted optional configuration fields explicitly, tests rejection under the real dependency guard, then proves no optimization/reselection during explicitly mocked compatible recovery. All 18 recovery tests pass; production code unchanged.",
+    "Standalone calibration run writes immutable used.json binding exact manifest path/hash before any slot processing or hosted admission, including a run with no transmitted requests. Identical replay remains valid; changed used manifest is rejected. All eight annotation-runner tests pass.",
+    "Confirmed provider HTTP failures are qualified against exact message/model/role identity and raw wire digest. First failure stops scheduled generation, retains all remaining denominator rows as not attempted, and propagates nonzero exit. Authentication failures use blocked_external plus bound proof for supervisor suppression of futile model retries.",
+    "Before batch annotation, a free GET /api/v1/key through the existing router checks each distinct endpoint/credential pair. No scientific request reservation is consumed; error proof is immutable and contains no key or authorization header. GET success records no account body.",
+    "Explicit user-approved request reallocation preserves704 aggregate attempts: calibration64, TRAIN352, DEV96, TEST192. Unique comparison quotas and $35 campaign/$2 calibration bounds remain. Exactly32 previous phase rows must match the immutable snapshot; each successor binds its original definitive401 request and same packet/model/provider/order. New provenance run identity produces a distinct wire request, with all old attempts retained.",
+    "Actual replacement manifest32 slots qualified through read-only SQLite; live phase ledger byte-for-byte unchanged. Real SQLite tests prove old401 then successful mocked successor, idempotent replay, cross-phase budgets, and rejection of unapproved, tampered, unsupported, reset or changed-comparison amendments.",
+    "The initial calibration produced32 wire attempts already classified rejected withHTTP401 and no provider usage fields, not unknown deliveries. Its conservative32 phase reservations/$0.50512 remain intact; absence of reported usage is not evidence of measured zero billing. No live reconciliation/reset performed."
+  ],
+  "original_hosted_auth_accounting": {
+    "ledger_files": 1,
+    "phase_reservations": {
+      "count": 32,
+      "reserved_cost_usd": 0.50512,
+      "states": {
+        "unresolved": 32
+      }
+    },
+    "wire": {
+      "attempts": 32,
+      "http_statuses": {
+        "401": 32
+      },
+      "missing_usage": 32,
+      "raw_response_has_usage": 0,
+      "states": {
+        "rejected": 32
+      }
+    }
+  },
+  "packages": {
+    "mypy": "1.20.2",
+    "pyelk-reasoner": "0.2.1",
+    "pyhermit": "0.2.1",
+    "pyowl-core": "0.2.1",
+    "pytest": "8.4.2",
+    "torch": "2.7.0+cu128",
+    "torch-geometric": "2.6.1"
+  },
+  "paid_calls": 0,
+  "schema": "exact-repair/learning-corrective-conformance/v1",
+  "scope": "CPU/native engineering conformance; no scientific fitting, live annotation or held-out evaluation",
+  "source_sha256": {
+    "exact/repair/__init__.py": "26a08a2edbf01d95937dda7e189d7171cc125f07ef5133bda22c0afaed0b4c1b",
+    "exact/repair/api.py": "c0deeec4469a04294f1566229ad22b223ff250a11ccfb4364457d3e7302b01ab",
+    "exact/repair/candidates.py": "54c5e277cab26815b0dd9748a23a8cac18fa2b2419f563dca1f9e2faf98684d9",
+    "exact/repair/checkpointing.py": "ea8c6b00f2459cc8d0925432d9db9bcbc81e9ed9713cd2b3a4a664a89c9ca7d3",
+    "exact/repair/circuit.py": "db0805bb258949dca0afc74b7dd138656c71d069e1c6fca3adf750d437016906",
+    "exact/repair/comparisons.py": "ff68342382c67c4f5f29d30e9b5402e8e16c0563f9ef4da6483af102beebd97f",
+    "exact/repair/compilation.py": "aec636715d213f86f3f67c2a417694d00777f88eceec0ba669c9f08cbe8b2998",
+    "exact/repair/detection.py": "ac9aa942e1d34ffff84c9436e68f46a52aa960694444354d7778f70955c3eb8d",
+    "exact/repair/evaluation.py": "90063151e48e49e26b5211cf877a56d62cd29ae2a758ba1419665d68131be147",
+    "exact/repair/grammar.py": "f6087826ec668656785c5fc25744f56d28c1cafc3c86a40cfbf91e9a829dbc3d",
+    "exact/repair/graph.py": "5c72a058e1d0d4d27ab42acf62d02c5e518b215b23f3572da4c1b78439650e1c",
+    "exact/repair/graph_schema.py": "fb77076945589f216da58caa1c70ba878ece477c9c0bc3b7a650c198127a279b",
+    "exact/repair/kernel.py": "11704c8c2ce5acf459f2cc0f6674c5187452668e085a199eebbd3c439cc79443",
+    "exact/repair/learning.py": "8ea27c5b851eaea3f41b8604fef4916c31f689a0ca23565a2574656f3c2a5c77",
+    "exact/repair/maxsat.py": "04ea8d0db37b0a5479e6a82b5cd84be06f2707f80bb8849eece8fa6be0bcfbce",
+    "exact/repair/model.py": "b6bb71878dcdde7d6b6eee2749f85f6bef5737d22ca519d1ee50b85a8e7fbae9",
+    "exact/repair/owl.py": "29e2c9f43fa6eee8e4c6a93b1e2801055e6a2a0c39d46026af003ef26b7ea274",
+    "exact/repair/pipeline.py": "e7c3cd0fba95f9b5e08869c37855d9ca5c9eeb3d08c6aeef619903aff920e586",
+    "exact/repair/proposals.py": "5c46e5ee719b6323f669edbc35444d64f658eaf5d5d8cadffd38ab4c1fe21fe7",
+    "exact/repair/protocol.py": "baf5879773617ae52b94f23c4c20bdfe81979b9574b7c1a243135a6731c9f01a",
+    "exact/repair/records.py": "ce36f5aa11fbacb3703884840d5b565049f7f0d1004376c0454450285fa0dd8a",
+    "exact/repair/retrieval.py": "7c143ee27dcdce81eee86164d45df8e41508d97a4719b30a93c3688034fda5b0",
+    "exact/repair/semantic_fidelity.py": "acc2da940db0c7dc308da7d95587e680b4529544d8f0c2d33ed394a305bc909e",
+    "exact/repair/study.py": "447d563445995e8f67d331f731ad470ee38b6cb105b59743a442c5283461e5ba",
+    "exact/repair/workers.py": "a9a1baf1a0dc8554240e69ae64a3335dfdae83ee66774abfbf68d6a79a02dbd1",
+    "tests/repair_acquisition_test.py": "87dee058aff7f50434fa5395d54be267ec3cc2229135536981ca121e723accc2",
+    "tests/repair_october_learning_annotation_runner_test.py": "18aaaeaf0aec6ba9b976c19f880338361f426080b5bcf2ac3c0a898115b3c76e",
+    "tests/repair_october_learning_contract_test.py": "f8189de7c50d73a78e2f976dc671841968d7e88b171454024e8e76553495e527",
+    "tests/repair_october_learning_semantics_test.py": "bb64109bf12160ae489f85e1882d47dd7262acc8ff298eb9418d7a9e159f8ae1",
+    "tests/repair_report_recovery_test.py": "50c44b7649f8203cfd9855175443999287ef1739ecc578aa6ead50fecffe25e1",
+    "tools/repair/acquisition.py": "00f0d54ccc133bd13c5b4a52a3320aa51b75eb959ed7902a21d78d6fddf2b062",
+    "tools/repair/corrective_semantics.py": "3e0ceaa24cff181058cab7b594079dc19120eea0ddf77b9944b4919f1f8b9c8a",
+    "tools/repair/development_collection.py": "6d0a9a5bdbf494608c28ab02a34e167a605f2fac6ebe7238ebae530f1f68545e",
+    "tools/repair/qualify_learning.py": "3e47c7bfd72734a65e24f1c17b7349e193399f5679360ca0c27a31226cc7c585",
+    "tools/repair/train.py": "7b82e6e4e2e52ce479e957e717098bbc4eb0cdadaf06b51906837c08abddd11f"
+  }
+}

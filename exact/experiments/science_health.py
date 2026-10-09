@@ -131,6 +131,117 @@ def _result_payload(saved, work, depth=0):
     return _result_payload(previous, old_work, depth + 1)
 
 
+def _authentication_preflight_evidence(confirmed, work, outputs):
+    """Authenticate a free read-only failure through its owned immutable receipt."""
+    ref = confirmed["evidence"]
+    path = Path(ref["path"]).resolve()
+    if not path.is_relative_to(work) or outputs.get(str(path.relative_to(work))) != ref["sha256"]:
+        raise ValueError("Authentication preflight is absent from completed outputs")
+    receipt = _inside(ref, work)
+    fields = (
+        "profile",
+        "method",
+        "endpoint",
+        "http_status",
+        "generation_requests",
+        "response_sha256",
+    )
+    if (
+        confirmed.get("method") != "GET"
+        or confirmed.get("endpoint") != "https://openrouter.ai/api/v1/key"
+        or confirmed.get("generation_requests") != 0
+        or confirmed.get("costs_reset") is not False
+        or not isinstance(confirmed.get("profile"), str)
+        or not confirmed["profile"]
+        or any(receipt.get(field) != confirmed.get(field) for field in fields)
+        or not isinstance(receipt.get("raw_response"), str)
+        or hashlib.sha256(receipt["raw_response"].encode("utf-8")).hexdigest()
+        != confirmed["response_sha256"]
+    ):
+        raise ValueError("Authentication preflight response provenance differs")
+    try:
+        payload = json.loads(receipt["raw_response"])
+    except ValueError:
+        payload = None
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if isinstance(error, dict) and "code" in error and error["code"] != confirmed["http_status"]:
+        raise ValueError("Authentication preflight response status differs")
+
+
+def _annotation_authentication(report, work, outputs, report_binding):
+    """Qualify explicit provider rejection; arbitrary unavailable labels stay unknown."""
+    rows = report.get("rows")
+    if (
+        not isinstance(rows, list)
+        or len(rows) > _MAX_ROWS
+        or len(rows) != report.get("scheduled")
+        or len(rows) != report.get("recorded")
+        or len({row["id"] for row in rows}) != len(rows)
+    ):
+        raise ValueError("Annotation completion denominator differs")
+    blockers = []
+    confirmed, blocker = report.get("confirmed_failure"), report.get("blocker")
+    if report.get("status") == "blocked_external":
+        if (
+            not isinstance(confirmed, dict)
+            or not isinstance(blocker, dict)
+            or blocker.get("kind") != "provider_authentication"
+            or blocker.get("requires_user") is not True
+            or blocker.get("retry_permitted") is not False
+            or blocker.get("status_code") not in {401, 403}
+            or confirmed.get("http_status") != blocker["status_code"]
+            or confirmed.get("kind") != "authentication"
+            or confirmed.get("retry_permitted") is not False
+            or not re.fullmatch(r"[a-f0-9]{64}", str(confirmed.get("response_sha256", "")))
+        ):
+            raise ValueError("Authentication blocker lacks qualified request provenance")
+        if confirmed.get("source") == "read_only_authentication_preflight":
+            _authentication_preflight_evidence(confirmed, work, outputs)
+        elif not re.fullmatch(r"[a-f0-9]{64}", str(confirmed.get("request_id", ""))):
+            raise ValueError("Authentication blocker lacks qualified request provenance")
+        blockers.append(
+            dict(
+                kind="provider_authentication",
+                status_code=blocker["status_code"],
+                detail=blocker["detail"],
+                evidence=report_binding,
+            )
+        )
+    # Legacy runner incorrectly called HTTP failures completed unavailable slots.
+    # Each exact retained transport exception must belong to the completed index.
+    for row in rows if not blockers and report.get("status") == "complete" else []:
+        if row.get("status") != "unavailable":
+            continue
+        path = (work / row["id"] / "receipt.json").resolve()
+        if not path.is_relative_to(work):
+            raise ValueError("Annotation receipt escapes owned work")
+        digest = outputs.get(str(path.relative_to(work)))
+        if not isinstance(digest, str):
+            continue  # Unattempted or ineligible slot is not provider evidence.
+        receipt = _read(path, digest)
+        matched = re.fullmatch(
+            r"Annotation worker error: RuntimeError: OpenRouter HTTP (401|403); "
+            r"request ([a-f0-9]{64}) retained; reservation retained",
+            str(receipt.get("error", "")),
+        )
+        if (
+            matched
+            and receipt.get("status") == "annotation_unavailable"
+            and receipt.get("retry_permitted") is False
+            and receipt.get("costs_reset") is False
+        ):
+            blockers.append(
+                dict(
+                    kind="provider_authentication",
+                    status_code=int(matched[1]),
+                    detail="OpenRouter rejected the configured credential; update it before an explicitly admitted resume.",
+                    evidence=dict(path=str(path), sha256=digest),
+                )
+            )
+            break  # One provider cause, one notification; never one per slot.
+    return blockers
+
+
 def inspect_science(run, completion):
     """Return grouped software failures, or retryable evidence-reading errors.
 
@@ -141,7 +252,7 @@ def inspect_science(run, completion):
     """
     result = dict(failures=[], errors=[])
     relative = run.get("science_report_relative")
-    if not relative or not completion or completion.get("status") != "complete":
+    if not relative or not completion or completion.get("status") not in {"complete", "failed"}:
         return result
     try:
         if completion.get("step_id") != run["step_id"] or (
@@ -158,6 +269,15 @@ def inspect_science(run, completion):
         if not isinstance(digest, str):
             raise ValueError("scientific report missing from completed output index")
         report = _read(path, digest)
+        if report.get("schema") == "exact-repair/corrective-annotation-report/v1":
+            blockers = _annotation_authentication(
+                report, work, outputs, dict(path=str(path), sha256=digest)
+            )
+            if blockers:
+                result["blockers"] = blockers
+            return result
+        if completion.get("status") != "complete":
+            return result  # Other failed workers retain their ordinary error path.
         if report.get("schema") == "exact-repair/corrective-study/v1":
             rows = report.get("rows")
             if (

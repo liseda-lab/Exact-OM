@@ -158,7 +158,7 @@ def slurm_steps(allocation):
 def eligible(state, incident, policy, now):
     """Bound retries of one unresolved error; a daily cap is optional."""
     record = state["incidents"][incident["id"]]
-    if incident["kind"] in {"hosted_spending_pause", "batch_deadline"}:
+    if incident["kind"] in {"hosted_spending_pause", "batch_deadline", "provider_authentication"}:
         return False, "requires_user"
     if record.get("needs_user"):
         return False, "requires_user"
@@ -718,6 +718,7 @@ def replacement_progress(directory, policy, incident, registry):
         "completion_failed",
         "launcher_failed",
         "scientific_software_error",
+        "provider_authentication",
     }:
         return None
     runs = {row["id"]: row for row in registry["runs"]}
@@ -811,6 +812,7 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             "launcher_failed",
             "step_missing",
             "scientific_software_error",
+            "provider_authentication",
         }:
             suppressed.add(incident["id"])
             for finding in observation["findings"]:
@@ -984,7 +986,13 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
                 record["observations"] >= 2 and now - record.get("first_seen_epoch", now) >= 60
             )
             if (
-                incident["kind"] not in {"next_batch", "hosted_spending_pause", "batch_deadline"}
+                incident["kind"]
+                not in {
+                    "next_batch",
+                    "hosted_spending_pause",
+                    "batch_deadline",
+                    "provider_authentication",
+                }
                 and confirmed
             ):
                 notify_blocker(directory, policy, incident, "problem_detected")
@@ -1194,10 +1202,13 @@ def validate_policy(policy):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, required=True)
+    parser.add_argument(
+        "--policy", type=Path, help="Pinned successor policy; durable state remains in --directory"
+    )
     parser.add_argument("--once", action="store_true", help="One observation; never invokes Codex")
     args = parser.parse_args()
     directory = args.directory.resolve()
-    policy = read(directory / "policy.json")
+    policy = read(args.policy if args.policy is not None else directory / "policy.json")
     validate_policy(policy)
     lock = (directory / "supervisor.lock").open("a")
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)

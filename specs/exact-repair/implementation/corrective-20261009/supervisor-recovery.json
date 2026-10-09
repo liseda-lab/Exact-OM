@@ -1,0 +1,50 @@
+{
+  "schema": "exact-repair/deployment-supervisor-correction-evidence/v1",
+  "recorded_at": "2026-10-09T23:34:05.826184+00:00",
+  "source_repository": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009",
+  "base_commit": "1f84325e722e15d28f274c8e42ce0688a9a0f6fa",
+  "source_files": {
+    "exact/experiments/science_health.py": "6b346b7e3e3de17a217b4415d6a394258e97e1a3f7401bd59a7508560999d16c",
+    "exact/experiments/supervision.py": "5cf515c9b547abfb7cdc4bc4e92873f8917348f544ffa8964494cfb14325445f",
+    "tools/supervise_experiments.py": "57ac5c3cc640d42c3eff75584911bdeea1b0b4ff4eade4feaaa46016879080f9",
+    "tools/repair/batch.py": "4684aa6165634fbf7ad5bd69ad430f2e666781dca9b47ec77e618399cf5c47be",
+    "tools/repair/supervisor_bootstrap.py": "12ba57dacbf4b8d8173463cab0faf82b77b8321f31aaeb75eb8b11344b8fc127",
+    "tests/experiments_science_health_test.py": "4ac2105f231219aefe579c7e3890f1a95abccd8b03d0e39034bfa65bb33719e8",
+    "tests/experiments_supervisor_cli_test.py": "eb2a1a19bf1245891c841c4e36247e431f64848de9466e3e470ed3b4ce86327a",
+    "tests/experiments_supervisor_notifications_test.py": "a71355577f17bc0af60fd4c767daf9c9923bf022cd4f94f5cb51dc73aa83161c",
+    "tests/repair_batch_test.py": "952b039abda90ddbeed539c991e38c4aefbce138d912489f10316bdf6f9b4427",
+    "tests/repair_supervisor_bootstrap_test.py": "034fffab960c16e33364ab32a6a84b544703630733966b80d16b776d365e2607"
+  },
+  "checks": [
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/experiments_science_health_test.py tests/experiments_supervisor_notifications_test.py tests/repair_supervisor_bootstrap_test.py tests/repair_batch_test.py tests/experiments_supervision_test.py tests/experiments_supervisor_cli_test.py tests/experiments_dispatch_test.py",
+      "status": "passed",
+      "passed": 302,
+      "seconds": 6.67
+    },
+    {
+      "command": "black exact/experiments/science_health.py exact/experiments/supervision.py tools/supervise_experiments.py tools/repair/batch.py tools/repair/supervisor_bootstrap.py tests/experiments_science_health_test.py tests/experiments_supervisor_cli_test.py tests/experiments_supervisor_notifications_test.py tests/repair_batch_test.py tests/repair_supervisor_bootstrap_test.py",
+      "status": "passed",
+      "files": 10
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    }
+  ],
+  "contracts": [
+    "HTTP401/403 annotation failures are qualified from hash-bound wire or immutable free GET /api/v1/key evidence and classified external authentication blockers.",
+    "Legacy completed/unavailable annotation receipts require exact retained transport exception and completed output binding; malformed evidence cannot become a provider blocker.",
+    "Provider authentication blockers receive one deduplicated user notice and no Codex retry; qualified queued recovery suppresses stale failure while independent jobs remain eligible.",
+    "Worker nonzero exit preserves an indexed output set after descendant cleanup, so technical evidence survives failed completion.",
+    "Successor deployment pins new code/policy separately and reuses original state, registry, lock, dispatch, notification ledger, tmux ownership and STOP controls.",
+    "Replacement job logical_id, seconds, budget_stages and deadline_epoch preserve cumulative budget identity and cannot reset prior usage.",
+    "No live state mutation, Slurm launch/cancel, credential read, paid request or email performed by this correction audit."
+  ],
+  "live_legacy_evidence": {
+    "receipt": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/work/calibration-hosted/deepseek-0-0/receipt.json",
+    "sha256": "016f32218ec4e4f2a7c415eb62d965536bac775fdd84eb193e3260b6734e9225",
+    "result": "one provider_authentication incident under opt-in report inspection; read-only"
+  },
+  "limitation": "Annotation reports have a deterministic maximum of 256 rows; later 352-slot TRAIN phase must be sharded."
+}

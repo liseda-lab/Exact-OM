@@ -255,6 +255,7 @@ def inspect_runs(
         )
         observation["errors"].extend(scientific["errors"])
         observation["scientific_failures"] = scientific["failures"]
+        observation["scientific_blockers"] = scientific.get("blockers", [])
         observations[run["id"]] = observation
     return assess_runs(runs, observations, step_states=step_states)
 
@@ -626,7 +627,18 @@ def assess_runs(
             "retryable": False,
         }
         incident = None
-        if phase in _FAILED or phase.startswith("blocked_"):
+        if observed.get("scientific_blockers"):
+            blocker = observed["scientific_blockers"][0]
+            reason = f"{name}: " + blocker["detail"]
+            incident = failure(
+                name,
+                blocker["kind"],
+                reason,
+                {key: blocker[key] for key in ("kind", "status_code")},
+            )
+            incident["evidence"] = blocker["evidence"]
+            incident["retry_permitted"] = False
+        elif phase in _FAILED or phase.startswith("blocked_"):
             reason = f"{name} reports {phase}"
             incident = failure(
                 name,

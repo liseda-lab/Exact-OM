@@ -57,7 +57,15 @@ def test_worker_preserves_failure_receipt_and_cost(tmp_path, monkeypatch):
         "id": "fixture",
         "seconds": 10,
         "resources": {"cpus": 1, "gpus": 0, "memory_mb": 512},
-        "commands": [["{python}", "-c", "raise ValueError('confirmed test failure')"]],
+        "commands": [
+            [
+                "{python}",
+                "-c",
+                "import json; from pathlib import Path; "
+                "Path('{work}/report.json').write_text(json.dumps(dict(status='blocked_external'))); "
+                "raise ValueError('confirmed test failure')",
+            ]
+        ],
     }
     manifest = dict(
         jobs=[job],
@@ -81,6 +89,7 @@ def test_worker_preserves_failure_receipt_and_cost(tmp_path, monkeypatch):
     value = json.loads(ledger.read_text())
     assert value["cumulative"]["worker_seconds"] > 0
     assert value["attempts"][str(attempt)]["status"] == "settled"
+    assert "report.json" in json.loads((attempt / "outputs.json").read_text())
 
 
 def test_freeze_records_export_runtime_instead_of_callers_editable_installation(tmp_path):

@@ -26,6 +26,16 @@ ONTOLOGY_SHA = "78688cda05857b594be188db6831abc5d890d2e38d6602e0cd8d3c82ecb24546
 RESULTS_URL = "https://oaei.ontologymatching.org/2025/results/conference/index.html"
 ALIGN = "{http://knowledgeweb.semanticweb.org/heterogeneity/alignment#}"
 RDF = "{http://www.w3.org/1999/02/22-rdf-syntax-ns#}"
+# Publisher filenames use confof; corpus/group/entity identities retain confOf.
+PUBLISHER_ONTOLOGY_TOKENS = {"confOf": "confof"}
+
+
+def publisher_matcher_member(ontology_names):
+    return (
+        "LogMap-"
+        + "-".join(PUBLISHER_ONTOLOGY_TOKENS.get(name, name) for name in ontology_names)
+        + ".rdf"
+    )
 
 
 def binding(path):
@@ -61,6 +71,12 @@ def immutable_bytes(path, raw):
 def prepare(previous, matcher_archive, output):
     """Copy immutable sources; extract TRAIN matcher files by frozen membership."""
     previous, output = Path(previous), Path(output)
+    existing = output / "manifest.json"
+    if existing.exists():
+        captured = json.loads(existing.read_text())
+        prior_provenance = json.loads(bound_bytes(captured["provenance"]))
+        if prior_provenance.get("publisher_ontology_tokens", {}) != PUBLISHER_ONTOLOGY_TOKENS:
+            raise ValueError("Publisher naming correction requires a separate successor release")
     assets = json.loads((previous / "assets.json").read_text())
     splits = json.loads((previous / "pair-splits.json").read_text())
     files = {row["id"]: row for row in assets["files"]}
@@ -79,7 +95,7 @@ def prepare(previous, matcher_archive, output):
                 continue
             if pair["split"] == "train" and "ekaw" in pair["ontology_names"]:
                 raise ValueError("Whole-ontology holdout cannot enter TRAIN")
-            member = "LogMap-" + "-".join(pair["ontology_names"]) + ".rdf"
+            member = publisher_matcher_member(pair["ontology_names"])
             row = {
                 **pair,
                 "historical_metadata": dict(pair),
@@ -121,6 +137,8 @@ def prepare(previous, matcher_archive, output):
         schema="exact-repair/conference-source-provenance/v1",
         release="OAEI-2025-Conference",
         matcher="LogMap",
+        publisher_ontology_tokens=dict(PUBLISHER_ONTOLOGY_TOKENS),
+        matcher_member_rule="explicit-publisher-token-map/v1",
         execution_origin="publisher-MELT",
         matcher_source_url=MATCHER_URL,
         publisher_results_url=RESULTS_URL,
