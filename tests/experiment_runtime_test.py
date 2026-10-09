@@ -249,6 +249,14 @@ def test_fusion_repair_reuses_completed_encodings_even_with_new_batch_members(
     assert encoded == ["a", "long", "new"]
     assert replay.tolist() == [[4, 1], [1, 1], [3, 1]]
     monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "reporting")
+    reporting = FakeScorer(encoded)._encode_with_cache(
+        ["a"], tokenizer, model, 32, OrderedDict(), None
+    )
+    # Reporting membership does not change a label-independent text embedding.
+    assert reporting.tolist() == [[1, 1]]
+    assert encoded == ["a", "long", "new"]
+    # The pinned encoder dependency still does: changing it must recompute.
+    model.config._commit_hash = "b" * 40
     FakeScorer(encoded)._encode_with_cache(["a"], tokenizer, model, 32, OrderedDict(), None)
     assert encoded == ["a", "long", "new", "a"]
 
