@@ -1,0 +1,371 @@
+schema_version: 1
+kind: implementation_and_scientific_design_spec_not_campaign_lock
+specification_id: throughput-and-mixed-scale-final-20261009
+recorded_at: '2026-10-09'
+status: specified_not_implemented_not_deployed
+authority:
+  requested_deliverable: Exhaustive implementation and experiment correction specification
+  specification_preparation_authorized: true
+  implementation_evidence: null
+  execution_admission: not_granted_by_this_file
+  changes_live_queue: false
+  changes_historical_locks: false
+documents:
+  implementation: specs/experiments/SCORING-THROUGHPUT-200.md
+  scientific_correction: specs/experiments/FINAL-STUDY-CORRECTION-20261009.md
+  recovery: specs/experiments/CHECKPOINT-RECOVERY.md
+  reference_boundary: specs/experiments/LABELS-AND-SUBMISSIONS.md
+  spending: specs/experiments/HOSTED-SPENDING-SAFETY.md
+inspected_sources:
+  repository_commit: 328b9c5a
+  frozen_G4_commit: 035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f
+  current_G4_lock: data/experiments-v2/g4-comparison-20261008-03/campaign.lock.yaml
+  current_registry: data/experiments-v2/hourly-supervisor-01/registry.json
+  historical_final_logical_cells: 63
+  historical_exact_final_logical_cells: 54
+  historical_published_reporting_cells: 9
+  historical_counts_are_not_remaining_work_forecasts: true
+objectives:
+  O01: Full-population baseline versus frozen selected stack on all three class pairs
+  O02: Distinct full global alignment and complete official local-ranking outputs
+  O03: Supervision control on the primary final pair and bounded public development checks elsewhere
+  O04: Paired seed sensitivity on predeclared public development cohorts
+  O05: Existing mechanism evidence plus only missing predeclared combined-system diagnostics
+  O06: Pinned published global comparator on all three final ontology pairs
+  O07: Reconstructible decisions, correct lineage, bounded storage and complete submission artifacts
+  O08: Measured cold numerical throughput and whole-campaign resource/spending feasibility
+invariants:
+  native_ontology_loading_and_projection: required
+  local_generative_models: forbidden
+  generate_rationales: false
+  private_test_references_for_optimization: forbidden
+  global_retrieval_restricted_by_local_test_pools: forbidden
+  silent_candidate_source_or_query_truncation: forbidden
+  changed_precision_to_meet_target: forbidden
+  cached_deterministic_outputs_count_as_independent_seeds: false
+  past_attempts_costs_and_unknown_send_exposure: retained
+  preexisting_approved_optional_deferrals: retained_not_reclassified_as_results
+  product_defaults_changed: false
+resources:
+  node: liseda-03
+  allocation_at_inspection: '14372'
+  submission: detached_numeric_slurm_step_inside_retained_allocation
+  preserve_interactive_shell_and_extern: true
+  gpus: 1
+  gpu_model_at_inspection: NVIDIA_GeForce_RTX_4090
+  gpu_memory_mib_at_inspection: 24564
+  allocated_cpus: 6
+  host_capacity_gib_at_inspection: 125
+  scientific_worker_envelope_gib: 112
+  heavy_gpu_workers: 1
+  local_scratch_candidate: /tmp
+  durable_dataset_mount_candidate: /mnt/datasets/pgcotovio
+  dataset_filesystem_at_inspection: '10.10.3.19:/volume2/cluster_data_pgcotovio'
+  dataset_mount_capacity_gib_at_inspection: 800
+  recheck_mount_free_space_and_quota_at_admission: true
+  use_nfs_as_gpu_hot_cache: false
+  numerical_cache_payload_allowance_bytes: 137438953472
+  cache_overhead_counts_against_storage: true
+  existing_storage_guard:
+    usage_root: data/experiments-v2
+    max_used_bytes: 1099511627776
+    min_free_bytes: 107374182400
+    growth_reserve_bytes: 17179869184
+  additional_roots_require_explicit_guard_coverage: true
+performance:
+  target_cold_unique_pairs_per_second: 200
+  measured_existing_pairs_per_second_range: [3.62, 3.94]
+  target_is_observed_result: false
+  unit: complete_natural_numerical_pair_evaluation_not_channel_or_cache_hit
+  required_inputs:
+    - exact_actual_candidate_and_query_inventory
+    - unique_numerical_dependency_identities
+    - missing_encoder_text_inventory
+    - genuine_seed_specific_fits_and_requests
+    - paid_request_and_token_forecast
+    - fitted_artifact_and_export_inventory
+    - physical_disk_growth_forecast
+  measure_separately:
+    - cold_native_input_preparation_and_model_loading
+    - cold_complete_numerical_pair_scoring_with_durable_output
+    - warm_encoder_cold_pair_scoring
+    - numerical_replay
+    - seed_specific_fitting
+    - hosted_waits_rate_limits_and_retries
+    - global_extraction_and_local_query_reconstruction
+    - checkpoint_export_and_submission_packaging
+  include_in_numerical_timing:
+    - feature_materialization_and_evidence_selection
+    - necessary_encoding_and_all_enabled_natural_channels
+    - quality_contributions_and_required_trace_construction
+    - data_transfers_hashing_cache_access_and_output_commit
+  exclude_from_unique_work_numerator:
+    - numerical_cache_hits
+    - duplicate_reporting_rows
+    - synthetic_perturbation_replays
+    - skipped_pairs
+    - separate_channels_for_the_same_pair
+  target_claim_must_hold_per_scoring_recipe: true
+  target_status_separate_from_execution_readiness: true
+  end_to_end_eta_required_even_if_target_passes: true
+  extra_disposable_qualification_matrix: forbidden
+  complete_valid_production_measurement_chunks_are_retained: true
+  offline_fixture_decisions_enter_scientific_artifacts: false
+  fixture_primitive_reuse_requires_independent_compatibility_receipt: true
+  planned_elapsed_days_target: [7, 10]
+  target_is_runtime_limit: false
+  speedup_claim_before_measurement: forbidden
+scientific_matrix:
+  design_revision_required: true
+  old_immutable_matrix_rewritten: false
+  full_cases:
+    H0:
+      pair: NCIT-DOID
+      global_source_count_observed: 206379
+      local_original_query_count_observed: 1819
+    H1:
+      pair: SNOMED-FMA
+      global_source_count_observed: 385973
+      local_original_query_count_observed: 3414
+    H2:
+      pair: SNOMED-NCIT
+      global_source_count_observed: 385973
+      local_original_query_count_observed: 10911
+  counts_are_bound_to_existing_public_input_receipts: true
+  final_primary:
+    arms: [baseline, stack_all]
+    cases: [H0, H1, H2]
+    modes: [global_alignment, local_ranking]
+    seeds: [17]
+    logical_cells: 12
+    population: full_eligible_global_and_all_original_local_queries
+    primary_endpoint: task_macro_global_F1_from_organizer_evaluation
+    secondary_endpoint: local_MRR_and_prespecified_guards
+    evaluation_requires_organizer_results: true
+  final_supervision:
+    arms: [label_free]
+    cases: [H0]
+    modes: [global_alignment, local_ranking]
+    seeds: [17]
+    maximum_additional_logical_cells: 2
+    required_when: frozen_main_stack_uses_target_training_labels
+    zero_cell_disposition_requires: inspected_supervision_identity_and_equivalence_receipt
+    claim_scope: primary_pair_only
+  published:
+    matcher: pinned_LogMap
+    cases: [H0, H1, H2]
+    modes: [global_alignment]
+    logical_cells: 3
+    deterministic_execution_count_maximum: 3
+    repeated_seed_copies_are_not_replicates: true
+  full_exact_cells_maximum: 14
+  full_cells_including_published_maximum: 17
+  bounded_seed_and_supervision:
+    arms: [baseline, stack_all, label_free]
+    cases: [D0_E03, D1, D_H2_valid]
+    modes: [global_alignment, local_ranking]
+    seeds: [17, 29, 43]
+    source_group_cap: 1000
+    maximum_logical_cells: 54
+    D0_E03: reuse_frozen_G4_cohort_all_619_eligible_sources
+    D1: reuse_frozen_G4_1000_source_cohort
+    D_H2_valid: new_separate_public_validation_binding_after_G4_selection_freeze
+    local_rule: retain_all_original_query_rows_and_candidates_for_selected_source_groups
+    global_rule: retrieve_from_full_target_ontology_independently_of_local_pools
+    cohort_seed_independent_of_execution_seed: true
+    use_to_change_frozen_method: false
+    official_partial_submissions: false
+    reuse_existing_scientific_results_only_with_identity_receipt: true
+    independent_replication_claim_for_reused_outputs: false
+    enlarge_population_automatically_when_cache_hits_are_cheap: false
+  conditional_combined_diagnostics:
+    case: D0_E03
+    source_group_cap: 1000
+    modes: [global_alignment, local_ranking]
+    seeds: [17]
+    maximum_component_removals: 4
+    maximum_named_two_by_two_boundaries: 2
+    maximum_additional_logical_cells_after_shared_stack_dedup: 20
+    enabled_only_for: predeclared_unfilled_combined_system_objectives
+    exact_component_names_and_overlays_required_before_admission: true
+    existing_sufficient_evidence_is_reused: true
+    automatic_full_catalogue_replay: false
+    final_component_causal_claim: false
+  limitations:
+    - One full final seed does not establish full-population seed variance.
+    - Secondary-pair supervision conclusions are development-cohort evidence.
+    - Sampled source problems do not estimate full global assignment effects without a separate design.
+    - A partial submission is not substituted for an official full-population result.
+    - Public incomplete-reference F1 is not complete semantic precision.
+    - Feature-kind claims retain their own eligible evidence and existing deferrals.
+work_packages:
+  T01:
+    title: Workload identity inventory and complete timing instrumentation
+    status: not_implemented
+    depends_on: []
+  T02:
+    title: Batch numerical-cache context without hosted-response replay bypass
+    status: not_implemented
+    depends_on: [T01]
+  T03:
+    title: Retained encoder-cache connections and bounded bulk input/output
+    status: not_implemented
+    depends_on: [T01]
+  T04:
+    title: Two-phase context batching and vectorized numerical reductions
+    status: not_implemented
+    depends_on: [T01, T02, T03]
+  T05:
+    title: Dependency-scoped primitive reuse and durable training-aggregate references
+    status: not_implemented
+    depends_on: [T01, T02]
+  T06:
+    title: One-pass index over native-produced relation examples
+    status: not_implemented
+    depends_on: [T01]
+  T07:
+    title: Scope synthetic perturbations to their declared development diagnostics
+    status: not_implemented
+    depends_on: [T01]
+  T08:
+    title: Compact streaming artifacts, resumable chunks and correct global extraction
+    status: not_implemented
+    depends_on: [T03, T05]
+  T09:
+    title: Numerical, decision, operational and throughput acceptance plus migration
+    status: not_implemented
+    depends_on: [T02, T03, T04, T05, T06, T07, T08]
+  C01:
+    title: Materialize corrected full and bounded design with all claim boundaries
+    status: not_implemented
+    depends_on: [T01]
+  C02:
+    title: Bind public D_H2_valid inputs and fixed source cohorts without test exposure
+    status: not_implemented
+    depends_on: [C01, C03]
+  C03:
+    title: Reconcile G4 quality reuse and fairly measured prospective deployment costs
+    status: not_implemented
+    depends_on: [T07, T09]
+  C04:
+    title: Freeze final seed-specific deployment artifacts and revised matrix
+    status: not_implemented
+    depends_on: [T05, C01, C02, C03]
+  C05:
+    title: Rebind supervisor successors and publish verified execution descriptors
+    status: not_implemented
+    depends_on: [T09, C04]
+  C06:
+    title: Validate mapping/query coverage, submission files and reporting handoff
+    status: not_implemented
+    depends_on: [C05]
+work_package_ids_are_not_experiment_family_ids: true
+acceptance:
+  prerequisites:
+    - All actual modes, arm overlays, model identities, cohorts and seed dependencies locked.
+    - D_H2_valid publicly sourced and prepared independently of H2 reporting inputs.
+    - No private reference reads or final-result-guided changes.
+  numerical:
+    deterministic_cpu_absolute_tolerance: 0.000001
+    pinned_gpu_absolute_tolerance: 0.00001
+    unchanged_model_precision: true
+    score_tolerance_alone_sufficient: false
+    exact_checks:
+      - source_target_and_query_identity_and_order
+      - selected_fact_and_label_ids
+      - empty_missing_and_unknown_semantics
+      - ties_route_membership_and_acceptance_decisions
+      - final_rankings_mappings_and_global_competitors
+      - reconstructible_pair_selector_calibration_and_extraction_traces
+  cache:
+    require_dependency_change_misses: true
+    require_batch_boundary_independence_for_pure_primitives: true
+    require_pool_dependence_for_group_operations: true
+    require_separate_stochastic_request_and_fit_identities: true
+    require_no_duplicate_durable_training_aggregate: true
+    disjointness_checks_follow_scientific_role: true
+    full_frozen_global_population_may_contain_training_seen_entities: true
+    training_seen_entities_are_not_heldout_evidence: true
+  recovery:
+    atomic_complete_chunks: true
+    corrupt_or_partial_chunks_never_count_complete: true
+    complete_chunks_survive_interruption: true
+    uncertain_paid_sends_never_blindly_reissued: true
+    no_automatic_live_G4_code_replacement: true
+    fixture_outputs_cannot_be_promoted_to_scientific_checkpoints: true
+  performance:
+    measurement_receipt_required: true
+    per_recipe_target_measurement_required: true
+    full_pipeline_forecast_including_hosted_wait_required: true
+    below_target_never_claimed_as_target_pass: true
+    target_miss_alone_blocks_otherwise_authorized_feasible_work: false
+    substantially_longer_than_authorized_forecast_requires_revised_plan: true
+    runtime_forecast_is_not_a_kill_timer: true
+  scientific:
+    original_final_references_remain_external: true
+    full_query_and_source_denominators_verified: true
+    count_differences_and_dispositions_explained: true
+    old_attempt_lineage_and_actual_costs_immutable: true
+    cost_based_G4_decision_reconciled_before_final_exposure: true
+  spending:
+    policy: specs/experiments/HOSTED-SPENDING-SAFETY.yaml
+    campaign_alert_interval_tokens: 10000000
+    experiment_warning_tokens: 10000000
+    experiment_pause_tokens: 25000000
+    campaign_pause_tokens: 200000000
+    stable_G4_E17_family_preserved: true
+    approval_required_for_allowance_increase: true
+    historical_charges_and_reservations_retained: true
+rollout:
+  current_live_G4_is_frozen: true
+  docs_do_not_pause_or_restart_any_job: true
+  implementation_requires_isolated_source_and_reviewed_receipts: true
+  old_E17_pending_rows_require_atomic_replacement_before_dispatch: true
+  supervisor_policy_cannot_be_self_approved_by_repair_worker: true
+  existing_completed_rows_and_accounting_remain: true
+  no_allocation_cancellation_or_new_cluster_required: true
+  no_package_or_repository_push_authorized_here: true
+  T09_acceptance_does_not_require_C05_deployment: true
+  sequence:
+    - Implement and verify in isolated source while preserving the active G4 worker.
+    - Inventory unique computation and public inputs without opening private references.
+    - Reconcile G4 cost/selection evidence under the corrected deployment path.
+    - Lock corrected scientific design and immutable trained deployment artifacts.
+    - Validate coverage, parity, storage, paid admission and measured throughput receipts.
+    - Replace only pending final descriptors under the registry lock with fresh bindings.
+    - Let the existing dispatcher launch verified numeric Slurm steps.
+    - Retain completed real chunks, report progress and prepare every submission artifact.
+handoff_requirements:
+  - owned_commits_and_changed_paths
+  - exact_environment_model_native_dependency_and_policy_hashes
+  - old_to_new_scientific_and_execution_revision_mapping
+  - work_inventory_unique_reuse_and_bounded_cell_counts
+  - cohort_and_public_input_provenance_manifests
+  - numerical_and_decision_parity_receipts
+  - cold_warm_hosted_and_whole_campaign_measurements
+  - quota_forecast_actual_physical_bytes_and_cleanup_ownership
+  - historical_and_new_usage_without_account_resets
+  - exact_live_step_registry_nonce_and_successor_state
+  - output_coverage_submission_checksums_and_external_evaluation_status
+evidence:
+  specification_validation:
+    status: passed
+    scope: documentation_only
+    checks:
+      - YAML_parsing_with_duplicate_key_rejection
+      - all_relative_document_links_and_plan_document_paths
+      - full_and_bounded_matrix_arithmetic
+      - fifteen_package_dependency_graph_acyclic
+      - implementation_work_package_ID_alignment
+      - G4_freeze_before_D_H2_valid_binding
+      - no_deployment_prerequisite_cycle
+      - specification_only_states_and_historical_counts_preserved
+      - whitespace_and_owned_file_review
+    independent_scientific_and_operational_review: completed_findings_resolved
+  implementation_tests: not_run
+  gpu_parity: not_run
+  target_200_pairs_per_second: unmeasured
+  corrected_matrix_prepared: false
+  deployment: not_done
+  final_mappings: not_generated
+  official_test_results: not_obtained
