@@ -82,6 +82,8 @@ def prepare(args):
 
 
 def run(args):
+    # Hugging Face reads these flags at import time, before model construction.
+    os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", OPENROUTER_API_KEY="")
     import resource
     import torch
     import pandas as pd
@@ -214,7 +216,9 @@ def run(args):
         "torch": torch.__version__, "host": platform.node(), "slurm_job": os.getenv("SLURM_JOB_ID"),
         "slurm_step": os.getenv("SLURM_STEP_ID"), "config": binding(args.config),
         "workload": binding(args.workload), "templates": binding(args.templates),
-        "source_revision": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "source_revision": ((ROOT / "source-revision.txt").read_text().strip()
+                            if (ROOT / "source-revision.txt").is_file()
+                            else subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()),
         "hosted_service_time": None, "end_to_end_scientific_time": None,
         "fixture_outputs_promotable": False,
     })
