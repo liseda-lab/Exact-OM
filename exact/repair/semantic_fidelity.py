@@ -575,11 +575,14 @@ def offline_plan_label(
     assignment: tuple[int, ...],
     profile: tuple,
     comparisons_with_packets: Sequence[
-        tuple[SemanticEvidencePacketV3, SemanticFidelityComparisonV3]
+        tuple[SemanticEvidencePacketV3, SemanticFidelityComparisonV3 | ValidatedFidelityAggregateV3]
     ],
     *,
     role: str = "teacher",
     require_aggregate: bool = True,
+    use_policy: str = "independent_evaluation",
+    rating_aggregation: Mapping[str, Any] | None = None,
+    aggregate_receipts: dict[str, Any] | None = None,
 ) -> Any:
     """Exact frozen-plan lookup, with no interpolation or model-generated target.
 
@@ -607,7 +610,11 @@ def offline_plan_label(
         for obj, index in zip(case.problem.objects, assignment)
     }
     query_hash = canonical_hash(consequence_basis_from_probes(case.probes))
-    scores, bases = [], set()
+    scores, bases, ratings = [], set(), []
+    if use_policy not in {"independent_evaluation", "development_selection/v1"}:
+        raise ValueError("Unknown offline evaluation use policy")
+    if case.split == "test" and use_policy != "independent_evaluation":
+        raise ValueError("TEST annotations require independent evaluation")
     for packet, comparison in comparisons_with_packets:
         if require_aggregate and not isinstance(comparison, ValidatedFidelityAggregateV3):
             raise ValueError("Offline training requires a validated aggregation revision")
@@ -636,11 +643,18 @@ def offline_plan_label(
             expected_use = (
                 "development_selection" if case.split == "development" else "held_out_test"
             )
-            if (
-                comparison.annotator.get("evaluation_use") != expected_use
-                or comparison.annotator.get("independent_evaluator") is not True
+            declared_selection = (
+                case.split == "development"
+                and use_policy == "development_selection/v1"
+                and comparison.annotator.get("development_use_policy") == use_policy
+            )
+            if comparison.annotator.get("evaluation_use") != expected_use:
+                raise ValueError("Evaluator independence/use is not established for this split")
+            if not declared_selection and (
+                comparison.annotator.get("independent_evaluator") is not True
                 or not comparison.annotator.get("teacher_model")
                 or comparison.annotator["teacher_model"] == model
+                or model in comparison.annotator.get("selection_model_ids", ())
             ):
                 raise ValueError("Evaluator independence/use is not established for this split")
         plans = {packet.plan_a.plan_id: packet.plan_a, packet.plan_b.plan_id: packet.plan_b}
@@ -660,8 +674,78 @@ def offline_plan_label(
                     (packet.rubric_version, query_hash, canonical_hash(packet.criterion_weights))
                 )
                 scores.append(score)
+                if rating_aggregation is not None:
+                    if not isinstance(comparison, ValidatedFidelityAggregateV3):
+                        raise ValueError(
+                            "Repeated plan ratings require validated observation provenance"
+                        )
+                    context = canonical_hash(
+                        (
+                            case.case_id,
+                            case.structural_parent,
+                            case.split,
+                            selected,
+                            theory_hash,
+                            packet.task,
+                            packet.original_observation,
+                            packet.evidence,
+                            packet.local_context,
+                            packet.rubric_version,
+                            packet.criterion_weights,
+                            packet.required_query_ids,
+                            plan.policy_hash,
+                            plan.query_basis_hash,
+                            plan.query_outcomes,
+                            model,
+                            comparison.annotator.get("revision"),
+                            comparison.annotator.get("prompt_hash"),
+                            comparison.annotator.get("parser_version"),
+                            use_policy,
+                        )
+                    )
+                    allowed_observations = {
+                        (o["request_id"], o["attempt"], o["response_sha256"])
+                        for o in comparison.result["unique_observations"]
+                    }
+                    seen = set()
+                    for observation in comparison.observations:
+                        # Revalidation picks the authoritative parser/correction per slot;
+                        # raw repeated/superseded copies do not increase scalar coverage.
+                        _, _, _, provenance = _validated_observation(
+                            observation, comparison.schedule
+                        )
+                        key = (
+                            provenance["request_id"],
+                            provenance["attempt"],
+                            provenance["response_sha256"],
+                        )
+                        if (
+                            key not in allowed_observations
+                            or key in seen
+                            or not observation.global_target_eligible
+                        ):
+                            continue
+                        seen.add(key)
+                        side = "a" if observation.plan_a_id == plan_id else "b"
+                        ratings.append(
+                            dict(
+                                context=context,
+                                provenance=provenance,
+                                criteria={
+                                    c["criterion_id"]: c[f"{side}_score"]
+                                    for c in observation.criteria
+                                },
+                            )
+                        )
     if not scores:
         return None
+    if rating_aggregation is not None:
+        result = aggregate_plan_ratings(ratings, dict(packet.criterion_weights), rating_aggregation)
+        if aggregate_receipts is not None:
+            aggregate_receipts[result["aggregate_hash"]] = result
+        if result["status"] != "eligible":
+            return None
+        scores = [result["score"]]
     if len(bases) != 1 or any(
         not math.isclose(value, scores[0], abs_tol=1e-9, rel_tol=0) for value in scores[1:]
     ):
@@ -671,6 +755,78 @@ def offline_plan_label(
         for obj, index in zip(case.problem.objects, assignment)
     )
     return RepairLabel(assignment, True, float(scores[0]), cost)
+
+
+def aggregate_plan_ratings(ratings, criterion_weights, policy):
+    """Immutable scalar target from compatible, unique complete observations.
+
+    Comparison preferences stay in their original aggregates; only plan ratings
+    are pooled across counterparts/orders. The receipt binds every raw input.
+    """
+    _keys(policy, {"revision", "minimum_ratings", "max_criterion_range"}, "Plan rating policy")
+    if (
+        policy["revision"] != "per_criterion_median/v1"
+        or type(policy["minimum_ratings"]) is not int
+        or policy["minimum_ratings"] < 1
+        or not 0 <= policy["max_criterion_range"] <= 1
+    ):
+        raise ValueError("Invalid frozen plan rating aggregation")
+    if len({row["context"] for row in ratings}) > 1:
+        raise ValueError("Repeated plan ratings have incompatible evidence/judge contexts")
+    unique = {}
+    for row in ratings:
+        provenance = row["provenance"]
+        key = (provenance["request_id"], provenance["attempt"], provenance["response_sha256"])
+        if set(row["criteria"]) != set(criterion_weights) or any(
+            not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 <= v <= 1
+            for v in row["criteria"].values()
+        ):
+            raise ValueError("Plan rating requires complete finite criterion values")
+        if key in unique and unique[key] != row:
+            raise ValueError("One durable rating has conflicting scalar content")
+        unique[key] = row
+    rows = [unique[key] for key in sorted(unique)]
+    medians = (
+        {
+            name: statistics.median(row["criteria"][name] for row in rows)
+            for name in criterion_weights
+        }
+        if rows
+        else {}
+    )
+    ranges = (
+        {
+            name: max(row["criteria"][name] for row in rows)
+            - min(row["criteria"][name] for row in rows)
+            for name in criterion_weights
+        }
+        if rows
+        else {}
+    )
+    status = (
+        "insufficient_coverage"
+        if len(rows) < policy["minimum_ratings"]
+        else (
+            "disagreement_abstention"
+            if any(v > policy["max_criterion_range"] for v in ranges.values())
+            else "eligible"
+        )
+    )
+    result = dict(
+        schema="exact-repair/plan-rating-aggregate/v1",
+        policy=dict(policy),
+        criterion_weights=dict(criterion_weights),
+        status=status,
+        ratings=rows,
+        medians=medians,
+        ranges=ranges,
+        score=(
+            sum(criterion_weights[k] * v for k, v in medians.items())
+            if status == "eligible"
+            else None
+        ),
+    )
+    return {**result, "aggregate_hash": canonical_hash(result)}
 
 
 def _canonical_request_key(parameters: Mapping[str, Any]) -> str:
@@ -744,7 +900,12 @@ class AnnotationScheduleV3(Record):
                     "evaluation_use",
                     "evidence_manifest_hash",
                     "split_manifest_hash",
-                },
+                }
+                | (
+                    {"development_use_policy", "selection_model_ids"}
+                    if "development_use_policy" in policy
+                    else set()
+                ),
                 "annotation slot policy",
             )
             if policy["role"] != parameters["role"] or policy["run_id"] != context["run_id"]:
@@ -1302,6 +1463,27 @@ class AnnotationRun(Record):
             raise ValueError("Unsupported prompt version")
 
 
+@dataclasses.dataclass(frozen=True)
+class SelectionAnnotationRunV1(AnnotationRun):
+    """Explicit DEV selection/TEST exclusion policy; legacy runs remain unchanged."""
+
+    development_use_policy: str = "development_selection/v1"
+    selection_model_ids: tuple[str, ...] = ()
+
+    def __post_init__(self):
+        super().__post_init__()
+        if self.development_use_policy not in {
+            "independent_evaluation",
+            "development_selection/v1",
+        }:
+            raise ValueError("Unknown versioned development annotation policy")
+        if (
+            self.evaluator_split == "test"
+            and self.development_use_policy != "independent_evaluation"
+        ):
+            raise ValueError("TEST assessor requires independent evaluation policy")
+
+
 def _annotation_wire(
     profile: LLMProfile,
     messages: list[dict[str, str]],
@@ -1348,9 +1530,9 @@ class SemanticAnnotationAdapter:
                 timeout_secs=min(profile.timeout_secs, run.max_seconds_per_request),
                 provider={**profile.provider, "allow_fallbacks": False},
             )
-        if (
-            run.independent_evaluator
-            and self.profiles[TEACHER].model == self.profiles[EVALUATOR].model
+        if run.independent_evaluator and (
+            self.profiles[TEACHER].model == self.profiles[EVALUATOR].model
+            or self.profiles[EVALUATOR].model in getattr(run, "selection_model_ids", ())
         ):
             raise ValueError("Independent evaluator collapses onto the teacher model")
         router.hosted.ledger_dir = Path(directory)
@@ -1374,11 +1556,26 @@ class SemanticAnnotationAdapter:
         manifest = canonical_hash(self.run)
         with self.ledger._transaction() as db:
             existing = db.execute(
-                "SELECT manifest FROM repair_annotation_reserves WHERE identity=?", (key,)
+                "SELECT manifest,state,raw FROM repair_annotation_reserves WHERE identity=?", (key,)
             ).fetchone()
             if existing:
                 if existing["manifest"] != manifest:
                     raise ValueError("Run manifest changed for an existing request")
+                if existing["state"] in {"reserved", "unresolved"} and existing["raw"] is None:
+                    wire = db.execute(
+                        "SELECT state FROM attempts WHERE request_id=? ORDER BY number DESC LIMIT 1",
+                        (key,),
+                    ).fetchone()
+                    if existing["state"] == "unresolved" or (
+                        wire is not None and wire["state"] == "unknown"
+                    ):
+                        raise RuntimeError(
+                            "Unknown paid request; explicit retry authorization is required"
+                        )
+                    if wire is None or wire["state"] != "completed":
+                        raise RuntimeError(
+                            "Request has an active or unresolved sender; recover it explicitly"
+                        )
                 return
             rows = db.execute(
                 "SELECT * FROM repair_annotation_reserves WHERE lineage=?", (self.run.lineage_id,)
@@ -1495,6 +1692,14 @@ class SemanticAnnotationAdapter:
 
     def _annotation_policy(self, role):
         return {
+            **(
+                dict(
+                    development_use_policy=self.run.development_use_policy,
+                    selection_model_ids=self.run.selection_model_ids,
+                )
+                if isinstance(self.run, SelectionAnnotationRunV1)
+                else {}
+            ),
             "run_id": self.run.run_id,
             "run_hash": canonical_hash(self.run),
             "role": role,
@@ -1592,6 +1797,8 @@ class SemanticAnnotationAdapter:
             raise PermissionError("Annotation requires a separately authorized frozen run manifest")
         if role not in self.profiles:
             raise ValueError("Unknown explicit repair annotation role")
+        if packet.split == "test" and not self.run.independent_evaluator:
+            raise ValueError("TEST assessor cannot waive independence")
         if role == TEACHER and packet.split == "test":
             raise ValueError("Test labels cannot enter teacher/training collection")
         if role == EVALUATOR and packet.split != self.run.evaluator_split:

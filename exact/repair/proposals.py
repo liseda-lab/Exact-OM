@@ -29,6 +29,7 @@ PROPOSAL_ARMS = (
     "rejection",
     "grammar_product",
     "grammar_mixture",
+    "matched_grammar_decoder",
 )
 
 
@@ -62,7 +63,7 @@ def enumerate_grammar(
         )
         if result.status == "timeout":
             raise TimeoutError("grammar enumeration deadline exhausted")
-        if result.status != "complete":
+        if result.status != "complete" or not result.cleanup_complete:
             raise ValueError(f"grammar enumeration failed: {result.detail}")
         expressions = result.value
     pool: list[ReplacementCandidateV2] = []
@@ -400,3 +401,130 @@ def _teacher_evaluation(problem: RepairInputV2, result: Any, cache: TeacherCache
         "exact_regret": optimum - utility if optimum is not None and utility is not None else None,
         "status": "labelled" if utility is not None else "outside_or_unknown_in_evaluator_cache",
     }
+
+
+class EnumeratedConditionedMixture:
+    """E3b tractable-support decoder with the circuit's exact fixed weights.
+
+    Admission requires completed enumeration of the entire declared grammar.
+    All accepted Boolean aliases retain their mass, including distinct activated
+    bundles. No prefix receives a full-language normalizer after exhaustion.
+    Setup enumeration, inverse encoding and weighting are charged to the deadline.
+    """
+
+    def __init__(
+        self,
+        base: UnconditionedMixture,
+        enumeration: GrammarEnumeration,
+        *,
+        deadline: float | None = None,
+    ):
+        import torch
+        from .circuit import EmptyProposalSpace
+
+        self.encoding = base.encoding
+        enumeration.representatives(self.encoding)
+        self.literal_logits = base.literal_logits
+        self.log_mixture = base.log_mixture
+        self._base = base
+        self.circuit = None
+        self.support_identity = canonical_hash(
+            ("matched-grammar-decoder/v1", self.encoding.content_hash, enumeration.content_hash)
+        )
+        self._candidates = {c.candidate_id: c for c in enumeration.candidates}
+        by_assignment: dict[tuple[bool, ...], str] = {}
+        component_masses = []
+        for candidate in enumeration.candidates:
+            for bits in self.encoding.candidate_assignments(candidate):
+                if deadline is not None and monotonic() >= deadline:
+                    raise TimeoutError("matched grammar decoder setup deadline exhausted")
+                if bits in by_assignment:
+                    if by_assignment[bits] != candidate.candidate_id:
+                        raise ValueError(
+                            "one grammar assignment emitted distinct complete candidates"
+                        )
+                    continue
+                by_assignment[bits] = candidate.candidate_id
+                selected = torch.tensor(bits, device=self.literal_logits.device, dtype=torch.bool)
+                component_masses.append(
+                    torch.where(selected[None, :], base.log_positive, base.log_negative).sum(dim=1)
+                )
+        if not component_masses:
+            raise EmptyProposalSpace("exhaustive grammar support is empty")
+        self.assignments = tuple(by_assignment)
+        self._indices = {bits: i for i, bits in enumerate(self.assignments)}
+        self._candidate_indices = {
+            identifier: tuple(
+                i for i, bits in enumerate(self.assignments) if by_assignment[bits] == identifier
+            )
+            for identifier in self._candidates
+        }
+        self._component_masses = torch.stack(component_masses)
+        self.component_log_normalizers = torch.logsumexp(self._component_masses, dim=0)
+        self.log_normalizer = torch.logsumexp(
+            self.log_mixture + self.component_log_normalizers, dim=0
+        )
+        if not torch.isfinite(self.log_normalizer):
+            raise EmptyProposalSpace("exhaustive grammar support has zero finite probability")
+        self.component_posterior = torch.softmax(
+            self.log_mixture + self.component_log_normalizers, dim=0
+        )
+        self._assignment_log_probabilities = (
+            torch.logsumexp(self._component_masses + self.log_mixture[None, :], dim=1)
+            - self.log_normalizer
+        )
+        self._joint = torch.softmax(
+            (self._component_masses + self.log_mixture[None, :]).flatten(), dim=0
+        )
+        if deadline is not None and monotonic() >= deadline:
+            raise TimeoutError("matched grammar decoder normalization deadline exhausted")
+
+    def accepts(self, assignment):
+        return tuple(assignment) in self._indices
+
+    def candidate(self, assignment):
+        if not self.accepts(assignment):
+            raise ValueError("assignment outside completed decoder support")
+        return self.encoding.decode(assignment)
+
+    def log_probability(self, assignment):
+        index = self._indices.get(tuple(assignment))
+        return (
+            self.literal_logits.new_tensor(-float("inf"))
+            if index is None
+            else self._assignment_log_probabilities[index]
+        )
+
+    def candidate_log_probability(self, candidate):
+        import torch
+
+        indices = self._candidate_indices.get(candidate.candidate_id, ())
+        if not indices:
+            return self.literal_logits.new_tensor(-float("inf"))
+        return torch.logsumexp(self._assignment_log_probabilities[list(indices)], dim=0)
+
+    def sample(self, count=1, *, seed=0):
+        import torch
+        from .circuit import ProposalSample
+
+        if type(count) is not int or count < 0:
+            raise ValueError("sample count must be a nonnegative integer")
+        if count == 0:
+            return ()
+        generator = torch.Generator(device=self.literal_logits.device).manual_seed(seed)
+        indices = torch.multinomial(self._joint, count, replacement=True, generator=generator)
+        count_components = self.literal_logits.shape[0]
+        results = []
+        for index in indices.tolist():
+            position, component = divmod(index, count_components)
+            bits = self.assignments[position]
+            candidate = self.encoding.decode(bits)
+            results.append(
+                ProposalSample(
+                    candidate.candidate_id,
+                    bits,
+                    component,
+                    float(self.candidate_log_probability(candidate)),
+                )
+            )
+        return tuple(results)

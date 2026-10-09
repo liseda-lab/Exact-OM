@@ -61,25 +61,45 @@ def _result(outcome):
 
 def _milestone_account(cli, tmp_path, policy, tokens):
     policy["hosted_spending_milestone"] = {
-        "id": "campaign-hosted-tokens", "notification_tokens": 100_000_000,
+        "id": "campaign-hosted-tokens",
+        "notification_tokens": 100_000_000,
     }
     budget = tmp_path / "budget.json"
-    cli.write(budget, {"limits": {}, "work": {
-        "history": {"status": "failed", "tokens": tokens},
-    }})
+    cli.write(
+        budget,
+        {
+            "limits": {},
+            "work": {
+                "history": {"status": "failed", "tokens": tokens},
+            },
+        },
+    )
     receipt = tmp_path / "worker-status.json"
     cli.write(receipt, {"status": "running", "cumulative_budget": str(budget)})
-    cli.write(tmp_path / "registry.json", {"runs": [{
-        "id": "E10", "step_id": "14372.2", "status_path": str(receipt),
-    }]})
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [
+                {
+                    "id": "E10",
+                    "step_id": "14372.2",
+                    "status_path": str(receipt),
+                }
+            ]
+        },
+    )
     return budget
 
 
-def test_milestone_queues_at_threshold_once_across_restart_without_repair(monitor, tmp_path, monkeypatch):
+def test_milestone_queues_at_threshold_once_across_restart_without_repair(
+    monitor, tmp_path, monkeypatch
+):
     cli, policy, state, observation = monitor
     budget = _milestone_account(cli, tmp_path, policy, 99_999_999)
     observation.update(status="healthy", incidents=[])
-    monkeypatch.setattr(cli, "run_agent", lambda *args: pytest.fail("Milestone must not trigger repair"))
+    monkeypatch.setattr(
+        cli, "run_agent", lambda *args: pytest.fail("Milestone must not trigger repair")
+    )
     sent = []
     monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
     first = cli.check(tmp_path, policy, state, act=True)
@@ -99,10 +119,14 @@ def test_milestone_queues_at_threshold_once_across_restart_without_repair(monito
     assert not (tmp_path / "PAUSE").exists() and not (tmp_path / "STOP").exists()
 
 
-def test_milestone_does_not_suppress_independent_repair_or_send_synchronously(monitor, tmp_path, monkeypatch):
+def test_milestone_does_not_suppress_independent_repair_or_send_synchronously(
+    monitor, tmp_path, monkeypatch
+):
     cli, policy, state, _ = monitor
     _milestone_account(cli, tmp_path, policy, 100_000_000)
-    monkeypatch.setattr(notifications, "_deliver", lambda *args: pytest.fail("Synchronous delivery"))
+    monkeypatch.setattr(
+        notifications, "_deliver", lambda *args: pytest.fail("Synchronous delivery")
+    )
     monkeypatch.setattr(cli, "run_agent", lambda *args: _result("repaired"))
     result = cli.check(tmp_path, policy, state, act=True)
     assert result["outcome"] == "repaired"
@@ -124,7 +148,9 @@ def test_spending_observation_error_does_not_block_repair(monitor, tmp_path, mon
 def test_read_only_milestone_observation_never_queues_mail(monitor, tmp_path, monkeypatch):
     cli, policy, state, _ = monitor
     _milestone_account(cli, tmp_path, policy, 100_000_000)
-    monkeypatch.setattr(cli, "notify_intervention", lambda *args, **kwargs: pytest.fail("Read only"))
+    monkeypatch.setattr(
+        cli, "notify_intervention", lambda *args, **kwargs: pytest.fail("Read only")
+    )
     result = cli.check(tmp_path, policy, state, act=False)
     assert result["hosted_spending"]["threshold_reached"]
     assert not (tmp_path / "alerts").exists()
@@ -175,11 +201,17 @@ def test_delivery_failure_retries_without_another_agent(monitor, tmp_path, monke
     monkeypatch.setattr(notifications.subprocess, "run", timeout)
     first = cli.check(tmp_path, policy, state, act=True)
     assert first["notification"]["delivery"] == "pending"
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"failed": 1, "suppressed": 1}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {
+        "failed": 1,
+        "suppressed": 1,
+    }
     monkeypatch.setattr(notifications.subprocess, "run", lambda *args, **kwargs: None)
     original_time = notifications.time.time()
     monkeypatch.setattr(notifications.time, "time", lambda: original_time + 61)
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"sent": 1, "suppressed": 1}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {
+        "sent": 1,
+        "suppressed": 1,
+    }
     second = cli.check(tmp_path, policy, state, act=True)
     assert second["notification"]["delivery"] == "sent"
     assert second["notification"]["attempts"] == 2
@@ -213,7 +245,7 @@ def test_read_only_check_does_not_send_or_repair(monitor, tmp_path, monkeypatch)
         cli, "notify_intervention", lambda *args, **kwargs: pytest.fail("Read only")
     )
     monkeypatch.setattr(cli, "run_agent", lambda *args: pytest.fail("Read only"))
-    assert cli.check(tmp_path, policy, state, act=False)["status"] == "needs_attention"
+    assert cli.check(tmp_path, policy, state, act=False)["status"] == "blocked"
     assert not (tmp_path / "alerts").exists()
 
 
@@ -224,9 +256,10 @@ def test_recovery_requires_healthy_successor_without_email(monitor, tmp_path, mo
     observation.update(status="healthy", incidents=[], findings=[])
     cli.check(tmp_path, policy, state, act=True)
     assert not state["incidents"]["failure"].get("recovered")
-    cli.write(tmp_path / "registry.json", {"runs": [
-        {"id": "E10", "superseded_by": "E10-recovery"}, {"id": "E10-recovery"}
-    ]})
+    cli.write(
+        tmp_path / "registry.json",
+        {"runs": [{"id": "E10", "superseded_by": "E10-recovery"}, {"id": "E10-recovery"}]},
+    )
     observation["findings"] = [{"run_id": "E10-recovery", "status": "healthy"}]
     for _ in range(2):
         cli.check(tmp_path, policy, state, act=True)
@@ -239,16 +272,22 @@ def test_recovery_requires_healthy_successor_without_email(monitor, tmp_path, mo
 def test_uncertain_mail_is_diagnosed_by_bounded_repair(monitor, tmp_path, monkeypatch):
     cli, policy, state, observation = monitor
     alert = notifications.notify_intervention(
-        tmp_path, {"id": "prior", "reason": "decision", "run_ids": []},
-        "requires_user", "Decide", config=policy["notifications"], defer=True,
+        tmp_path,
+        {"id": "prior", "reason": "decision", "run_ids": []},
+        "requires_user",
+        "Decide",
+        config=policy["notifications"],
+        defer=True,
     )
     alert["delivery"] = "ambiguous"
     cli.write(Path(alert["path"]), alert)
     observation.update(status="healthy", incidents=[])
     prompts = []
+
     def repair(_policy, _directory, prompt, _stop):
         prompts.append(prompt)
         return _result("needs_user")
+
     monkeypatch.setattr(cli, "run_agent", repair)
     status = cli.check(tmp_path, policy, state, act=True)
     assert status["outcome"] == "needs_user"
@@ -257,16 +296,23 @@ def test_uncertain_mail_is_diagnosed_by_bounded_repair(monitor, tmp_path, monkey
     assert len(state["agent_runs"]) == 1
 
 
-def test_failed_repair_is_local_until_same_incident_attempts_are_exhausted(monitor, tmp_path, monkeypatch):
+def test_failed_repair_is_local_until_same_incident_attempts_are_exhausted(
+    monitor, tmp_path, monkeypatch
+):
     cli, policy, state, _ = monitor
     monkeypatch.setattr(cli, "run_agent", lambda *args: {"status": "failed"})
     sent = []
     monkeypatch.setattr(notifications, "_deliver", lambda *args: sent.append(args))
     cli.check(tmp_path, policy, state, act=True)
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"suppressed": 1}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {
+        "suppressed": 1
+    }
     assert not sent and state["incidents"]["failure"]["attempts"] == 1
     cli.check(tmp_path, policy, state, act=True)
-    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {"suppressed": 1, "sent": 1}
+    assert notifications.flush_notifications(tmp_path, policy["notifications"])["counts"] == {
+        "suppressed": 1,
+        "sent": 1,
+    }
     assert len(sent) == 1 and state["incidents"]["failure"]["attempts"] == 2
 
 
@@ -283,7 +329,9 @@ def test_supervisor_outage_requires_three_checks_and_fifteen_minutes(monitor):
     incident, requires_user = cli.record_supervisor_error(state, error, 1900)
     assert requires_user and incident["first_seen_epoch"] == 1000
     # A distinct transient error does not inherit the previous outage window.
-    incident, requires_user = cli.record_supervisor_error(state, "OSError: temporary NAS error", 2000)
+    incident, requires_user = cli.record_supervisor_error(
+        state, "OSError: temporary NAS error", 2000
+    )
     assert not requires_user and incident["observations"] == 1
     assert incident["first_seen_epoch"] == 2000
     # A slow second check is still insufficient on its own.
@@ -312,7 +360,7 @@ def test_monitor_loop_queues_only_persistent_outage_and_resets_after_recovery(
     def observe(*args, **kwargs):
         checks.append(clock[0])
         if len(checks) == 4:
-            first_path, = (tmp_path / "alerts").glob("*.json")
+            (first_path,) = (tmp_path / "alerts").glob("*.json")
             first = cli.read(first_path)
             first.update(delivery="sent", delivered_at="prior-delivery")
             cli.write(first_path, first)
@@ -343,7 +391,10 @@ def test_ongoing_legacy_outage_keeps_delivery_identity_until_healthy_reset(monit
     error = "RuntimeError: controller unavailable"
     legacy_id = cli.hashlib.sha256(error.encode()).hexdigest()[:24]
     state["supervisor_error"] = {
-        "id": legacy_id, "reason": error, "first_seen_epoch": 1000, "observations": 3,
+        "id": legacy_id,
+        "reason": error,
+        "first_seen_epoch": 1000,
+        "observations": 3,
     }
     ongoing, requires_user = cli.record_supervisor_error(state, error, 2000)
     assert requires_user and ongoing["id"] == legacy_id

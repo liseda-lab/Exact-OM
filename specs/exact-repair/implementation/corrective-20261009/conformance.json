@@ -1,0 +1,139 @@
+{
+  "execution_state": "Implementation receipt only; actual batch and supervisor status live in campaign deployment/completion records.",
+  "integration_base": "500a942ecfa75437955d4908d710cd170e6bbb94",
+  "methodological_amendments": [
+    "staged_verified_repair search schedule",
+    "desired/unwanted/nonvacuity query revision with preserved parent/split boundaries",
+    "symbolic plus separate weak anchor/comparison losses",
+    "teacher calibration selected only from authoredTRAIN; independentGeminiTEST withheld"
+  ],
+  "receipts": {
+    "core": {
+      "path": "specs/exact-repair/implementation/corrective-20261009/core.json",
+      "sha256": "ac70b40d0a3df614ec1ae5edb4b4687d3d4dbf8d081e8ccd187cae8180d7b970"
+    },
+    "deployment": {
+      "path": "specs/exact-repair/implementation/corrective-20261009/deployment.json",
+      "sha256": "b997e0160002516a443a8f801aebe030c118f1b8e5d9c6232187962f7d649303"
+    },
+    "learning": {
+      "path": "specs/exact-repair/implementation/corrective-20261009/learning.json",
+      "sha256": "fe83de8c5f280e74cc4cccac691b996922f36c8735e4d4253e45e4d5cd195222"
+    }
+  },
+  "repository_check_limit": "Full repository mypy also reports18 errors in untouched exact_inspect/study files; targeted repair/experiments types are clean.",
+  "requirements": {
+    "COR-01": {
+      "evidence": [
+        "core",
+        "learning",
+        "deployment"
+      ],
+      "implementation": "Integrated selected published corrections and their dependency closure; retained unrelated matcher safeguards.",
+      "qualification_limit": "Imported regression integration audit is still running.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-02": {
+      "evidence": [
+        "learning"
+      ],
+      "implementation": "Declared13-node/553-relation graph contract, actual optimizer and exact checkpoint resume.",
+      "qualification_limit": "Production-width/layer qualification on both GPUs is the first batch.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-03": {
+      "evidence": [
+        "core"
+      ],
+      "implementation": "Bounded reusable workers, cleanup quarantine, atomic partial results and phase/resource receipts.",
+      "qualification_limit": "Concurrent end-to-end throughput remains empirical calibration.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-04": {
+      "evidence": [
+        "core"
+      ],
+      "implementation": "Exact immutable-context reuse and source-bound compiler caches with support/probability tests.",
+      "qualification_limit": "Report measured cold/warm savings from campaign; no speedup claim from unit tests.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-05": {
+      "evidence": [
+        "core"
+      ],
+      "implementation": "Typed whole-bundle class endpoint replacement with activations and canonical costs.",
+      "qualification_limit": "Composite nonclass or ambiguous substitutions remain explicitly unavailable.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-06": {
+      "evidence": [
+        "core"
+      ],
+      "implementation": "Verified elementary incumbent before expansion; retain scoped evidence and reverify new objectives.",
+      "qualification_limit": "Equal-budget one-stage/staged measurement is scheduled, not yet a result.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-07": {
+      "evidence": [
+        "core",
+        "learning",
+        "deployment"
+      ],
+      "implementation": "Shared capability-aware native routing, hard feasibility separated from soft semantic queries.",
+      "qualification_limit": "Full Conference xsd:date support remains unavailable; preserve original axioms.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-08": {
+      "evidence": [
+        "learning"
+      ],
+      "implementation": "Partial parent/query outcomes keep masks, exact collector provenance and bounded acquisition.",
+      "qualification_limit": "Usable cross-parent/stratum label coverage must be measured before fitting.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-09": {
+      "evidence": [
+        "learning"
+      ],
+      "implementation": "Separate benefit/pair/risk/proposal targets, actual gradients and feasible signed quartets.",
+      "qualification_limit": "A learned head cannot claim coverage absent qualifying campaign supervision.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-10": {
+      "evidence": [
+        "learning",
+        "deployment"
+      ],
+      "implementation": "Complete DEV denominators, explicit evaluation epochs, real optimizer/RNG/update resume and retained budgets.",
+      "qualification_limit": "Freeze common paired update endpoints and final DEV reserve after calibration.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-11": {
+      "evidence": [
+        "core",
+        "deployment"
+      ],
+      "implementation": "Distinct observable controls, frozen expected rows, exact finite weighted decoder, original public Conference admission.",
+      "qualification_limit": "E3b requires complete identical language/distribution and same unique target. All21 real rows retained; unsupported rows stay unavailable.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    },
+    "COR-12": {
+      "evidence": [
+        "learning"
+      ],
+      "implementation": "Additive independently masked fidelity losses, exact-plan annotations, independent TEST role and cumulative paid quotas.",
+      "qualification_limit": "Live teacher calibration and grounded corpus coverage are not established by mock tests.",
+      "status": "implemented_with_recorded_checks; empirical_gate_separate"
+    }
+  },
+  "root_checks": {
+    "calibration_packets": "32locallyvalidated; no paidtransmissions",
+    "import_boundaries": "5contracts kept,0broken",
+    "imported_regressions": "running; one legacy parent-status compatibility regression fixed and affected19tests passed",
+    "protocol_tests": "21passed",
+    "scoped_mypy": "74files passed"
+  },
+  "schema": "exact-repair/corrective-conformance/v1",
+  "source_binding": "Each component receipt records actual final source/test SHA256; deployment additionally freezes an entire clean Git commit.",
+  "specification_commit": "f29f7534"
+}

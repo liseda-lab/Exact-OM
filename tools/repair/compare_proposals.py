@@ -19,6 +19,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--arms", nargs="+")
     parser.add_argument("--seconds", type=float, default=30.0)
     parser.add_argument("--draws", type=int, default=32)
+    parser.add_argument("--unique-candidate-target", type=int)
     parser.add_argument("--candidate-cap", type=int, default=64)
     parser.add_argument("--depth", type=int, default=2)
     parser.add_argument("--constructors", type=int, default=2)
@@ -74,6 +75,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         teacher_cache=teacher,
         options={
             "draws_per_object": args.draws,
+            "unique_candidate_target": args.unique_candidate_target,
             "candidate_cap": args.candidate_cap,
             "max_depth": args.depth,
             "max_constructors": args.constructors,

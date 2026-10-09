@@ -11,10 +11,13 @@ from exact.repair.workers import CallResult
 from tests.repair_training_completion_test import cache_for
 from tools.repair import train
 from tools.repair.corpus import generate_corpus
-from tools.repair.prepare import load_preparation
+from tools.repair.prepare import load_preparation, publish_label_cache
 
 
-def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_path, monkeypatch):
+@pytest.mark.parametrize("report_resume", [False, True])
+def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(
+    tmp_path, monkeypatch, report_resume
+):
     pytest.importorskip("torch")
     template = (
         Path(__file__).parents[1] / "specs/exact-repair/protocol/xr21-review2-conformance.json"
@@ -36,10 +39,13 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
     path.write_text(json.dumps(protocol))
     output = tmp_path / "run"
     args = ["repair-train", "--protocol", str(path), "--output", str(output)]
+    if report_resume:
+        args.append("--resume-report-transport")
     monkeypatch.setattr(sys, "argv", args)
     monkeypatch.delenv("SLURM_STEP_GPUS", raising=False)
     monkeypatch.delenv("SLURM_JOB_GPUS", raising=False)
     cases = generate_corpus(
+        revision="v3",
         split_counts={"train": 1, "development": 1, "test": 0},
         siblings_per_parent=1,
         families=("range",),
@@ -50,11 +56,15 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
         calls.append((function.__name__, options))
         if function.__name__ == "generated_from_protocol":
             value, cpu = cases, 0.25
-        elif function is train.label_case:
-            value = replace(cache_for(worker_args[0]), schema="exact-repair/teacher-cache/v3")
+        elif function is train._label_payload:
+            value = publish_label_cache(
+                replace(cache_for(worker_args[0]), schema="exact-repair/teacher-cache/v3"),
+                worker_args[1],
+            )
             cpu = 0.5
         elif function is train._train_payload:
             train_rows, dev_rows, model_options = worker_args
+            assert model_options["resume_report_transport"] is report_resume
             assert len(train_rows) == len(dev_rows) == 1
             assert model_options["revision"] == "v3"
             assert model_options["deadline_seconds"] < options["timeout"]
@@ -67,7 +77,13 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
                 },
                 output / "checkpoints",
             )
-            value = (descriptor, {"schema": "exact-repair/training/v3", "status": "fixture"})
+            value = (
+                descriptor,
+                train.publish_report(
+                    {"schema": "exact-repair/training/v3", "status": "fixture"},
+                    output / "reports",
+                ),
+            )
             cpu = 0.75
         else:
             raise AssertionError(function)
@@ -93,8 +109,8 @@ def test_v3_cli_accounts_shared_campaign_and_stage_cpu_and_preserves_resume(tmp_
     }
     assert [name for name, _ in calls] == [
         "generated_from_protocol",
-        "label_case",
-        "label_case",
+        "_label_payload",
+        "_label_payload",
         "_train_payload",
     ]
     assert [options["cpu_seconds"] for _, options in calls] == [600, 300, 300, 1800]

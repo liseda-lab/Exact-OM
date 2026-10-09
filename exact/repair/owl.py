@@ -281,6 +281,9 @@ class OwlVerifier:
         activated: Iterable[owl.ClassExpression] = (),
         exceptions: Iterable[str | owl.Class] = (),
         on_complete: Callable[[ObligationResult, SupportReport], None] | None = None,
+        feasibility_only: bool = False,
+        routing_queries: Iterable[owl.AxiomNode] = (),
+        routing_expressions: Iterable[owl.ClassExpression] = (),
     ) -> CheckReport:
         """Check consistency and every frozen policy query on one current theory.
 
@@ -292,10 +295,15 @@ class OwlVerifier:
         monitored_classes = None if monitored_classes is None else tuple(monitored_classes)
         required, prohibited = tuple(required), tuple(prohibited)
         activated, exceptions = tuple(activated), tuple(exceptions)
+        routing_queries, routing_expressions = tuple(routing_queries), tuple(routing_expressions)
         if self.reasoner == "auto":
             # Conservative whole-input/query capability gate, followed by each
             # backend's strict compiler/profile validation and complete results.
-            routes = qualified_routes(snapshot, (*required, *prohibited), activated)
+            routes = qualified_routes(
+                snapshot,
+                (*required, *prohibited, *routing_queries),
+                (*activated, *routing_expressions),
+            )
             last = None
             for route in routes:
                 last = OwlVerifier(
@@ -311,6 +319,9 @@ class OwlVerifier:
                     activated=activated,
                     exceptions=exceptions,
                     on_complete=on_complete,
+                    feasibility_only=feasibility_only,
+                    routing_queries=routing_queries,
+                    routing_expressions=routing_expressions,
                 )
                 if last.logical_status != "UNKNOWN":
                     return last
@@ -355,7 +366,23 @@ class OwlVerifier:
         try:
             if not snapshot.is_complete:
                 raise NotImplementedError("incomplete import closure")
+            from .workers import record_phase
+
+            record_phase(
+                "reasoner_prepare",
+                "start",
+                theory_hash=snapshot.logical_fingerprint.hex,
+                reasoner=self.reasoner,
+                backend=self.backend,
+            )
             package_version, reasoner = self._open(snapshot)
+            record_phase(
+                "reasoner_prepare",
+                "finish",
+                theory_hash=snapshot.logical_fingerprint.hex,
+                reasoner=self.reasoner,
+                backend=self.backend,
+            )
             support = replace(
                 support,
                 package_version=package_version,
@@ -381,17 +408,29 @@ class OwlVerifier:
                         and not isinstance(query, owl.LOGICAL_AXIOM_TYPES)
                     ):
                         raise NotImplementedError("nonlogical consequence query")
+                    record_phase("reasoning_query", "start", kind=kind, query_id=_query_id(query))
                     value = (
                         kind in {"required_entailment", "prohibited_entailment"}
                         if inconsistent
                         else self._execute(reasoner, kind, query)
                     )
                     result = replace(result, verdict=value, complete=True)
+                    record_phase(
+                        "reasoning_query",
+                        "finish",
+                        kind=kind,
+                        query_id=_query_id(query),
+                        verdict=value,
+                        complete=True,
+                    )
                 except Exception as error:
                     result = replace(result, reason=_failure(error))
                 obligations.append(result)
                 if on_complete is not None and result.complete:
                     on_complete(result, support)
+                if feasibility_only and result.satisfied is False:
+                    failure = "unchecked after decisive qualified violation"
+                    break
             support = replace(support, diagnostics=tuple(sorted(reasoner.diagnostics().items())))
         except Exception as error:
             failure = _failure(error)

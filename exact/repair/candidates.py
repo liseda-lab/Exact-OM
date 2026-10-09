@@ -6,7 +6,7 @@ simple generalisations here; editable assertions never prune the grammar.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import fields, is_dataclass, replace
 from functools import lru_cache
 from hashlib import sha256
 from itertools import combinations
@@ -208,6 +208,65 @@ def _expression_cost(axioms: Iterable[Any]) -> float:
     )
 
 
+def substitute_bound_endpoint(value: Any, anchor: Any, replacement: Any) -> Any:
+    """Typed structural substitution; annotations and IRI text are untouched.
+
+    The mapping record supplies the binding. Matching a Class never replaces a
+    property/individual which merely shares its IRI.
+    """
+    if type(anchor) is not type(replacement):
+        raise TypeError("endpoint substitution must preserve the entity type")
+    if type(value) is type(anchor) and value == anchor:
+        return replacement
+    if isinstance(value, (owl.IRI, owl.Annotation, owl.Entity)):
+        return value
+    if isinstance(value, owl.ObjectIntersectionOf):
+        return intersection(
+            *(substitute_bound_endpoint(x, anchor, replacement) for x in value.operands)
+        )
+    if isinstance(value, owl.CanonicalSet):
+        return owl.CanonicalSet(substitute_bound_endpoint(x, anchor, replacement) for x in value)
+    if isinstance(value, tuple):
+        return tuple(substitute_bound_endpoint(x, anchor, replacement) for x in value)
+    if is_dataclass(value) and not isinstance(value, type):
+        return replace(
+            value,
+            **{
+                field.name: substitute_bound_endpoint(
+                    getattr(value, field.name), anchor, replacement
+                )
+                for field in fields(value)
+                if field.init and field.name != "annotations"
+            },
+        )
+    return value
+
+
+def _single_endpoint_substitution(original: tuple[Any, ...], emitted: tuple[Any, ...]):
+    """Recognise a complete syntax-preserving edit without trusting action tags."""
+    if not original or not emitted or original == emitted:
+        return None
+    before = {entity for a in original for entity in owl.signature(a)}
+    after = {entity for a in emitted for entity in owl.signature(a)}
+    # A single globally bound replacement removes precisely one old entity.
+    removed = before - after
+    if len(removed) != 1:
+        return None
+    anchor = next(iter(removed))
+    for replacement in sorted(after, key=_key):
+        if type(anchor) is not type(replacement):
+            continue
+        try:
+            substituted = normalise_axioms(
+                substitute_bound_endpoint(a, anchor, replacement) for a in original
+            )
+        except (ValueError, TypeError):
+            continue
+        if substituted == emitted:
+            return anchor, replacement
+    return None
+
+
 def replacement_cost_features(
     original_axioms: Iterable[Any],
     emitted_axioms: Iterable[Any],
@@ -244,10 +303,18 @@ def replacement_cost_features(
                     result[_key(node)] += count
         return result
 
-    introduced = constructors(emitted) - constructors(original)
+    substitution = _single_endpoint_substitution(original, emitted) if kind == "mapping" else None
+    cost_original = (
+        normalise_axioms(substitute_bound_endpoint(a, *substitution) for a in original)
+        if substitution is not None
+        else original
+    )
+    introduced = constructors(emitted) - constructors(cost_original)
     directed = (owl.SubClassOf, owl.SubObjectPropertyOf, owl.SubDataPropertyOf)
     removed = (
-        sum(isinstance(a, directed) and a not in emitted for a in original) if mapping_edit else 0
+        sum(isinstance(a, directed) and a not in emitted for a in cost_original)
+        if mapping_edit
+        else 0
     )
     original_classes = [a for a in original if isinstance(a, owl.SubClassOf)]
     emitted_classes = [a for a in emitted if isinstance(a, owl.SubClassOf)]
@@ -288,7 +355,7 @@ def replacement_cost_features(
         return None
 
     before, after = endpoint_pair(original_classes), endpoint_pair(emitted_classes)
-    endpoint_change = bool(
+    endpoint_change = substitution is not None or bool(
         mapping_edit
         and len(original_classes) == len(emitted_classes)
         and before is not None
@@ -502,69 +569,142 @@ def mapping_candidates(
     return deduplicate_candidates(result)
 
 
+def _original_mapping_relation(obj: Any, source: Any, target: Any, kind: str) -> str | None:
+    """Match the entire observed bundle, including both directions of equality."""
+    return next(
+        (
+            relation
+            for relation in ("=", "<", ">")
+            if not (kind == "individual" and relation != "=")
+            and mapping_candidates(
+                obj.object_id,
+                source,
+                target,
+                relation,
+                entity_kind=kind,
+                enabled_actions=("keep",),
+            )[0].axioms
+            == normalise_axioms(obj.original_axioms)
+        ),
+        None,
+    )
+
+
 def materialize_retrieved_endpoints(problem: Any, retrieval: Any) -> Any:
-    """Construct the same typed elementary endpoints on API and direct paths."""
+    """Substitute observed, explicitly bound endpoints in complete bundles.
+
+    An unavailable/ambiguous alternative is attached to original provenance and
+    cannot erase other valid actions or crash the whole case. Non-class composite
+    extensions require a separately qualified substitution contract.
+    """
     objects = []
-    constructors = {
-        owl.Class: "class",
-        owl.ObjectProperty: "object_property",
-        owl.DataProperty: "data_property",
-        owl.NamedIndividual: "individual",
-    }
+    entity_types = (owl.Class, owl.ObjectProperty, owl.DataProperty, owl.NamedIndividual)
     for obj in problem.objects:
         alternatives = retrieval.for_object(obj.object_id).endpoint_alternatives
-        if obj.kind != "mapping" or not alternatives:
+        if obj.kind != "mapping" or not alternatives or obj.locked or not obj.eligible:
             objects.append(obj)
             continue
-        kind = constructors.get(type(obj.source_entity))
-        if kind is None or type(obj.source_entity) is not type(obj.target_entity):
-            raise ValueError("retrieved endpoints require explicit, identically typed endpoints")
-        relation = next(
-            (
-                relation
-                for relation in ("=", "<", ">")
-                if not (kind == "individual" and relation != "=")
-                and mapping_candidates(
+        source, target = obj.source_entity, obj.target_entity
+        originals = normalise_axioms(obj.original_axioms)
+        # Preserve the qualified elementary observed-bundle recovery imported
+        # from the preliminary campaign. Composite bundles never take this path.
+        if isinstance(source, owl.Class) and isinstance(target, owl.Class):
+            if _original_mapping_relation(obj, source, target, "class") is None:
+                entities = {
+                    e for a in originals for e in owl.signature(a) if isinstance(e, owl.Class)
+                }
+                matches = [
+                    (left, right)
+                    for left in sorted(entities, key=_key)
+                    for right in sorted(entities, key=_key)
+                    if left != right
+                    and (left == source or right == target)
+                    and _original_mapping_relation(obj, left, right, "class") is not None
+                ]
+                if len(matches) == 1:
+                    source, target = matches[0]
+        original_states = tuple(
+            c for c in obj.candidates if c.axioms == originals and "keep" in c.action_tags
+        )
+        activation_sets = {c.active_expressions for c in original_states}
+        reason = None
+        if type(source) not in entity_types or type(source) is not type(target):
+            reason = "missing_or_inconsistent_observed_endpoint_binding"
+        elif source == target:
+            reason = "ambiguous_shared_endpoint_requires_occurrence_binding"
+        elif len(activation_sets) > 1:
+            reason = "ambiguous_original_activation_binding"
+        elif not all(
+            endpoint in {e for a in originals for e in owl.signature(a)}
+            for endpoint in (source, target)
+        ):
+            reason = "observed_endpoint_absent_from_original_bundle"
+        elif not isinstance(source, owl.Class):
+            kind = {
+                owl.ObjectProperty: "object_property",
+                owl.DataProperty: "data_property",
+                owl.NamedIndividual: "individual",
+            }[type(source)]
+            if _original_mapping_relation(obj, source, target, kind) is None:
+                reason = "unsupported_composite_nonclass_substitution"
+        active = next(iter(activation_sets), ())
+        additions = []
+        unavailable = []
+        for side, endpoint in alternatives:
+            issue = reason
+            if side not in {"source", "target"} or type(endpoint) is not type(source):
+                issue = "invalid_typed_endpoint_alternative"
+            if issue is not None:
+                unavailable.append(("endpoint_unavailable", f"{side}:{issue}"))
+                continue
+            anchor = source if side == "source" else target
+            if endpoint == anchor:
+                continue
+            try:
+                emitted = normalise_axioms(
+                    substitute_bound_endpoint(a, anchor, endpoint) for a in originals
+                )
+                activated = tuple(substitute_bound_endpoint(e, anchor, endpoint) for e in active)
+            except (ValueError, TypeError) as error:
+                unavailable.append(
+                    (
+                        "endpoint_unavailable",
+                        f"{side}:structural_substitution:{type(error).__name__}",
+                    )
+                )
+                continue
+            additions.append(
+                make_candidate(
                     obj.object_id,
-                    obj.source_entity,
-                    obj.target_entity,
-                    relation,
-                    entity_kind=kind,
-                    enabled_actions=("keep",),
-                )[0].axioms
-                == normalise_axioms(obj.original_axioms)
-            ),
-            None,
-        )
-        if relation is None:
-            raise ValueError("cannot infer complete original relation for endpoint retrieval")
-        additions = mapping_candidates(
-            obj.object_id,
-            obj.source_entity,
-            obj.target_entity,
-            relation,
-            entity_kind=kind,
-            eligible=obj.eligible,
-            locked=obj.locked,
-            endpoint_alternatives=alternatives,
-            enabled_actions=("keep", "replace_endpoint"),
-        )
-        additions = tuple(
-            (
-                replace(
-                    c,
-                    provenance=tuple(
-                        sorted(set(c.provenance) | {("retrieval", "observed_endpoint_alternative")})
+                    emitted,
+                    ("replace_endpoint",),
+                    active_expressions=activated,
+                    cost_features=replacement_cost_features(
+                        originals,
+                        emitted,
+                        kind=obj.kind,
+                        authorship=obj.authorship,
+                        active_expressions=activated,
+                    ),
+                    provenance=(
+                        ("retrieval", "observed_endpoint_alternative"),
+                        ("endpoint_contract", "complete-bound-substitution/v1"),
+                        ("cost_contract", "syntax-delta/v2"),
+                        ("endpoint_side", side),
+                        ("bound_anchor", str(anchor.iri.value)),
+                        ("bound_replacement", str(endpoint.iri.value)),
                     ),
                 )
-                if "replace_endpoint" in c.action_tags
-                else c
             )
-            for c in additions
+        existing = (
+            tuple(
+                replace(c, provenance=tuple(sorted(set(c.provenance) | set(unavailable))))
+                for c in obj.candidates
+            )
+            if unavailable
+            else obj.candidates
         )
-        objects.append(
-            replace(obj, candidates=deduplicate_candidates((*obj.candidates, *additions)))
-        )
+        objects.append(replace(obj, candidates=deduplicate_candidates((*existing, *additions))))
     from .records import replace_inventory
 
     return replace_inventory(problem, tuple(objects))

@@ -1,0 +1,305 @@
+{
+  "base_revision": "500a942ecfa75437955d4908d710cd170e6bbb94",
+  "checks": {
+    "black": "owned files formatted",
+    "diff_check": "passed",
+    "supervisor_mypy": "passed: mypy exact/experiments/dispatch.py exact/experiments/interventions.py exact/experiments/science_health.py exact/experiments/supervision.py --follow-imports=silent --no-incremental"
+  },
+  "corrections": {
+    "COR-10": {
+      "executed_gpu_qualification": false,
+      "implemented": [
+        "dispatch-time atomic cumulative reservation",
+        "stage clocks retained across replacement jobs",
+        "explicit per-model logical budget identity",
+        "frozen CUDA optimizer/checkpoint qualification job on each GPU"
+      ],
+      "scope": "deployment side of durable budgets and optimizer qualification",
+      "training_implementation": "owned by separate implementation agent"
+    },
+    "COR-11": {
+      "implemented": [
+        "immutable2025publisherLogMap/MELTarchive",
+        "all21pairidentities retained",
+        "13TRAIN matcherfilesonlyopened",
+        "referencesnotmatcherinputs/semanticlabels",
+        "whole-source strict native parser",
+        "fullsourceautoandforcedHermiTqualification",
+        "softwareerrors distinguished from scientifically unsupported rows",
+        "first calibration expected rows preserved",
+        "frozen committed shared source and descriptors"
+      ],
+      "scope": "full-source real-data admission and accountable control execution"
+    }
+  },
+  "created_epoch": 1791586600.9604285,
+  "deployment": {
+    "actual_frozen_batch_created": false,
+    "jobs_launched": false,
+    "paid_calls": 0,
+    "plan_preflight": "waiting for parent to regenerate implementation-source.json after final merge/commit",
+    "prepared_source": true,
+    "preserved_allocations": [
+      "14372",
+      "14451"
+    ],
+    "preserved_steps": [
+      "14451.0",
+      "14451.4",
+      "14451.extern"
+    ]
+  },
+  "known_edge_case": "Empty publisher Alignment is retained as a valid zero-mapping scheduled input; unrelated XML is rejected",
+  "limitations": [
+    "native cmt/conference source datatype xsd:date remains unsupported without changing original semantics",
+    "no real semantic labels invented from reference alignments",
+    "future supervisor source fixes must commit and merge/push dev safely; frozen earlier work remains unchanged"
+  ],
+  "native_conference": {
+    "all21_pairs_remain_scheduled": true,
+    "capability_diagnostic": {
+      "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/inputs/conference/train/cmt-conference/qualification-smoke/capability-diagnostic.json",
+      "sha256": "df8045c6a1d1fbf759083d1af24718eca73bd1643a92a141a21a7d00122cd76b"
+    },
+    "heldout_rows_opened": false,
+    "logical_status": "UNKNOWN",
+    "manifest": {
+      "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/inputs/conference/manifest.json",
+      "sha256": "300d564ee0ad843474787511b81901022d4f2f6778d35604e3512971ad75ea8b"
+    },
+    "matcher_mappings": 11,
+    "ontologies_modified": false,
+    "pair": "conference_2025:cmt:conference",
+    "projections_used": false,
+    "provenance": {
+      "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/inputs/conference/provenance.json",
+      "sha256": "bd39cf9881889154a0563278200d403ddba645d78c1a87b6049095c36928a021"
+    },
+    "qualification": {
+      "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/inputs/conference/train/cmt-conference/qualification-smoke/qualification.json",
+      "sha256": "b07a58b551abb6ecf1760062971f4bb8912144854aec8c91f83a10b4b8ee4ba4"
+    },
+    "reason": "xsd:date DataPropertyRange unsupported by strict qualified HermiT OWL2 datatype/profile gate",
+    "routes": [
+      "auto/auto",
+      "hermit/native"
+    ],
+    "scope": "complete_source_input_unavailable_for_current_qualified_reasoner",
+    "source_axioms": [
+      318,
+      407
+    ]
+  },
+  "packages": {
+    "black": "24.10.0",
+    "mypy": "1.20.2",
+    "pyelk-reasoner": "0.2.1",
+    "pyhermit": "0.2.1",
+    "pyowl-core": "0.2.1",
+    "pytest": "8.4.2",
+    "torch": "2.7.0+cu128",
+    "torch-geometric": "2.6.1"
+  },
+  "predeployment_engineering_costs": {
+    "accounting": "bound provenance for costs; no Slurm steps or paid calls in this audit",
+    "diagnostic_worker_resources": {
+      "auto/auto": {
+        "cpu_seconds": 1.119127,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 87158784,
+        "wall_seconds": 1.1704899580217898
+      },
+      "hermit/native": {
+        "cpu_seconds": 1.078924,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 84721664,
+        "wall_seconds": 1.1313305203802884
+      },
+      "profile": {
+        "cpu_seconds": 0.915762,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 79650816,
+        "wall_seconds": 0.9591955319046974
+      }
+    },
+    "qualification_elapsed_seconds": 4.585750579833984,
+    "qualification_worker_resources": {
+      "alignment": {
+        "cpu_seconds": 1.06,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 89698304,
+        "wall_seconds": 1.1063762130215764
+      },
+      "construction": {
+        "cpu_seconds": 0.546619,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 74145792,
+        "wall_seconds": 0.5811206321232021
+      },
+      "source": {
+        "cpu_seconds": 0.76,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 87846912,
+        "wall_seconds": 0.829775404650718
+      },
+      "target": {
+        "cpu_seconds": 0.822972,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 84381696,
+        "wall_seconds": 0.8786619403399527
+      },
+      "union": {
+        "cpu_seconds": 1.07,
+        "peak_buffered_event_bytes": 0.0,
+        "peak_sampled_tree_rss_bytes": 85311488,
+        "wall_seconds": 1.111318435985595
+      }
+    }
+  },
+  "schema": "exact-repair/corrective-deployment-conformance/v1",
+  "tests": [
+    {
+      "command": [
+        "/home/pgcotovio/Exact-OM/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/repair_corrective_launch_test.py",
+        "tests/repair_corrective_conference_test.py",
+        "tests/repair_batch_test.py",
+        "tests/repair_supervisor_bootstrap_test.py",
+        "tests/experiments_dispatch_test.py",
+        "tests/experiments_supervision_test.py",
+        "tests/experiments_supervisor_cli_test.py",
+        "tests/experiments_interventions_test.py",
+        "tests/experiments_idle_completion_test.py",
+        "tests/experiments_science_health_test.py",
+        "tests/experiments_supervisor_notifications_test.py"
+      ],
+      "passed": 344,
+      "result": "passed_before_final_empty_alignment_admission_regression",
+      "seconds": 7.23
+    },
+    {
+      "command": [
+        "/home/pgcotovio/Exact-OM/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/repair_corrective_conference_test.py",
+        "tests/repair_batch_test.py",
+        "tests/repair_supervisor_bootstrap_test.py",
+        "tests/experiments_dispatch_test.py",
+        "tests/experiments_supervision_test.py",
+        "tests/experiments_supervisor_cli_test.py",
+        "tests/experiments_interventions_test.py",
+        "tests/experiments_idle_completion_test.py",
+        "tests/experiments_science_health_test.py",
+        "tests/experiments_supervisor_notifications_test.py"
+      ],
+      "passed": 338,
+      "result": "passed_on_preceding_revision",
+      "seconds": 6.78
+    },
+    {
+      "command": [
+        "/home/pgcotovio/Exact-OM/.venv/bin/python",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/repair_corrective_conference_test.py",
+        "tests/repair_corrective_launch_test.py",
+        "tests/experiments_science_health_test.py"
+      ],
+      "passed": 39,
+      "result": "passed_on_final_owned_sources",
+      "seconds": 2.7
+    }
+  ],
+  "working_source": [
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/exact/experiments/dispatch.py",
+      "sha256": "f9854b717597c29886fccbec6257d6f2f22f532c0621b8f0f082f0ab35fc1d69"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/exact/experiments/supervision.py",
+      "sha256": "8138497afa8f105b1d91dde20aabd7bf37329d82416e76b4eabb01cba963e5f5"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/exact/experiments/interventions.py",
+      "sha256": "6cc4eaffde03ce20f11e6a118e093f081338c8bfcd7685b9dd44d7b245a4daa0"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/exact/experiments/completion.py",
+      "sha256": "351539eedae982d7ec22c5a7eefe2d5bdc74d693a6494e792fe7306aaebf4696"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/exact/experiments/science_health.py",
+      "sha256": "7ce234dc07d748d0883d27a6160f9b04abf8837a70ead82132eae2bb2165619c"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/supervise_experiments.py",
+      "sha256": "2281918bc613e588b766013d9385efce52d2bef2224bbe7bc0407921f3486ce1"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/batch.py",
+      "sha256": "2e9f6476887815ddf765c20c5c097fe4441d76046549b1a494b4f1acde045ad1"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/supervisor_bootstrap.py",
+      "sha256": "a33420bcb4418cf1c618da0a2477b0c892cb74122fc41cc296d9e7ece7ebc2da"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/corrective_conference.py",
+      "sha256": "adf98475d9df64964c8c7439196c473b4fbb45d058055345b4914d4f16c2af74"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/corrective_launch.py",
+      "sha256": "6999d21833d88caf3091c0bb788fcc29349bce0b640a1ae70d159901334223d6"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_corrective_launch_test.py",
+      "sha256": "58dce1d200307daa47ccbe82cf15e98568a8ed7eca4cbb0feadeccc52f5d8f2e"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_corrective_conference_test.py",
+      "sha256": "2fc79e388afb85885f2aa7c1477d691c41b0c380fdec63865fc4d99c1e538557"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_batch_test.py",
+      "sha256": "b5d178d789fec853d1d96a99ff240e8582b7f9d6609c695c5ce53e7535576a65"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_supervisor_bootstrap_test.py",
+      "sha256": "f901512327ac0a40d1ad28899c4350620d065a1470a1a0a7145c2f72b2bab9c7"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_dispatch_test.py",
+      "sha256": "8e2d97909b8bb46e9882830c9fa61d9cd39ddbd26547d2717d6d792f3bf1a8fe"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_supervision_test.py",
+      "sha256": "d0b8d3ab3a0d4059f2cb6aec1c51c9eb12bb7848f79fcbf32c6d2ecbe7882da8"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_supervisor_cli_test.py",
+      "sha256": "cfac9b3d82769bb6752961742fb7586ac413885b1939d988406cf05d16d5b395"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_interventions_test.py",
+      "sha256": "34deb4837efb8c09ce2bc796a520de191254d6208887bfbfc664a31e9681bb69"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_idle_completion_test.py",
+      "sha256": "d529db718c37ef1b1fff16d75900ac02ff44764290251de271693a11be890dca"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_science_health_test.py",
+      "sha256": "016cd00c258613c65ae56a503da719a3b58b0fa918ebf7aa8fb308b211caba46"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/experiments_supervisor_notifications_test.py",
+      "sha256": "71edab10ff63d14a459053da1448169eba20416884fd1dec7fa4272fc77f394e"
+    }
+  ]
+}

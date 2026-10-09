@@ -1010,6 +1010,12 @@ class GenerationReportV3(_PayloadRecordV3):
             "probability_semantics",
         }
         optional = {
+            "contextual_expensive_calls",
+            "contextual_cache_hits",
+            "decoder_support_identity",
+            "decoder_scope",
+            "unique_candidate_target",
+            "unique_target_reached",
             "representative_max_checks",
             "preparation_identity",
             "support_admission",
@@ -1054,6 +1060,25 @@ class GenerationReportV3(_PayloadRecordV3):
             or self["representative_max_checks"] < 0
         ):
             raise ValueError("representative traversal cap must be a nonnegative integer")
+        for name in ("contextual_expensive_calls", "contextual_cache_hits"):
+            if name in self and (type(self[name]) is not int or self[name] < 0):
+                raise ValueError(f"{name} must be a nonnegative integer")
+        target = self.get("unique_candidate_target")
+        if target is not None and (type(target) is not int or target < 1):
+            raise ValueError("unique candidate target must be a positive integer")
+        reached = self.get("unique_target_reached")
+        if target is not None and (
+            type(reached) is not bool or reached != (self["unique_draws"] >= target)
+        ):
+            raise ValueError("unique-target outcome disagrees with actual draws")
+        if target is None and reached is not None:
+            raise ValueError("unique-target outcome requires its declared target")
+        if "decoder_support_identity" in self:
+            self._hash_field("decoder_support_identity", nullable=True)
+        if self.get("decoder_scope") not in {None, "tractable_completed_exhaustive_support"}:
+            raise ValueError("invalid matched decoder support scope")
+        if (self.get("decoder_scope") is None) != (self.get("decoder_support_identity") is None):
+            raise ValueError("matched decoder scope and identity must be recorded together")
         for name in ("generation_identity", "language_hash"):
             if name in self:
                 self._hash_field(name)

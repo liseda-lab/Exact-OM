@@ -12,6 +12,7 @@ import os
 import pickle
 import resource
 import signal
+import sys
 import sqlite3
 import tempfile
 import time
@@ -28,7 +29,44 @@ from typing import Any, Callable
 _SUPERVISED_GROUP = False
 _EVENT_CHANNEL: Any = None
 _MAX_FRAME = 16 * 1024 * 1024
+_NESTED_CLEANUP_COMPLETE = True
+_STOP_EXIT_CODES: dict[int, int] = {}
 SUPERVISION_GRACE_SECONDS = 0.22  # process cleanup plus bounded receiver join
+
+
+def record_phase(phase: str, event: str, **context: Any) -> str | None:
+    """Commit small independent phase receipts before blocking native work.
+
+    The caller supplies an owned campaign directory; absence disables optional
+    instrumentation. Per-record atomic files preserve the last completed prefix
+    under termination and never sum overlapping nested phase walls as elapsed.
+    """
+    directory = os.environ.get("EXACT_REPAIR_PHASE_JOURNAL")
+    if not directory:
+        return None
+    import json
+
+    root = Path(directory)
+    root.mkdir(parents=True, exist_ok=True)
+    identity = f"{time.time_ns()}-{os.getpid()}-{uuid.uuid4().hex}"
+    record = dict(
+        schema="exact-repair/phase-receipt/v1",
+        phase=phase,
+        event=event,
+        pid=os.getpid(),
+        monotonic_seconds=time.monotonic(),
+        process_cpu_seconds=_process_cpu_seconds(),
+        process_peak_rss_bytes=resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024,
+        **context,
+    )
+    temporary = root / (identity + ".tmp")
+    final = root / (identity + ".json")
+    with temporary.open("x") as stream:
+        json.dump(record, stream, sort_keys=True)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, final)
+    return str(final)
 
 
 @dataclass(frozen=True)
@@ -242,7 +280,8 @@ def emit_event(event: Any) -> None:
 def _execute(
     connection: Any, function: Callable[..., Any], args: tuple, kwargs: dict, own_group: bool
 ) -> None:
-    global _SUPERVISED_GROUP, _EVENT_CHANNEL
+    global _SUPERVISED_GROUP, _EVENT_CHANNEL, _NESTED_CLEANUP_COMPLETE
+    _NESTED_CLEANUP_COMPLETE = True
     try:
         if own_group:
             os.setsid()
@@ -253,7 +292,11 @@ def _execute(
 
         value = compact_verification_report(value)
         result = CallResult(
-            "complete", value, resource_usage=(("cpu_seconds", _process_cpu_seconds()),)
+            "complete" if _NESTED_CLEANUP_COMPLETE else "cleanup_incomplete",
+            value,
+            cleanup_complete=_NESTED_CLEANUP_COMPLETE,
+            detail="" if _NESTED_CLEANUP_COMPLETE else "nested worker cleanup incomplete",
+            resource_usage=(("cpu_seconds", _process_cpu_seconds()),),
         )
         payload = pickle.dumps(("result", result), protocol=5)
         if len(payload) > _MAX_FRAME:
@@ -267,6 +310,7 @@ def _execute(
                     CallResult(
                         "error",
                         detail=f"{type(error).__name__}: {error}",
+                        cleanup_complete=_NESTED_CLEANUP_COMPLETE,
                         resource_usage=(("cpu_seconds", _process_cpu_seconds()),),
                     ),
                 ),
@@ -320,7 +364,10 @@ def _stop(pid: int, own_group: bool) -> bool:
     while time.monotonic() < deadline:
         if not reaped:
             try:
-                reaped = bool(os.waitpid(pid, os.WNOHANG)[0])
+                waited, wait_status = os.waitpid(pid, os.WNOHANG)
+                reaped = bool(waited)
+                if waited:
+                    _STOP_EXIT_CODES[pid] = os.waitstatus_to_exitcode(wait_status)
             except ChildProcessError:
                 reaped = True
         # A killed child in uninterruptible I/O is still running. Zombies have
@@ -367,6 +414,20 @@ def _coordinate(
                 for event in value:
                     if handler is not None and not handler(event):
                         raise ValueError("invalid worker event")
+                for event in value:
+                    if isinstance(event, tuple) and event and event[0] == "bounded_task_started":
+                        if (
+                            len(event) != 3
+                            or not isinstance(event[2], (int, float))
+                            or not isfinite(event[2])
+                            or event[2] <= 0
+                        ):
+                            raise ValueError("invalid bounded task deadline")
+                        control.send_bytes(
+                            pickle.dumps(("task_deadline", float(event[2])), protocol=5)
+                        )
+                    elif isinstance(event, tuple) and event and event[0] == "bounded_task_finished":
+                        control.send_bytes(pickle.dumps(("task_deadline", None), protocol=5))
                 receipt = _commit_event_batch(directory, receipt, value)
                 for event in value:
                     if (
@@ -441,6 +502,19 @@ def _coordinate(
         control.close()
 
 
+def _spawn_coordinate(control, function, args, kwargs, handler, directory, own_group):
+    """Fresh interpreter broker for a CUDA-owning caller; no parent-context fork."""
+    if own_group:
+        os.setsid()
+    _coordinate(control, function, args, kwargs, handler, directory)
+
+
+def _cuda_context_is_live() -> bool:
+    torch = sys.modules.get("torch")
+    cuda = getattr(torch, "cuda", None) if torch is not None else None
+    return bool(cuda is not None and cuda.is_initialized())
+
+
 def bounded_call(
     function: Callable[..., Any],
     *args: Any,
@@ -458,6 +532,13 @@ def bounded_call(
     The controller receives only bounded messages and durable-prefix receipts.
     Cleanup has a 0.2-second grace; explicit journal replay needs its own budget.
     """
+    global _NESTED_CLEANUP_COMPLETE
+    if not _NESTED_CLEANUP_COMPLETE:
+        return CallResult(
+            "cleanup_incomplete",
+            detail="worker quarantined after incomplete descendant cleanup",
+            cleanup_complete=False,
+        )
     if not isfinite(timeout):
         raise ValueError("timeout must be finite")
     if cpu_seconds is not None and (
@@ -472,6 +553,14 @@ def bounded_call(
         return CallResult("unsupported", detail="worker CPU/RSS supervision requires Linux procfs")
     if timeout <= 0:
         return CallResult("timeout", detail="stage deadline exhausted")
+    record_phase(
+        "worker",
+        "start",
+        task=getattr(function, "__qualname__", str(function)),
+        timeout_seconds=timeout,
+        memory_mb=memory_mb,
+        cpu_seconds=cpu_seconds,
+    )
     started = time.monotonic()
     deadline = started + timeout
     context = multiprocessing.get_context("spawn")
@@ -482,15 +571,26 @@ def bounded_call(
         else Path(tempfile.gettempdir()) / ("exact-repair-events-" + uuid.uuid4().hex)
     )
     own_group = not _SUPERVISED_GROUP
-    pid = os.fork()
-    if pid == 0:
-        try:
-            parent.close()
-            if own_group:
-                os.setsid()
-            _coordinate(child, function, args, kwargs, event_handler, directory)
-        finally:
-            os._exit(0)
+    broker = None
+    if _cuda_context_is_live():
+        broker = context.Process(
+            target=_spawn_coordinate,
+            args=(child, function, args, kwargs, event_handler, directory, own_group),
+            daemon=False,
+        )
+        broker.start()
+        pid = broker.pid
+        assert pid is not None
+    else:
+        pid = os.fork()
+        if pid == 0:
+            try:
+                parent.close()
+                if own_group:
+                    os.setsid()
+                _coordinate(child, function, args, kwargs, event_handler, directory)
+            finally:
+                os._exit(0)
     child.close()
     queue: Queue[Any] = Queue(maxsize=1)
     stopped = Event()
@@ -520,8 +620,9 @@ def bounded_call(
     peak_rss = measured_cpu = peak_buffer = 0.0
     sampled_at = 0.0
     result = CallResult("timeout", detail="stage deadline exhausted")
+    task_deadline = deadline
     try:
-        while time.monotonic() < deadline:
+        while time.monotonic() < min(deadline, task_deadline):
             if time.monotonic() - sampled_at >= 0.01:
                 sampled_at = time.monotonic()
                 measured_cpu = max(measured_cpu, _cpu_tree_seconds(pid))
@@ -538,10 +639,16 @@ def bounded_call(
                     )
                     break
             try:
-                kind, value = queue.get(timeout=min(0.02, max(0.0, deadline - time.monotonic())))
+                kind, value = queue.get(
+                    timeout=min(0.02, max(0.0, min(deadline, task_deadline) - time.monotonic()))
+                )
             except Empty:
                 continue
-            if kind == "receipt":
+            if kind == "task_deadline":
+                task_deadline = (
+                    deadline if value is None else min(deadline, time.monotonic() + float(value))
+                )
+            elif kind == "receipt":
                 events, failure, buffered = value
                 peak_buffer = max(peak_buffer, buffered)
                 parent.send_bytes(b"recorded")
@@ -553,16 +660,46 @@ def bounded_call(
             else:
                 result = CallResult("error", detail="invalid supervisor envelope")
                 break
+        if (
+            result.status == "timeout"
+            and task_deadline < deadline
+            and time.monotonic() >= task_deadline
+        ):
+            result = replace(result, detail="bounded task deadline exhausted")
     finally:
         stopped.set()
+        record_phase("cleanup", "start", owner_pid=pid)
         cleanup = _stop(pid, own_group)
+        exit_code = _STOP_EXIT_CODES.pop(pid, None)
+        if broker is not None and exit_code is not None:
+            # _stop owns waitpid so it can bound cleanup of the whole tree;
+            # inform multiprocessing of that real reaped exit status before close.
+            popen = getattr(broker, "_popen")
+            popen.returncode = exit_code
+            broker.close()
+        record_phase("cleanup", "finish", owner_pid=pid, cleanup_complete=cleanup)
         parent.close()
         receiver.join(timeout=0.02)
     measured_cpu = max(measured_cpu, dict(result.resource_usage).get("cpu_seconds", 0.0))
     if result.status == "complete" and cpu_seconds is not None and measured_cpu > cpu_seconds:
         result = CallResult("cpu_limit", detail=f"worker tree CPU exceeded {cpu_seconds:g} seconds")
+    cleanup = cleanup and result.cleanup_complete
+    _NESTED_CLEANUP_COMPLETE = _NESTED_CLEANUP_COMPLETE and cleanup
+    record_phase(
+        "worker",
+        "finish",
+        task=getattr(function, "__qualname__", str(function)),
+        status=result.status,
+        cleanup_complete=cleanup,
+        wall_seconds=time.monotonic() - started,
+        tree_cpu_seconds=measured_cpu,
+        tree_peak_rss_bytes=peak_rss,
+    )
     return replace(
         result,
+        status=(
+            "cleanup_incomplete" if result.status == "complete" and not cleanup else result.status
+        ),
         events=events,
         event_failure=failure,
         cleanup_complete=cleanup,

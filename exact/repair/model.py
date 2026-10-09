@@ -42,6 +42,30 @@ class GraphMemory:
     scopes: dict[str, tuple[str, ...]] = field(default_factory=dict)
 
 
+class ModelGraphSchemaError(ValueError):
+    """A frozen encoder has no parameters for required graph node/relation types."""
+
+
+def graph_schema_compatibility(metadata, encoder, graph):
+    """Inspect graph types without adding weights or discarding observable edges.
+
+    The no-graph control has node projections but no relation parameters. Its
+    readouts retain the entire graph, including adjacency for context selection.
+    """
+    actual_nodes, actual_edges = graph.metadata
+    missing_nodes = sorted(set(actual_nodes) - set(metadata[0]))
+    missing_edges = (
+        sorted(set(actual_edges) - set(map(tuple, metadata[1]))) if encoder != "none" else []
+    )
+    return dict(
+        compatible=not (missing_nodes or missing_edges),
+        missing_node_types=missing_nodes,
+        missing_edge_types=missing_edges,
+        encoder=encoder,
+        weights_changed=False,
+    )
+
+
 class RepairModel(nn.Module):
     """HGT, matched R-GCN, or no-graph encoder with identical prediction heads.
 
@@ -65,6 +89,7 @@ class RepairModel(nn.Module):
         support_enabled: bool = False,
         support_readout_identity: str = SUPPORT_READOUT_IDENTITY,
         pair_factor_bound: float = 1.0,
+        graph_schema: dict | None = None,
     ) -> None:
         super().__init__()
         if revision not in {"v2", "v3"}:
@@ -84,6 +109,14 @@ class RepairModel(nn.Module):
         if hidden_dim < 1 or heads < 1 or hidden_dim % heads or layers < 0:
             raise ValueError("hidden_dim must be positive and divisible by heads; layers >= 0")
         self.metadata = (tuple(sorted(metadata[0])), tuple(sorted(metadata[1])))
+        self.graph_schema_hash = None
+        if graph_schema is not None:
+            from .graph_schema import declared_metadata
+            from .records import canonical_hash
+
+            if revision != "v3" or self.metadata != declared_metadata(graph_schema):
+                raise ModelGraphSchemaError("Model metadata differs from declared graph schema")
+            self.graph_schema_hash = canonical_hash(graph_schema)
         if not self.metadata[0]:
             raise ValueError("The encoder requires at least one node type")
         self.feature_dim, self.hidden_dim, self.encoder = feature_dim, hidden_dim, encoder
@@ -102,6 +135,10 @@ class RepairModel(nn.Module):
         }
         if revision == "v3":
             self.config["support_readout_identity"] = support_readout_identity
+        if graph_schema is not None:
+            from copy import deepcopy
+
+            self.config["graph_schema"] = deepcopy(graph_schema)
         self.input_projection = nn.ModuleDict(
             {kind: nn.Linear(feature_dim, hidden_dim) for kind in self.metadata[0]}
         )
@@ -152,6 +189,11 @@ class RepairModel(nn.Module):
         if self.revision == "v3" and graph.feature_schema != "exact-repair/observable-features/v3":
             raise ValueError("V3 model requires the versioned v3 observable feature view")
         validate_admitted_supports(graph)
+        compatibility = graph_schema_compatibility(
+            self.metadata, "declared" if self.graph_schema_hash else self.encoder, graph
+        )
+        if not compatibility["compatible"]:
+            raise ModelGraphSchemaError(str(compatibility))
         device = self.empty_bundle.device
         grouped: dict[str, list[GraphNode]] = {kind: [] for kind in self.metadata[0]}
         for node in graph.nodes:
@@ -176,7 +218,7 @@ class RepairModel(nn.Module):
         edge_lists: dict[tuple[str, str, str], list[tuple[int, int]]] = {
             edge: [] for edge in self.metadata[1]
         }
-        for src, role, dst in graph.edges:
+        for src, role, dst in graph.edges if self.encoder != "none" else ():
             src_kind, src_index = locations[src]
             dst_kind, dst_index = locations[dst]
             key = (src_kind, role, dst_kind)

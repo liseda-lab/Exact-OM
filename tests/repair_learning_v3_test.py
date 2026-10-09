@@ -287,10 +287,12 @@ def test_v3_training_selects_generated_repairs_and_saves_resumable_acquisition(t
         mixtures=1,
         max_depth=1,
         max_constructors=1,
-        decode_seconds=30,
+        # This asserts checkpoint/acquisition correctness through real native
+        # workers, not a decode-speed endpoint. Allow finite cold-start headroom.
+        decode_seconds=120,
         development_draws_per_object=0,
         sampled_assignments=4,
-        deadline_seconds=180,
+        deadline_seconds=600,
         checkpoint_path=checkpoint,
     )
     assert report["schema"] == "exact-repair/training/v3"

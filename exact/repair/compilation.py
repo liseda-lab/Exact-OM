@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import tempfile
+from collections import OrderedDict
 from dataclasses import asdict, dataclass, replace
 from functools import lru_cache
 from importlib.metadata import version
@@ -613,9 +614,11 @@ def _compile_bounded_cached(
         wall_seconds=monotonic() - supervised_started,
         resources=dict(outcome.resource_usage),
         status=outcome.status,
+        cleanup_complete=outcome.cleanup_complete,
+        event_journal=outcome.event_journal,
         scope="input/startup/worker/result transfer and cleanup",
     )
-    if outcome.status != "complete":
+    if outcome.status != "complete" or not outcome.cleanup_complete:
         error = (
             TimeoutError("Circuit compilation/cache deadline exhausted")
             if outcome.status == "timeout"
@@ -711,6 +714,8 @@ def compile_bounded(
 
 
 _DISK_STATS = {"hits": 0, "misses": 0, "rejected": 0}
+_BATCH_CIRCUITS: OrderedDict[str, CompiledCircuit] = OrderedDict()
+_BATCH_CACHE_ESTIMATED_BYTES = 64 * 1024 * 1024
 
 
 def compilation_cache_info() -> dict[str, int]:
@@ -724,3 +729,226 @@ def compilation_cache_info() -> dict[str, int]:
         "entries": info.currsize,
         "capacity": info.maxsize or 0,
     }
+
+
+@dataclass(frozen=True)
+class CompilationTaskResult:
+    index: int
+    status: str
+    circuit: CompiledCircuit | None = None
+    detail: str = ""
+    failure_telemetry: tuple = ()
+    cleanup_complete: bool = True
+
+
+def _compile_batch_worker(tasks, call_seconds, lifetime_seconds, options):
+    """Single-owner serial native batch; no live native manager is shared."""
+    from .workers import emit_event, record_phase
+
+    started = monotonic()
+    for index, encoding in tasks:
+        remaining = lifetime_seconds - (monotonic() - started)
+        if remaining <= 0:
+            break
+        allowance = min(call_seconds, remaining)
+        emit_event(("bounded_task_started", index, allowance))
+        emit_event(("compile_task_started", index, encoding.content_hash, allowance))
+        record_phase(
+            "compile_task",
+            "start",
+            index=index,
+            encoding_hash=encoding.content_hash,
+            allowance_seconds=allowance,
+        )
+        before = monotonic()
+        try:
+            circuit = _compile_persistent_worker(encoding, seconds=allowance, **options)
+            result = CompilationTaskResult(index, "complete", circuit)
+        except (ValueError, RuntimeError, TimeoutError, MemoryError) as error:
+            status = (
+                "timeout"
+                if isinstance(error, TimeoutError)
+                else (
+                    "resource_limit"
+                    if isinstance(error, MemoryError)
+                    or any(w in str(error).lower() for w in ("node", "element", "memory"))
+                    else "error"
+                )
+            )
+            receipt = dict(
+                schema="exact-repair/compiler-batch-failure/v1",
+                encoding_identity=encoding.content_hash,
+                status=status,
+                wall_seconds=monotonic() - before,
+                detail=f"{type(error).__name__}: {error}",
+            )
+            result = CompilationTaskResult(
+                index,
+                status,
+                detail=receipt["detail"],
+                failure_telemetry=(("measurement_receipt", receipt),),
+            )
+        emit_event(result)
+        emit_event(("bounded_task_finished", index))
+        record_phase("compile_task", "finish", index=index, status=result.status)
+    return None
+
+
+def compile_bounded_batch(
+    encodings: Sequence[Any],
+    *,
+    seconds: float,
+    call_seconds: float,
+    max_nodes: int = 100000,
+    cache_directory: str | None = None,
+    memory_mb: float | None = None,
+    max_tasks_per_worker: int = 8,
+    vtree_type: str = "balanced",
+    max_live_nodes: int | None = None,
+    max_reachable_nodes: int | None = None,
+    max_elements: int | None = None,
+) -> tuple[CompilationTaskResult, ...]:
+    """Bounded batched compilation with durable per-family outcomes.
+
+    Native objects are constructed, serialized, and released serially inside one
+    spawned worker. Task count, lifetime, and tree RSS are bounded; a failed or
+    expired batch is replaced deterministically. Committed completed circuits
+    survive a later task timeout. Incomplete cleanup quarantines further work.
+    """
+    from .workers import SUPERVISION_GRACE_SECONDS
+
+    if (
+        type(max_tasks_per_worker) is not int
+        or not 1 <= max_tasks_per_worker <= 32
+        or not all(isfinite(x) and x > 0 for x in (seconds, call_seconds))
+    ):
+        raise ValueError("invalid bounded compiler batch limits")
+    results = {}
+    started = monotonic()
+    options = dict(
+        max_nodes=max_nodes,
+        cache_directory=cache_directory,
+        vtree_type=vtree_type,
+        max_live_nodes=max_live_nodes,
+        max_reachable_nodes=max_reachable_nodes,
+        max_elements=max_elements,
+        admission_memory_mb=memory_mb,
+    )
+    keys = {
+        index: canonical_hash(("compiler-batch-memory/v1", encoding, options))
+        for index, encoding in enumerate(encodings)
+    }
+    pending_tasks = []
+    for index, encoding in enumerate(encodings):
+        if keys[index] not in _BATCH_CIRCUITS:
+            pending_tasks.append((index, encoding))
+            continue
+        circuit = _BATCH_CIRCUITS[keys[index]]
+        _BATCH_CIRCUITS.move_to_end(keys[index])
+        telemetry = dict(circuit.telemetry)
+        telemetry["measurement_receipt"] = {
+            **telemetry["measurement_receipt"],
+            "cache_mode": "memory_reuse",
+            "supervised_call": None,
+            "supervised_batch": None,
+            "phases": [],
+            "total": None,
+        }
+        results[index] = CompilationTaskResult(
+            index,
+            "complete",
+            replace(circuit, compilation_seconds=0.0, telemetry=tuple(telemetry.items())),
+        )
+        _DISK_STATS["hits"] += 1
+    tasks = tuple(pending_tasks)
+    quarantined = False
+    for offset in range(0, len(tasks), max_tasks_per_worker):
+        remaining = seconds - (monotonic() - started) - SUPERVISION_GRACE_SECONDS
+        if remaining <= 0 or quarantined:
+            break
+        batch = tasks[offset : offset + max_tasks_per_worker]
+        outcome = bounded_call(
+            _compile_batch_worker,
+            batch,
+            call_seconds,
+            remaining,
+            options,
+            timeout=remaining,
+            memory_mb=memory_mb,
+        )
+        supervised = dict(
+            status=outcome.status,
+            cleanup_complete=outcome.cleanup_complete,
+            resources=dict(outcome.resource_usage),
+            event_journal=outcome.event_journal,
+            max_tasks_per_worker=max_tasks_per_worker,
+            batch_task_count=len(batch),
+            lifetime_seconds=remaining,
+            memory_mb=memory_mb,
+        )
+        attempted = set()
+        for event in outcome.events:
+            if isinstance(event, tuple) and len(event) == 4 and event[0] == "compile_task_started":
+                if event[1] not in {index for index, _ in batch}:
+                    raise ValueError("foreign compiler task receipt")
+                attempted.add(event[1])
+            elif isinstance(event, CompilationTaskResult):
+                if event.index not in attempted or event.index in results:
+                    raise ValueError("unbound or duplicate compiler completion")
+                if event.circuit is not None:
+                    if event.circuit.encoding != encodings[event.index]:
+                        raise ValueError("compiler batch returned a different language")
+                    telemetry = dict(event.circuit.telemetry)
+                    telemetry["measurement_receipt"] = {
+                        **telemetry["measurement_receipt"],
+                        "supervised_batch": supervised,
+                    }
+                    event = replace(
+                        event, circuit=replace(event.circuit, telemetry=tuple(telemetry.items()))
+                    )
+                results[event.index] = replace(event, cleanup_complete=outcome.cleanup_complete)
+                if event.circuit is not None and outcome.cleanup_complete:
+                    _BATCH_CIRCUITS[keys[event.index]] = event.circuit
+                    _BATCH_CIRCUITS.move_to_end(keys[event.index])
+                    _DISK_STATS[
+                        (
+                            "hits"
+                            if dict(event.circuit.telemetry).get("persistent_cache_hit")
+                            else "misses"
+                        )
+                    ] += 1
+                    while _BATCH_CIRCUITS and (
+                        len(_BATCH_CIRCUITS) > 32
+                        or sum(c.node_count * 256 for c in _BATCH_CIRCUITS.values())
+                        > _BATCH_CACHE_ESTIMATED_BYTES
+                    ):
+                        _BATCH_CIRCUITS.popitem(last=False)
+        for index, encoding in batch:
+            if index in results:
+                continue
+            status = outcome.status if index in attempted else "not_attempted"
+            receipt = dict(
+                schema="exact-repair/compiler-batch-failure/v1",
+                encoding_identity=encoding.content_hash,
+                status=status,
+                supervised_batch=supervised,
+            )
+            results[index] = CompilationTaskResult(
+                index,
+                status,
+                detail=outcome.detail,
+                failure_telemetry=(("measurement_receipt", receipt),),
+                cleanup_complete=outcome.cleanup_complete,
+            )
+        quarantined = not outcome.cleanup_complete
+    return tuple(
+        results.get(
+            index,
+            CompilationTaskResult(
+                index,
+                "cleanup_incomplete" if quarantined else "not_attempted",
+                detail="quarantined batch" if quarantined else "aggregate deadline exhausted",
+            ),
+        )
+        for index in range(len(encodings))
+    )
