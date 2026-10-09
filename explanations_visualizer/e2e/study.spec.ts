@@ -153,24 +153,32 @@ test("v1 explanation cases open card parents with their recorded type (19 F21)",
   test.setTimeout(180_000);
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
-  await startCases(page, request);
   let current: Record<string, any> = {};
-  for (let index = 0; index < 3; index += 1) {
-    await expect(page.getByRole("radio", { name: /^None of these/ })).toBeEnabled();
-    current = await (await page.request.get(`${config!.origin}/api/v1/study/cases/current`)).json();
-    if (current.condition === "explanation") break;
-    await page.getByRole("radio", { name: /^Insufficient information/ }).click();
-    await page.getByRole("button", { name: "Submit answer", exact: true }).click();
-    await page.getByRole("radio", { name: "No", exact: true }).check();
-    await page.getByRole("button", { name: /^Save and (go to case|continue)/ }).click();
+  const key = (entity: { ontology_version_id: string; iri: string; kind: string }) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`;
+  let recorded = new Map<string, { ontology_version_id: string; iri: string; kind: string }>();
+  // Use the first explanation case whose source has recorded parents (one fixture source has none),
+  // independent of how cases and conditions are assigned; a fresh test session if none fits.
+  for (let attempt = 0; attempt < 4 && !recorded.size; attempt += 1) {
+    await startCases(page, request);
+    for (let index = 0; index < 3; index += 1) {
+      await expect(page.getByRole("radio", { name: /^None of these/ })).toBeEnabled();
+      current = await (await page.request.get(`${config!.origin}/api/v1/study/cases/current`)).json();
+      if (current.condition === "explanation") {
+        // The typed parents the frozen v1 resources record for the source concept.
+        const resources = await Promise.all((current.explanation_refs as string[]).map(async (ref) => (await page.request.get(`${config!.origin}/api/v1/study/resources/${encodeURIComponent(ref)}`)).json()));
+        recorded = new Map();
+        for (const resource of resources)
+          for (const edge of resource.hierarchy) if (edge.basis === "literal_asserted" && key(edge.child) === key(current.source)) recorded.set(edge.parent.iri, edge.parent);
+        if (recorded.size) break;
+      }
+      if (index === 2) break;
+      await page.getByRole("radio", { name: /^Insufficient information/ }).click();
+      await page.getByRole("button", { name: "Submit answer", exact: true }).click();
+      await page.getByRole("radio", { name: "No", exact: true }).check();
+      await page.getByRole("button", { name: /^Save and (go to case|continue)/ }).click();
+    }
   }
   expect(current.condition).toBe("explanation");
-  // The typed parents the frozen v1 resources record for the source concept.
-  const resources = await Promise.all((current.explanation_refs as string[]).map(async (ref) => (await page.request.get(`${config!.origin}/api/v1/study/resources/${encodeURIComponent(ref)}`)).json()));
-  const key = (entity: { ontology_version_id: string; iri: string; kind: string }) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`;
-  const recorded = new Map<string, { ontology_version_id: string; iri: string; kind: string }>();
-  for (const resource of resources)
-    for (const edge of resource.hierarchy) if (edge.basis === "literal_asserted" && key(edge.child) === key(current.source)) recorded.set(edge.parent.iri, edge.parent);
   expect(recorded.size).toBeGreaterThan(0);
   await page.getByRole("button", { name: /^Add .* as rank 1$/ }).first().click();
   await expect(page.locator(".save-indicator")).toContainText("Saved");
