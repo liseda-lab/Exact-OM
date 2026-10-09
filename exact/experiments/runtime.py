@@ -650,10 +650,39 @@ def encoder_identity(scorer, tokenizer, model, max_len):
     state_tensors = list(model.named_parameters()) if hasattr(model, "named_parameters") else []
     if hasattr(model, "named_buffers"):
         state_tensors += list(model.named_buffers())
-    weight_versions = tuple(
-        (name, id(value), value.data_ptr(), value._version, str(value.dtype), tuple(value.shape))
-        for name, value in state_tensors
-    )
+    try:
+        weight_versions = tuple(
+            (name, id(value), value.data_ptr(), value._version, str(value.dtype), tuple(value.shape))
+            for name, value in state_tensors
+        )
+    except RuntimeError:
+        # Tensors created in inference mode have no mutation counter. Their
+        # weights cannot safely reuse a memoized identity after in-place edits.
+        return None
+    if not hasattr(tokenizer, "get_vocab"):
+        return None
+    tokenizer_settings = {
+        "config": {key: value for key, value in getattr(tokenizer, "init_kwargs", {}).items()
+                   if key not in {"name_or_path", "cache_dir"}},
+        "special_tokens": getattr(tokenizer, "special_tokens_map", {}),
+        "padding_side": getattr(tokenizer, "padding_side", None),
+        "truncation_side": getattr(tokenizer, "truncation_side", None),
+        "added_vocab": tokenizer.get_added_vocab() if hasattr(tokenizer, "get_added_vocab") else {},
+        "backend_id": id(getattr(tokenizer, "backend_tokenizer", None)),
+    }
+    batch = getattr(scorer, "_numerical_channel_scopes", None)
+    tokenizer_key = ("encoder_tokenizer", id(tokenizer), _hash(tokenizer_settings))
+    tokenization = batch.get(tokenizer_key) if batch is not None else None
+    if tokenization is None:
+        tokenization = {
+            "vocab": tokenizer.get_vocab(),
+            "backend": tokenizer.backend_tokenizer.to_str() if hasattr(tokenizer, "backend_tokenizer") else None,
+        }
+        # Store copies: a mutable Python vocabulary must not alter its past identity.
+        tokenization = json.loads(json.dumps(tokenization))
+        tokenization["sha256"] = _hash(tokenization)
+        if batch is not None:
+            batch[tokenizer_key] = tokenization
     local_key = (id(model), id(tokenizer), max_len, revision, scorer.fp16,
                  str(scorer._cache_tensor_dtype), scorer.pooling_method.value,
                  scorer.device_type, namespace)
@@ -665,11 +694,12 @@ def encoder_identity(scorer, tokenizer, model, max_len):
             "EXACT_PAIR_CONTEXT_BATCHING", "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
             "EXACT_PAIR_CONTEXT_TEXT_BATCH", "EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS")},
     }
-    local_key = (*local_key, weight_versions, tuple(execution.items()))
+    model_config = {key: value for key, value in config.to_dict().items()
+                    if key not in {"_name_or_path", "name_or_path"}}
+    local_key = (*local_key, weight_versions, tuple(execution.items()),
+                 _hash([model_config, tokenizer_settings, tokenization["sha256"]]))
     identities = cached.get(local_key)
     if identities is None:
-        if not hasattr(tokenizer, "get_vocab"):
-            return None
         weights = hashlib.sha256()
         for name, value in state_tensors:
             weights.update(json.dumps([name, str(value.dtype), list(value.shape)]).encode())
@@ -681,17 +711,9 @@ def encoder_identity(scorer, tokenizer, model, max_len):
             "tf32": torch.backends.cuda.matmul.allow_tf32,
             "autocast": torch.is_autocast_enabled("cuda"),
             "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
-            "model_config": {
-                key: value
-                for key, value in config.to_dict().items()
-                if key not in {"_name_or_path", "name_or_path"}
-            },
-            "tokenizer_vocab": tokenizer.get_vocab(),
-            "tokenizer_backend": (
-                tokenizer.backend_tokenizer.to_str()
-                if hasattr(tokenizer, "backend_tokenizer")
-                else None
-            ),
+            "model_config": model_config,
+            "tokenizer_vocab": tokenization["vocab"],
+            "tokenizer_backend": tokenization["backend"],
             "encode_code": inspect.getsource(scorer._encode_texts),
             "pool_code": inspect.getsource(scorer._pool),
             "tokenizer_config": {
@@ -784,7 +806,7 @@ def cached_encoder_rows(
         if store is not None:
             try:
                 store.publish(additions)
-            except (OSError, sqlite3.Error):
+            except (OSError, sqlite3.Error, RuntimeError):
                 pass
     by_text = {text: found[key] for text, key in zip(unique, keys)}
     result = torch.stack([by_text[text] for text in texts])

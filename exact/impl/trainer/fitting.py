@@ -247,6 +247,11 @@ class TrainingPoolMixin:
                 for source, count in original_counts.items()
                 if int(labeled_counts.get(source, 0)) == int(count)
             )
+        from exact.experiments.numerical_cache import (
+            publish_training_reference, shared_training_scores, training_content_contract,
+            training_score_reference,
+        )
+        primitive = training_content_contract(self.model)
         identity = fingerprint(
             self._json_safe_value(
                 {
@@ -254,8 +259,8 @@ class TrainingPoolMixin:
                     "reference": sorted(reference),
                     "negative_label_policy": policy,
                     "batch_size": int(batch_size),
-                    "dataset": getattr(self.dataset, "cache_fingerprint", None),
-                    "model": (
+                    "dataset": primitive["dataset"] if primitive else getattr(self.dataset, "cache_fingerprint", None),
+                    "model": primitive or (
                         self.model.runtime_fingerprint_payload()
                         if hasattr(self.model, "runtime_fingerprint_payload")
                         else type(self.model).__name__
@@ -265,14 +270,12 @@ class TrainingPoolMixin:
         )
         cache_dir = self.output_dir / "fitting" / identity
         frame_path = cache_dir / "training_scores.json"
-        from exact.experiments.numerical_cache import shared_training_scores, training_score_reference
-
         frame_source = frame_path
         if not frame_path.exists():
             shared_reference = training_score_reference(self.model, identity, application, batch_size)
             if shared_reference is not None:
                 frame_source = Path(shared_reference["aggregate_uri"])
-                freeze_json(cache_dir / "training_scores.reference.json", shared_reference)
+                publish_training_reference(cache_dir / "training_scores.reference.json", shared_reference)
             else:
                 shared_rows = shared_training_scores(self.model, identity, application, batch_size)
                 if shared_rows is not None:

@@ -301,19 +301,25 @@ class ScorerCommonMixin:
         from exact.experiments.runtime import encoder_identity
 
         identity = encoder_identity(self, tokenizer, model, max_len)
-        if identity is not None:
-            bindings = getattr(self, "_resident_encoder_identities", {})
-            if bindings.get(id(cache)) != identity[0]:
-                cache.clear()
-                getattr(self, "_cpu_embedding_cache_sizes", {}).pop(id(cache), None)
-                resident = getattr(self, "_device_embedding_rows", None)
-                if resident is not None:
-                    for key in list(resident.rows):
-                        if key[0] == id(cache):
-                            _, row = resident.rows.pop(key)
-                            resident.bytes -= row.numel() * row.element_size()
+        bindings = getattr(self, "_resident_encoder_identities", {})
+        if identity is None or bindings.get(id(cache)) != identity[0]:
+            cache.clear()
+            getattr(self, "_cpu_embedding_cache_sizes", {}).pop(id(cache), None)
+            resident = getattr(self, "_device_embedding_rows", None)
+            if resident is not None:
+                for key in list(resident.rows):
+                    if key[0] == id(cache):
+                        _, row = resident.rows.pop(key)
+                        resident.bytes -= row.numel() * row.element_size()
+            if identity is None:
+                bindings.pop(id(cache), None)
+            else:
                 bindings[id(cache)] = identity[0]
-                self._resident_encoder_identities = bindings
+            self._resident_encoder_identities = bindings
+        if getattr(model, "training", False):
+            # Training/dropout duplicates are independent observations, not one
+            # cached text vector. Preserve the caller's full ordered batch.
+            return self._encode_texts(tokenizer, model, texts, max_len)
 
         outputs: List[Optional[torch.Tensor]] = [None] * len(texts)
         missing_keys: List[str] = []

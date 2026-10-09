@@ -67,13 +67,18 @@ class EncoderStore:
             encoded.append((key, json.dumps({"shape": list(row.shape), "dtype": str(row.dtype)}),
                             raw, hashlib.sha256(raw).hexdigest()))
         size = sum(len(row[2]) for row in encoded)
-        physical = sum(p.stat().st_size for p in self.path.parent.glob(self.path.name + "*"))
         limit = max(0, int(os.getenv("EXACT_EMBEDDING_CACHE_MAX_BYTES", str(8 * 1024**3))))
-        if physical + 2 * size + 65536 > limit:
-            self.counts["skipped_writes"] += len(encoded)
-            return
+        growth = 2 * sum(len(raw) + len(key.encode()) + len(shape.encode()) + 512
+                         for key, shape, raw, _ in encoded) + 65536
         try:
             with self.db:
+                self.db.execute("BEGIN IMMEDIATE")
+                # Quota admission shares the writer lock: another process cannot
+                # independently reserve the same physical DB/WAL headroom.
+                physical = sum(p.stat().st_size for p in self.path.parent.glob(self.path.name + "*"))
+                if physical + growth > limit:
+                    self.counts["skipped_writes"] += len(encoded)
+                    return
                 self.db.executemany("INSERT OR REPLACE INTO vectors VALUES (?,?,?,?)", encoded)
             self.counts["transactions"] += 1
             self.counts["bytes_written"] += size

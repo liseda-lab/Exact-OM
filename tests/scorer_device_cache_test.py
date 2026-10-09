@@ -51,11 +51,14 @@ def test_pair_prefetch_preserves_uneven_missing_and_tied_evidence(monkeypatch):
             }
 
     def model():
+        from tests.encoder_cache_migration_test import Tokenizer
         scorer = _scorer(return_explanations=True)
         scorer.use_lexical = scorer.use_context = True
-        scorer.lex_model = SimpleNamespace(config=SimpleNamespace(hidden_size=3))
-        scorer.ctx_model = SimpleNamespace(config=SimpleNamespace(hidden_size=3))
-        scorer.lex_tok = scorer.ctx_tok = None
+        pinned = SimpleNamespace(hidden_size=3, _commit_hash="a" * 40,
+                                 to_dict=lambda: {"hidden_size": 3, "_commit_hash": "a" * 40})
+        scorer.lex_model = SimpleNamespace(config=pinned, training=False)
+        scorer.ctx_model = SimpleNamespace(config=pinned, training=False)
+        scorer.lex_tok = scorer.ctx_tok = Tokenizer()
         calls = []
 
         def encode(tokenizer, encoder, texts, max_len):
