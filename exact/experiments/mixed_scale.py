@@ -114,7 +114,12 @@ def corrected_cost_guard(protocol_binding, baseline_binding, selected_binding, p
             or len(phases) != len(set(phases))
             or protocol.get("diagnostic_replays_included") is not False):
         raise ValueError("Cost boundary must declare natural phases and exclude synthetic diagnostics")
-    if parity.get("natural_decisions_equal") is not True or parity.get("query_boundaries_equal") is not True:
+    if (parity.get("kind") != "complete_G4_natural_output_parity" or parity.get("status") != "passed"
+            or parity.get("namespace") == "qualification_only"
+            or parity.get("fixture_outputs_promotable") is False
+            or any(parity.get(field) is not True for field in (
+                "natural_decisions_equal", "query_boundaries_equal", "candidate_coverage_equal",
+                "rankings_equal", "mappings_equal", "fitted_artifacts_equal", "hosted_decisions_compatible"))):
         raise ValueError("G4 quality reuse requires decision and query-boundary parity")
     rows = [read_binding(b) for b in (baseline_binding, selected_binding)]
     keys = ("task_id", "seed", "hardware", "resources", "cache_regime", "population_sha256")

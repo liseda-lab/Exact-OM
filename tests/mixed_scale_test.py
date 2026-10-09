@@ -57,7 +57,11 @@ def cost_inputs(tmp_path, *, task="D0-global", seed=17, selected_seconds=12):
         "required_phases": ["preprocessing", "numerical", "hosted", "durable_outputs", "recovery"],
         "diagnostic_replays_included": False,
     })
-    parity = saved(tmp_path / "parity.json", {"natural_decisions_equal": True, "query_boundaries_equal": True})
+    parity = saved(tmp_path / "parity.json", {
+        "kind": "complete_G4_natural_output_parity", "status": "passed",
+        **{field: True for field in ("natural_decisions_equal", "query_boundaries_equal", "candidate_coverage_equal",
+            "rankings_equal", "mappings_equal", "fitted_artifacts_equal", "hosted_decisions_compatible")},
+    })
     common = {"protocol": protocol, "task_id": task, "seed": seed,
               "hardware": "fixture", "resources": {"gpu": 1}, "cache_regime": "cold",
               "population_sha256": "public-population", "hosted_cost_disposition": "measured_original"}
@@ -90,6 +94,10 @@ def test_corrected_cost_guard_is_pending_for_unmeasured_hosted_and_compares_task
     selected["hosted_cost_disposition"] = "cache_replay"
     with pytest.raises(ValueError, match="original service"):
         mixed.corrected_cost_guard(args[0], args[1], saved(tmp_path / "replay.json", selected), args[3])
+    fixture = mixed.read_binding(args[3])
+    fixture["namespace"] = "qualification_only"
+    with pytest.raises(ValueError, match="G4 quality reuse"):
+        mixed.corrected_cost_guard(*args[:3], saved(tmp_path / "fixture-parity.json", fixture))
 
 
 def selection_fixture(tmp_path, monkeypatch):
