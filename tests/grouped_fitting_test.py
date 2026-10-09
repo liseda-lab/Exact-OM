@@ -550,6 +550,10 @@ def test_incomplete_reference_does_not_create_negative_labels(tmp_path):
 
 
 class LearningFixture(HostedFixture):
+    def _get_hosted_decision_tokenizer(self, profile):
+        # Local deterministic byte tokenizer: exercise real exemplar budget checks.
+        return SimpleNamespace(encode=lambda text, **kwargs: list(text.encode("utf-8")))
+
     def __init__(self, *, student="off", teacher="gold_teacher", gate="analytic", exemplars="off"):
         from exact.core.entities.configs.experimental import LLMExperimentConfig
 
@@ -610,7 +614,11 @@ def learning_frame():
     frame["U"] = 0.8
     frame["q_lex"] = 0.9
     frame["Q_struct"] = 0.8
-    frame["llm_evidence_packet"] = '{"fact": "ontology fact"}'
+    frame["llm_evidence_packet"] = [json.dumps({
+        "source_label": row.Src, "target_label": row.Tgt,
+        "facts": [{"side": "source", "group": "attribute", "property_iri": "urn:definition",
+                   "text": "ontology fact"}],
+    }) for row in frame.itertuples()]
     frame["src_label_text"] = frame.Src
     frame["tgt_label_text"] = frame.Tgt
     return frame
@@ -709,6 +717,7 @@ def test_exemplars_are_train_only_bounded_and_bound_to_teacher(tmp_path):
     enriched, sources = exemplar_prompt(model, plan)
     assert len(sources) == 3 and set(sources) <= {f"s{i}" for i in range(9)}
     assert "Training-only examples" in enriched.calls[0].prompt["user"]
+    assert "ontology fact" in enriched.calls[0].prompt["user"]
     assert enriched.selected_candidate_ids == plan.selected_candidate_ids
 
 
