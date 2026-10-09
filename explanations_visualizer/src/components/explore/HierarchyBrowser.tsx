@@ -23,10 +23,11 @@ import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceConte
 export type { Basis } from "@/lib/workspace/types";
 export type FocusVia = "parent" | "child" | "search" | "card" | "return";
 
-const BASES: { value: Basis; label: string; note: string }[] = [
-  { value: "literal_asserted", label: "Asserted", note: "Named parents exactly as asserted in the ontology file." },
-  { value: "structural_navigation", label: "Structural navigation", note: "Also named parts of equivalence and intersection axioms, by a documented rule." },
-  { value: "reasoner_inferred", label: "Reasoner inferred", note: "Only when a reasoner was run for this bundle." },
+// One short meaning per mode (21 F06); unsupported modes say why instead of showing an empty tree.
+const BASES: { value: Basis; label: string; note: string; unavailable: string }[] = [
+  { value: "literal_asserted", label: "Asserted", note: "Relationships written directly in the ontology. Direct parents and children.", unavailable: "Asserted relationships are not available here." },
+  { value: "structural_navigation", label: "Structural", note: "Navigation extracted from class expressions, by a documented rule. Direct links only.", unavailable: "Structural navigation was not prepared for this view." },
+  { value: "reasoner_inferred", label: "Inferred", note: "Relationships computed by the recorded reasoner.", unavailable: "Inferred relationships were not prepared for this bundle, so this mode cannot be shown." },
 ];
 
 function ParentBranch({
@@ -72,7 +73,7 @@ function ParentBranch({
         >
           {open ? <IconChevronDown /> : <IconChevronUp />}
         </button>
-        <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(iri, kind, "parent")}>
+        <button type="button" className={`tree-label tree-${side}`} data-tour={depth === 0 ? `parent-${side}` : undefined} onClick={() => onFocus(iri, kind, "parent")}>
           {label(iri)?.value ?? <span className="muted">{curie(iri)}</span>}
         </button>
         <span className="iri">{curie(iri)}</span>
@@ -81,7 +82,7 @@ function ParentBranch({
         <div className="tree-children">
           {state.error ? <ErrorNote error={state.error} onRetry={state.reload} /> : null}
           {!state.data && !state.error ? <Skeleton lines={1} title={false} /> : null}
-          {state.data && !parents.length && <EmptyReason status={state.data.status} what="named parent" reason={state.data.reason} />}
+          {state.data && !parents.length && <EmptyReason status={state.data.status} what="parents" reason={state.data.reason} absent="No parent shown." />}
           {parents.length > 0 && (
             <ul>
               {parents.map((edge) => (
@@ -153,6 +154,7 @@ export function HierarchyBrowser({
   const workspace = useWorkspace();
   const report = useWorkspaceAction();
   const [basis, setBasis] = useState<Basis>("literal_asserted");
+  const [modeNote, setModeNote] = useState<string | null>(null);
   const [childPages, setChildPages] = useState<HierarchyEdge[]>([]);
   const [childCursor, setChildCursor] = useState<string | null>(null);
   const [childMoreError, setChildMoreError] = useState<unknown>(null);
@@ -196,6 +198,7 @@ export function HierarchyBrowser({
   const Sub = headingLevel === 2 ? "h3" : "h4";
   const sideName = side === "source" ? "Source" : "Target";
   const partialScope = workspace.capabilities.navigation === "partial";
+  const away = Boolean(pinnedIri && focusIri && (pinnedIri !== focusIri || pinnedKind !== kind));
 
   return (
     <section className={`card browser browser-${side}`} aria-label={`${sideName} ontology browser`}>
@@ -205,16 +208,31 @@ export function HierarchyBrowser({
           <Heading>{/^(Source|Target) ontology$/.test(ontologyLabel) ? ontologyLabel : `${sideName} ontology · ${ontologyLabel}`}</Heading>
           {entityCount != null && <span className="meta">{entityCount.toLocaleString()} entities</span>}
         </div>
+        {pinnedIri && (
+          // The compared entity stays identifiable; the way back sits with the search and mode controls (21 F02).
+          <div className="compared-row">
+            <span className="meta">Compared</span>
+            <span className={`compared-name text-${side}`}>{label(pinnedIri)?.value ?? curie(pinnedIri)}</span>
+            {away ? (
+              <button type="button" className="btn btn-sm" data-tour={`return-${side}`} onClick={() => onFocus(pinnedIri, pinnedKind, "return")}>
+                Back to compared concept
+              </button>
+            ) : (
+              <span className="compared-state">Viewing compared concept</span>
+            )}
+          </div>
+        )}
         <EntitySearch
           ontology={ontology}
           label={`Search the ${side} ontology`}
-          placeholder="Search by label, synonym prefix or full IRI"
+          placeholder="Search by label, synonym or IRI"
+          tourId={`search-${side}`}
           onChoose={(item) => {
             report({ type: "search", side });
             onFocus(item.entity.iri, item.entity.kind, "search");
           }}
         />
-        <div className="basis-group" role="radiogroup" aria-label="Hierarchy basis">
+        <div className="basis-group" role="radiogroup" aria-label="Relationships shown">
           {BASES.map((option) => {
             const disabled = !prepared(option.value);
             return (
@@ -224,22 +242,28 @@ export function HierarchyBrowser({
                 role="radio"
                 aria-checked={basis === option.value}
                 aria-disabled={disabled}
-                title={option.note}
                 className={basis === option.value ? "basis-option on" : disabled ? "basis-option unavailable" : "basis-option"}
-                onClick={() => !disabled && setBasis(option.value)}
+                onClick={() => {
+                  if (disabled) {
+                    setModeNote(option.unavailable);
+                    return;
+                  }
+                  setModeNote(null);
+                  setBasis(option.value);
+                }}
               >
                 {option.label}
-                {disabled ? " · not prepared" : ""}
+                {disabled ? <span className="sr-only"> (not prepared)</span> : null}
               </button>
             );
           })}
         </div>
-        <p className="meta">{BASES.find((option) => option.value === basis)?.note}</p>
+        <p className="meta" aria-live="polite">{modeNote ?? BASES.find((option) => option.value === basis)?.note}</p>
       </div>
       {scopeNote}
       {partialScope && (
-        <p className="note browser-note" role="note">
-          {workspace.capabilities.scopeNote ?? "Only part of this ontology is available here."} Where the prepared information ends, the browser says so.
+        <p className="meta browser-note" role="note">
+          {workspace.capabilities.scopeNote ?? "Only part of this ontology is available here."}
         </p>
       )}
       {!focusIri ? (
@@ -261,7 +285,7 @@ export function HierarchyBrowser({
             </div>
             {parents.error ? <ErrorNote error={parents.error} onRetry={parents.reload} what="Parents" /> : null}
             {!parents.data && !parents.error ? <Skeleton lines={2} title={false} /> : null}
-            {parents.data && !parentEdges.length && <EmptyReason status={parents.data.status} what="named parent" reason={parents.data.reason} />}
+            {parents.data && !parentEdges.length && <EmptyReason status={parents.data.status} what="parents" reason={parents.data.reason} absent="No parent shown." />}
             {parentEdges.length > 0 && (
               <ul className="tree">
                 {parentEdges.map((edge) => (
@@ -272,22 +296,17 @@ export function HierarchyBrowser({
             <EdgeContinuation state={parentPages} noun={PARENT_NOUN} />
           </div>
 
-          <div className={`focus-card focus-${side}`}>
-            <span className={`eyebrow text-${side}`}>Focused {KIND_NAMES[kind]}</span>
+          <div className={`focus-card focus-${side}`} tabIndex={-1} aria-label={`Focused ${KIND_NAMES[kind]}: ${label(focusIri)?.value ?? curie(focusIri)}`}>
+            <span className={`eyebrow text-${side}`}>Focused {KIND_NAMES[kind]}{pinnedIri && !away ? " · compared" : ""}</span>
             <span className="focus-label">{label(focusIri)?.value ?? <span className="muted">No label in scope</span>}</span>
             <span className="iri">{focusIri}</span>
-            <div className="focus-actions">
-              {onOpenContext && (
+            {onOpenContext && (
+              <div className="focus-actions">
                 <button type="button" className="btn btn-sm" onClick={() => onOpenContext(focusIri, kind)}>
                   Open full context
                 </button>
-              )}
-              {pinnedIri && (pinnedIri !== focusIri || pinnedKind !== kind) && (
-                <button type="button" className="btn btn-sm" onClick={() => onFocus(pinnedIri, pinnedKind, "return")}>
-                  Return to {label(pinnedIri)?.value ?? curie(pinnedIri)}
-                </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
 
           <div className="browser-section">
@@ -301,12 +320,12 @@ export function HierarchyBrowser({
             </div>
             {children.error ? <ErrorNote error={children.error} onRetry={children.reload} what="Children" /> : null}
             {!children.data && !children.error ? <Skeleton lines={2} title={false} /> : null}
-            {children.data && !childPages.length && <EmptyReason status={children.data.status} what="named child" reason={children.data.reason} />}
+            {children.data && !childPages.length && <EmptyReason status={children.data.status} what="children" reason={children.data.reason} absent="No children shown." />}
             {childPages.length > 0 && (
               <ul className="child-list">
                 {childPages.map((edge) => (
                   <li key={edge.id}>
-                    <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind, "child")}>
+                    <button type="button" className={`tree-label tree-${side}`} data-tour={`child-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind, "child")}>
                       {label(edge.child.iri)?.value ?? <span className="muted">{curie(edge.child.iri)}</span>}
                     </button>
                     <span className="iri">{curie(edge.child.iri)}</span>

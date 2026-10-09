@@ -12,7 +12,7 @@
 // description only when `entity_description` is admitted and the shell allows it.
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Dialog } from "@/components/common/Dialog";
 import { Tabs } from "@/components/common/Tabs";
@@ -45,6 +45,31 @@ export interface PairNavigation {
   source: Focus | null;
   target: Focus | null;
   set: (side: Side, focus: Focus | null) => void;
+}
+
+/** An explicit request to open a detail view and bring it, or a control inside it, into view. */
+export interface RevealRequest {
+  tab: string;
+  /** A selector inside the details region to scroll to and focus; the open tab otherwise. */
+  target?: string;
+  /** A new value repeats the reveal even when the tab is already open. */
+  nonce: number;
+}
+
+const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Reveal-and-focus for explicit cross-section actions (21 F03): wait until the destination is
+ * mounted, scroll it into view below the sticky headers (scroll-padding) and move focus there.
+ * Never called for async data, label refreshes or autosaves.
+ */
+export function revealElement(element: HTMLElement | null, focusTarget?: HTMLElement | null) {
+  if (!element) return false;
+  element.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  const target = focusTarget ?? element;
+  if (target.tabIndex < 0 && !target.matches("a[href], button, input, select, textarea, [tabindex]")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+  return true;
 }
 
 export interface ExtraTab {
@@ -90,6 +115,7 @@ export function PairWorkspace({
   cardTitles,
   compactCards = false,
   profileAllowed = () => true,
+  reveal = null,
 }: {
   pair: PairScope;
   viewKey: string;
@@ -107,6 +133,8 @@ export function PairWorkspace({
   compactCards?: boolean;
   /** Whether a generated description may be read for an entity (the study restricts it to focal entities). */
   profileAllowed?: (entity: EntityRef) => boolean;
+  /** A shell's explicit "open and show me" request (for example Open decision trace). */
+  reveal?: RevealRequest | null;
 }) {
   const workspace = useWorkspace();
   const report = useWorkspaceAction();
@@ -131,18 +159,51 @@ export function PairWorkspace({
     .filter((item): item is { key: string; label: string } => Boolean(item));
   const activeTab = tab && tabs.some((item) => item.key === tab) ? tab : null;
 
-  const focusFrom = (side: Side) => (iri: string, kind: EntityKind, via: FocusVia) => {
+  // Reveal requests: from the shell (prop) or from this workspace's own links.
+  const details = useRef<HTMLElement>(null);
+  const [revealing, setRevealing] = useState<RevealRequest | null>(null);
+  const requestReveal = useCallback((tab: string, target?: string) => setRevealing((current) => ({ tab, target, nonce: (current?.nonce ?? 0) + 1 })), []);
+  useEffect(() => {
+    if (reveal) setRevealing({ ...reveal });
+  }, [reveal]);
+  useEffect(() => {
+    if (!revealing || activeTab !== revealing.tab) return;
+    let frames = 0;
+    let handle = 0;
+    // The panel and its data mount over a few frames; stop after ~1 s if the target never appears.
+    const attempt = () => {
+      const region = details.current;
+      const element = revealing.target ? region?.querySelector<HTMLElement>(revealing.target) ?? null : null;
+      if (revealing.target && !element && frames++ < 60) {
+        handle = requestAnimationFrame(attempt);
+        return;
+      }
+      const tab = region?.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]') ?? null;
+      revealElement(element ?? region, element ?? tab);
+      setRevealing(null);
+    };
+    handle = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(handle);
+  }, [revealing, activeTab]);
+
+  /** Move one side's browser; reaching the compared entity again after being away is a return. */
+  const navigate = (side: Side, iri: string, kind: EntityKind, via: FocusVia) => {
+    const compared = side === "source" ? source : target;
+    const previous = navigation[side];
+    const away = Boolean(previous) && (previous!.iri !== compared.iri || previous!.kind !== compared.kind);
+    const home = iri === compared.iri && kind === compared.kind;
     navigation.set(side, { iri, kind });
-    report({ type: "hierarchy_focus", side, iri, kind, via });
+    report({ type: "hierarchy_focus", side, iri, kind, via, ...(home && away && via !== "return" ? { returned: true } : {}) });
   };
+  const focusFrom = (side: Side) => (iri: string, kind: EntityKind, via: FocusVia) => navigate(side, iri, kind, via);
   // Card links carry the recorded typed entity; a side's browser stays within its ontology (19 F21).
   const openFromCard = (side: Side) => (entity: EntityRef) => {
     const ontology = (side === "source" ? source : target).ontology_version_id;
     if (!components.has("hierarchy") || entity.ontology_version_id !== ontology) return;
-    navigation.set(side, { iri: entity.iri, kind: entity.kind });
-    report({ type: "hierarchy_focus", side, iri: entity.iri, kind: entity.kind, via: "card" });
+    navigate(side, entity.iri, entity.kind, "card");
     onTab("hierarchy");
     report({ type: "tab_open", tab: "hierarchy" });
+    requestReveal("hierarchy", `.browser-${side} .focus-card`);
   };
 
   const openContext = (side: Side) => (iri: string, kind: EntityKind) => {
@@ -182,7 +243,7 @@ export function PairWorkspace({
           {components.has("pair_comparison") && <ComparisonPanel source={source} target={target} cite={cite} />}
 
           {tabs.length > 0 && (
-            <section className="card details" aria-label="Optional details">
+            <section className="card details" aria-label="Optional details" ref={details}>
               <Tabs
                 label="Optional details"
                 tabs={tabs}
@@ -222,11 +283,42 @@ export function PairWorkspace({
                       </div>
                     );
                   if (active === "evidence")
-                    return <EvidenceList state={evidence} selected={selectedEvidence} onSelect={components.has("evidence_graph") ? (id) => { setSelectedEvidence(id); onTab("graph"); } : undefined} />;
+                    return (
+                      <EvidenceList
+                        state={evidence}
+                        selected={selectedEvidence}
+                        onSelect={
+                          components.has("evidence_graph")
+                            ? (id) => {
+                                setSelectedEvidence(id);
+                                onTab("graph");
+                                requestReveal("graph", ".graph-inspector");
+                              }
+                            : undefined
+                        }
+                      />
+                    );
                   if (active === "graph")
                     return evidence.data ? (
                       evidence.data.items.length ? (
-                        <EvidenceGraph key={`${workspace.key}|${viewKey}`} source={source} target={target} bundle={evidence.data} viewKey={`${workspace.key}|${viewKey}`} selected={selectedEvidence} onSelect={setSelectedEvidence} />
+                        <EvidenceGraph
+                          key={`${workspace.key}|${viewKey}`}
+                          source={source}
+                          target={target}
+                          bundle={evidence.data}
+                          viewKey={`${workspace.key}|${viewKey}`}
+                          selected={selectedEvidence}
+                          onSelect={setSelectedEvidence}
+                          onShowInList={
+                            components.has("evidence_table")
+                              ? (id) => {
+                                  setSelectedEvidence(id);
+                                  onTab("evidence");
+                                  requestReveal("evidence", `[data-evidence-id="${CSS.escape(id)}"]`);
+                                }
+                              : undefined
+                          }
+                        />
                       ) : (
                         <EvidenceList state={evidence} />
                       )
@@ -249,8 +341,7 @@ export function PairWorkspace({
               onClose={() => setContextFor(null)}
               onOpenEntity={(entity) => {
                 if (entity.ontology_version_id !== contextFor.entity.ontology_version_id) return;
-                navigation.set(contextFor.side, { iri: entity.iri, kind: entity.kind });
-                report({ type: "hierarchy_focus", side: contextFor.side, iri: entity.iri, kind: entity.kind, via: "card" });
+                navigate(contextFor.side, entity.iri, entity.kind, "card");
                 setContextFor(null);
               }}
             />

@@ -14,7 +14,7 @@ import { DecisionTrace, ScoresPanel } from "@/components/explore/DecisionTrace";
 import { ontologyName, useExplore } from "@/components/explore/ExploreContext";
 import { ReviewPanel } from "@/components/explore/ReviewPanel";
 import { CandidateList, SourcePicker } from "@/components/explore/SourceRail";
-import { PairWorkspace, type Focus, type PairNavigation } from "@/components/workspace/PairWorkspace";
+import { PairWorkspace, type Focus, type PairNavigation, type RevealRequest } from "@/components/workspace/PairWorkspace";
 import { getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
 import type { Candidate, EntityKind, EntityRef, Page, PairTrace, SourceSummary } from "@/lib/types";
@@ -135,6 +135,13 @@ export function CompareView() {
   }, [params, setParams]);
 
   const index = candidate ? ordered.indexOf(candidate) : -1;
+  // "Open decision trace" opens the tab and brings it into view every time (21 F03).
+  const [reveal, setReveal] = useState<RevealRequest | null>(null);
+  const [scoreHelp, setScoreHelp] = useState(false);
+  const openTrace = () => {
+    setParams({ details: "trace" }, "replace");
+    setReveal((current) => ({ tab: "trace", target: ".trace-heading", nonce: (current?.nonce ?? 0) + 1 }));
+  };
   // Phones read top to bottom: the review belongs after the comparison, not before it.
   const narrow = useNarrow();
   const openBrowse = useCallback(() => {
@@ -221,6 +228,7 @@ export function CompareView() {
                 { key: "scores", label: "Scores", render: () => <ScoresPanel candidate={candidate} /> },
               ]}
               navigation={navigation}
+              reveal={reveal}
               hierarchyFooter={
                 <button type="button" className="btn" onClick={openBrowse}>
                   Open both in the full ontology browser
@@ -248,18 +256,29 @@ export function CompareView() {
                     </div>
                   </div>
                   <div className="matcher-bar">
-                    <span className="origin-tag origin-matcher">Matcher record</span>
+                    <span className="origin-tag origin-matcher">Matcher</span>
                     <span>
-                      {selection?.status === "completed" ? (selection.outcome === "selected" ? "Exact selected this candidate" : selection.outcome === "not_selected" ? "Exact did not select this candidate" : `Selection: ${selection.outcome.replace(/_/g, " ")}`) : "Selection not recorded"}
+                      {selection?.status === "completed" ? (selection.outcome === "selected" ? "Selected" : selection.outcome === "not_selected" ? "Not selected" : `Selection: ${selection.outcome.replace(/_/g, " ")}`) : "Selection not recorded"}
                       {" · "}
                       {candidate.saved_alignment_member === true ? <strong>in saved alignment</strong> : candidate.saved_alignment_member === false ? "not in saved alignment" : "saved alignment unknown"}
-                      {score ? ` · matching score ${formatScore(score.value)}` : ""}
+                      {score ? (
+                        <>
+                          {" · "}
+                          <button type="button" className="link-btn score-help" aria-expanded={scoreHelp} onClick={() => setScoreHelp((value) => !value)}>
+                            matching score {formatScore(score.value)}
+                          </button>
+                        </>
+                      ) : null}
                     </span>
-                    <span className="meta">{score?.calibration_status === "validated" ? "Calibrated score." : "Not a probability of being correct."}</span>
                     <span className="matcher-bar-spacer" />
-                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => setParams({ details: "trace" }, "replace")}>
+                    <button type="button" className="btn btn-sm" onClick={openTrace}>
                       Open decision trace
                     </button>
+                    {scoreHelp && score && (
+                      <p className="meta matcher-bar-note">
+                        {score.calibration_status === "validated" ? "A calibrated score." : "A matching score ranks candidates for this source. It is not a probability of being correct."}
+                      </p>
+                    )}
                   </div>
                 </>
               )}

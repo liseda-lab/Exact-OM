@@ -1,37 +1,17 @@
 "use client";
 
+// The decision trace for one saved candidate pair (21 F03): a short summary of the recorded
+// route first, then the recorded sequence in order. Exact matching is named as such; runs of
+// unrecorded or intentionally skipped stages are collapsed with their stages one click away;
+// raw codes and implementation IDs stay available as technical details.
+
+import { useState } from "react";
+
 import { formatScore } from "@/components/explore/candidates";
+import { GROUP_TEXT, eventMeaning, groupTrace, routeSummary, stageName } from "@/lib/trace";
 import type { Candidate, PairTrace } from "@/lib/types";
 
-const STAGE_NAMES: Record<string, string> = {
-  retrieval: "Retrieval",
-  prefilter: "Prefilter",
-  pair_scoring: "Pair scoring",
-  llm_signal: "Language-model signal",
-  selection: "Selection",
-  threshold: "Threshold",
-  cardinality: "Cardinality",
-  extraction: "Extraction",
-  relation_typing: "Relation typing",
-  repair: "Repair",
-};
-
-const STATUS_NAMES: Record<string, string> = {
-  completed: "Completed",
-  not_run: "Not run",
-  not_recorded: "Not recorded",
-  failed: "Failed",
-};
-
-const OUTCOME_NAMES: Record<string, string> = {
-  retained: "Retained",
-  rejected: "Rejected",
-  abstained: "Abstained",
-  selected: "Selected",
-  not_selected: "Not selected",
-  not_applicable: "Not applicable",
-  unknown: "Unknown",
-};
+type TraceEvent = PairTrace["events"][number];
 
 const RELATION_NAMES: Record<string, string> = {
   equivalent: "Equivalent",
@@ -48,61 +28,128 @@ const BASIS_NAMES: Record<string, string> = {
   unavailable: "How the relation was set was not recorded.",
 };
 
-function reasonText(code: string): string {
-  if (code === "historical_stage_record_not_exported") return "The saved run did not keep a record of this stage, so whether it ran is unknown.";
-  return code.replace(/_/g, " ");
+function EventRow({ event, index }: { event: TraceEvent; index: number }) {
+  const [details, setDetails] = useState(false);
+  const meaning = eventMeaning(event);
+  const failed = event.status === "failed";
+  return (
+    <li className={`trace-item trace-${event.status}`}>
+      <span className="trace-dot" aria-hidden="true">
+        {index + 1}
+      </span>
+      <div className="trace-body">
+        <div className="trace-head">
+          <h4>{stageName(event.stage)}</h4>
+          {failed && <span className="status status-bad">Failed</span>}
+        </div>
+        <p className="trace-reason">{meaning.text}</p>
+        {event.scores.length > 0 && (
+          <ul className="score-rows">
+            {event.scores.map((score) => (
+              <li key={`${score.name}-${score.stage}`}>
+                <span className="score-chip">
+                  <strong>{score.name}</strong> {formatScore(score.value)}
+                </span>
+                <span className="muted">{score.meaning}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        <button type="button" className="link-btn trace-more" aria-expanded={details} onClick={() => setDetails((value) => !value)}>
+          {details ? "Hide technical details" : "Technical details"}
+        </button>
+        {details && (
+          <dl className="kv trace-tech">
+            <div>
+              <dt>Recorded</dt>
+              <dd className="mono">
+                {event.stage} · {event.status} · {event.outcome} · {event.reason_code}
+              </dd>
+            </div>
+            {event.competitor_pair_ids.length > 0 && (
+              <div>
+                <dt>Compared against</dt>
+                <dd>
+                  {event.competitor_pair_ids.length} competing {event.competitor_pair_ids.length === 1 ? "pair" : "pairs"}
+                </dd>
+              </div>
+            )}
+            {event.implementation_id && (
+              <div>
+                <dt>Implementation</dt>
+                <dd className="mono">{event.implementation_id}</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function GroupRow({ reason, events }: { reason: keyof typeof GROUP_TEXT; events: { event: TraceEvent; index: number }[] }) {
+  const [open, setOpen] = useState(false);
+  const first = events[0].index + 1;
+  const last = events[events.length - 1].index + 1;
+  return (
+    <li className="trace-item trace-group">
+      <span className="trace-dot" aria-hidden="true">
+        {first}–{last}
+      </span>
+      <div className="trace-body">
+        <p className="trace-reason">
+          <strong>{events.map((item) => stageName(item.event.stage)).join(", ")}</strong> · {GROUP_TEXT[reason]}
+        </p>
+        <button type="button" className="link-btn trace-more" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+          {open ? "Hide these stages" : `Show these ${events.length} stages`}
+        </button>
+        {open && (
+          <ol className="trace-list trace-sublist">
+            {events.map(({ event, index }) => (
+              <EventRow key={`${event.stage}-${index}`} event={event} index={index} />
+            ))}
+          </ol>
+        )}
+      </div>
+    </li>
+  );
 }
 
 export function DecisionTrace({ trace }: { trace: PairTrace }) {
+  const summary = routeSummary(trace.events);
+  const selection = trace.events.find((event) => event.stage === "selection" && event.status === "completed");
+  const items = groupTrace(trace.events);
   return (
     <div className="trace">
-      <ol className="trace-list">
-        {trace.events.map((event, index) => (
-          <li key={`${event.stage}-${index}`} className={`trace-item trace-${event.status}`}>
-            <span className="trace-dot" aria-hidden="true">
-              {index + 1}
-            </span>
-            <div className="trace-body">
-              <div className="trace-head">
-                <h3>{STAGE_NAMES[event.stage] ?? event.stage}</h3>
-                <span className={event.status === "completed" ? "status status-ok" : event.status === "failed" ? "status status-bad" : "status"}>{STATUS_NAMES[event.status] ?? event.status}</span>
-                <span className="muted">{OUTCOME_NAMES[event.outcome] ?? event.outcome}</span>
-              </div>
-              <p className="trace-reason">{reasonText(event.reason_code)}</p>
-              {event.scores.length > 0 && (
-                <ul className="score-rows">
-                  {event.scores.map((score) => (
-                    <li key={`${score.name}-${score.stage}`}>
-                      <span className="score-chip">
-                        <strong>{score.name}</strong> {formatScore(score.value)}
-                      </span>
-                      <span className="muted">{score.meaning}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {event.competitor_pair_ids.length > 0 && <p className="meta">Compared against {event.competitor_pair_ids.length} competing {event.competitor_pair_ids.length === 1 ? "pair" : "pairs"} at this stage.</p>}
-              {event.implementation_id && <p className="meta">Implementation: {event.implementation_id}</p>}
-            </div>
-          </li>
-        ))}
-      </ol>
-      <div className="trace-summary card-inset">
-        <h3>Final result</h3>
+      <div className="trace-summary">
+        <h3 className="trace-heading" tabIndex={-1}>
+          How this pair was decided
+        </h3>
+        <p className="trace-route">{summary.text}</p>
         <dl className="kv">
           <div>
+            <dt>Selection</dt>
+            <dd>{selection ? eventMeaning(selection).text : "No selection record"}</dd>
+          </div>
+          <div>
             <dt>Saved alignment</dt>
-            <dd>{trace.saved_alignment_member === null ? "Not known: no saved alignment was bound" : trace.saved_alignment_member ? "Member" : "Not a member"}</dd>
+            <dd>{trace.saved_alignment_member === null ? "Not known" : trace.saved_alignment_member ? "Included" : "Not included"}</dd>
           </div>
           <div>
             <dt>Relation</dt>
             <dd>
               {trace.relation ? RELATION_NAMES[trace.relation] : "None recorded"}
-              <span className="meta block">{BASIS_NAMES[trace.relation_basis]}</span>
+              {trace.relation && BASIS_NAMES[trace.relation_basis] ? <span className="meta block">{BASIS_NAMES[trace.relation_basis]}</span> : null}
             </dd>
           </div>
         </dl>
       </div>
+      <h3 className="subhead">Recorded sequence</h3>
+      <ol className="trace-list">
+        {items.map((item) =>
+          item.kind === "event" ? <EventRow key={`${item.event.stage}-${item.index}`} event={item.event} index={item.index} /> : <GroupRow key={`group-${item.events[0].index}`} reason={item.reason} events={item.events} />,
+        )}
+      </ol>
     </div>
   );
 }
@@ -112,7 +159,7 @@ export function ScoresPanel({ candidate }: { candidate: Candidate }) {
   const nil = Object.entries(candidate.nil);
   return (
     <div className="scores-panel">
-      <p className="muted">Each value keeps the stage that produced it and what it means. None is a probability of being correct unless marked as calibrated.</p>
+      <p className="muted">Each value names the stage that produced it. Scores rank candidates; they are not probabilities of being correct unless marked calibrated.</p>
       <ul className="score-rows">
         {candidate.scores.map((score) => (
           <li key={`${score.name}-${score.stage}`}>
