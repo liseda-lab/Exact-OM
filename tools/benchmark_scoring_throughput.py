@@ -14,6 +14,9 @@ import platform
 import subprocess
 import sys
 import time
+from contextlib import ExitStack
+from collections import Counter
+from functools import wraps
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -114,6 +117,22 @@ def run(args):
         raise ValueError("Qualification namespace required")
     for value in workload.get("inputs", {}).values():
         verified(value)
+    namespace = "qualification-" + workload["identity"]
+    os.environ["EXACT_PRIMITIVE_NAMESPACE"] = namespace
+    runtime_path = args.output / "recovery-runtime.json"
+    write(runtime_path, {
+        "root": str(args.output / "cache"), "primitive_namespace": namespace,
+        "identity": {
+            "parameters": config.model_dump(mode="json"),
+            "inputs": {"source": binding(config.data.source), "target": binding(config.data.target),
+                       "workload": binding(args.workload)},
+            "implementation": {"scorer": binding(ROOT / "exact/impl/models/pair_adaptive_scorer.py"),
+                               "channels": binding(ROOT / "exact/impl/models/pair_adaptive_channels.py")},
+            "dependencies": {"torch": torch.__version__, "transformers": __import__("transformers").__version__},
+            "role": "qualification_fixture", "entity_kind": "class", "seed": 17,
+        },
+    })
+    os.environ["EXACT_EXPERIMENT_RUNTIME"] = str(runtime_path)
     groups = list(group_chunks(workload["queries"], args.chunk_pairs))
     if args.max_chunks:
         groups = groups[:args.max_chunks]
@@ -161,7 +180,31 @@ def run(args):
     if scorer.llm_experiment_config["decision"]["mode"] != "binary" or scorer.llm_experiment_config.get("exemplars") == "knn":
         raise ValueError("This path requires a recorded compatible group/exemplar response fixture")
     model_seconds = time.perf_counter() - model_start
-    phases = PhaseCounters()
+    from exact.experiments import numerical_cache
+    from exact.experiments.encoder_store import encoder_cache_stats
+    from exact.impl.models import pair_adaptive_batch
+    encoded_texts = set()
+    encoding = {"calls": 0, "rows": 0, "tokens": 0, "batch_sizes": Counter(), "counter_seconds": 0.0}
+    original_encode = scorer._encode_texts
+    @wraps(original_encode)
+    def counted_encode(tokenizer, model, texts, max_len):
+        started = time.perf_counter()
+        encoded_texts.update((id(model), max_len, text) for text in texts)
+        encoding["counter_seconds"] += time.perf_counter() - started
+        return original_encode(tokenizer, model, texts, max_len)
+    scorer._encode_texts = counted_encode
+    def encoded_batch(_model, _args, kwargs):
+        started = time.perf_counter()
+        ids = kwargs["input_ids"]
+        rows = len(ids)
+        encoding["calls"] += 1
+        encoding["rows"] += rows
+        encoding["batch_sizes"][rows] += 1
+        encoding["tokens"] += int(kwargs["attention_mask"].detach().cpu().sum())
+        encoding["counter_seconds"] += time.perf_counter() - started
+    hooks = [model.register_forward_pre_hook(encoded_batch, with_kwargs=True)
+             for model in (getattr(scorer, "lex_model", None), getattr(scorer, "ctx_model", None))
+             if model is not None]
     methods = {"_experiment_entity_features": "feature_gathering", "_encode_label_matrix": "raw_matrices",
                "_encode_context_matrix": "raw_matrices", "_object_support_matrix": "raw_matrices",
                "_select_diverse_indices": "evidence_selection",
@@ -169,7 +212,17 @@ def run(args):
                "_uncertainty_components": "fusion_uncertainty", "_llm_gate_mask": "routing",
                "encode_labels_batch": "encoder_labels", "encode_contexts_batch": "encoder_contexts"}
     receipts = {}
-    for mode in ("cold", "warm"):
+    for mode in ("cold", "warm", "replay"):
+        phases = PhaseCounters()
+        encoded_texts.clear()
+        encoding.update(calls=0, rows=0, tokens=0, batch_sizes=Counter(), counter_seconds=0.0)
+        if mode == "warm":
+            # Warm vectors, cold numerical primitives; replay is a separate pass.
+            cache = getattr(scorer, "_numerical_cache", None)
+            if cache is not None:
+                cache.close()
+                del scorer._numerical_cache
+            os.environ["EXACT_NUMERICAL_CACHE_ROOT"] = str(args.output / "warm-pair-cache")
         store = ExplanationStore(args.output / mode / "ordinary-evidence")
         measure = Measurement(mode=mode, workload=workload, device=args.device)
         for number, group in enumerate(groups):
@@ -182,7 +235,11 @@ def run(args):
             if str(args.device).startswith("cuda"):
                 torch.cuda.synchronize()
             started = time.perf_counter()
-            with phases.instrument(scorer, methods):
+            with ExitStack() as instrumentation:
+                instrumentation.enter_context(phases.instrument(scorer, methods))
+                instrumentation.enter_context(phases.instrument(pair_adaptive_batch, {
+                    "_batch_matrices": "raw_matrices_batched", "_batch_context_similarity": "combined_context_encoding_batched"}))
+                instrumentation.enter_context(phases.instrument(numerical_cache, {"_scope": "numerical_identity"}))
                 source_labels = [dataset.source_graph.get_labels(s) for s in sources]
                 target_labels = [dataset.target_graph.get_labels(t) for t in targets]
                 result = scorer(src_iris=sources, tgt_iris=targets,
@@ -203,12 +260,17 @@ def run(args):
                 exact_prefiltered_rows=sum((q["source"], t) in exact_pairs for q in group for t in q["candidates"]),
                 scores=result["S_final"].detach().cpu().tolist(),
                 query_ids=[q["qid"] for q in group])
-            write(args.output / f"{mode}.json", {**measure.receipt(), "phases": phases.receipt()})
+            write(args.output / f"{mode}.json", {**measure.receipt(), "phases": phases.receipt(),
+                "encoder": {**encoding, "distinct_texts": len(encoded_texts)},
+                "encoder_cache_cumulative": encoder_cache_stats(),
+                "numerical_cache_cumulative": scorer._numerical_cache.stats() if hasattr(scorer, "_numerical_cache") else None})
             print(json.dumps({"mode": mode, "chunk": number, "rows": len(sources), "seconds": elapsed}), flush=True)
-        receipts[mode] = measure.receipt()
+        receipts[mode] = {**measure.receipt(), "phases": phases.receipt(),
+                          "encoder": {**encoding, "distinct_texts": len(encoded_texts)}}
     write(args.output / "measurement.json", {
         "schema_version": 1, "namespace": "qualification_only", "paid_calls": 0,
         "fixture_calls": fixture_calls, "cold": receipts["cold"], "warm": receipts["warm"],
+        "replay": receipts["replay"],
         "native_preparation_seconds": native_seconds, "model_loading_seconds": model_seconds,
         "phases": phases.receipt(), "peak_rss_kib": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
         "peak_vram_bytes": torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
@@ -221,7 +283,12 @@ def run(args):
                             else subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()),
         "hosted_service_time": None, "end_to_end_scientific_time": None,
         "fixture_outputs_promotable": False,
+        "cache_root": str(args.output / "cache"),
+        "execution_flags": {key: os.getenv(key) for key in ("EXACT_PAIR_CONTEXT_BATCHING", "EXACT_PAIR_CONTEXT_BLOCK_PAIRS", "EXACT_PAIR_CONTEXT_TEXT_BATCH")},
+        "instrumentation": "opt-in inclusive host timers and encoder counters; measured counter_seconds included in wall time",
     })
+    for hook in hooks:
+        hook.remove()
 
 
 def main():
