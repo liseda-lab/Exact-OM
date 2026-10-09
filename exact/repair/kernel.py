@@ -189,6 +189,7 @@ def verify_theory(
         activated=active,
         exceptions=policy.exceptions,
         on_complete=completed,
+        feasibility_only=True,
     )
     emit_events(buffer)
     obligations = tuple(
@@ -836,6 +837,7 @@ def repair(
     risk_order: Callable[[tuple[int, ...]], float] | None = None,
     risk_identity: str = "none",
     baseline_evidence: BaselineReportV3 | None = None,
+    initial_assignment: tuple[int, ...] | None = None,
     ledger_path: str | Path | None = None,
     resume: bool = False,
 ) -> RepairResultV3:
@@ -871,6 +873,10 @@ def repair(
         raise ValueError("shortlist construction budget must be finite and positive")
     if risk_order is not None and risk_identity == "none":
         raise ValueError("a risk ordering callback requires a frozen identity")
+    if initial_assignment is not None:
+        materialize(problem, initial_assignment)  # validate before starting any work
+        if resume:
+            raise ValueError("initial assignment cannot alter a resumed search epoch")
     budgets, started = problem.budgets, time.monotonic()
     prior_elapsed = 0.0
     reserved_until = 0.0
@@ -1473,6 +1479,21 @@ def repair(
             baseline.append(("alignment", report))
             accept_report(original, report)
             bypass = report.authorizes and preserve_verified_input
+
+    if (
+        not bypass
+        and initial_assignment is not None
+        and initial_assignment not in feasible
+        and checks < budgets.max_checks
+        and remaining(1) > 0
+    ):
+        # New inventory/objective epoch: candidate IDs were remapped by the
+        # scheduler. Recheck all context and score it in this objective; no old
+        # certificate or scalar bound authorizes this initial assignment.
+        deferred[initial_assignment] = DeferredAssignmentV3(
+            initial_assignment, objective.score(initial_assignment)
+        )
+        accept_report(initial_assignment, check(initial_assignment))
 
     while (
         not bypass and not persistence_failure and remaining(1) > 0 and checks < budgets.max_checks

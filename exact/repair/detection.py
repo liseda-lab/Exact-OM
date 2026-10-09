@@ -141,6 +141,59 @@ class _Completion:
         return facts
 
 
+class PreparedDetector:
+    """Request-local immutable Horn rules and completion memoisation.
+
+    This only returns sufficient negative evidence; silence is never acceptance.
+    It is deliberately not a persisted cache of unknown decisions.
+    """
+
+    def __init__(self, axioms, policy, *, max_contexts=512, max_depth=16):
+        if max_contexts < 1 or max_depth < 0:
+            raise ValueError("invalid prepared detector bounds")
+        self.axioms = tuple(sorted(set(axioms), key=canonical_hash))
+        self.policy = policy
+        self.bounds = (max_contexts, max_depth)
+        self.completion = _Completion(self.axioms, max_contexts, max_depth)
+        self.identity = canonical_hash(
+            (
+                "prepared-active-detector/v1",
+                self.axioms,
+                policy,
+                RULE_VERSION,
+                self.bounds,
+                "active_satisfiability",
+            )
+        )
+
+    def active_violations(self, active):
+        active = tuple(sorted(set(active), key=canonical_hash))
+        theory_hash = canonical_hash((self.axioms, active))
+        results = []
+        # Bounds are per activation request. Previously completed memoised work
+        # remains reusable; transient truncated entries are never reused.
+        self.completion.contexts = 0
+        self.completion.truncated = False
+        for expression in active:
+            if not _supported(expression):
+                continue
+            facts = self.completion.complete({expression: frozenset()})
+            if owl.OWL_NOTHING in facts:
+                results.append(
+                    ProofSupportV3(
+                        theory_hash,
+                        self.policy.content_hash,
+                        "active_satisfiability",
+                        expression,
+                        tuple(sorted(facts[owl.OWL_NOTHING], key=canonical_hash)),
+                        expression,
+                    )
+                )
+        if self.completion.truncated:
+            self.completion.cache.clear()
+        return tuple(results)
+
+
 def detect_violations(
     axioms: tuple[Any, ...],
     active: tuple[Any, ...],

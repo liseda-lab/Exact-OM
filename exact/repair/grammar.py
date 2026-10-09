@@ -66,6 +66,8 @@ class GrammarEncoding:
     context_proofs: tuple[Any, ...] = ()
     contextual_checks: int = 0
     contextual_truncated: bool = False
+    contextual_expensive_calls: int = 0
+    contextual_cache_hits: int = 0
 
     @property
     def slot_count(self) -> int:
@@ -559,6 +561,7 @@ def mapping_grammar(
     enabled_actions: Iterable[str] | None = None,
     fixed_axioms: Iterable[Any] = (),
     constraint_identity: str = "",
+    omitted_generation_symbols: Iterable[str] = (),
     source_classes: Iterable[Any] | None = None,
     target_classes: Iterable[Any] | None = None,
     source_properties: Iterable[Any] | None = None,
@@ -604,9 +607,12 @@ def mapping_grammar(
     originals = normalise_axioms(revision.original_axioms)
     controls = list(revision.candidates)
     if revision.kind == "mapping":
-        controls.append(
-            make_candidate(revision.object_id, originals, ("keep",), cost_features=(("edit", 0.0),))
-        )
+        if not any(c.axioms == originals and "keep" in c.action_tags for c in controls):
+            controls.append(
+                make_candidate(
+                    revision.object_id, originals, ("keep",), cost_features=(("edit", 0.0),)
+                )
+            )
         if revision.eligible and not revision.locked:
             if "delete" in actions:
                 controls.append(
@@ -650,6 +656,26 @@ def mapping_grammar(
     controls = [
         c for c in deduplicate_candidates(controls) if set(c.action_tags) & actions & fixed_actions
     ]
+    # Ontology controls are rebuilt from visible fixed axioms above. Apply the
+    # output-vocabulary intervention here, before these branches enter either
+    # the sampling distribution or protected representatives. Premises remain
+    # visible and symbols in unchanged editable axioms remain legal.
+    omitted = frozenset(omitted_generation_symbols)
+    if omitted:
+        original_symbols = {str(e.iri.value) for axiom in originals for e in owl.signature(axiom)}
+        controls = [
+            c
+            for c in controls
+            if not (
+                {
+                    str(e.iri.value)
+                    for axiom in (*c.axioms, *c.active_expressions)
+                    for e in owl.signature(axiom)
+                }
+                - original_symbols
+            )
+            & omitted
+        ]
     templates = [
         GrammarTemplate(f"fixed:{c.candidate_id}", c.action_tags[0], fixed=c) for c in controls
     ]
@@ -1245,7 +1271,7 @@ def compile_families(
     from time import monotonic
 
     from .circuit import CompiledFamily, FactoredCircuit
-    from .compilation import compile_bounded
+    from .compilation import compile_bounded_batch
 
     limits = dict(circuit_limits or {})
     allowed = {
@@ -1292,6 +1318,7 @@ def compile_families(
         )
     }
     families = []
+    compile_tasks = []
     for template in encoding.templates:
         if template.fixed is not None:
             families.append(
@@ -1357,45 +1384,50 @@ def compile_families(
                 )
             )
             continue
-        try:
-            circuit = compile_bounded(
-                reduced,
-                seconds=min(remaining, limits.get("call_seconds", remaining)),
-                max_nodes=max_nodes,
-                vtree_type=vtree_type,
-                cache_directory=cache_directory,
-                memory_mb=limits.get("rss_mb"),
-                max_live_nodes=limits.get("live_node_limit"),
-                max_reachable_nodes=limits.get("reachable_node_limit"),
-                max_elements=limits.get("element_limit"),
+        compile_tasks.append((len(families), reduced))
+        families.append(
+            CompiledFamily(
+                template.name,
+                None,
+                indices,
+                fixed,
+                "not_attempted",
+                "awaiting bounded compiler batch",
             )
-            status = "empty_language" if circuit.root.is_false() else "resolved"
-            families.append(CompiledFamily(template.name, circuit, indices, fixed, status))
-        except (TimeoutError, RuntimeError, CircuitBudgetExceeded) as exc:
-            status = (
-                "compile_timeout"
-                if isinstance(exc, TimeoutError)
-                else (
-                    "compile_memory_limit"
-                    if "memory_limit" in str(exc)
-                    else (
-                        "compile_node_limit"
-                        if any(word in str(exc) for word in ("node", "element"))
-                        else "worker_error"
-                    )
-                )
-            )
-            failure = getattr(exc, "measurement_receipt", None)
-            families.append(
-                CompiledFamily(
-                    template.name,
-                    None,
-                    indices,
-                    fixed,
-                    status,
-                    str(exc),
-                    (("measurement_receipt", failure),) if failure is not None else (),
-                )
+        )
+    if compile_tasks:
+        outcomes = compile_bounded_batch(
+            tuple(reduced for _, reduced in compile_tasks),
+            seconds=max(0.001, seconds - (monotonic() - started)),
+            call_seconds=limits.get("call_seconds", seconds),
+            max_nodes=max_nodes,
+            cache_directory=cache_directory,
+            vtree_type=vtree_type,
+            memory_mb=limits.get("rss_mb"),
+            max_live_nodes=limits.get("live_node_limit"),
+            max_reachable_nodes=limits.get("reachable_node_limit"),
+            max_elements=limits.get("element_limit"),
+        )
+        for (position, _), outcome in zip(compile_tasks, outcomes):
+            prior = families[position]
+            if not outcome.cleanup_complete:
+                status = "cleanup_incomplete"
+            elif outcome.status == "complete" and outcome.circuit is not None:
+                status = "empty_language" if outcome.circuit.root.is_false() else "resolved"
+            else:
+                status = {
+                    "timeout": "compile_timeout",
+                    "not_attempted": "not_attempted",
+                    "memory_limit": "compile_memory_limit",
+                    "resource_limit": "compile_node_limit",
+                    "cleanup_incomplete": "cleanup_incomplete",
+                }.get(outcome.status, "worker_error")
+            families[position] = replace(
+                prior,
+                circuit=outcome.circuit,
+                status=status,
+                detail=outcome.detail,
+                failure_telemetry=outcome.failure_telemetry,
             )
     return FactoredCircuit(
         encoding,
@@ -1437,6 +1469,11 @@ def with_immutable_context(
     proofs: dict[str, ProofSupportV3] = {}
     checks, truncated = 0, False
     visited = set()
+    activation_results: dict[tuple[Any, ...], tuple[Any, ...]] = {}
+    expensive_calls = cache_hits = 0
+    from .detection import PreparedDetector
+
+    prepared = PreparedDetector(fixed, policy)
     for template in encoding.templates:
         if template.fixed is not None:
             continue
@@ -1452,7 +1489,16 @@ def with_immutable_context(
                 truncated = True
                 continue
             checks += 1
-            derived = detect_violations(fixed, candidate.active_expressions, policy)
+            activation_key = tuple(sorted(set(candidate.active_expressions), key=canonical_hash))
+            if activation_key in activation_results:
+                cache_hits += 1
+                qualified = activation_results[activation_key]
+                if qualified:
+                    denied.update(encoding.candidate_assignments(candidate))
+                    proofs.update((p.content_hash, p) for p in qualified)
+                continue
+            expensive_calls += 1
+            derived = prepared.active_violations(activation_key)
             qualified = tuple(
                 p
                 for p in derived
@@ -1461,6 +1507,7 @@ def with_immutable_context(
                 and set(p.asserted_support) <= set(fixed)
                 and validate_proof(p, fixed, candidate.active_expressions, policy)
             )
+            activation_results[activation_key] = qualified
             if qualified:
                 denied.update(encoding.candidate_assignments(candidate))
                 proofs.update((p.content_hash, p) for p in qualified)
@@ -1470,4 +1517,6 @@ def with_immutable_context(
         context_proofs=tuple(proofs[key] for key in sorted(proofs)),
         contextual_checks=checks,
         contextual_truncated=truncated,
+        contextual_expensive_calls=expensive_calls,
+        contextual_cache_hits=cache_hits,
     )

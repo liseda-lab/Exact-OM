@@ -370,7 +370,13 @@ def proposal_distribution(
     elif compile_seconds is not None:
         from .compilation import compile_bounded
 
-        compiled = compile_bounded(encoding, seconds=compile_seconds, max_nodes=max_circuit_nodes)
+        compiled = compile_bounded(
+            encoding,
+            seconds=compile_seconds,
+            max_nodes=max_circuit_nodes,
+            cache_directory=compiler_cache_directory,
+            vtree_type=vtree_type,
+        )
     elif hasattr(encoding, "decode"):
         from .grammar import compile_grammar
 
@@ -461,6 +467,7 @@ def freeze_neural_round(
     graph: ObservableGraph | None = None,
     retrieved_symbols: Iterable[Any] = (),
     draws_per_object: int = 32,
+    unique_candidate_target: int | None = None,
     candidate_cap: int = 64,
     mixtures: int = 4,
     seed: int = 13,
@@ -507,6 +514,7 @@ def freeze_neural_round(
     from .candidates import (
         budget_candidates,
         deduplicate_candidates,
+        make_candidate,
         materialize_retrieved_endpoints,
     )
     from .retrieval import retrieve_vocabulary
@@ -516,12 +524,22 @@ def freeze_neural_round(
         "grammar_uniform",
         "grammar_product",
         "grammar_mixture",
+        "matched_grammar_decoder",
         "rejection",
     }
     if proposal_arm not in arms:
         raise ValueError(f"unknown proposal arm: {proposal_arm}")
     if draws_per_object < 0 or candidate_cap < 1 or max_circuit_nodes < 1:
         raise ValueError("Invalid finite neural round budget")
+    if unique_candidate_target is not None:
+        if (
+            type(unique_candidate_target) is not int
+            or unique_candidate_target < 1
+            or unique_candidate_target > candidate_cap
+        ):
+            raise ValueError("unique candidate target must fit the declared candidate cap")
+        if proposal_arm in {"bounded_enumeration", "rejection"}:
+            raise ValueError("unique-target stopping requires a conditioned sampling arm")
     started = monotonic()
     problem = replace(
         problem,
@@ -530,8 +548,17 @@ def freeze_neural_round(
             for obj in problem.objects
         ),
     )
+    from .workers import record_phase
+
+    record_phase("retrieval", "start", input_hash=problem.content_hash)
     retrieval = retrieve_vocabulary(
         problem, **({"config": retrieval_config} if retrieval_config is not None else {})
+    )
+    record_phase(
+        "retrieval",
+        "finish",
+        input_hash=problem.content_hash,
+        retrieval_hash=canonical_hash(retrieval),
     )
     selected_ids = None
     if selected_other_assignment is not None:
@@ -599,6 +626,13 @@ def freeze_neural_round(
             )
             objects_without.append(replace(obj, candidates=candidates))
         problem = replace_inventory(problem, tuple(objects_without))
+    record_phase(
+        "effective_menu",
+        "commit",
+        input_hash=problem.content_hash,
+        retrieval_hash=canonical_hash(retrieval),
+        menus=__import__("json").loads(canonical_json(retrieval.menus)),
+    )
     problem = materialize_retrieved_endpoints(problem, retrieval)
     if selected_ids is not None:
         selected_other_assignment = tuple(
@@ -647,14 +681,20 @@ def freeze_neural_round(
         and graph.preparation_identity != preparation.content_hash
     ):
         raise ValueError("Supplied graph uses incompatible effective preparation settings")
+    record_phase("graph", "start", input_hash=problem.content_hash)
     graph = graph or preparation.graph(problem, retrieval, retrieved_symbols=retrieved_symbols)
+    record_phase(
+        "graph", "finish", input_hash=problem.content_hash, graph_hash=canonical_hash(graph)
+    )
     graph_seconds = monotonic() - started
     prior_training = model.training
     model.eval()
     try:
         with torch.no_grad():
             before = monotonic()
+            record_phase("model", "start", operation="encode")
             memory = model.encode(graph)
+            record_phase("model", "finish", operation="encode")
             model_seconds = monotonic() - before
             objects, reports = [], []
             for index, obj in enumerate(problem.objects):
@@ -670,6 +710,7 @@ def freeze_neural_round(
                 from .grammar import mapping_grammar
 
                 menu = menus[obj.object_id]
+                record_phase("grammar", "start", object_id=obj.object_id)
                 encoding = mapping_grammar(
                     obj,
                     menu.classes,
@@ -677,6 +718,7 @@ def freeze_neural_round(
                     max_depth=max_depth,
                     max_constructors=max_constructors,
                     fixed_axioms=problem.fixed_axioms,
+                    omitted_generation_symbols=omitted,
                     enabled_actions=enabled_actions,
                     source_classes=menu.source_classes,
                     target_classes=menu.target_classes,
@@ -684,6 +726,10 @@ def freeze_neural_round(
                     target_properties=menu.target_properties,
                     constraint_identity=canonical_hash((problem.policy, menu)),
                 )
+                record_phase(
+                    "grammar", "finish", object_id=obj.object_id, grammar_hash=encoding.content_hash
+                )
+                record_phase("immutable_context", "start", object_id=obj.object_id)
                 context_started = monotonic()
                 if contextual_filtering:
                     from .grammar import with_immutable_context
@@ -695,6 +741,14 @@ def freeze_neural_round(
                         max_checks=max_context_checks,
                     )
                 context_seconds = monotonic() - context_started
+                record_phase(
+                    "immutable_context",
+                    "finish",
+                    object_id=obj.object_id,
+                    requested_checks=encoding.contextual_checks,
+                    expensive_calls=encoding.contextual_expensive_calls,
+                    cache_hits=encoding.contextual_cache_hits,
+                )
                 before = monotonic()
                 distribution = None
                 setup_seconds = sampling_seconds = 0.0
@@ -713,6 +767,7 @@ def freeze_neural_round(
                     )
                     sampled_candidates = enumeration.candidates
                     enumerated = len(sampled_candidates)
+                    record_phase("compile_cache", "finish", object_id=obj.object_id)
                     setup_seconds = monotonic() - before
                     from .grammar import protected_representatives
 
@@ -726,10 +781,70 @@ def freeze_neural_round(
                         c.candidate_id: float(model.candidate_value(c, memory, context)[0])
                         for c in sampled_candidates
                     }
+                elif proposal_arm == "matched_grammar_decoder":
+                    from .proposals import enumerate_grammar, EnumeratedConditionedMixture
+                    from .grammar import protected_representatives
+
+                    decoder_deadline = before + compile_seconds
+                    record_phase("grammar_decoder_enumeration", "start", object_id=obj.object_id)
+                    enumeration = enumerate_grammar(
+                        encoding,
+                        max_expressions=max_enumerated_expressions,
+                        deadline=decoder_deadline,
+                    )
+                    enumerated = len(enumeration.candidates)
+                    raw_distribution = proposal_distribution(
+                        model,
+                        memory,
+                        obj,
+                        mixtures=mixtures,
+                        profile=profile,
+                        encoding=encoding,
+                        conditioned=False,
+                        circuit_limits=None,
+                        selected_context=(
+                            model.plan_context(
+                                problem.objects,
+                                memory,
+                                context_assignment,
+                                target_object_id=obj.object_id,
+                            )
+                            if context_assignment is not None
+                            else None
+                        ),
+                    )
+                    distribution = EnumeratedConditionedMixture(
+                        raw_distribution, enumeration, deadline=decoder_deadline
+                    )
+                    record_phase(
+                        "grammar_decoder_enumeration",
+                        "finish",
+                        object_id=obj.object_id,
+                        support_identity=distribution.support_identity,
+                        candidates=enumerated,
+                        boolean_assignments=len(distribution.assignments),
+                    )
+                    setup_seconds = monotonic() - before
+                    sampling_started = monotonic()
+                    samples = _conditioned_samples(
+                        distribution, draws_per_object, seed + index, unique_candidate_target
+                    )
+                    sampling_seconds = monotonic() - sampling_started
+                    sampled_candidates = tuple(
+                        distribution.candidate(sample.assignment) for sample in samples
+                    )
+                    controls, protected_reports = protected_representatives(
+                        encoding, max_checks=representative_max_checks, enumeration=enumeration
+                    )
+                    ranked = {
+                        c.candidate_id: max(-1e30, float(distribution.candidate_log_probability(c)))
+                        for c in deduplicate_candidates((*controls, *sampled_candidates))
+                    }
                 else:
                     from .compilation import compilation_cache_info
 
                     cache_before = compilation_cache_info()
+                    record_phase("compile_cache", "start", object_id=obj.object_id)
                     distribution = proposal_distribution(
                         model,
                         memory,
@@ -742,7 +857,7 @@ def freeze_neural_round(
                         compile_seconds=compile_seconds,
                         max_circuit_nodes=max_circuit_nodes,
                         uniform=proposal_arm == "grammar_uniform",
-                        conditioned=proposal_arm != "rejection",
+                        conditioned=proposal_arm not in {"rejection", "matched_grammar_decoder"},
                         factored=factored,
                         compiler_cache_directory=compiler_cache_directory,
                         vtree_type=vtree_type,
@@ -758,16 +873,21 @@ def freeze_neural_round(
                             else None
                         ),
                     )
+                    record_phase("compile_cache", "finish", object_id=obj.object_id)
                     setup_seconds = monotonic() - before
                     compilation_cache_hit = compilation_cache_info()["hits"] > cache_before["hits"]
+                    record_phase("sampling", "start", object_id=obj.object_id)
                     sampling_started = monotonic()
                     if proposal_arm == "rejection":
                         samples, rejected = _rejection_samples(
                             distribution, draws_per_object, seed + index
                         )
                     else:
-                        samples = distribution.sample(draws_per_object, seed=seed + index)
+                        samples = _conditioned_samples(
+                            distribution, draws_per_object, seed + index, unique_candidate_target
+                        )
                     sampling_seconds = monotonic() - sampling_started
+                    record_phase("sampling", "finish", object_id=obj.object_id, draws=len(samples))
                     sampled_candidates = tuple(
                         distribution.candidate(s.assignment) for s in samples
                     )
@@ -782,6 +902,7 @@ def freeze_neural_round(
                         c.candidate_id: max(-1e30, float(distribution.candidate_log_probability(c)))
                         for c in deduplicate_candidates((*controls, *sampled_candidates))
                     }
+                compiled = getattr(distribution, "circuit", None)
                 mandatory = {c.candidate_id for c in controls}
                 offered = deduplicate_candidates((*sampled_candidates, *controls))
                 removed = removals.get(obj.object_id, frozenset())
@@ -806,7 +927,13 @@ def freeze_neural_round(
                             "preserved candidate violates the effective nested generation language"
                         )
                 offered = deduplicate_candidates((*offered, *preserved))
-                if any("keep" in c.action_tags and c.candidate_id in removed for c in offered):
+                # Action tags describe derivations and can alias activated or
+                # changed bundles. Only the original axioms without activation
+                # constitute the unchanged mandatory state.
+                unchanged_id = make_candidate(
+                    obj.object_id, obj.original_axioms, ("keep",)
+                ).candidate_id
+                if unchanged_id in removed:
                     raise ValueError(
                         "evaluator removal cannot remove the unchanged mandatory state"
                     )
@@ -820,7 +947,17 @@ def freeze_neural_round(
                     offered, candidate_cap, scores=ranked, mandatory_ids=mandatory | preserved_ids
                 )
                 if any(
-                    c.candidate_id in removed or not encoding.candidate_assignments(c)
+                    c.candidate_id in removed
+                    or not encoding.candidate_assignments(c)
+                    or (
+                        {
+                            str(e.iri.value)
+                            for ax in (*c.axioms, *c.active_expressions)
+                            for e in owl.signature(ax)
+                        }
+                        - original_symbols
+                    )
+                    & omitted
                     for c in selected
                 ):
                     raise AssertionError("frozen candidate pool violates its effective declaration")
@@ -881,7 +1018,8 @@ def freeze_neural_round(
                                     and not getattr(
                                         (
                                             distribution.circuit
-                                            if proposal_arm != "rejection"
+                                            if proposal_arm
+                                            not in {"rejection", "matched_grammar_decoder"}
                                             else None
                                         ),
                                         "complete",
@@ -920,6 +1058,12 @@ def freeze_neural_round(
                             else "completed_families_only_unknown_omitted_mass"
                         ),
                         "arm": proposal_arm,
+                        "decoder_support_identity": getattr(distribution, "support_identity", None),
+                        "decoder_scope": (
+                            "tractable_completed_exhaustive_support"
+                            if proposal_arm == "matched_grammar_decoder"
+                            else None
+                        ),
                         "seed": seed + index,
                         "mixtures": (
                             int(distribution.literal_logits.shape[0])
@@ -945,8 +1089,8 @@ def freeze_neural_round(
                                     "log_probability": sample.log_probability,
                                     "grammar_hash": encoding.content_hash,
                                     "circuit_hash": (
-                                        distribution.circuit.cache_key
-                                        if distribution is not None and proposal_arm != "rejection"
+                                        compiled.cache_key
+                                        if distribution is not None and compiled is not None
                                         else None
                                     ),
                                     "retrieval_hash": canonical_hash(retrieval),
@@ -969,7 +1113,14 @@ def freeze_neural_round(
                             )
                             for sample, candidate in zip(samples, sampled_candidates)
                         ),
-                        "attempted_draws": draws_per_object if distribution is not None else 0,
+                        "attempted_draws": len(samples) + rejected,
+                        "unique_candidate_target": unique_candidate_target,
+                        "unique_target_reached": (
+                            len({sample.candidate_id for sample in samples})
+                            >= unique_candidate_target
+                            if unique_candidate_target is not None
+                            else None
+                        ),
                         "enumerated_candidates": enumerated,
                         "probability_semantics": (
                             "unconditioned_bundle_mass"
@@ -991,27 +1142,29 @@ def freeze_neural_round(
                             p.content_hash for p in encoding.context_proofs
                         ),
                         "contextual_checks": encoding.contextual_checks,
+                        "contextual_expensive_calls": encoding.contextual_expensive_calls,
+                        "contextual_cache_hits": encoding.contextual_cache_hits,
                         "contextual_truncated": encoding.contextual_truncated,
                         "contextual_scope": "immutable named/one-existential active-unsatisfiability proofs",
                         "circuit_hash": (
-                            distribution.circuit.cache_key
-                            if distribution is not None and proposal_arm != "rejection"
+                            compiled.cache_key
+                            if distribution is not None and compiled is not None
                             else None
                         ),
                         "circuit_nodes": (
-                            distribution.circuit.node_count
-                            if distribution is not None and proposal_arm != "rejection"
+                            compiled.node_count
+                            if distribution is not None and compiled is not None
                             else 0
                         ),
                         "boolean_variables": encoding.variable_count,
                         "compilation_seconds": (
-                            distribution.circuit.compilation_seconds
-                            if distribution is not None and proposal_arm != "rejection"
+                            compiled.compilation_seconds
+                            if distribution is not None and compiled is not None
                             else 0.0
                         ),
                         "circuit_build_seconds": (
-                            distribution.circuit.compilation_seconds
-                            if distribution is not None and proposal_arm != "rejection"
+                            compiled.compilation_seconds
+                            if distribution is not None and compiled is not None
                             else 0.0
                         ),
                         "compilation_cache_hit": compilation_cache_hit,
@@ -1112,6 +1265,21 @@ def freeze_neural_round(
             )
     finally:
         model.train(prior_training)
+
+
+def _conditioned_samples(distribution, maximum, seed, target):
+    """Stop at the same unique K while charging each actual draw in both decoders."""
+    if target is None:
+        return distribution.sample(maximum, seed=seed)
+    samples = []
+    unique = set()
+    for offset in range(maximum):
+        sample = distribution.sample(1, seed=seed + offset)[0]
+        samples.append(sample)
+        unique.add(sample.candidate_id)
+        if len(unique) >= target:
+            break
+    return tuple(samples)
 
 
 def _rejection_samples(distribution: Any, count: int, seed: int) -> tuple[tuple[Any, ...], int]:
@@ -1430,4 +1598,261 @@ def repair_neural_round(
         shortlist_seconds=shortlist_seconds,
         **risk_options,
         **options,
+    )
+
+
+@dataclass(frozen=True)
+class StagedRepairResult:
+    """The selected certificate remains bound to precisely its frozen epoch."""
+
+    frozen: FrozenNeuralRound | None
+    result: Any
+    stages: tuple[dict[str, Any], ...]
+    elapsed_seconds: float
+    generation_status: str
+
+
+def staged_verified_repair(
+    problem: RepairInputV2,
+    model: Any = None,
+    *,
+    total_seconds: float | None = None,
+    elementary_seconds: float = 30.0,
+    generation_options: dict[str, Any] | None = None,
+    repair_options: dict[str, Any] | None = None,
+    final_verification_seconds: float | None = None,
+    checkpoint_path: str | None = None,
+    checkpoint_sha256: str | None = None,
+) -> StagedRepairResult:
+    """Seek a verified incumbent before bounded rich-generation epochs.
+
+    This explicit scheduling amendment never carries a solver bound or an
+    acceptance certificate into a changed objective/policy. A stalled expansion
+    returns the previously verified elementary result with its original scope.
+    """
+    import math
+    from .candidates import deduplicate_candidates
+    from .grammar import mapping_grammar
+    from .kernel import repair
+    from .records import ObjectiveV2
+    from .workers import SUPERVISION_GRACE_SECONDS
+
+    total = problem.budgets.total_seconds if total_seconds is None else total_seconds
+    if not all(math.isfinite(x) and x > 0 for x in (total, elementary_seconds)):
+        raise ValueError("staged budgets must be finite and positive")
+    if (model is None) == (checkpoint_path is None):
+        raise ValueError("provide exactly one frozen model or checkpoint path")
+    options = dict(generation_options or {})
+    kernel_options = dict(repair_options or {})
+    if kernel_options.get("resume") or kernel_options.get("initial_assignment") is not None:
+        raise ValueError("staged epochs require their own fresh search identities")
+    base_ledger = kernel_options.pop("ledger_path", None)
+    started = monotonic()
+    stages: list[dict[str, Any]] = []
+    selected_frozen = selected_result = None
+    final_allowance = (
+        min(problem.budgets.verification_seconds * 2, total / 3)
+        if final_verification_seconds is None
+        else final_verification_seconds
+    )
+    if not math.isfinite(final_allowance) or final_allowance <= 0 or final_allowance >= total:
+        raise ValueError("final verification reserve must fit the total budget")
+
+    def remaining():
+        return max(0.0, total - (monotonic() - started))
+
+    def run_kernel(frozen, seconds, index, initial=None):
+        scoped = replace(
+            frozen.problem,
+            budgets=replace(frozen.problem.budgets, total_seconds=max(0.001, seconds)),
+        )
+        frozen = replace(frozen, problem=scoped)
+        calls = {**kernel_options}
+        if base_ledger is not None:
+            calls["ledger_path"] = str(base_ledger) + f".epoch-{index}"
+        if initial is not None:
+            calls["initial_assignment"] = initial
+        before = monotonic()
+        result = repair_neural_round(frozen, **calls)
+        stages.append(
+            dict(
+                phase="selection_verification",
+                epoch=index,
+                status=result.logical_status,
+                input_hash=scoped.content_hash,
+                objective_hash=frozen.objective.content_hash,
+                assignment_ids=[c.candidate_id for c in result.selected],
+                wall_seconds=monotonic() - before,
+                search_status=result.search_status,
+            )
+        )
+        return frozen, result
+
+    # Construct only deterministic elementary actions. This performs no circuit,
+    # graph or model work and freezes their public vocabulary before verification.
+    objects = []
+    for obj in problem.objects:
+        actions = (
+            ("keep", "delete", "retain_subsumption")
+            if obj.kind == "mapping"
+            else ("keep", "delete")
+        )
+        encoding = mapping_grammar(
+            obj,
+            (),
+            (),
+            max_depth=0,
+            max_constructors=0,
+            enabled_actions=actions,
+            fixed_axioms=problem.fixed_axioms,
+        )
+        objects.append(
+            replace(obj, candidates=deduplicate_candidates(encoding.elementary_candidates))
+        )
+    elementary = replace_inventory(problem, tuple(objects))
+    elementary_deadline = started + min(elementary_seconds, total - final_allowance)
+    preflight_seconds = min(max(0.001, elementary_seconds / 3), remaining() - final_allowance)
+    if preflight_seconds > 0:
+        preflight = replace(
+            elementary,
+            budgets=replace(elementary.budgets, total_seconds=preflight_seconds, max_solves=0),
+        )
+        neutral = ObjectiveV2(tuple(tuple(0 for _ in obj.candidates) for obj in preflight.objects))
+        initial_frozen = FrozenNeuralRound(
+            preflight, neutral, "not_constructed", "not_evaluated:initial_coherence", ()
+        )
+        before = monotonic()
+        initial_result = repair(preflight, neutral, **kernel_options)
+        stages.append(
+            dict(
+                phase="initial_coherence",
+                status=initial_result.logical_status,
+                input_hash=preflight.content_hash,
+                wall_seconds=monotonic() - before,
+                optimization_bypassed=initial_result.optimization_bypassed,
+            )
+        )
+        if (
+            initial_result.optimization_bypassed
+            and initial_result.verification is not None
+            and initial_result.verification.authorizes
+        ):
+            return StagedRepairResult(
+                initial_frozen,
+                initial_result,
+                tuple(stages),
+                monotonic() - started,
+                "INITIAL_COHERENT_NO_GENERATION",
+            )
+
+    def freeze(pool, seconds, **generation):
+        arguments = dict(seconds=seconds, memory_mb=pool.budgets.memory_mb, **generation)
+        if checkpoint_path is not None:
+            return bounded_freeze_checkpoint(
+                pool, checkpoint_path, checkpoint_sha256=checkpoint_sha256, **arguments
+            )
+        return bounded_freeze_neural_round(pool, model, **arguments)
+
+    allowance = min(elementary_deadline - monotonic(), remaining() - final_allowance)
+    if allowance > 2 * SUPERVISION_GRACE_SECONDS:
+        elementary_options = {
+            **options,
+            "draws_per_object": 0,
+            "max_depth": 0,
+            "max_constructors": 0,
+            "enabled_actions": tuple(
+                sorted(
+                    {
+                        tag
+                        for obj in elementary.objects
+                        for candidate in obj.candidates
+                        for tag in candidate.action_tags
+                    }
+                    & {"keep", "delete", "retain_subsumption"}
+                )
+            ),
+            "preserved_candidates": {obj.object_id: obj.candidates for obj in elementary.objects},
+        }
+        # Mixed ontology/mapping inputs admit keep/delete, the common contract.
+        if len({obj.kind for obj in elementary.objects}) > 1:
+            elementary_options["enabled_actions"] = ("keep", "delete")
+        before = monotonic()
+        outcome = freeze(elementary, max(0.001, allowance / 2), **elementary_options)
+        stages.append(
+            dict(
+                phase="elementary_scoring",
+                status=outcome.status,
+                cleanup_complete=outcome.cleanup_complete,
+                detail=outcome.detail,
+                wall_seconds=monotonic() - before,
+            )
+        )
+        if not outcome.cleanup_complete:
+            return StagedRepairResult(
+                None, None, tuple(stages), monotonic() - started, "CLEANUP_INCOMPLETE"
+            )
+        if outcome.status == "complete":
+            left = min(elementary_deadline - monotonic(), remaining() - final_allowance)
+            if left > SUPERVISION_GRACE_SECONDS:
+                frozen, result = run_kernel(outcome.value, left, 0)
+                if result.verification is not None and result.verification.authorizes:
+                    selected_frozen, selected_result = frozen, result
+
+    # The rich epoch freezes a fresh objective over every retained candidate.
+    # Independently completed family circuits remain in their exact-language cache.
+    preserved = {
+        obj.object_id: obj.candidates
+        for obj in (selected_frozen.problem if selected_frozen else elementary).objects
+    }
+    generation_seconds = remaining() - final_allowance - SUPERVISION_GRACE_SECONDS
+    if generation_seconds > 0:
+        before = monotonic()
+        outcome = freeze(
+            problem, generation_seconds, **{**options, "preserved_candidates": preserved}
+        )
+        stages.append(
+            dict(
+                phase="rich_generation",
+                status=outcome.status,
+                cleanup_complete=outcome.cleanup_complete,
+                detail=outcome.detail,
+                wall_seconds=monotonic() - before,
+                preserved_candidate_ids={
+                    key: [c.candidate_id for c in values] for key, values in preserved.items()
+                },
+            )
+        )
+        if not outcome.cleanup_complete:
+            return StagedRepairResult(
+                selected_frozen,
+                selected_result,
+                tuple(stages),
+                monotonic() - started,
+                "CLEANUP_INCOMPLETE",
+            )
+        if outcome.status == "complete" and remaining() > SUPERVISION_GRACE_SECONDS:
+            frozen = outcome.value
+            initial = None
+            if selected_result is not None:
+                ids = {c.object_id: c.candidate_id for c in selected_result.selected}
+                initial = tuple(
+                    next(
+                        i
+                        for i, c in enumerate(obj.candidates)
+                        if c.candidate_id == ids[obj.object_id]
+                    )
+                    for obj in frozen.problem.objects
+                )
+            frozen, result = run_kernel(frozen, remaining() - SUPERVISION_GRACE_SECONDS, 1, initial)
+            if result.verification is not None and result.verification.authorizes:
+                selected_frozen, selected_result = frozen, result
+                return StagedRepairResult(
+                    frozen, result, tuple(stages), monotonic() - started, result.generation_status
+                )
+    return StagedRepairResult(
+        selected_frozen,
+        selected_result,
+        tuple(stages),
+        monotonic() - started,
+        "ELEMENTARY_INCUMBENT_PARTIAL_GENERATION" if selected_result else "UNRESOLVED_NO_INCUMBENT",
     )

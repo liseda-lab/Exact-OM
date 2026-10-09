@@ -22,11 +22,19 @@ def stalled_handler(event):
 
 
 def test_rev01_large_event_count_uses_bounded_durable_stream(record_property):
-    outcome = bounded_call(many_events, 10001, timeout=30)
-    assert outcome.status == "complete", outcome.detail
+    # This checks cardinality and durability, not storage throughput. Each
+    # singleton is FULL-synchronous and acknowledged separately; 10,001 commits
+    # on allocation 14408's disk need more than the old 30-second allowance.
+    # Keep a finite engineering deadline; scientific case budgets and the short
+    # REV-02 deadline-responsiveness regressions are independent and unchanged.
+    timeout = 900
+    outcome = bounded_call(many_events, 10001, timeout=timeout)
+    record_property("qualification_timeout_seconds", timeout)
     record_property("transported_events", len(outcome.events))
+    record_property("transport_status", outcome.status)
     for key, value in outcome.resource_usage:
         record_property(key, value)
+    assert outcome.status == "complete", outcome.detail
     assert outcome.value == 10001 and len(outcome.events) == 10001
     assert list(outcome.events)[-1] == ("coverage", 10000)
     assert dict(outcome.resource_usage)["peak_buffered_event_bytes"] <= 16 * 1024 * 1024
@@ -200,7 +208,7 @@ def test_rev01_invalid_coverage_never_manufactures_acceptance():
             assert "integrity discrepancy" in result.value.detail
 
 
-def test_rev01_committed_failure_survives_hang_and_broken_frame():
+def test_rev01_committed_failure_survives_hang_and_broken_frame(record_property):
     from exact.repair.kernel import _VerificationStream
 
     for kind in ("hang", "broken"):
@@ -209,10 +217,18 @@ def test_rev01_committed_failure_survives_hang_and_broken_frame():
             malformed_stream,
             problem,
             kind,
-            timeout=0.8,
+            # Allow spawned OWL imports and the first durable ACK to complete.
+            # This checks retention after a hang/broken frame; the independent
+            # REV-02 tests below enforce subsecond deadline responsiveness.
+            timeout=5,
             event_handler=_VerificationStream(problem, ()),
         )
+        record_property(kind + "_transported_events", len(result.events))
+        record_property(kind + "_transport_status", result.status)
+        for key, value in result.resource_usage:
+            record_property(kind + "_" + key, value)
         assert result.status in {"timeout", "error"}
+        assert result.event_failure is not None, result.detail
         assert result.event_failure.obligation.verdict == "fail"
         assert len(result.events) == 1
 
