@@ -102,6 +102,7 @@ def test_report_recovery_cannot_start_fresh_or_combine_migrations(tmp_path):
 
 def test_completed_checkpoint_finalizes_without_training_or_reselection(tmp_path, monkeypatch):
     import inspect
+    from pathlib import Path
 
     import torch
 
@@ -139,6 +140,9 @@ def test_completed_checkpoint_finalizes_without_training_or_reselection(tmp_path
     bound = inspect.signature(train.train_cases).bind(training, development, **options)
     bound.apply_defaults()
     identity_options = dict(bound.arguments)
+    for key in ("graph_schema", "final_development_reserve_seconds"):
+        if identity_options[key] is None:
+            identity_options.pop(key)
     for key in (
         "checkpoint_path",
         "deadline_seconds",
@@ -160,6 +164,19 @@ def test_completed_checkpoint_finalizes_without_training_or_reselection(tmp_path
     monkeypatch.setattr(train, "generated_development", forbidden)
     with pytest.raises(ValueError, match="incompatible"):
         train.train_cases(training, development, **options)
+    # The production migration remains pinned to its original dependency set;
+    # changing only a predecessor label must not bypass that guard.
+    with pytest.raises(ValueError, match="incompatible"):
+        train.train_cases(training, development, resume_report_transport=True, **options)
+    fixture_dependencies = canonical_hash(
+        [
+            (source.name, source.read_bytes().hex())
+            for source in sorted(
+                (Path(train.__file__).resolve().parents[2] / "exact/repair").glob("*.py")
+            )
+        ]
+    )
+    monkeypatch.setattr(report_recovery, "UNCHANGED_DEPENDENCIES", fixture_dependencies)
     resumed, report = train.train_cases(
         training, development, resume_report_transport=True, **options
     )

@@ -36,6 +36,18 @@
       "exit_code": 0,
       "log": "...................                                                      [100%]\n19 passed in 4.93s\n",
       "log_sha256": "f3ff6d52d5ad9c8805df98aaebc75fef9b59d368518b6582e4cf52b147ffdc10"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_report_recovery_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "..................                                                       [100%]\n18 passed, 9 warnings in 13.51s\n",
+      "log_sha256": "d86e378a77eff561ca0ee0e8b79ea5b52463601ca252ecc972dcc0f90f7b8b0f"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "........                                                                 [100%]\n8 passed in 1.87s\n",
+      "log_sha256": "695a1f78ac0c347ebe04a8b74e22541b6d0f2815e834b0f7e9fcca1938e19587"
     }
   ],
   "compatibility": "Legacy mixed supervision retains old blending; new symbolic_plus_llm requires provenance_additive/v1. New protocol optional fields are omitted when absent. Changed schema/targets/source retain strict incompatible-resume rejection; no old experiment data was modified.",
@@ -111,7 +123,9 @@
     "Default DEV post-decode reserve is 182 seconds plus 90 seconds for an order-swap audit; a 300-second audited slot leaves 28 seconds for repair. Any enlarged case budget needs a matched frozen protocol amendment informed by calibration.",
     "Order-swap audits use an original and swapped independently charged observation, aggregate with quorum two and unanimity; missing/disagreeing audit observations abstain instead of admitting the original alone.",
     "A live model is never passed into native bounded workers: staged generation uses a CPU checkpoint path; core owns CUDA-safe worker launching.",
-    "Acquisition recognizes both exact historical hard-plus-soft and current hard-only unqualified-parent ValueError spellings, retaining original detail and no supervision. RuntimeError and near-matching unrelated messages remain software failures. Live parent qualification still checks hard policy alone; 19 regression/native tests passed."
+    "Acquisition recognizes both exact historical hard-plus-soft and current hard-only unqualified-parent ValueError spellings, retaining original detail and no supervision. RuntimeError and near-matching unrelated messages remain software failures. Live parent qualification still checks hard policy alone; 19 regression/native tests passed.",
+    "Historical completed-report recovery acceptance remains pinned to production predecessor and dependency hashes. Its synthetic integration fixture now models both hashes and omitted optional configuration fields explicitly, tests rejection under the real dependency guard, then proves no optimization/reselection during explicitly mocked compatible recovery. All 18 recovery tests pass; production code unchanged.",
+    "Standalone calibration run writes immutable used.json binding exact manifest path/hash before any slot processing or hosted admission, including a run with no transmitted requests. Identical replay remains valid; changed used manifest is rejected. All eight annotation-runner tests pass."
   ],
   "packages": {
     "mypy": "1.20.2",
@@ -152,11 +166,12 @@
     "exact/repair/study.py": "447d563445995e8f67d331f731ad470ee38b6cb105b59743a442c5283461e5ba",
     "exact/repair/workers.py": "a9a1baf1a0dc8554240e69ae64a3335dfdae83ee66774abfbf68d6a79a02dbd1",
     "tests/repair_acquisition_test.py": "87dee058aff7f50434fa5395d54be267ec3cc2229135536981ca121e723accc2",
-    "tests/repair_october_learning_annotation_runner_test.py": "eafee4e65c07c25444770d35ca3ffecb7fc92754a2157ce03537a8a17c898bfb",
+    "tests/repair_october_learning_annotation_runner_test.py": "fc87a2543b225f048a6e31d1a5e808c001fba00205af908798c949b5034ab781",
     "tests/repair_october_learning_contract_test.py": "f8189de7c50d73a78e2f976dc671841968d7e88b171454024e8e76553495e527",
     "tests/repair_october_learning_semantics_test.py": "bb64109bf12160ae489f85e1882d47dd7262acc8ff298eb9418d7a9e159f8ae1",
+    "tests/repair_report_recovery_test.py": "50c44b7649f8203cfd9855175443999287ef1739ecc578aa6ead50fecffe25e1",
     "tools/repair/acquisition.py": "00f0d54ccc133bd13c5b4a52a3320aa51b75eb959ed7902a21d78d6fddf2b062",
-    "tools/repair/corrective_semantics.py": "31ebe945ceeaa964231dca6d037ee5430d2a9c21c080e4dc43a4031a4316b8c3",
+    "tools/repair/corrective_semantics.py": "d2123e2ab50848f2cdda960760bfcb118998b99bd7a235be756de50a8d6169b7",
     "tools/repair/development_collection.py": "6d0a9a5bdbf494608c28ab02a34e167a605f2fac6ebe7238ebae530f1f68545e",
     "tools/repair/qualify_learning.py": "3e47c7bfd72734a65e24f1c17b7349e193399f5679360ca0c27a31226cc7c585",
     "tools/repair/train.py": "7b82e6e4e2e52ce479e957e717098bbc4eb0cdadaf06b51906837c08abddd11f"

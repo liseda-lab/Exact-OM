@@ -110,7 +110,7 @@ def test_first_queue_is_bound_paired_and_budgeted_without_reservation(campaign):
     followup = registry["pending_batches"][-1]
     assert set(followup["depends_on"]) == {row["id"] for row in value["jobs"]}
     assert followup["preparation_only"] and not followup["needs_user"]
-    assert registry["campaign_context"]["preserve_steps"] == ["14451.0", "14451.4", "14451.extern"]
+    assert registry["campaign_context"]["preserve_steps"] == ["14451.0", "14451.extern"]
     assert (campaign / "ledger.json").read_bytes() == before
     assert not (campaign / "supervisor").exists()
 

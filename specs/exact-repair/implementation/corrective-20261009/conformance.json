@@ -10,18 +10,18 @@
   "receipts": {
     "core": {
       "path": "specs/exact-repair/implementation/corrective-20261009/core.json",
-      "sha256": "ac70b40d0a3df614ec1ae5edb4b4687d3d4dbf8d081e8ccd187cae8180d7b970"
+      "sha256": "3e74bb15656d2cafb0f5f636e5b6037a6e26d41eaa326addb1e43a6f067b3e65"
     },
     "deployment": {
       "path": "specs/exact-repair/implementation/corrective-20261009/deployment.json",
-      "sha256": "b997e0160002516a443a8f801aebe030c118f1b8e5d9c6232187962f7d649303"
+      "sha256": "3832b0ddaa5edfb5f87252f925189e96a97f96ca00d162601c2d1fa564802182"
     },
     "learning": {
       "path": "specs/exact-repair/implementation/corrective-20261009/learning.json",
-      "sha256": "fe83de8c5f280e74cc4cccac691b996922f36c8735e4d4253e45e4d5cd195222"
+      "sha256": "77c8c92a15197b0eb3beaa54fff9bbe59a1cbbaf14a9e3df2a5d6ae57a887562"
     }
   },
-  "repository_check_limit": "Full repository mypy also reports18 errors in untouched exact_inspect/study files; targeted repair/experiments types are clean.",
+  "repository_check_limit": "Repository-wide type checks also expose unrelated exact_inspect/study errors (18) and newly merged matcher throughput/public-inference/campaign errors (10). No repair or owned supervisor type errors remain. Unrelated concurrent work is preserved.",
   "requirements": {
     "COR-01": {
       "evidence": [
@@ -30,7 +30,7 @@
         "deployment"
       ],
       "implementation": "Integrated selected published corrections and their dependency closure; retained unrelated matcher safeguards.",
-      "qualification_limit": "Imported regression integration audit is still running.",
+      "qualification_limit": "Imported test segments and all identified compatibility regressions completed; scientific campaign gates remain separate.",
       "status": "implemented_with_recorded_checks; empirical_gate_separate"
     },
     "COR-02": {
@@ -128,10 +128,24 @@
   },
   "root_checks": {
     "calibration_packets": "32locallyvalidated; no paidtransmissions",
+    "dry_launch": "7 reviewed jobs planned from actual draft inputs;4launch tests passed",
     "import_boundaries": "5contracts kept,0broken",
-    "imported_regressions": "running; one legacy parent-status compatibility regression fixed and affected19tests passed",
+    "imported_regressions": {
+      "annotation_consumption": 8,
+      "corrected_full_files": {
+        "acquisition": 19,
+        "composite_scaling_policy": 12,
+        "report_recovery": 18,
+        "transport_plus_lifecycle": 13
+      },
+      "draft_calibration_guards": 8,
+      "initial_segment": "391passed;3failures identified then corrected in focused runs",
+      "overlap": "Counts overlap with component evidence; do not sum them as distinct tests.",
+      "remaining_final_segment": "169passed",
+      "remaining_first_segment": "10passed;2 obsolete composite expectations corrected"
+    },
     "protocol_tests": "21passed",
-    "scoped_mypy": "74files passed"
+    "scoped_mypy": "30repair/owned supervisor source files clean after merging concurrent dev; earlier broader74file scope passed before unrelated matcher additions"
   },
   "schema": "exact-repair/corrective-conformance/v1",
   "source_binding": "Each component receipt records actual final source/test SHA256; deployment additionally freezes an entire clean Git commit.",
