@@ -328,10 +328,16 @@ class AuditIOMixin:
         destination = self.output_dir / "source_decisions.json"
         previous = json.loads(destination.read_text()) if destination.exists() else {}
         previous_records = {str(row["Src"]): row for row in previous.get("records", [])}
+        emitted_by_source = {}
+        pre_typing_by_source = {}
+        for source, target in emitted:
+            emitted_by_source.setdefault(source, []).append(target)
+        for source, target in before_typing:
+            pre_typing_by_source.setdefault(source, []).append(target)
         records = []
         for source in universe:
             candidates = sorted(groups.get(source, []), key=lambda row: row["target"])
-            targets = sorted(target for src, target in emitted if src == source)
+            targets = sorted(emitted_by_source.get(source, ()))
             record = dict(previous_records.get(source, {}))
             record.update(
                 Src=source,
@@ -340,7 +346,7 @@ class AuditIOMixin:
                 emitted_targets=targets,
                 action="emit" if targets else "abstain",
                 empty_candidate_pool=not candidates,
-                pre_typing_targets=sorted(target for src, target in before_typing if src == source),
+                pre_typing_targets=sorted(pre_typing_by_source.get(source, ())),
                 competing_sources_by_target={
                     row["target"]: sorted(competitors[row["target"]] - {source})
                     for row in candidates

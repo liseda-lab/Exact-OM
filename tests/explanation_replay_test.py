@@ -141,6 +141,70 @@ def test_source_trace_is_after_target_cardinality_and_keeps_empty_and_exact_sour
     assert rows["s2"]["competing_sources_by_target"] == {"t1": ["s1"]}
 
 
+@pytest.mark.parametrize("reverse", [False, True])
+def test_source_trace_preserves_sorted_mapping_and_relation_abstentions(tmp_path, reverse):
+    dataset = _Dataset()
+    dataset.eligible_source_iris = ["s2", "empty", "s1"]
+    runner = SemanticAlignmentRunner(
+        dataset=dataset, model=_Model, device=torch.device("cpu"), output_dir=tmp_path
+    )
+    rows = [
+        {"Src": "s2", "Tgt": "tz", "S_final": 0.9},
+        {"Src": "s1", "Tgt": "tz", "S_final": 0.9},
+        {"Src": "s1", "Tgt": "ta", "S_final": 0.9},
+        {"Src": "s1", "Tgt": "removed", "S_final": 0.9},
+    ]
+    predictions = [EntityMapping(row["Src"], row["Tgt"], score=0.9) for row in rows]
+    # Repeated predictions still represent one mapping, while tied scores retain
+    # every distinct candidate and the shared target's original competitors.
+    predictions.append(predictions[0])
+    typed = [
+        {"SrcEntity": "s1", "TgtEntity": "tz", "Relation": "<", "relation_confidence": 0.8},
+        {"SrcEntity": "s2", "TgtEntity": "tz", "Relation": "=", "relation_confidence": 0.7},
+        {"SrcEntity": "s1", "TgtEntity": "ta", "Relation": "=", "relation_confidence": 0.6},
+    ]
+    if reverse:
+        rows.reverse()
+        predictions.reverse()
+        typed.reverse()
+    runner._final_candidate_frame = pd.DataFrame(rows)
+    runner._decision_policy = {"threshold": 0.7}
+    runner.results_json.append({
+        "src_iri": "s1", "tgt_iri": "removed",
+        "relation_abstention": {"reason": "insufficient_directional_evidence"},
+    })
+    (tmp_path / "source_decisions.json").write_text(json.dumps({
+        "mode": "local", "records": [{"Src": "empty", "original_query_ids": [4, 9]}],
+    }))
+    path = runner._write_source_decisions(predictions, pd.DataFrame(typed))
+    trace = json.loads(path.read_text())
+    records = trace["records"]
+    assert trace["source_universe"] == ["empty", "s1", "s2"]
+    assert trace["mode"] == "local"
+    assert trace["reference_labels_used"] is False
+    assert [
+        (row["Src"], row["emitted_targets"], row["pre_typing_targets"],
+         row["action"], row["empty_candidate_pool"])
+        for row in records
+    ] == [
+        ("empty", [], [], "abstain", True),
+        ("s1", ["ta", "tz"], ["removed", "ta", "tz"], "emit", False),
+        ("s2", ["tz"], ["tz"], "emit", False),
+    ]
+    assert records[0]["original_query_ids"] == [4, 9]
+    assert records[1]["competing_sources_by_target"] == {"removed": [], "ta": [], "tz": ["s2"]}
+    assert records[2]["competing_sources_by_target"] == {"tz": ["s1"]}
+    candidates = records[1]["candidates"]
+    assert [row["target"] for row in candidates] == ["removed", "ta", "tz"]
+    assert candidates[0]["reason"] == "relation_abstention"
+    assert candidates[0]["pre_typing_selected"] is True
+    assert candidates[0]["emitted"] is False
+    assert candidates[0]["relation_abstention"] == {"reason": "insufficient_directional_evidence"}
+    assert [(row["relation"], row["relation_confidence"]) for row in candidates[1:]] == [
+        ("=", 0.6), ("<", 0.8),
+    ]
+
+
 @pytest.mark.parametrize("alias,column", [("src_iri", "Src"), ("tgt_iri", "Tgt")])
 @pytest.mark.parametrize("canonical_value", ["same", None])
 def test_source_trace_coalesces_consistent_identity_aliases(

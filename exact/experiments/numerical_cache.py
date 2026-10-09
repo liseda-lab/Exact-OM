@@ -243,6 +243,7 @@ class NumericalCache:
         self.limit = max(
             0, int(os.environ.get("EXACT_NUMERICAL_CACHE_MAX_BYTES", str(8 * 1024**3)))
         )
+        self.disk_limit = max(0, int(os.getenv("EXACT_NUMERICAL_CACHE_MAX_DISK_BYTES", str(self.limit))))
         self.hits = self.misses = self.skipped = 0
         self.depth = 0
         self.pid = os.getpid()
@@ -276,7 +277,7 @@ class NumericalCache:
         return value
 
     def put(self, scope, operation, key, value):
-        if self.bytes >= self.limit:
+        if self.bytes >= self.limit or self._disk_bytes() >= self.disk_limit:
             self.skipped += 1
             return
         stream = io.BytesIO()
@@ -299,6 +300,9 @@ class NumericalCache:
         # Bound RAM, never retain a SQLite writer while hosted inference waits.
         if self.pending_bytes >= 8 * 1024**2 or len(self.pending) >= 256 or not self.depth:
             self.flush()
+
+    def _disk_bytes(self):
+        return sum(path.stat().st_size for path in self.path.parent.glob(self.path.name + "*"))
 
     def _insert(self, scope, operation, key, payload, digest):
         cursor = self.connection.execute(
@@ -342,8 +346,17 @@ class NumericalCache:
         self.pending_bytes = 0
         before = self.entries, self.bytes, self.bytes_written
         try:
+            # Serialize quota admission with other writers. The reservation covers
+            # database pages, their WAL copies, indexes and per-row page overhead.
+            self.connection.execute("BEGIN IMMEDIATE")
+            reserved = self._disk_bytes()
             for address, (payload, digest) in pending.items():
+                growth = 2 * (len(payload) + sum(len(part.encode()) for part in address) + 32768)
+                if reserved + growth > self.disk_limit:
+                    self.skipped += 1
+                    continue
                 self._insert(*address, payload, digest)
+                reserved += growth
             self.connection.commit()
             self.transactions += 1
         except (OSError, sqlite3.Error):
@@ -375,6 +388,7 @@ class NumericalCache:
             "entries": self.entries,
             "payload_bytes": self.bytes,
             "limit_bytes": self.limit,
+            "physical_limit_bytes": self.disk_limit,
             "bytes_per_entry": self.bytes / self.entries if self.entries else 0,
             "disk_bytes": disk_bytes,
             "transactions": self.transactions,
@@ -420,7 +434,7 @@ def cached_numerical(*, channels=False):
                     try:
                         if allowed:
                             cache.put(identity, function.__name__, key, value)
-                    except (OSError, sqlite3.Error, TypeError):
+                    except (OSError, sqlite3.Error, TypeError, RuntimeError):
                         cache.skipped += 1
             if not channels and isinstance(value, dict):
                 value["numerical_cache"] = {
@@ -466,6 +480,110 @@ def cached_numerical(*, channels=False):
     return decorate
 
 
+def training_content_contract(model):
+    """Bind known train-only primitives independently of the reporting population.
+
+    This narrow contract is intentionally unavailable for unfamiliar scorers or
+    datasets. Actual train rows, labels and batching are bound by the caller.
+    """
+    dataset = getattr(model, "_attached_dataset", None)
+    runtime_path = os.getenv("EXACT_EXPERIMENT_RUNTIME")
+    if (not runtime_path or os.getenv("EXACT_NUMERICAL_CACHE", "1") == "0"
+            or type(model).__module__ != "exact.impl.models.pair_adaptive_scorer"
+            or type(dataset).__module__ != "exact.impl.datasets.pair_adaptive_context"):
+        return None
+    try:
+        record = json.loads(Path(runtime_path).read_text())
+        identity = record["identity"]
+        if not all(side in identity["inputs"] for side in ("source", "target")):
+            return None
+        templates = getattr(dataset, "_verbalization_templates", None)
+        if getattr(dataset, "verbalization_mode", None) == "deterministic":
+            templates = {}
+        if templates is None:
+            return None  # Never generate templates while discovering a cache.
+        data = deepcopy(dataset._cache_fingerprint_payload())
+        for name in ("filter_exact_matches", "drop_exact_match_sources", "filter_ignored_alignment_classes",
+                     "cardinality", "candidate_generation_version",
+                     "exact_prefilter_materialization_version", "ignored_alignment_filter_version",
+                     "candidate_generation_params", "retrieval_artifacts", "candidate_data_lock",
+                     "candidate_spec_lock", "candidate_model_lock", "request_seed"):
+            data.pop(name, None)
+        data["template_contents"] = deepcopy(templates)
+        encoders = _encoder_bindings(model)
+        if encoders is None:
+            return None
+        settings = {name: deepcopy(value) for name, value in vars(model).items()
+                    if name.endswith(("_config", "_enabled")) or name.startswith(("max_", "top_"))
+                    or name in {"tau", "gamma", "beta", "threshold", "use_lexical", "use_context", "fp16",
+                                "request_seed", "label_pair_pooling", "pooling_method",
+                                "hierarchical_relation_families", "ctx_sentence_delimiter"}}
+        original_llm = model.use_llm
+        model.use_llm = False
+        try:
+            state = deepcopy(model.runtime_fingerprint_payload())
+        finally:
+            model.use_llm = original_llm
+        deterministic = (getattr(model, "graph_config", {}).get("mode", "off") == "off"
+                         and not getattr(model, "graph_config", {}).get("hierarchy_removal", False)
+                         and not getattr(model, "property_config", {}).get("relations_shuffled", False)
+                         and not getattr(model, "instance_config", {}).get("relations_shuffled", False))
+        if deterministic:
+            state.pop("request_seed", None)
+            settings.pop("request_seed", None)
+        artifacts = {}
+        for name in ("_graph_artifact", "_fusion_artifact", "_gate_artifact", "_student_artifact", "_exemplar_artifact"):
+            artifact = getattr(model, name, None)
+            if artifact is None:
+                continue
+            if isinstance(artifact, dict):
+                artifacts[name] = deepcopy(artifact)
+            elif isinstance(getattr(artifact, "payload", None), dict) and isinstance(getattr(artifact, "provenance", None), dict):
+                artifacts[name] = {"payload": deepcopy(artifact.payload), "provenance": deepcopy(artifact.provenance)}
+            else:
+                return None
+        contract = {
+            "schema": "exact-training-content-v1", "role": "train", "kind": identity["entity_kind"],
+            "dataset": data, "model": state, "effective_settings": settings, "encoders": encoders,
+            "inputs": {side: identity["inputs"][side] for side in ("source", "target")},
+            "implementation": identity["implementation"], "dependencies": identity["dependencies"],
+            "artifacts": artifacts,
+            "exact_anchors": {name: {str(key): sorted(map(str, values)) for key, values in getattr(model, name, {}).items()}
+                              for name in ("_exact_anchor_src_to_tgt", "_exact_anchor_tgt_to_src")},
+            "hardware": {"device": str(model.device), "fp16": bool(model.fp16), "cuda": torch.version.cuda,
+                         "gpu": torch.cuda.get_device_name(model.device) if str(model.device).startswith("cuda") else None,
+                         "autocast": torch.is_autocast_enabled("cuda"),
+                         "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
+                         "tf32": torch.backends.cuda.matmul.allow_tf32,
+                         **{name: value for name, value in os.environ.items() if name.startswith("EXACT_PAIR_CONTEXT_")}},
+            "namespace": os.getenv("EXACT_PRIMITIVE_NAMESPACE", record.get("primitive_namespace", "scientific")),
+        }
+        fingerprint(contract)  # Unknown opaque dependencies fail closed.
+        return contract
+    except (OSError, TypeError, ValueError, KeyError, AttributeError):
+        return None
+
+
+def publish_training_reference(path, reference):
+    """Allow relocation only when every scientific binding and checksum is identical."""
+    from exact.experiments.runtime import _write
+    from exact.utils.fitted_artifacts import freeze_json
+    from exact.utils.provenance import sha256_file
+
+    path = Path(path)
+    if path.exists():
+        previous = json.loads(path.read_text())
+        if ({key: value for key, value in previous.items() if key != "aggregate_uri"}
+                != {key: value for key, value in reference.items() if key != "aggregate_uri"}):
+            raise ValueError("Training aggregate reference identity changed")
+        if sha256_file(Path(reference["aggregate_uri"])) != reference["sha256"]:
+            raise ValueError("Relocated training aggregate checksum mismatch")
+        if previous != reference:
+            _write(path, reference)
+        return reference
+    return freeze_json(path, reference)
+
+
 def training_score_reference(model, identity, application, batch_size, *, aggregate_path=None):
     """Discover a verified durable aggregate without duplicating its row payload."""
     from exact.experiments.runtime import _write
@@ -477,7 +595,12 @@ def training_score_reference(model, identity, application, batch_size, *, aggreg
     model._numerical_scoring_role = "train"
     model.use_llm = False
     try:
-        scope = _scope(model)
+        primitive = training_content_contract(model)
+        if primitive is None:
+            scope = _scope(model)
+        else:
+            record = json.loads(Path(os.environ["EXACT_EXPERIMENT_RUNTIME"]).read_text())
+            scope = (Path(os.getenv("EXACT_NUMERICAL_CACHE_ROOT", record["root"])), fingerprint(primitive))
         if scope is None:
             return None
         root, model_identity = scope
@@ -494,6 +617,8 @@ def training_score_reference(model, identity, application, batch_size, *, aggreg
             if payload.get("identity") != identity or not isinstance(payload.get("rows"), list):
                 return None
             rows = payload["rows"]
+            if {str(row["Src"]) for row in rows} & set(map(str, application.get("source_ids", []))):
+                raise ValueError("Training aggregate overlaps reporting source groups")
             reference = {
                 "schema": "exact-training-aggregate-reference-v1",
                 "semantic_key": key, "aggregate_uri": str(path),
@@ -503,9 +628,10 @@ def training_score_reference(model, identity, application, batch_size, *, aggreg
             }
             if index.exists():
                 previous = json.loads(index.read_text())
-                if previous.get("sha256") != reference["sha256"]:
+                if (previous.get("semantic_key") != key or previous.get("upstream") != contract
+                        or previous.get("sha256") != reference["sha256"]):
                     return None
-            _write(index, reference)
+            publish_training_reference(index, reference)
         else:
             reference = json.loads(index.read_text())
             if (reference.get("schema") != "exact-training-aggregate-reference-v1"
