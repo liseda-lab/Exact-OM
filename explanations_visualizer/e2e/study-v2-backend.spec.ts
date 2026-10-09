@@ -127,7 +127,9 @@ test("fresh browser journey: training, both conditions, reports and completion o
   await expect(source.locator(".focus-label")).toHaveText("crate");
   await source.locator(".tree .tree-label").first().click();
   await source.locator(".child-list .tree-label").first().click();
-  await source.getByRole("button", { name: /^Return to / }).click();
+  // Back to the compared concept: the explicit control (a child link that reaches it counts too, 21 F02).
+  if (await source.getByRole("button", { name: "Back to compared concept" }).count()) await source.getByRole("button", { name: "Back to compared concept" }).click();
+  await expect(source.getByText("Viewing compared concept")).toBeVisible();
   await expect(source.locator(".browser-section .section-head .meta").first()).toContainText("multiple inheritance");
   await saved(page, 4);
 
@@ -142,6 +144,26 @@ test("fresh browser journey: training, both conditions, reports and completion o
   await saved(page, 3);
 
   await page.getByRole("button", { name: "Next lesson", exact: true }).click();
+  // Q01/Q11: free exploration of the optional graph lesson. Ontology context added to the graph
+  // is inspection only: it saves nothing and is never rejected; a feature line is evidence.
+  await expect(page.getByRole("heading", { level: 1, name: /^Lesson 4 of 6/ })).toBeVisible();
+  const progressStatuses: number[] = [];
+  const onProgress = (response: import("@playwright/test").Response) => {
+    if (response.url().endsWith("/api/v1/study/tutorial/progress") && response.request().method() === "PUT") progressStatuses.push(response.status());
+  };
+  page.on("response", onProgress);
+  await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
+  const graphItems = page.locator(".graph-items");
+  await graphItems.getByRole("button", { name: /^Compared / }).first().click();
+  await page.locator(".graph-inspector").getByRole("button", { name: "Add its parents" }).click();
+  await expect(graphItems.getByText("Added from the ontology")).toBeVisible();
+  await graphItems.locator("section").filter({ hasText: "Added from the ontology" }).getByRole("button").first().click();
+  await expect(page.locator(".graph-inspector")).toContainText("Not one of Exact's selected features");
+  await saved(page, 0);
+  await graphItems.locator('[data-tour="graph-feature"]').first().click();
+  await saved(page, 2);
+  expect(progressStatuses.filter((status) => status >= 400)).toEqual([]);
+  page.off("response", onProgress);
   await page.getByRole("button", { name: "Next lesson", exact: true }).click();
   await expect(page.getByRole("heading", { name: /^Lesson 5 of 6/ })).toBeVisible();
   const add = () => page.getByRole("button", { name: /^Add .* as rank \d$/ }).first().click();
@@ -180,32 +202,42 @@ test("fresh browser journey: training, both conditions, reports and completion o
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Check your understanding" })).toBeVisible();
 
-  // C11: server-graded items with specific feedback and unlimited retries.
-  const items = page.locator(".assessment-item");
-  await items.nth(0).getByRole("radio", { name: "It must be equivalent." }).check();
-  await items.nth(0).getByRole("button", { name: "Check answer" }).click();
-  await expect(items.nth(0)).toContainText("Not quite");
-  await expect(items.nth(0).getByRole("button", { name: /^Revisit the lesson/ })).toBeVisible();
+  // C11: server-graded items with specific feedback and unlimited retries, one question at a time (21 F02).
+  const item = page.locator(".assessment-item");
+  const next = () => page.getByRole("button", { name: "Next question", exact: true }).click();
+  await item.getByRole("radio", { name: "It must be equivalent." }).check();
+  await item.getByRole("button", { name: "Check answer" }).click();
+  await expect(item).toContainText("Not quite");
+  await expect(item.getByRole("button", { name: /^Revisit the lesson/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Finish the tutorial and start the scored cases" })).toBeDisabled();
   await noViolations(page);
-  await items.nth(0).getByRole("radio", { name: /The matcher suggests it/ }).check();
-  await items.nth(0).getByRole("button", { name: "Check again" }).click();
-  await items.nth(1).getByRole("radio", { name: "No, the candidate is broader." }).check();
-  await items.nth(1).getByRole("button", { name: "Check answer" }).click();
-  const q3 = items.nth(2).locator("fieldset.match-row");
+  await item.getByRole("radio", { name: /The matcher suggests it/ }).check();
+  await item.getByRole("button", { name: "Check again" }).click();
+  await expect(item.getByText("Passed")).toBeVisible();
+  await next();
+  await item.getByRole("radio", { name: "No, the candidate is broader." }).check();
+  await item.getByRole("button", { name: "Check answer" }).click();
+  await expect(item.getByText("Passed")).toBeVisible();
+  await next();
+  const q3 = item.locator("fieldset.match-row");
   await q3.nth(0).getByRole("radio", { name: "None of these" }).check();
   await q3.nth(1).getByRole("radio", { name: "Insufficient information" }).check();
   await q3.nth(2).getByRole("radio", { name: "An empty, unsubmitted draft" }).check();
-  await items.nth(2).getByRole("button", { name: "Check answer" }).click();
-  const q4 = items.nth(3).locator("fieldset.match-row");
+  await item.getByRole("button", { name: "Check answer" }).click();
+  await expect(item.getByText("Passed")).toBeVisible();
+  await next();
+  const q4 = item.locator("fieldset.match-row");
   await q4.nth(0).getByRole("radio", { name: "Original ontology fact" }).check();
   await q4.nth(1).getByRole("radio", { name: "Matcher evidence" }).check();
   await q4.nth(2).getByRole("radio", { name: "Generated text" }).check();
   await q4.nth(3).getByRole("radio", { name: "No", exact: true }).check();
-  await items.nth(3).getByRole("button", { name: "Check answer" }).click();
-  for (const label of [/is optional/, /combine methods/, /After each source-and-candidates case/]) await items.nth(4).getByRole("checkbox", { name: label }).check();
-  await items.nth(4).getByRole("button", { name: "Check answer" }).click();
-  await expect(page.locator(".assessment-item.passed")).toHaveCount(5);
+  await item.getByRole("button", { name: "Check answer" }).click();
+  await expect(item.getByText("Passed")).toBeVisible();
+  await next();
+  for (const label of [/is optional/, /combine methods/, /After each source-and-candidates case/]) await item.getByRole("checkbox", { name: label }).check();
+  await item.getByRole("button", { name: "Check answer" }).click();
+  await expect(item.getByText("Passed")).toBeVisible();
+  await expect(page.locator(".question-nav button").filter({ hasText: "(passed)" })).toHaveCount(5);
   await page.getByRole("button", { name: "Finish the tutorial and start the scored cases" }).click();
 
   // Scored cases in both conditions, each followed by its own report.
@@ -248,7 +280,7 @@ test("fresh browser journey: training, both conditions, reports and completion o
         await studyBrowser.getByRole("combobox").press("Enter");
         await expect(studyBrowser.locator(".focus-label")).toHaveText("Navigation source 012");
         await expect(studyBrowser.locator(".browser-section .section-head .meta").first()).toHaveText("5 · multiple inheritance");
-        await studyBrowser.getByRole("button", { name: /^Return to / }).click();
+        await studyBrowser.getByRole("button", { name: "Back to compared concept" }).click();
         // Multi-page fact category: continue the context's own cursor to the end, no duplicates.
         const sourceCard = page.locator(".entity-card-source");
         await sourceCard.getByRole("button", { name: /^Other recorded facts/ }).click();

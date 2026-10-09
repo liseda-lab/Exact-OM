@@ -80,23 +80,29 @@ test.describe("R03 tutorial position (J06)", () => {
     expect((await api.state()).tutorial_progress.position).toEqual({ view: "assessment", lesson_id: null, question_id: null });
     await page.reload();
     await expect(page.getByRole("heading", { level: 1, name: "Check your understanding" })).toBeVisible();
-    // A partial (draft) answer is restored; a draft never changes the position.
-    const items = page.locator(".assessment-item");
-    await items.nth(2).locator("fieldset.match-row").nth(0).getByRole("radio", { name: "None of these" }).check();
-    await savedIndicator(page);
-    expect((await api.state()).tutorial_progress.position).toEqual({ view: "assessment", lesson_id: null, question_id: null });
-    // Deliberate question navigation moves focus and is saved as the destination.
+    // One question at a time (21 F02). Deliberate question navigation moves focus and is saved as the destination.
+    const item = page.locator(".assessment-item");
     const third = await page.locator(".question-nav button").nth(2).textContent();
     await page.locator(".question-nav button").nth(2).click();
-    await expect(items.nth(2).getByRole("heading", { level: 2 })).toBeFocused();
+    await expect(item.getByRole("heading", { level: 2 })).toBeFocused();
+    await expect(item.getByRole("heading", { level: 2 })).toContainText("3 ·");
     await savedIndicator(page);
     const state = await api.state();
     expect(state.tutorial_progress.position).toEqual({ view: "assessment", lesson_id: null, question_id: state.tutorial.assessment[2].question_id });
+    // A partial (draft) answer is restored; a draft never changes the position.
+    await item.locator("fieldset.match-row").nth(0).getByRole("radio", { name: "None of these" }).check();
+    await savedIndicator(page);
+    expect((await api.state()).tutorial_progress.position).toEqual({ view: "assessment", lesson_id: null, question_id: state.tutorial.assessment[2].question_id });
     await page.reload();
-    await expect(items.nth(2).locator("fieldset.match-row").nth(0).getByRole("radio", { name: "None of these" })).toBeChecked();
+    await expect(item.locator("fieldset.match-row").nth(0).getByRole("radio", { name: "None of these" })).toBeChecked();
     await expect(page.locator(".question-nav button").nth(2)).toHaveAttribute("aria-current", "location");
     expect(third).toContain("3 ·");
-    await expect(items.nth(2)).toBeInViewport();
+    await expect(item).toBeInViewport();
+    // Back/Next move between questions without losing the draft.
+    await page.getByRole("button", { name: "Previous question", exact: true }).click();
+    await expect(item.getByRole("heading", { level: 2 })).toContainText("2 ·");
+    await page.getByRole("button", { name: "Next question", exact: true }).click();
+    await expect(item.locator("fieldset.match-row").nth(0).getByRole("radio", { name: "None of these" })).toBeChecked();
   });
 
   test("an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload", async ({ page }) => {

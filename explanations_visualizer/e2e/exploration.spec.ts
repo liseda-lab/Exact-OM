@@ -12,7 +12,9 @@ test("prepared comparison, evidence, graph and saved pair navigation", async ({ 
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto("/");
   await ready(page);
-  await expect(page.getByText("Not a probability of being correct.", { exact: true })).toBeVisible();
+  // The score caveat is said once, on request (21 F04).
+  await page.getByRole("button", { name: /^matching score / }).click();
+  await expect(page.getByText(/not a probability of being correct/)).toBeVisible();
   await expect(page.locator(".entity-card")).toHaveCount(2);
   for (const name of ["Hierarchy", "Evidence", "Decision trace", "Evidence graph", "Scores"]) {
     await page.getByRole("tab", { name, exact: true }).click();
