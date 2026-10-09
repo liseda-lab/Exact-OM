@@ -133,7 +133,8 @@ def run(args):
         },
     })
     os.environ["EXACT_EXPERIMENT_RUNTIME"] = str(runtime_path)
-    groups = list(group_chunks(workload["queries"], args.chunk_pairs))
+    all_groups = list(group_chunks(workload["queries"], args.chunk_pairs))
+    groups = all_groups
     if args.max_chunks:
         groups = groups[:args.max_chunks]
     setup_start = time.perf_counter()
@@ -149,7 +150,7 @@ def run(args):
     # Native graph creation belongs to preparation; per-entity feature extraction stays cold.
     _ = dataset.source_graph, dataset.target_graph
     dataset._candidates = pd.DataFrame(
-        [(q["source"], t) for group in groups for q in group for t in q["candidates"]],
+        [(q["source"], t) for group in all_groups for q in group for t in q["candidates"]],
         columns=["Src", "Tgt"],
     )
     dataset.get_exact_matches()
