@@ -632,22 +632,8 @@ def _compatible_encoder_source(scorer: Any) -> str | None:
     return expected
 
 
-def cached_encoder_rows(
-    scorer: Any,
-    tokenizer: Any,
-    model: Any,
-    texts: list[str],
-    max_len: int,
-    compute: Callable[[list[str]], Any],
-) -> Any:
-    """Reuse vectors by exact text, pinned encoder/tokenizer, precision, and role.
-
-    Opaque/unpinned model weights fail closed to ordinary encoding. The shared
-    cache is independent of candidate selection, fusion, and reporting labels.
-    """
-    directory = os.getenv("EXACT_EMBEDDING_CACHE_DIR")
-    if not directory:
-        return compute(texts)
+def encoder_identity(scorer, tokenizer, model, max_len):
+    """Actual encoder weights and execution contract, independent of reporting labels."""
     import torch
 
     config = getattr(model, "config", None)
@@ -658,16 +644,43 @@ def cached_encoder_rows(
         or len(str(revision)) != 40
         or getattr(model, "training", False)
     ):
-        return compute(texts)
+        return None
+    namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "scientific")
     cached = getattr(scorer, "_stage_encoder_keys", {})
-    local_key = (id(model), id(tokenizer), max_len)
+    state_tensors = list(model.named_parameters()) if hasattr(model, "named_parameters") else []
+    if hasattr(model, "named_buffers"):
+        state_tensors += list(model.named_buffers())
+    weight_versions = tuple(
+        (name, id(value), value.data_ptr(), value._version, str(value.dtype), tuple(value.shape))
+        for name, value in state_tensors
+    )
+    local_key = (id(model), id(tokenizer), max_len, revision, scorer.fp16,
+                 str(scorer._cache_tensor_dtype), scorer.pooling_method.value,
+                 scorer.device_type, namespace)
+    execution = {
+        "tf32": torch.backends.cuda.matmul.allow_tf32,
+        "autocast": torch.is_autocast_enabled("cuda"),
+        "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
+        **{name: os.getenv(name) for name in (
+            "EXACT_PAIR_CONTEXT_BATCHING", "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
+            "EXACT_PAIR_CONTEXT_TEXT_BATCH", "EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS")},
+    }
+    local_key = (*local_key, weight_versions, tuple(execution.items()))
     identities = cached.get(local_key)
     if identities is None:
         if not hasattr(tokenizer, "get_vocab"):
-            return compute(texts)
+            return None
+        weights = hashlib.sha256()
+        for name, value in state_tensors:
+            weights.update(json.dumps([name, str(value.dtype), list(value.shape)]).encode())
+            weights.update(value.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes())
         payload = {
             "schema": 1,
             "revision": revision,
+            "weights_sha256": weights.hexdigest() if state_tensors else None,
+            "tf32": torch.backends.cuda.matmul.allow_tf32,
+            "autocast": torch.is_autocast_enabled("cuda"),
+            "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
             "model_config": {
                 key: value
                 for key, value in config.to_dict().items()
@@ -702,7 +715,9 @@ def cached_encoder_rows(
             "torch": torch.__version__,
             "transformers": __import__("transformers").__version__,
             "tokenizers": __import__("tokenizers").__version__,
-            "role": os.getenv("EXACT_EXPERIMENT_ROLE", "unspecified"),
+            "role": "label_independent_text_v1",
+            "namespace": namespace,
+            "execution": execution,
             "implementation": sha256_file(
                 Path(__file__).parents[1] / "impl/models/scorer_common.py"
             ),
@@ -713,73 +728,67 @@ def cached_encoder_rows(
         identities = (identity, legacy)
         cached[local_key] = identities
         scorer._stage_encoder_keys = cached
+    return identities
+
+
+def cached_encoder_rows(
+    scorer: Any,
+    tokenizer: Any,
+    model: Any,
+    texts: list[str],
+    max_len: int,
+    compute: Callable[[list[str]], Any],
+    *, return_cpu: bool = False,
+) -> Any:
+    """Reuse vectors by exact text, pinned encoder/tokenizer, precision, and role.
+
+    Opaque/unpinned model weights fail closed to ordinary encoding. The shared
+    cache is independent of candidate selection, fusion, and reporting labels.
+    """
+    directory = os.getenv("EXACT_EMBEDDING_CACHE_DIR")
+    if not directory or not texts:
+        return compute(texts)
+    import torch
+
+    identities = encoder_identity(scorer, tokenizer, model, max_len)
+    if identities is None:
+        return compute(texts)
+    config = model.config
     identity, legacy = identities
-    path = Path(directory)
-    path.mkdir(parents=True, exist_ok=True)
-    db = sqlite3.connect(path / "vectors.sqlite3", timeout=30)
-    keys = [_hash([identity, text]) for text in texts]
+    from exact.experiments.encoder_store import encoder_store
+
+    unique = list(dict.fromkeys(texts))
+    keys = [_hash([identity, text]) for text in unique]
+    store = None
+    found = {}
+    dimension = config.to_dict().get("hidden_size")
     try:
-        db.execute("PRAGMA synchronous=FULL")
-        db.execute(
-            "CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, shape TEXT, raw BLOB, sha256 TEXT)"
-        )
-        rows = [
-            db.execute("SELECT shape,raw,sha256 FROM vectors WHERE key=?", (key,)).fetchone()
-            for key in keys
-        ]
+        store = encoder_store(Path(directory) / "vectors.sqlite3")
+        found = store.lookup(keys, scorer._cache_tensor_dtype, dimension)
         if legacy and legacy != identity:
-            for index, row in enumerate(rows):
-                if row is not None:
-                    continue
-                prior = db.execute(
-                    "SELECT shape,raw,sha256 FROM vectors WHERE key=?",
-                    (_hash([legacy, texts[index]]),),
-                ).fetchone()
-                if prior is not None:
-                    if hashlib.sha256(prior[1]).hexdigest() != prior[2]:
-                        raise ValueError("Corrupted compatible embedding vector")
-                    db.execute(
-                        "INSERT OR IGNORE INTO vectors VALUES (?,?,?,?)", (keys[index], *prior)
-                    )
-                    rows[index] = prior
-            db.commit()
-        # The caller computes the requested missing text batch. Avoid batch-dependent cache IDs.
-        if any(row is None for row in rows):
-            missing = [index for index, row in enumerate(rows) if row is None]
-            tensors = (
-                compute([texts[index] for index in missing])
-                .detach()
-                .to("cpu")
-                .to(scorer._cache_tensor_dtype)
-            )
-            for index, tensor in zip(missing, tensors):
-                raw = tensor.contiguous().view(torch.uint8).numpy().tobytes()
-                db.execute(
-                    "INSERT OR IGNORE INTO vectors VALUES (?,?,?,?)",
-                    (
-                        keys[index],
-                        json.dumps(list(tensor.shape)),
-                        raw,
-                        hashlib.sha256(raw).hexdigest(),
-                    ),
-                )
-            db.commit()
-            rows = [
-                db.execute("SELECT shape,raw,sha256 FROM vectors WHERE key=?", (key,)).fetchone()
-                for key in keys
-            ]
-        tensors = []
-        for shape, raw, digest in rows:
-            if hashlib.sha256(raw).hexdigest() != digest:
-                raise ValueError("Corrupted durable embedding vector")
-            tensors.append(
-                torch.frombuffer(bytearray(raw), dtype=scorer._cache_tensor_dtype).reshape(
-                    json.loads(shape)
-                )
-            )
-        return torch.stack(tensors).to(scorer.device)
-    finally:
-        db.close()
+            absent = [i for i, key in enumerate(keys) if key not in found]
+            old_keys = [_hash([legacy, unique[i]]) for i in absent]
+            prior = store.lookup(old_keys, scorer._cache_tensor_dtype, dimension)
+            migrated = {keys[i]: prior[old] for i, old in zip(absent, old_keys) if old in prior}
+            found.update(migrated)
+            store.publish(migrated)
+    except (OSError, sqlite3.Error):
+        pass
+    missing = [i for i, key in enumerate(keys) if key not in found]
+    if missing:
+        fresh = compute([unique[i] for i in missing]).detach().to("cpu").to(scorer._cache_tensor_dtype)
+        if fresh.ndim != 2 or len(fresh) != len(missing):
+            raise ValueError("Encoder returned an invalid row count or shape")
+        additions = {keys[i]: row for i, row in zip(missing, fresh)}
+        found.update(additions)
+        if store is not None:
+            try:
+                store.publish(additions)
+            except (OSError, sqlite3.Error):
+                pass
+    by_text = {text: found[key] for text, key in zip(unique, keys)}
+    result = torch.stack([by_text[text] for text in texts])
+    return result if return_cpu else result.to(scorer.device)
 
 
 def validate_campaign_results(
