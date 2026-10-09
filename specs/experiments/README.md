@@ -1,8 +1,19 @@
 # Exact-OM experiment programme v2
 
-**Hosted spending amendment, 2026-10-04:** [Notification-only spending](HOSTED-SPENDING-AMENDMENT-20261004.md)
-supersedes aggregate request/token stops for the authorized remaining campaign. Continue
-accounting and notify once at 100 million tokens; the threshold does not stop experiments.
+**Implementation and design specification, 2026-10-09 — not deployed:**
+[200-pair/s scoring contract](SCORING-THROUGHPUT-200.md) specifies the implementation,
+parity, throughput, storage and recovery work. [Final-study correction](FINAL-STUDY-CORRECTION-20261009.md)
+specifies 12 full primary Exact-OM cells, up to two primary-pair label-free controls,
+three unique published comparisons and separately bounded diagnostics. The
+[machine-readable plan](throughput-final-plan-20261009.yaml) records dependencies and
+unmet acceptance gates. These are prospective specifications: active G4, historical locks,
+live final successors and spending allowances have not been changed by this documentation.
+
+**Current hosted spending amendment, 2026-10-05:**
+[Prompt and spending safety](HOSTED-SPENDING-SAFETY.md) supersedes the historical
+[October 4 notification-only policy](HOSTED-SPENDING-AMENDMENT-20261004.md). It retains
+past usage, alerts every 10M campaign tokens, warns at 10M per family, and pauses new
+paid calls at 25M per family or 200M campaign tokens until an approved allowance change.
 
 **Approved optional-input amendment, 2026-10-03:**
 [Public-input amendment](PUBLIC-INPUT-AMENDMENT-20261003.md) records the E08 deferral,
@@ -36,15 +47,18 @@ result is implied by the design specifications.
 
 Read in order:
 
-1. [RUN-PLAN.md](RUN-PLAN.md): scope, task roles, budgets, gates, selection, and final study.
-2. [PREPARATION-STATUS.md](PREPARATION-STATUS.md): current implementation, validation, local
+1. [SCORING-THROUGHPUT-200.md](SCORING-THROUGHPUT-200.md) and
+   [FINAL-STUDY-CORRECTION-20261009.md](FINAL-STUDY-CORRECTION-20261009.md): the requested
+   prospective implementation and experiment correction; acceptance is not yet established.
+2. [RUN-PLAN.md](RUN-PLAN.md): scope, task roles, budgets, gates, selection, and final study.
+3. [PREPARATION-STATUS.md](PREPARATION-STATUS.md): current implementation, validation, local
    inputs and remaining execution prerequisites. [IMPLEMENTATION-STATUS.md](IMPLEMENTATION-STATUS.md)
    preserves the historical pre-implementation audit.
-3. [CHECKPOINT-RECOVERY.md](CHECKPOINT-RECOVERY.md): interruption, relocation, bug fixes,
+4. [CHECKPOINT-RECOVERY.md](CHECKPOINT-RECOVERY.md): interruption, relocation, bug fixes,
    artifact compatibility, and statistical validity.
-4. [IMPLEMENTATION-CLARIFICATIONS.md](IMPLEMENTATION-CLARIFICATIONS.md): precise method contracts.
-5. The relevant E00–E26 files: bounded treatments and acceptance criteria.
-6. [AGENT-HANDOFF.md](AGENT-HANDOFF.md): implement, validate, then execute the campaign.
+5. [IMPLEMENTATION-CLARIFICATIONS.md](IMPLEMENTATION-CLARIFICATIONS.md): precise method contracts.
+6. The relevant E00–E26 files: bounded treatments and acceptance criteria.
+7. [AGENT-HANDOFF.md](AGENT-HANDOFF.md): implement, validate, then execute the campaign.
 
 [campaign-v2.yaml](campaign-v2.yaml) is the machine-readable **design blueprint**, not an
 executable run declaration. `tools/prepare_experiment_campaign.py` binds it to inspected
@@ -98,8 +112,9 @@ active release is now bound; its private test answers remain excluded. Resolve p
 limit is explicit, and is not a negative empirical result.
 
 The normal execution budget is 336 node-hours; a predeclared expanded profile permits 504.
-These include retries and reserve. They are caps, not runtime forecasts. The first throughput
-probe must show that the remaining frozen work fits the selected node. Implementation time before
+These historical envelopes include retries and reserve. Under the September 29 run-once
+amendment they are advisory forecasts, not timers that kill work. The throughput
+measurement must support the remaining frozen work on the selected node. Implementation time before
 readiness acceptance is separate. See RUN-PLAN for protected final-study and repair reserves.
 
 ## Shared experimental discipline

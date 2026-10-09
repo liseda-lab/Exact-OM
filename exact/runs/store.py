@@ -36,6 +36,15 @@ def _json_default(value: Any) -> str:
     return str(value)
 
 
+def _sync_directory(path: Path) -> None:
+    """Make a published name durable as well as its file contents."""
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
@@ -45,6 +54,7 @@ def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
         stream.flush()
         os.fsync(stream.fileno())
     os.replace(temporary, path)
+    _sync_directory(path.parent)
 
 
 def _source_iri(record: Mapping[str, Any]) -> str:
@@ -256,7 +266,7 @@ class ExplanationStore:
             for record in records
         )
         if self._index.get("compression") == "zstd":
-            return zstd.ZstdCompressor(level=3).compress(raw)
+            return zstd.ZstdCompressor(level=3, write_checksum=True).compress(raw)
         return raw
 
     def _open_text(self, path: Path, compression: Optional[str] = None) -> TextIO:
@@ -374,13 +384,31 @@ class ExplanationStore:
                         created.add(path)
                 encoded = self._encode_lines(shard_records)
                 self._append_bytes(path, encoded)
+                # Hash each newly committed frame once, not the growing shard.
+                # Legacy prefixes remain readable, and are explicitly unverified.
+                shard.setdefault("frames", []).append({
+                    "offset": baselines[path], "bytes": len(encoded),
+                    "sha256": hashlib.sha256(encoded).hexdigest(),
+                    "records": len(shard_records),
+                })
                 shard["bytes"] = (
                     int(shard.get("bytes", 0)) - pending_estimates[shard_id] + len(encoded)
                 )
             working["next_sequence"] = next_sequence
             working["total_records"] = int(working.get("total_records", 0)) + len(materialized)
+            working["integrity_schema_version"] = 1
+            _sync_directory(self.shards_dir)
             self._write_index(working)
         except BaseException:
+            # A directory fsync can fail after rename. Never truncate data that
+            # the published index already references; the caller still stops.
+            try:
+                published = json.loads(self.index_path.read_text()) == working
+            except (OSError, ValueError):
+                published = False
+            if published:
+                self._index = working
+                raise
             for path, offset in baselines.items():
                 if path.exists():
                     with path.open("r+b") as stream:
@@ -394,6 +422,8 @@ class ExplanationStore:
     def _iter_shard_records(self, shard: Mapping[str, Any]) -> Iterator[dict[str, Any]]:
         path = self._resolve_store_path(str(shard["path"]))
         self.shard_reads += 1
+        self._verify_frames(path, shard)
+        count = 0
         with self._open_text(path) as stream:
             for line in stream:
                 if not line.strip():
@@ -404,7 +434,35 @@ class ExplanationStore:
                     raise ValueError(f"Corrupt explanation record in {path}: {exc}") from exc
                 if not isinstance(payload, dict):
                     raise ValueError(f"Non-object explanation record in {path}")
+                count += 1
                 yield payload
+        if count != int(shard["records"]):
+            raise ValueError(f"Explanation shard record count mismatch: {path}")
+
+    @staticmethod
+    def _verify_frames(path: Path, shard: Mapping[str, Any]) -> None:
+        """Verify committed frames with bounded reads before returning any rows."""
+        previous_end = None
+        with path.open("rb") as stream:
+            for frame in shard.get("frames", []):
+                offset, remaining = int(frame["offset"]), int(frame["bytes"])
+                if (offset < 0 or remaining <= 0
+                        or (previous_end is not None and offset != previous_end)
+                        or offset + remaining > int(shard["bytes"])):
+                    raise ValueError(f"Invalid explanation frame boundary: {path}")
+                stream.seek(offset)
+                digest = hashlib.sha256()
+                while remaining:
+                    block = stream.read(min(remaining, 1024 * 1024))
+                    if not block:
+                        raise ValueError(f"Truncated explanation frame: {path}")
+                    digest.update(block)
+                    remaining -= len(block)
+                if digest.hexdigest() != frame["sha256"]:
+                    raise ValueError(f"Explanation frame checksum mismatch: {path}")
+                previous_end = offset + int(frame["bytes"])
+        if previous_end is not None and previous_end != int(shard["bytes"]):
+            raise ValueError(f"Unbound explanation shard tail: {path}")
 
     def _iter_overlay_records(self) -> Iterator[dict[str, Any]]:
         for entry in self._index.get("overlays") or []:

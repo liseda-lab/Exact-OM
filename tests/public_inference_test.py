@@ -144,3 +144,32 @@ def test_native_population_reuse_and_incomplete_import_guard(tmp_path, monkeypat
     manifest.write_text(json.dumps(original))
     with pytest.raises(ValueError, match="full native"):
         validate_population(manifest)
+
+
+def test_native_population_binds_import_options_and_rechecks_import_bytes(tmp_path):
+    from exact.experiments.public_inference import (
+        prepare_population,
+        validate_population,
+    )
+    from tools.prepared_batch import binding
+
+    imported = tmp_path / "import.ofn"
+    imported.write_text("Ontology(<urn:import> Declaration(Class(<urn:imported>)))")
+    ontology = tmp_path / "source.ofn"
+    ontology.write_text("Ontology(Import(<urn:import>) Declaration(Class(<urn:source>)))")
+    options = {"imports": {"urn:import": binding(imported)}}
+    output = tmp_path / "population.txt"
+    result = prepare_population(ontology, output, entity_kinds=["class"], source_options=options)
+    assert set(output.read_text().splitlines()) == {"urn:imported", "urn:source"}
+    assert result["source_options"] == options
+    assert (
+        prepare_population(ontology, output, entity_kinds=["class"], source_options=options)
+        == result
+    )
+    with pytest.raises(ValueError, match="different inputs/policy"):
+        prepare_population(ontology, output, entity_kinds=["class"])
+    imported.write_text("Ontology(<urn:import> Declaration(Class(<urn:changed>)))")
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        prepare_population(ontology, output, entity_kinds=["class"], source_options=options)
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        validate_population(output.with_suffix(".txt.manifest.json"))

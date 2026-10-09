@@ -86,6 +86,51 @@ class _FixtureModel(IModel):
         return output
 
 
+def test_binary_experimental_judgment_keeps_oversized_source_group_whole(tmp_path):
+    import pandas as pd
+
+    class Dataset(_FixtureDataset):
+        def __init__(self):
+            self._df = pd.DataFrame({"Src": ["s"] * 7 + ["other"],
+                                     "Tgt": [str(i) for i in range(8)]})
+
+        @property
+        def dataframe(self):
+            return self._df
+
+        def _active_dataframe(self):
+            return self._df
+
+        def _invalidate_active_dataframe_cache(self):
+            pass
+
+        def __len__(self):
+            return len(self._df)
+
+        def __getitem__(self, index):
+            row = self._df.iloc[index]
+            return {"src_iri": row.Src, "tgt_iri": row.Tgt,
+                    "src_labels": [row.Src], "tgt_labels": [row.Tgt]}
+
+    class Model(_FixtureModel):
+        def __init__(self, **kwargs):
+            super().__init__(False, **kwargs)
+            self.llm_experiment_enabled = True
+            self.llm_experiment_config = {"decision": {"mode": "binary"}, "gate": {"mode": "off"}}
+            self.groups = []
+
+        def forward(self, *, src_iris, **kwargs):
+            self.groups.append(src_iris)
+            return {"S_final": torch.full((len(src_iris),), 0.8)}
+
+    runner = SemanticAlignmentRunner(dataset=Dataset(), model=Model,
+                                     device=torch.device("cpu"), output_dir=tmp_path)
+    runner.predict(local_alignment=True, batch_size=2, num_workers=0, enable_checkpoints=False,
+                   cache_persist_policy="never", log_every=100)
+    assert sorted(map(len, runner.model.groups)) == [1, 7]
+    assert len(runner._candidate_rows) == 8
+
+
 class _BackendUsageModel(_FixtureModel):
     def __init__(self, **kwargs: Any) -> None:
         super().__init__(emit_experiment_outputs=False, **kwargs)

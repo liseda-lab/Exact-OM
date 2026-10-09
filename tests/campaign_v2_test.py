@@ -281,7 +281,8 @@ def test_cooperative_stop_requires_explicit_resume_and_restores_handlers(tmp_pat
     assert len(list(tmp_path.glob("STOP.resumed-*"))) == 1
 
 
-def test_g4_freezes_full_panel_without_opening_final_references(tmp_path):
+@pytest.mark.parametrize("public", [False, True])
+def test_g4_freezes_full_panel_without_opening_final_references(tmp_path, public):
     import json
 
     from exact.experiments.campaign import (
@@ -336,6 +337,44 @@ def test_g4_freezes_full_panel_without_opening_final_references(tmp_path):
     final["selection"]["decisions"][0].update(baseline="baseline", candidates=["stack_all"])
     raw["steps"].extend([gate, final])
     raw.update(freeze_step="G4", composition_sources=["E00"])
+    if public:
+        cases = {}
+        for name in ("H0", "H1", "H2"):
+            case = raw["cases"][name]
+            case["references"] = {}
+            populations = {}
+            for side in ("source", "target"):
+                population = {
+                    "kind": "full_native_ontology_population",
+                    "source_cap": None,
+                    "reference_labels_used": False,
+                    "ontology_core": {"backend": "native", "closure": {"complete": True}},
+                    "ontology": case[side],
+                    "entity_kinds": ["class"],
+                    "filter_ignored_alignment_classes": True,
+                    "count": 1,
+                    "population": case["source_universe"],
+                }
+                populations[side + "_population"] = _binding(
+                    tmp_path / (name + side + ".json"), json.dumps(population)
+                )
+            query = _binding(tmp_path / (name + ".queries.jsonl"), '{"qid":"0"}\n')
+            queries = {
+                "labels_exposed": False,
+                "role": "test",
+                "query_grouping": "original_rows_preserved_with_positional_qid",
+                "original_query_rows": 1,
+                "outputs": {"queries": query},
+            }
+            populations.update(
+                local_queries=_binding(tmp_path / (name + "-inputs.json"), json.dumps(queries)),
+                query_count=1,
+            )
+            cases[name] = populations
+        raw["public_final_inputs"] = _binding(
+            tmp_path / "public-inputs.json",
+            json.dumps({"status": "complete", "reference_labels_used": False, "cases": cases}),
+        )
     path.write_text(yaml.safe_dump(raw))
     lock, _ = load_campaign(path)
     evidence = {
@@ -349,6 +388,16 @@ def test_g4_freezes_full_panel_without_opening_final_references(tmp_path):
     frozen = freeze_final_selection(path, selection_path, tmp_path / "G4.json")
     assert frozen["final_arm_task_count"] == 6
     assert frozen["experiments"]["E17"]["arms"]["stack_all"] == {}
+    if public:
+        assert frozen["execution_contract"] == "reference_free_public_inference"
+        assert frozen["requires_fitted_deployment_manifests"] is True
+        assert frozen["experiments"]["E17"]["population_hashes"]["H0"]["query_count"] == 1
+        with pytest.raises(ValueError, match="internal confirmation is forbidden"):
+            validate_final_selection(frozen, None)
+        (tmp_path / "H0.queries.jsonl").write_text('{"qid":"tampered"}\n')
+        with pytest.raises(ValueError):
+            freeze_final_selection(path, selection_path, tmp_path / "tampered.json")
+        return
     raw["final_selection"] = {
         "path": str(tmp_path / "G4.json"),
         "sha256": hashlib.sha256((tmp_path / "G4.json").read_bytes()).hexdigest(),

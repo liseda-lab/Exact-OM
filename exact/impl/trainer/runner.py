@@ -1410,15 +1410,10 @@ class SemanticAlignmentRunner(
         fitting_started = time.perf_counter()
         self.fit_training_pool(batch_size=batch_size)
         self._fitting_seconds = time.perf_counter() - fitting_started
-        grouped_decisions = bool(getattr(self.model, "llm_experiment_enabled", False)) and (
-            getattr(self.model, "llm_experiment_config", {})
-            .get("decision", {})
-            .get("mode", "binary")
-            != "binary"
-            or bool(self.fitting_gate_config)
-            or getattr(self.model, "llm_experiment_config", {}).get("gate", {}).get("mode")
-            == "learned"
-        )
+        # Binary experimental judgment also selects the top displayed candidates
+        # per source. Splitting a source across arbitrary batches changes that
+        # set just as it changes a listwise prompt or learned routing features.
+        grouped_decisions = bool(getattr(self.model, "llm_experiment_enabled", False))
         grouped_decisions = grouped_decisions or (
             getattr(self.model, "lex_enabled", False)
             and getattr(self.model, "lex_config", {}).get("quality")
@@ -1936,8 +1931,8 @@ class SemanticAlignmentRunner(
                         ] = evidence_items
                         record["selector_evidence_items"] = evidence_items
                 union_records.append(record)
-            self.results_json.extend(union_records)
             self._append_audit_records(union_records)
+            self.results_json.extend(self._resident_evidence_record(row) for row in union_records)
 
             if (
                 checkpoint_enabled

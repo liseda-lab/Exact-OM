@@ -9,6 +9,7 @@ strategy-appropriate point and keep exact matches protected.
 from __future__ import annotations
 
 import math
+import os
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
@@ -396,6 +397,20 @@ def extract_global_alignment(
         raise ValueError("non-greedy extraction requires declared one-to-one cardinality")
     if assignment_component_cap < 1:
         raise ValueError("assignment_component_cap must be at least one")
+
+    # Optional disk-backed reductions keep competitors global while bounding
+    # intermediate edge storage. Assignment retains its existing component and
+    # fallback contract; it must never be applied independently to input chunks.
+    scratch = os.environ.get("EXACT_EXTRACTION_SQLITE_DIR")
+    if scratch and normalized_mode in {"threshold", "greedy", "mutual_best"}:
+        from exact.impl.extraction_index import extract_indexed
+
+        return extract_indexed(
+            mappings, directory=scratch, mode=normalized_mode, threshold=threshold,
+            protected_pairs=protected_pairs or set(), source_cardinality=source_cardinality,
+            target_cardinality=target_cardinality, anchor_conflict_policy=anchor_conflict_policy,
+            assignment_component_cap=assignment_component_cap,
+        )
 
     protected_set = {(str(source), str(target)) for source, target in (protected_pairs or set())}
     source_conflicts, target_conflicts, conflicting_pairs = _protected_exact_conflicts(

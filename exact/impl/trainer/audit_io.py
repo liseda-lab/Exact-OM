@@ -66,6 +66,32 @@ def _json_default(value: Any) -> str:
 
 
 class AuditIOMixin:
+    def _resident_evidence_record(self, record):
+        """Keep compact selector/reconstruction state after full evidence is durable.
+
+        Opt-in during migration. Unknown postprocessors retain their full input.
+        The authoritative explanation store always keeps the original record.
+        """
+        if (os.getenv("EXACT_COMPACT_RESIDENT_EVIDENCE") != "1"
+                or getattr(self, "_explanation_store", None) is None
+                or getattr(getattr(self, "model", None), "generate_llm_rationales", False)):
+            return record
+        from exact.impl.models.selector.selector import CandidateSetSelector
+        if any(not isinstance(model, CandidateSetSelector)
+               for model in getattr(self, "models", [])[1:]):
+            return record
+        result = dict(record)
+        result["selector_evidence_items"] = self._selector_evidence_items_for_record(record)
+        result["resident_evidence_schema"] = 1
+        for name in ("triple_attributions", "attributes", "cross_side_provenance",
+                     "llm_pair_evidence_packet", "llm_summaries"):
+            result.pop(name, None)
+        if "context" in result:
+            # Retain the legacy summary statistic's exact inputs.
+            result["context"] = {k: v for k, v in result["context"].items()
+                                 if k == "triple_importances"}
+        return result
+
     def _write_relation_diagnostics(self, accepted, **kwargs):
         from exact.experiments.relation_metrics import write_relation_diagnostics
 

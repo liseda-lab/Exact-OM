@@ -377,6 +377,7 @@ class CampaignLock(StrictConfigModel):
     final_tokens_reserved: int = Field(0, ge=0)
     final_selection: Optional[InputBinding] = None
     freeze_step: Optional[str] = None
+    public_final_inputs: Optional[InputBinding] = None
     composition_sources: list[str] = Field(default_factory=list)
     baseline_manifest: Optional[InputBinding] = None
 
@@ -1678,6 +1679,8 @@ def cooperative_signals(root: Path, *, resume: bool = False) -> Iterator[None]:
 def campaign_identity(lock: CampaignLock, root: Path) -> str:
     """Scientific design identity excludes readiness updates and movable file locators."""
     value = lock.model_dump(mode="json", exclude={"final_selection"})
+    if value.get("public_final_inputs") is None:
+        value.pop("public_final_inputs", None)
     for step in value["steps"]:
         step.pop("readiness")
         if step.get("external_selection") is None:
@@ -1745,6 +1748,84 @@ def _population_group_counts(lock: CampaignLock, cases: list[str], root: Path) -
     return counts
 
 
+def validate_public_final_inputs(lock: CampaignLock, root: Path) -> dict[str, Any]:
+    """Verify public populations/queries without opening any final reference."""
+    if lock.public_final_inputs is None:
+        return {}
+    from exact.experiments.public_inference import validate_population
+    from exact.experiments.harness import deep_merge
+
+    base_path = lock.base_config if lock.base_config.is_absolute() else root / lock.base_config
+    base_config = load_yaml_mapping(base_path)
+    record = json.loads(lock.public_final_inputs.verify(root).read_text())
+    expected = {
+        case
+        for step in lock.steps
+        if step.phase == "final"
+        for case in [step.case, *step.additional_cases]
+    }
+    if (
+        record.get("status") != "complete"
+        or record.get("reference_labels_used") is not False
+        or set(record.get("cases", {})) != expected
+    ):
+        raise ValueError("Incomplete reference-free final input panel")
+    result = {}
+    for name in sorted(expected):
+        case, prepared = lock.cases[name], record["cases"][name]
+        if (
+            case.references
+            or case.local_references
+            or case.evaluation_source_labels
+            or case.evaluation_candidate_labels
+        ):
+            raise ValueError("Public final cases must have no reference bindings")
+        result[name] = {}
+        config = deep_merge(base_config, case.overlay)
+        for side in ("source", "target"):
+            manifest = InputBinding.model_validate(prepared[side + "_population"])
+            population, _ = validate_population(manifest.verify(root))
+            ontology = getattr(case, side)
+            if ontology is None or ontology.sha256 != population["ontology"]["sha256"]:
+                raise ValueError("Public final population ontology mismatch")
+            if population.get("source_options", {}) != config.get("io", {}).get(
+                side + "_options", {}
+            ) or population.get("filter_ignored_alignment_classes") != config.get(
+                "dataset", {}
+            ).get(
+                "filter_ignored_alignment_classes", True
+            ):
+                raise ValueError("Public final native population policy mismatch")
+            if population["entity_kinds"] != [case.kind]:
+                raise ValueError("Public final population kind mismatch")
+            if side == "source" and (
+                case.source_universe is None
+                or case.source_universe.sha256 != population["population"]["sha256"]
+            ):
+                raise ValueError("Public final source population mismatch")
+            result[name][side + "_population"] = manifest.model_dump(mode="json")
+        query_binding = InputBinding.model_validate(prepared["local_queries"])
+        queries = json.loads(query_binding.verify(root).read_text())
+        if (
+            queries.get("labels_exposed") is not False
+            or queries.get("role") != "test"
+            or queries.get("query_grouping") != "original_rows_preserved_with_positional_qid"
+            or queries.get("original_query_rows") != prepared["query_count"]
+        ):
+            raise ValueError("Public final query identity/label boundary mismatch")
+        for item in queries["outputs"].values():
+            InputBinding.model_validate(item).verify(root)
+        query_path = InputBinding.model_validate(queries["outputs"]["queries"]).verify(root)
+        if (
+            sum(bool(line.strip()) for line in query_path.read_text().splitlines())
+            != prepared["query_count"]
+        ):
+            raise ValueError("Public final query count mismatch")
+        result[name]["local_queries"] = query_binding.model_dump(mode="json")
+        result[name]["query_count"] = prepared["query_count"]
+    return result
+
+
 def freeze_final_selection(path: Path, selection_path: Path, destination: Path) -> dict[str, Any]:
     """Mechanically freeze the declared final panel from completed development evidence."""
     from exact.experiments.harness import (
@@ -1776,6 +1857,7 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
             if parent not in required:
                 required.add(parent)
                 pending.append(parent)
+    public_inputs = validate_public_final_inputs(lock, root)
     optional_dispositions = {}
     for step in lock.steps:
         if step.phase == "final":
@@ -1904,7 +1986,9 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
         cases = [step.case, *step.additional_cases]
         for case_id in cases:
             case = lock.cases[case_id]
-            if case.source_universe is None or "test" not in case.references:
+            if case.source_universe is None or (
+                not public_inputs and "test" not in case.references
+            ):
                 raise ValueError(
                     "final populations and reference identities must be bound before G4"
                 )
@@ -1919,19 +2003,23 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
             "seeds": step.seeds,
             "execution_modes": step.execution_modes,
             "independent_group_counts": _population_group_counts(lock, cases, root),
-            "population_hashes": {
-                case_id: {
-                    "source_universe": cast(
-                        InputBinding, lock.cases[case_id].source_universe
-                    ).sha256,
-                    "reporting_reference": lock.cases[case_id].references["test"].sha256,
-                    "local_reference": (
-                        lock.cases[case_id].local_references.get("test")
-                        or lock.cases[case_id].references["test"]
-                    ).sha256,
+            "population_hashes": (
+                {case_id: public_inputs[case_id] for case_id in cases}
+                if public_inputs
+                else {
+                    case_id: {
+                        "source_universe": cast(
+                            InputBinding, lock.cases[case_id].source_universe
+                        ).sha256,
+                        "reporting_reference": lock.cases[case_id].references["test"].sha256,
+                        "local_reference": (
+                            lock.cases[case_id].local_references.get("test")
+                            or lock.cases[case_id].references["test"]
+                        ).sha256,
+                    }
+                    for case_id in cases
                 }
-                for case_id in cases
-            },
+            ),
         }
         count += len(overlays) * len(cases) * len(step.execution_modes)
     if not panel or count > blueprint["profiles"][lock.profile]["final_arm_task_design_cap"]:
@@ -1951,6 +2039,10 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
         "final_arm_task_count": count,
         "no_final_outcomes_consumed": True,
     }
+    if public_inputs:
+        record["execution_contract"] = "reference_free_public_inference"
+        record["public_final_inputs"] = lock.public_final_inputs.model_dump(mode="json")
+        record["requires_fitted_deployment_manifests"] = True
     record["selection_hash"] = digest(record)
     _write_json_once(destination, record, label="G4 final selection")
     return record
@@ -1958,6 +2050,8 @@ def freeze_final_selection(path: Path, selection_path: Path, destination: Path) 
 
 def validate_final_selection(record: Mapping[str, Any], suite: Any) -> dict[str, Any]:
     """Validate immutable final recipes against this campaign before opening test labels."""
+    if record.get("execution_contract") == "reference_free_public_inference":
+        raise ValueError("Use public inference deployment; internal confirmation is forbidden")
     value = dict(record)
     claimed = value.pop("selection_hash", None)
     if (

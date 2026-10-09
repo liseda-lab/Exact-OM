@@ -59,6 +59,19 @@ def check_storage(root, *, min_free, max_used, growth_reserve, used=None):
     return used
 
 
+def check_additional_roots(policies, previous=None):
+    """Every configured cache/output filesystem has its own measured envelope."""
+    result = {}
+    for item in policies:
+        root = str(Path(item["usage_root"]).resolve())
+        result[root] = check_storage(
+            root, min_free=item["min_free_bytes"], max_used=item["max_used_bytes"],
+            growth_reserve=item["growth_reserve_bytes"],
+            used=(previous or {}).get(root),
+        )
+    return result
+
+
 def pause(paths, reason):
     for path in paths:
         path = Path(path)
@@ -190,6 +203,7 @@ def run(
     completed_run_root=None,
     step_path=None,
     dispatch_nonce=None,
+    additional_roots=(),
 ):
     if not command or min(min_free, max_used, growth_reserve, interval, scan_interval) < 0:
         raise ValueError("A worker command and nonnegative storage limits are required")
@@ -203,6 +217,7 @@ def run(
         used = check_storage(
             root, min_free=min_free, max_used=max_used, growth_reserve=growth_reserve
         )
+        extra_used = check_additional_roots(additional_roots)
         env = {**os.environ, "EXACT_STORAGE_MIN_FREE_BYTES": str(min_free)}
         process = subprocess.Popen(command, env=env, start_new_session=True)
         scanned = time.monotonic()
@@ -221,6 +236,9 @@ def run(
                     max_used=max_used,
                     growth_reserve=growth_reserve,
                     used=None if rescan else used,
+                )
+                extra_used = check_additional_roots(
+                    additional_roots, None if rescan else extra_used
                 )
                 if rescan:
                     scanned = now
@@ -262,6 +280,22 @@ def validate_policy(config):
             raise ValueError("Storage guard policy requires positive " + key)
     if config["growth_reserve_bytes"] >= config["max_used_bytes"]:
         raise ValueError("Storage growth reserve must be below usage ceiling")
+    roots = config.get("additional_roots", [])
+    if not isinstance(roots, list):
+        raise ValueError("Additional storage roots must be a list")
+    seen = {str(Path(config["usage_root"]).resolve())}
+    for item in roots:
+        if not isinstance(item, dict) or not isinstance(item.get("usage_root"), str):
+            raise ValueError("Additional storage root requires a usage_root")
+        path = Path(item["usage_root"])
+        if not path.is_absolute() or str(path.resolve()) in seen:
+            raise ValueError("Additional storage roots must be distinct absolute paths")
+        seen.add(str(path.resolve()))
+        for key in ("min_free_bytes", "max_used_bytes", "growth_reserve_bytes"):
+            if type(item.get(key)) is not int or item[key] <= 0:
+                raise ValueError("Additional storage root requires positive " + key)
+        if item["growth_reserve_bytes"] >= item["max_used_bytes"]:
+            raise ValueError("Additional storage growth reserve exceeds ceiling")
     source = config.get("source", {})
     if (
         not isinstance(source.get("path"), str)
@@ -298,6 +332,8 @@ def _wrapper(
     ]
     for option in ("min_free_bytes", "max_used_bytes", "growth_reserve_bytes"):
         command.extend(["--" + option.replace("_", "-"), str(config[option])])
+    for item in config.get("additional_roots", []):
+        command.extend(["--additional-root", json.dumps(item, sort_keys=True)])
     if "completed_fitting_dedup" in config:
         if (
             not isinstance(completion_path, str)
@@ -453,6 +489,7 @@ def main():
     parser.add_argument("--completed-run-root", type=Path)
     parser.add_argument("--step-path", type=Path)
     parser.add_argument("--dispatch-nonce")
+    parser.add_argument("--additional-root", type=json.loads, action="append", default=[])
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -473,6 +510,7 @@ def main():
             completed_run_root=args.completed_run_root,
             step_path=args.step_path,
             dispatch_nonce=args.dispatch_nonce,
+            additional_roots=args.additional_root,
         )
     )
 

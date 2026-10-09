@@ -1,5 +1,15 @@
 # E17 — Fresh final stack integration
 
+**Prospective final-study correction, 2026-10-09 — not applied:**
+[FINAL-STUDY-CORRECTION-20261009.md](FINAL-STUDY-CORRECTION-20261009.md) specifies the revised
+full primary matrix, conditional primary-pair label-free control, bounded seed/mechanism
+diagnostics and exact claim limits. [SCORING-THROUGHPUT-200.md](SCORING-THROUGHPUT-200.md)
+specifies the required implementation and verification. The September 9 implementation
+inventory below is historical; actual current evidence belongs to the frozen run receipts.
+The admitted public final path remains reference-free: produce submissions with
+`run_eval=False`; organizer test scores are separate from compute completion. No private
+test reference may be opened to implement or select this correction.
+
 **v2 specification, 2026-09-09. Implementation still required.**
 This file replaces the v1 matrix for this family. [RUN-PLAN](RUN-PLAN.md),
 [shared clarifications](IMPLEMENTATION-CLARIFICATIONS.md), and

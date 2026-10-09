@@ -1,5 +1,12 @@
 # Run-once execution amendment — 2026-09-29
 
+**Prospective implementation specification, 2026-10-09:**
+[SCORING-THROUGHPUT-200.md](SCORING-THROUGHPUT-200.md) defines narrowly scoped primitive
+identities, actual batching, storage and measured throughput acceptance. Its reuse changes
+require proof of every omitted dependency; they do not generally remove seed/role protections.
+[The mixed-scale final correction](FINAL-STUDY-CORRECTION-20261009.md) is a separate scientific
+revision. Both remain specified, not implemented or applied; running workers are unchanged.
+
 This records the user's approved operational optimization. It supersedes conflicting
 runtime admission and qualification instructions in older plans. It does not change the
 scientific hypotheses, candidate/query populations, training examples, epochs, seeds,
