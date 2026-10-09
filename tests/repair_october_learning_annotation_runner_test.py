@@ -199,7 +199,7 @@ def test_calibration_consumption_is_frozen_before_any_hosted_attempt(tmp_path, m
         runner.run(path, tmp_path / "output")
 
 
-@pytest.mark.parametrize("status", [401, 403, 429, 503])
+@pytest.mark.parametrize("status", [401, 403, 404, 429, 503])
 def test_confirmed_http_failure_stops_schedule_and_replay_without_renewing_quotas(
     tmp_path, monkeypatch, status
 ):
@@ -452,3 +452,133 @@ def test_request_amendment_rejects_unapproved_tampered_reset_or_changed_support(
             comparison_id=settings["slots"][0]["comparison_id"],
         )
     assert sum(call["method"] == "POST" for call in calls) == 1
+
+
+def _policy_fixture(tmp_path, monkeypatch):
+    import httpx
+    import exact.llm.routing
+
+    def transport(**kwargs):
+        if kwargs["method"] == "GET":
+            return httpx.Response(
+                200, json={"data": {}}, request=httpx.Request("GET", kwargs["url"])
+            )
+        model = json.loads(kwargs["content"])["model"]
+        if model == "vendor/teacher":
+            return httpx.Response(
+                404,
+                json={
+                    "error": {
+                        "code": 404,
+                        "metadata": {
+                            "failed_routing_step": "Filter by Guardrails",
+                            "input_endpoint_count": 1,
+                            "ineligibility_reasons": [
+                                {
+                                    "reason": "paid-model-training-violation-by-account",
+                                    "endpoint_count": 1,
+                                    "configure_url": "https://openrouter.ai/settings/privacy",
+                                }
+                            ],
+                        },
+                    }
+                },
+                request=httpx.Request("POST", kwargs["url"]),
+            )
+        return response(judgment(packet()), model=model)
+
+    client, calls = adapter(tmp_path / "ledger", monkeypatch, handler=transport)
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    packet_path = tmp_path / "packet.json"
+    runner.write_artifact(packet_path, packet().to_dict())
+    settings = {
+        **manifest(tmp_path),
+        "seconds": 300,
+        "prices_per_million": {name: dict(input=1, output=2) for name in ("teacher", "evaluator")},
+        "slots": [
+            dict(
+                id=f"slot-{i}",
+                profile=profile,
+                packet=dict(path=str(packet_path), sha256=runner.sha(packet_path)),
+            )
+            for i, profile in enumerate(("teacher", "evaluator", "teacher", "evaluator"))
+        ],
+    }
+    path = tmp_path / "initial/manifest.json"
+    runner.write_artifact(path, settings)
+    return settings, path, calls
+
+
+def test_provider_policy_rejection_masks_only_its_profile_and_keeps_other_slots(
+    tmp_path, monkeypatch
+):
+    _, path, calls = _policy_fixture(tmp_path, monkeypatch)
+    output = tmp_path / "output"
+    for _ in range(2):
+        rows = runner.run(path, output)
+        assert [row["status"] for row in rows] == [
+            "provider_error",
+            "complete",
+            "not_attempted_provider_policy",
+            "complete",
+        ]
+        assert sum(call["method"] == "POST" for call in calls) == 3
+        report = runner.read(output / "report.json")
+        assert report["status"] == "complete"
+        assert report["recorded"] == report["scheduled"] == 4
+        assert set(report["provider_policy_deferrals"]) == {"teacher"}
+        assert not (output / "slot-2").exists()
+        state = runner.read(tmp_path / "ledger/phase-reservations.json")
+        assert len(state["reservations"]) == 3
+
+
+@pytest.mark.parametrize(
+    "mutation", [None, "schedule", "wrong_slot", "tampered_receipt", "unqualified"]
+)
+def test_source_bound_policy_deferral_preserves_earlier_cost_and_never_repeats_failure(
+    tmp_path, monkeypatch, mutation
+):
+    settings, path, calls = _policy_fixture(tmp_path, monkeypatch)
+    old = tmp_path / "old-output"
+    with pytest.raises(runner.ConfirmedAnnotationFailure):
+        runner.annotate_packet(packet(), settings, old, slot_id="slot-0", seconds=300)
+    prior = runner.read(tmp_path / "ledger/phase-reservations.json")
+    reference = lambda value: dict(path=str(value), sha256=runner.sha(value))
+    settings["provider_deferrals"] = {
+        "teacher": dict(
+            previous_manifest=reference(path),
+            failed_slot="slot-0",
+            receipt=reference(old / "receipt.json"),
+        )
+    }
+    if mutation == "schedule":
+        settings["slots"] = settings["slots"][:-1]
+    elif mutation == "wrong_slot":
+        settings["provider_deferrals"]["teacher"]["failed_slot"] = "slot-1"
+    elif mutation == "tampered_receipt":
+        runner.write_artifact(old / "receipt.json", {})
+    elif mutation == "unqualified":
+        with runner.sqlite3.connect(tmp_path / "ledger/requests.sqlite3") as db:
+            db.execute("UPDATE attempts SET raw=?", (b'{"error":{"code":404}}',))
+    next_path = tmp_path / "continued/manifest.json"
+    runner.write_artifact(next_path, settings)
+    output = tmp_path / "continued-output"
+    if mutation:
+        with pytest.raises(ValueError):
+            runner.run(next_path, output)
+        assert sum(call["method"] == "POST" for call in calls) == 1
+    else:
+        rows = runner.run(next_path, output)
+        assert [row["status"] for row in rows] == [
+            "provider_error",
+            "complete",
+            "not_attempted_provider_policy",
+            "complete",
+        ]
+        assert sum(call["method"] == "POST" for call in calls) == 3
+        after = runner.read(tmp_path / "ledger/phase-reservations.json")
+        assert all(
+            after["reservations"][key] == value for key, value in prior["reservations"].items()
+        )
+        assert len(after["reservations"]) == 3
+        assert not (output / "slot-0").exists()

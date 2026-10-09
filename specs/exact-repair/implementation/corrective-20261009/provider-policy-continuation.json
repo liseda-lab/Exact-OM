@@ -1,0 +1,46 @@
+{
+  "schema": "exact-repair/provider-policy-continuation-evidence/v1",
+  "source": {
+    "tools/repair/corrective_semantics.py": "b1a5169a3892cfa1762704c046a67b758e6974b2adf873288d616bb791c10cb5",
+    "tests/repair_october_learning_annotation_runner_test.py": "75ee63021530a164b866df889fd29a6d3d5c53f3268b8fdd1beb672e463ca1eb"
+  },
+  "checks": [
+    {
+      "command": "OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py",
+      "result": "26 passed in 7.53s"
+    },
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/python -m mypy --explicit-package-bases tools/repair/corrective_semantics.py",
+      "result": "Success: no issues found in 1 source file"
+    },
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/python -m black tools/repair/corrective_semantics.py tests/repair_october_learning_annotation_runner_test.py",
+      "result": "formatted; no behavioral changes"
+    }
+  ],
+  "actual_manifest_readonly_validation": {
+    "manifest": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/annotations/calibration-available-providers-001/manifest.json",
+    "valid": true,
+    "scheduled": 32,
+    "deferred_profiles": [
+      "deepseek"
+    ],
+    "eligible_unattempted_slots": 24,
+    "phase_rows_retained": 33,
+    "phase_bytes_unchanged": true,
+    "generation_requests": 0
+  },
+  "invariants": [
+    "Only complete qualified account paid-model-training privacy rejection disqualifies its profile.",
+    "All frozen rows, models, packets, comparisons, orders, split boundaries, budgets and original costs retained.",
+    "No account privacy settings relaxed.",
+    "Authentication and generic provider failures still stop the complete schedule.",
+    "Initial policy deferral binds prior manifest and original durable failed receipt."
+  ],
+  "public_endpoint_availability": {
+    "source": "https://openrouter.ai/api/v1/models/{model}/endpoints",
+    "all_four_approved_models_http_status": 200,
+    "account_specific_policy_admission": "not exposed by public API; runtime qualification still required"
+  },
+  "paid_calls_by_agent": 0
+}

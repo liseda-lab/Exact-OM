@@ -13,6 +13,7 @@ import hashlib
 import json
 import math
 import os
+import sqlite3
 import time
 from pathlib import Path
 
@@ -126,6 +127,7 @@ def validate_manifest(value):
             )
     if not value.get("authorized"):
         raise PermissionError("Frozen annotation execution is not authorized")
+    _provider_deferrals(value)
     return value
 
 
@@ -133,6 +135,89 @@ def _read_bound(reference):
     if sha(reference["path"]) != reference["sha256"]:
         raise ValueError("Frozen request amendment evidence changed")
     return read(reference["path"])
+
+
+def _provider_policy_failure(manifest, evidence):
+    """Only a qualified account training-policy rejection disqualifies one provider."""
+    if evidence.get("http_status") != 404 or evidence.get("kind") != "provider_response":
+        return False
+    path = Path(manifest["ledger_directory"]) / "requests.sqlite3"
+    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as db:
+        row = db.execute(
+            "SELECT status,sha256,raw FROM attempts WHERE request_id=? AND number=?",
+            (evidence["request_id"], evidence["attempt"]),
+        ).fetchone()
+    if row is None or row[0] != 404 or row[1] != evidence["response_sha256"]:
+        raise ValueError("Provider-policy failure changed its durable attempt")
+    raw = bytes(row[2] or b"")
+    if hashlib.sha256(raw).hexdigest() != row[1]:
+        raise ValueError("Provider-policy failure changed its response digest")
+    error = json.loads(raw).get("error", {})
+    metadata = error.get("metadata", {})
+    reasons = metadata.get("ineligibility_reasons", [])
+    return (
+        error.get("code") == 404
+        and metadata.get("failed_routing_step") == "Filter by Guardrails"
+        and metadata.get("input_endpoint_count", 0) > 0
+        and len(reasons) == 1
+        and reasons[0].get("reason") == "paid-model-training-violation-by-account"
+        and reasons[0].get("endpoint_count") == metadata["input_endpoint_count"]
+        and reasons[0].get("configure_url") == "https://openrouter.ai/settings/privacy"
+    )
+
+
+def _provider_deferrals(manifest):
+    """A successor may mask a failed profile, never alter its frozen comparisons."""
+    from exact.llm.ledger import RequestLedger
+
+    result = {}
+    for profile, binding in manifest.get("provider_deferrals", {}).items():
+        previous = _read_bound(binding["previous_manifest"])
+        unchanged = lambda value: {
+            key: item for key, item in value.items() if key not in {"provider_deferrals", "profile"}
+        }
+        if (
+            manifest["phase"] != "calibration"
+            or unchanged(manifest) != unchanged(previous)
+            or profile not in previous["profiles"]
+        ):
+            raise ValueError("Provider deferral changed the frozen calibration design")
+        matches = [row for row in previous["slots"] if row["id"] == binding["failed_slot"]]
+        if len(matches) != 1 or matches[0].get("profile", previous["profile"]) != profile:
+            raise ValueError("Provider deferral does not identify its failed profile")
+        row = matches[0]
+        receipt = _read_bound(binding["receipt"])
+        directory = Path(binding["receipt"]["path"]).parent
+        packet = read_record(read(directory / "packet.json"))
+        schedule = read_record(read(directory / "schedule.json"))
+        expected = canonical_hash(
+            (
+                packet,
+                {**previous, "profile": profile},
+                row["id"],
+                row.get("swapped", False),
+                row.get("comparison_id", row["id"]),
+            )
+        )
+        if (
+            receipt.get("status") != "provider_error"
+            or receipt["identity"] != expected
+            or sha(row["packet"]["path"]) != row["packet"]["sha256"]
+            or packet != read_record(read(row["packet"]["path"]))
+            or schedule.packet != packet
+        ):
+            raise ValueError("Provider deferral changed its exact failed-request provenance")
+        evidence = _confirmed_provider_failure(
+            RequestLedger(Path(manifest["ledger_directory"])), schedule.slots[0]["parameters"]
+        )
+        if (
+            evidence is None
+            or evidence != receipt.get("confirmed_failure")
+            or not _provider_policy_failure(manifest, evidence)
+        ):
+            raise ValueError("Provider deferral requires a qualified account-policy rejection")
+        result[profile] = dict(failed_slot=row["id"], confirmed_failure=evidence, binding=binding)
+    return result
 
 
 def _request_budget(manifest):
@@ -275,6 +360,8 @@ def _authentication_preflight(manifest, output):
         for name in dict.fromkeys(
             row.get("profile", manifest["profile"]) for row in manifest["slots"]
         ):
+            if name in manifest.get("provider_deferrals", {}):
+                continue
             profile = router.profiles[name]
             key = router.hosted.resolve_api_key(profile)
             if not key:
@@ -887,6 +974,7 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
 
 def run(manifest_path, output):
     manifest = validate_manifest(read(manifest_path))
+    deferrals = _provider_deferrals(manifest)
     if manifest["phase"] == "calibration":
         path = Path(manifest_path).resolve()
         immutable(
@@ -917,6 +1005,8 @@ def run(manifest_path, output):
         )
         raise ConfirmedAnnotationFailure(failure)
     for index, row in enumerate(manifest["slots"]):
+        profile = row.get("profile", manifest["profile"])
+        deferred = deferrals.get(profile)
         packet_path = row["packet"]
         if sha(packet_path["path"]) != packet_path["sha256"]:
             raise ValueError("Frozen annotation packet changed")
@@ -927,25 +1017,49 @@ def run(manifest_path, output):
             artifact = (
                 annotate_packet(
                     packet,
-                    {**manifest, "profile": row.get("profile", manifest["profile"])},
+                    {**manifest, "profile": profile},
                     Path(output) / row["id"],
                     slot_id=row["id"],
                     swapped=row.get("swapped", False),
                     seconds=left,
                     comparison_id=row.get("comparison_id", row["id"]),
                 )
-                if left > 3
+                if left > 3 and deferred is None
                 else None
             )
         except ConfirmedAnnotationFailure as error:
             failure = error
             artifact = None
+            if manifest["phase"] == "calibration" and _provider_policy_failure(
+                manifest, error.evidence
+            ):
+                deferred = deferrals[profile] = dict(
+                    failed_slot=row["id"], confirmed_failure=error.evidence
+                )
+                failure = None
+        policy_failure = deferred and deferred["failed_slot"] == row["id"]
         rows.append(
             dict(
                 id=row["id"],
-                status="provider_error" if failure else "complete" if artifact else "unavailable",
+                status=(
+                    "provider_error"
+                    if failure or policy_failure
+                    else (
+                        "not_attempted_provider_policy"
+                        if deferred
+                        else "complete" if artifact else "unavailable"
+                    )
+                ),
                 artifact=str(artifact) if artifact else None,
-                **(dict(confirmed_failure=failure.evidence) if failure else {}),
+                **(
+                    dict(confirmed_failure=failure.evidence)
+                    if failure
+                    else (
+                        dict(confirmed_failure=deferred["confirmed_failure"])
+                        if policy_failure
+                        else {}
+                    )
+                ),
             )
         )
         if failure:
@@ -960,6 +1074,7 @@ def run(manifest_path, output):
                 scheduled=len(manifest["slots"]),
                 recorded=len(rows),
                 rows=rows,
+                provider_policy_deferrals=deferrals,
                 **(
                     _failure_report_fields(failure.evidence)
                     if failure
