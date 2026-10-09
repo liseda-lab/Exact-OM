@@ -345,6 +345,29 @@ def prepare_lock(recipe, root, registry, *, completed=True):
                     missing=["separately queued"],
                     reason="Separately queued comparison; never execute implicitly",
                 )
+    # Explicit reviewed input dispositions remain terminal, never empirical wins.
+    if recipe.get("approved_dispositions"):
+        dispositions = read(verified(recipe["approved_dispositions"]))
+        for identifier, disposition in dispositions.items():
+            current = registry.get("approved_dispositions", {}).get(identifier)
+            if current != disposition or disposition.get("status") != "deferred_approved":
+                raise ValueError("Approved optional disposition changed: " + identifier)
+            declared = next(step for step in lock["steps"] if step["id"] == identifier)
+            if declared.get("external_selection") or declared.get("external_acceptance"):
+                raise ValueError("Cannot replace completed evidence with a disposition")
+            for states in declared["readiness"].values():
+                states["screen"].update(
+                    status="inapplicable", missing=[], reason=disposition["reason"]
+                )
+    if target["phase"] == "freeze":
+        from exact.experiments.campaign import (
+            CampaignLock,
+            validate_public_final_inputs,
+        )
+
+        if not lock.get("public_final_inputs"):
+            raise ValueError("G4 preparation requires verified reference-free final inputs")
+        validate_public_final_inputs(CampaignLock.model_validate(lock), root)
     return lock
 
 

@@ -40,7 +40,12 @@ def _verify(binding: dict[str, Any]) -> Path:
 
 
 def prepare_population(
-    ontology: Path, destination: Path, *, entity_kinds: list[str], filter_ignored: bool = False
+    ontology: Path,
+    destination: Path,
+    *,
+    entity_kinds: list[str],
+    filter_ignored: bool = False,
+    source_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Enumerate the native ontology closure, never a benchmark reference/query file."""
     from exact.core.entities.kinds import normalize_entity_kinds
@@ -48,6 +53,11 @@ def prepare_population(
     from exact.ontology.provenance import _core_provenance
 
     kinds = normalize_entity_kinds(entity_kinds)
+    source_options = dict(source_options or {})
+    # Verify imported bytes even when reusing a completed population.
+    from exact.io.sources.owl import _import_resolver, create_source
+
+    _import_resolver(source_options.get("imports", {}), Path(ontology).resolve().parent)
     ontology = Path(ontology).resolve()
     manifest = destination.with_suffix(destination.suffix + ".manifest.json")
     if manifest.is_file():
@@ -56,10 +66,15 @@ def prepare_population(
             record["ontology"]["sha256"] != sha256_file(ontology)
             or record["entity_kinds"] != [kind.value for kind in kinds]
             or record["filter_ignored_alignment_classes"] != filter_ignored
+            or record.get("source_options", {}) != source_options
         ):
             raise ValueError("Existing native population was prepared with different inputs/policy")
         return record
-    source = load_ontology(ontology)
+    source = (
+        create_source(ontology, options=source_options)
+        if source_options
+        else load_ontology(ontology)
+    )
     core = cast(dict[str, Any], _core_provenance(source.owl_snapshot()))
     if core["backend"] != "native" or core["closure"]["complete"] is not True:
         raise ValueError("Public ontology populations require a complete native closure")
@@ -72,6 +87,7 @@ def prepare_population(
         "schema_version": 1,
         "kind": "full_native_ontology_population",
         "ontology": _binding(ontology),
+        "source_options": source_options,
         "entity_kinds": [kind.value for kind in kinds],
         "filter_ignored_alignment_classes": filter_ignored,
         "source_cap": None,
@@ -96,7 +112,10 @@ def validate_population(path: Path, population: Path | None = None) -> tuple[dic
     ):
         raise ValueError("Global inference requires a full native ontology population manifest")
     bound = _verify(record["population"])
-    _verify(record["ontology"])
+    ontology = _verify(record["ontology"])
+    from exact.io.sources.owl import _import_resolver
+
+    _import_resolver(record.get("source_options", {}).get("imports", {}), ontology.parent)
     if population is not None and population.resolve() != bound.resolve():
         raise ValueError("Source universe differs from the native population binding")
     values = bound.read_text().splitlines()
@@ -234,6 +253,7 @@ def prepare_public_inference(
                 path,
                 entity_kinds=base["matching"]["entity_kinds"],
                 filter_ignored=base["dataset"]["filter_ignored_alignment_classes"],
+                source_options=base["io"][side + "_options"],
             )
             record[side + "_population_manifest"] = _binding(path.with_suffix(".txt.manifest.json"))
         base["data"]["source_universe"] = str(destination / "source.population.txt")

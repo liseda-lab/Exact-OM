@@ -183,3 +183,19 @@ def test_required_history_is_checked_through_named_output_ports(tmp_path, monkey
     monkeypatch.setattr(prepared_batch, "source_campaign", required_source)
     with pytest.raises(ValueError, match="Required source must still be verified"):
         prepared_batch.prepare_lock(recipe, tmp_path / "new", registry)
+
+
+def test_approved_optional_disposition_survives_preparation_and_rejects_drift(tmp_path):
+    recipe, retained, _ = _fixture(tmp_path)
+    disposition = {"status": "deferred_approved", "reason": "Approved unavailable input"}
+    path = tmp_path / "dispositions.json"
+    path.write_text(json.dumps({"E20": disposition}))
+    recipe["approved_dispositions"] = prepared_batch.binding(path)
+    registry = {"runs": [], "approved_dispositions": {"E20": disposition}}
+    lock = prepared_batch.prepare_lock(recipe, tmp_path / "new", registry)
+    step = next(s for s in lock["steps"] if s["id"] == "E20")
+    assert all(s["screen"]["status"] == "inapplicable" for s in step["readiness"].values())
+    assert step["requires"] == retained["steps"][2]["requires"]
+    registry["approved_dispositions"]["E20"] = {**disposition, "status": "pending"}
+    with pytest.raises(ValueError, match="disposition changed"):
+        prepared_batch.prepare_lock(recipe, tmp_path / "changed", registry)
