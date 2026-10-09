@@ -45,18 +45,19 @@ export function EvidenceList({
   if (state.error) return <ErrorNote error={state.error} onRetry={state.reload} what="Evidence" />;
   if (!state.data) return <Skeleton lines={4} title={false} />;
   const { items, axioms } = state.data;
-  if (!items.length) return <EmptyReason status={state.data.status} what="selected matcher evidence" reason={state.data.reason} />;
+  if (!items.length) return <EmptyReason status={state.data.status} what="matcher evidence" reason={state.data.reason} absent="No matcher evidence was selected for this pair." />;
   return (
     <div className="evidence-list">
       <div className="evidence-toolbar">
         <p className="muted">
-          {items.length} {items.length === 1 ? "feature" : "features"} Exact selected when scoring this pair{state.data.status === "partial" && state.data.total ? ` (of ${state.data.total} recorded)` : ""}. Each rests on the original records shown.
+          {items.length} {items.length === 1 ? "feature" : "features"} Exact used for this pair{state.data.status === "partial" && state.data.total ? ` (of ${state.data.total} recorded)` : ""}{synthetic ? " · invented practice examples" : ""}.
         </p>
         <label className="check">
           <input type="checkbox" checked={weights} onChange={(event) => setWeights(event.target.checked)} />
           Show matching weights
         </label>
       </div>
+      {weights && <p className="meta">Weights describe the matcher&apos;s internal use, not correctness or semantic strength.</p>}
       <ul className="evidence-items" ref={list}>
         {items.map((item) => (
           <li key={item.evidence_id} data-evidence-id={item.evidence_id} className={selected === item.evidence_id ? "evidence-item selected" : "evidence-item"} aria-current={selected === item.evidence_id ? "true" : undefined}>
@@ -65,14 +66,15 @@ export function EvidenceList({
               <span className="evidence-kind">
                 {channelName(item.channel)} feature · {item.side === "source" ? "source side" : "target side"}
               </span>
-              <span className="meta">{synthetic ? "Invented practice example of matcher evidence; no matcher was run" : interpretationText(item.interpretation)}</span>
+              {!synthetic && <span className="meta">{interpretationText(item.interpretation)}</span>}
               {onSelect && (
                 <button
                   type="button"
                   className="btn btn-quiet btn-sm"
+                  data-tour="evidence-select"
                   onClick={() => {
                     onSelect(item.evidence_id);
-                    report({ type: "evidence_select", evidenceId: item.evidence_id, from: "list" });
+                    report({ type: "evidence_select", evidenceId: item.evidence_id, from: "list", factIds: item.fact_ids });
                   }}
                   aria-pressed={selected === item.evidence_id}
                 >
@@ -87,7 +89,7 @@ export function EvidenceList({
               if (!axiom) {
                 return (
                   <div key={factId} className="evidence-fact" data-fact-id={factId}>
-                    <p className="meta">No readable or structured form of this record is available here.</p>
+                    <p className="meta">No readable form here.</p>
                     <button type="button" className="btn btn-quiet btn-sm" onClick={() => inspector?.open({ factId, ontologies: [item.entity.ontology_version_id], subject: item.entity }, `${item.side === "source" ? "Source" : "Target"} ${channelName(item.channel).toLowerCase()} record`)}>
                       Inspect the original record
                     </button>
@@ -104,7 +106,7 @@ export function EvidenceList({
                       <Expression node={relation.other} ontology={item.entity.ontology_version_id} onOpen={onOpenEntity ? (iri, kind) => onOpenEntity(item.side, { ontology_version_id: item.entity.ontology_version_id, iri, kind }) : undefined} />
                     </p>
                   ) : (
-                    <p className="meta">No plain-language template; the original is shown.</p>
+                    <p className="meta">Shown in its original form.</p>
                   )}
                   {readable && (
                     <button
@@ -129,8 +131,7 @@ export function EvidenceList({
                   ? Object.entries(item.values)
                       .map(([name, value]) => `${name} ${value.toFixed(3)}`)
                       .join(" · ")
-                  : "No matching weight was recorded for this feature."}{" "}
-                <span className="meta">Weights describe the matcher&apos;s internal use, not correctness or semantic strength.</span>
+                  : "No matching weight was recorded for this feature."}
               </p>
             )}
           </li>
