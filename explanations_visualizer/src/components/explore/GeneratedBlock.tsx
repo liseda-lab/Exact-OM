@@ -60,9 +60,10 @@ export function Citations({
             key={factId}
             type="button"
             className={`citation ${fact?.side ? `citation-${fact.side}` : ""}`}
+            data-tour="citation"
             aria-label={`Open the cited original record: ${label}`}
             title={`Reference ${shortHash(factId, 12)}`}
-            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: subject ?? null }, label)}
+            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: subject ?? null }, label, "citation")}
             disabled={!inspector}
           >
             {label}
@@ -73,15 +74,28 @@ export function Citations({
   );
 }
 
-export function ProvenanceDetails({ provenance }: { provenance: ExplanationProvenance }) {
+/** One "Sources and preparation" disclosure per generated block: model, checks and limits (21 F04). */
+export function ProvenanceDetails({ provenance, limitations = [], note }: { provenance: ExplanationProvenance; limitations?: string[]; note?: string }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="provenance">
-      <button type="button" className="btn btn-quiet btn-sm" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        {open ? "Hide how this was prepared" : "How this was prepared"}
+      <button type="button" className="link-btn" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+        {open ? "Hide sources and preparation" : "Sources and preparation"}
       </button>
       {open && (
         <dl className="provenance-list">
+          {note && (
+            <div>
+              <dt>Scope</dt>
+              <dd>{note}</dd>
+            </div>
+          )}
+          {limitations.length > 0 && (
+            <div>
+              <dt>Limits</dt>
+              <dd>{limitations.join(" ")}</dd>
+            </div>
+          )}
           {provenance.kind === "manifest" ? (
             <>
               <div>
@@ -147,12 +161,13 @@ export function GeneratedProfile({
   if (!state.data) return <div className="generated generated-loading" aria-busy="true" />;
   const data = state.data;
   if (data.status !== "available") {
+    // Never claim the original facts are complete just because no description was prepared (21 F04).
     const text =
       data.status === "unverified"
-        ? "A generated description exists but has not passed grounding review, so it is not shown."
+        ? "A generated description exists but did not pass grounding review, so it is not shown."
         : data.status === "not_exported"
           ? data.reason
-          : "No generated description was prepared for this entity. The original facts above are complete for the loaded scope.";
+          : "No generated description was prepared.";
     return (
       <section className="generated generated-empty" aria-label="Generated description">
         <h3 className="generated-title">Generated description</h3>
@@ -161,33 +176,22 @@ export function GeneratedProfile({
     );
   }
   const explanation = data.explanation;
-  const facts = new Set(explanation.claims.flatMap((claim) => claim.fact_ids));
   return (
     <section className="generated" aria-label="Generated description">
       <div className="generated-head">
         <h3 className="generated-title">Generated description</h3>
-        <span className="meta">
-          Cites {facts.size} {facts.size === 1 ? "fact" : "facts"} · grounding validated
-        </span>
+        <span className="origin-tag origin-generated">Generated</span>
       </div>
       {explanation.claims.length === 0 && <p className="meta">The generator made no claim it could support from the available facts.</p>}
       <ul className="claim-list">
         {explanation.claims.map((claim, index) => (
           <li key={claim.claim_id ?? index} className="claim">
-            <span className="claim-category">{claimCategoryName(claim.category)}</span>
             <span className="claim-text">{claim.text}</span>
             <Citations claim={claim} ontologies={data.factOntologies} subject={subject} cite={cite} />
           </li>
         ))}
       </ul>
-      {explanation.limitations.length > 0 && (
-        <ul className="limitations">
-          {explanation.limitations.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      )}
-      <ProvenanceDetails provenance={data.provenance} />
+      <ProvenanceDetails provenance={data.provenance} limitations={explanation.limitations} />
     </section>
   );
 }

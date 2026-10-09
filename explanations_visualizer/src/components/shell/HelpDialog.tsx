@@ -37,13 +37,13 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
               <svg width="44" height="10" aria-hidden="true">
                 <line x1="0" y1="5" x2="44" y2="5" stroke="currentColor" strokeWidth="2.5" />
               </svg>
-              Ontology assertion
+              Added from the ontology: asserted parent
             </li>
             <li>
               <svg width="44" height="10" aria-hidden="true">
                 <line x1="0" y1="5" x2="44" y2="5" stroke="currentColor" strokeWidth="2.5" strokeDasharray="8 5" />
               </svg>
-              Structural navigation (documented rule)
+              Added from the ontology: structural (documented rule)
             </li>
             <li>
               <svg width="44" height="10" aria-hidden="true">
@@ -52,11 +52,10 @@ export function HelpDialog({ onClose }: { onClose: () => void }) {
               Feature Exact selected when scoring
             </li>
             <li>
-              <svg width="44" height="12" aria-hidden="true">
-                <line x1="0" y1="3" x2="44" y2="3" stroke="var(--bridge)" strokeWidth="2" />
-                <line x1="0" y1="9" x2="44" y2="9" stroke="var(--bridge)" strokeWidth="2" />
+              <svg width="44" height="10" aria-hidden="true">
+                <line x1="3" y1="5" x2="41" y2="5" stroke="var(--bridge)" strokeWidth="4" strokeLinecap="round" strokeDasharray="0.1 8" />
               </svg>
-              Comparison across the two ontologies
+              Kind of feature compared on both sides (not a correspondence)
             </li>
           </ul>
         </section>

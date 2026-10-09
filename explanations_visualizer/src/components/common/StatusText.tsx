@@ -1,7 +1,7 @@
 // Availability statuses in plain words. A zero-length list always travels with its reason:
 // "absent in scope" is not "false", and "not exported" is not "absent".
 
-import { IconInfo, IconWarning } from "@/components/common/Icons";
+import { IconWarning } from "@/components/common/Icons";
 import type { Availability } from "@/lib/types";
 
 const PHRASES: Record<string, string> = {
@@ -31,40 +31,53 @@ export function statusTone(status: string | null | undefined): "ok" | "warn" | "
   return "neutral";
 }
 
-/** A category-specific explanation for an empty or unavailable section. */
+/**
+ * One short sentence for an empty or unavailable section (21 F04). Meanings stay distinct:
+ * absent in this ontology, not included in this view (unprepared or a partial scope),
+ * withheld by policy, not computed, and failed. Scope, import and basis details belong to the
+ * panel's single scope disclosure, not to every empty category; a loading failure keeps its
+ * Retry elsewhere. `partial` says the view holds only part of the ontology, so absence here
+ * is not absence from the ontology.
+ */
 export function EmptyReason({
   status,
   what,
-  scopeNote,
+  partial = false,
   reason,
+  absent,
 }: {
   status: Availability | string | null | undefined;
   what: string;
-  scopeNote?: string;
+  partial?: boolean;
   reason?: string | null;
+  /** Wording for "absent" when the noun phrase does not fit (for example "No parent shown."). */
+  absent?: string;
 }) {
+  const What = capitalize(what);
+  const plural = what.endsWith("s");
   let text: string;
   switch (status) {
     case "absent_in_scope":
-      text = `No ${what} is stated for this entity in the loaded scope${scopeNote ? ` (${scopeNote})` : ""}. This does not mean one exists nowhere.`;
+      text = partial ? `${What} not included in this view.` : absent ?? `No ${what} in this ontology.`;
       break;
     case "not_exported":
-      text = `${capitalize(what)} ${what.endsWith("s") ? "were" : "was"} not included in this bundle.`;
+    case "not_requested":
+      text = `${What} not included in this view.`;
       break;
     case "filtered":
-      text = `${capitalize(what)} ${what.endsWith("s") ? "are" : "is"} withheld by this view's information policy.`;
+      text = `${What} ${plural ? "are" : "is"} withheld by this view's information policy.`;
       break;
     case "unsupported":
-      text = `${capitalize(what)} ${what.endsWith("s") ? "are" : "is"} not supported for this kind of entity.`;
+      text = `Not available for this kind of entity.`;
       break;
     case "not_run":
-      text = `${capitalize(what)} ${what.endsWith("s") ? "were" : "was"} not computed for this bundle.`;
+      text = `${What} ${plural ? "were" : "was"} not computed for this bundle.`;
       break;
     case "unresolved_import":
-      text = `${capitalize(what)} may come from an ontology import that was not resolved.`;
+      text = `${What} may come from an import that was not resolved.`;
       break;
     case "partial":
-      text = `Only part of the ${what} could be shown inline.`;
+      text = `Only part of the ${what} is shown here.`;
       break;
     case "failed":
       text = `Loading ${what} failed.`;
@@ -73,12 +86,13 @@ export function EmptyReason({
       text = reason || `No ${what} to show.`;
   }
   // A view-specific reason (for example "not prepared for this study case") is more precise
-  // than the generic bundle wording; absence in scope keeps its fixed explanation.
+  // than the generic wording; absence keeps its short form.
   if (reason && status && status !== "absent_in_scope" && status !== "available") text = reason;
   const warn = status === "unresolved_import" || status === "partial" || status === "failed";
+  if (!warn) return <p className="empty-reason">{text}</p>;
   return (
-    <p className={warn ? "note note-warn" : "note"}>
-      {warn ? <IconWarning /> : <IconInfo />}
+    <p className="note note-warn">
+      <IconWarning />
       <span>{text}</span>
     </p>
   );

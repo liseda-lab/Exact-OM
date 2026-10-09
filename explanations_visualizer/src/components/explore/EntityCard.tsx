@@ -48,6 +48,7 @@ export function CopyIri({ iri, label, onCopied }: { iri: string; label?: string;
       <button
         type="button"
         className="btn btn-sm"
+        data-tour="copy-iri"
         aria-label={label}
         onClick={async () => {
           try {
@@ -95,9 +96,9 @@ function Section({ title, meta, children }: { title: string; meta?: React.ReactN
   );
 }
 
-function scopeText(ctx: EntityContext): string {
-  if (ctx.completeness.scope === "study_resource") return "the information prepared for this view";
-  return ctx.completeness.scope === "root" ? "root document; imports not loaded" : "resolved import closure";
+/** Whether this card's view holds only part of the ontology, so an empty category is not absence from it. */
+function partialScope(ctx: EntityContext, navigation: string): boolean {
+  return navigation === "partial" || ctx.completeness.imports_complete === false;
 }
 
 const factKey = (fact: Fact) => fact.fact_id;
@@ -277,7 +278,7 @@ export function EntityCard({
     : definingTotals.every((value) => value != null)
       ? `${definingTotals.reduce((sum, value) => sum! + value!, 0)} recorded`
       : `${definingCategories.reduce((sum, category) => sum + (ctx?.categories[category]?.items.length ?? 0), 0)} on the first page${definingMore ? " · more exist" : ""}`;
-  const scopeNote = ctx ? scopeText(ctx) : undefined;
+  const partial = ctx ? partialScope(ctx, source.capabilities.navigation) : false;
   const moreCategories = MORE.filter((category) => (ctx?.categories[category]?.items.length ?? 0) > 0);
 
   return (
@@ -311,7 +312,7 @@ export function EntityCard({
                 <Continuation state={definitions} noun={NOUNS.definitions} />
               </div>
             ) : (
-              <EmptyReason status={ctx.definitions.status} what="definition" scopeNote={scopeNote} reason={ctx.definitions.reason} />
+              <EmptyReason status={ctx.definitions.status} what="definition" partial={partial} reason={ctx.definitions.reason} />
             )}
             {alternate.items.length > 0 && (
               <div className="alternate-definitions" data-category="alternate_definitions">
@@ -345,7 +346,7 @@ export function EntityCard({
               ) : hiddenDuplicates.length > 0 && synonymPages.complete ? (
                 <p className="meta">Only a synonym identical to the label is recorded.</p>
               ) : synonymPages.items.length === 0 ? (
-                <EmptyReason status={ctx.synonyms.status} what="synonyms" scopeNote={scopeNote} reason={ctx.synonyms.reason} />
+                <EmptyReason status={ctx.synonyms.status} what="synonyms" partial={partial} reason={ctx.synonyms.reason} absent="No synonyms in this ontology." />
               ) : null}
               {synonyms.length > 0 && hiddenDuplicates.length > 0 && (
                 <p className="meta">
@@ -364,7 +365,7 @@ export function EntityCard({
                 ))}
               </div>
             ) : (
-              <EmptyReason status={definingStatus} what="restrictions or other defining axioms" scopeNote={scopeNote} />
+              <EmptyReason status={definingStatus} what="defining axioms" partial={partial} absent="No restrictions or other defining axioms." />
             )}
             {definingUnprepared && !definingCategories.length && definingStatus === "absent_in_scope" && <p className="meta">Some other kinds of defining axioms were not prepared for this view.</p>}
           </Section>
@@ -386,7 +387,7 @@ export function EntityCard({
                 })}
               </ul>
             ) : (
-              <EmptyReason status={ctx.parents.status} what="named parent" scopeNote={scopeNote} reason={ctx.parents.reason} />
+              <EmptyReason status={ctx.parents.status} what="parents" partial={partial} reason={ctx.parents.reason} absent="No parent shown." />
             )}
             <Continuation state={parents} noun={NOUNS.parents} />
             </div>

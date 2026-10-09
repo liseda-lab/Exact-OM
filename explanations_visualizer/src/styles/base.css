@@ -5,7 +5,7 @@
 :root {
   color-scheme: light;
   --text-scale: 1;
-  --paper: #f5f2ec;
+  --paper: #f6f4f0;
   --surface: #ffffff;
   --surface-2: #faf8f4;
   --surface-3: #f3f0ea;
@@ -30,9 +30,10 @@
   --bad: #a33a2f;
   --bad-tint: #fbeae7;
   --bad-line: #ebc3bc;
-  --bridge: #6b4fa0;
-  --bridge-tint: #f1ecf8;
+  --bridge: #6d5a92;
+  --bridge-tint: #f1eef6;
   --focus: #2f78bd;
+  --focus-halo: rgba(47, 120, 189, 0.22);
   --primary: #1d2529;
   --on-primary: #ffffff;
   --link: #1f5a7a;
@@ -47,77 +48,79 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --paper: #11171b;
-  --surface: #182127;
-  --surface-2: #1c262d;
-  --surface-3: #212c34;
-  --line: #2e3b44;
-  --line-soft: #26323a;
-  --line-strong: #3e4d57;
-  --ink: #e7ecef;
-  --ink-2: #b5c0c7;
-  --ink-3: #9aa7b0;
-  --source: #8db7d8;
-  --source-tint: #1d3345;
-  --source-line: #2f4b61;
-  --target: #e0a47c;
-  --target-tint: #3a2519;
-  --target-line: #5a3a26;
-  --ok: #7bc596;
-  --ok-tint: #173424;
-  --ok-line: #2c5a3c;
-  --warn: #e3c06a;
-  --warn-tint: #3a2f12;
-  --warn-line: #5b4a1e;
-  --bad: #f09a8e;
-  --bad-tint: #3e1d19;
-  --bad-line: #6a2e27;
-  --bridge: #b8a2e6;
-  --bridge-tint: #2a2340;
-  --focus: #7fb3e6;
-  --primary: #e7ecef;
-  --on-primary: #11171b;
-  --link: #8cc3e6;
-  --generated-line: #6f7b83;
-  --shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  --paper: #121619;
+  --surface: #191e22;
+  --surface-2: #1d2328;
+  --surface-3: #22292f;
+  --line: #2c353c;
+  --line-soft: #252d33;
+  --line-strong: #3a454d;
+  --ink: #e3e7ea;
+  --ink-2: #b2bcc3;
+  --ink-3: #96a1a9;
+  --source: #9ab4c9;
+  --source-tint: #1c262e;
+  --source-line: #34475a;
+  --target: #cfa58c;
+  --target-tint: #2a221d;
+  --target-line: #574032;
+  --ok: #8fc4a1;
+  --ok-tint: #18261e;
+  --ok-line: #2e4a38;
+  --warn: #d9be7e;
+  --warn-tint: #2a2518;
+  --warn-line: #4d4226;
+  --bad: #e6a59c;
+  --bad-tint: #2d1d1b;
+  --bad-line: #5a3530;
+  --bridge: #ab9fcb;
+  --bridge-tint: #231f2e;
+  --focus: #8bb4de;
+  --focus-halo: rgba(139, 180, 222, 0.25);
+  --primary: #e3e7ea;
+  --on-primary: #121619;
+  --link: #93bfde;
+  --generated-line: #6d7880;
+  --shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --paper: #11171b;
-    --surface: #182127;
-    --surface-2: #1c262d;
-    --surface-3: #212c34;
-    --line: #2e3b44;
-    --line-soft: #26323a;
-    --line-strong: #3e4d57;
-    --ink: #e7ecef;
-    --ink-2: #b5c0c7;
-    --ink-3: #9aa7b0;
-    --source: #8db7d8;
-    --source-tint: #1d3345;
-    --source-line: #2f4b61;
-    --target: #e0a47c;
-    --target-tint: #3a2519;
-    --target-line: #5a3a26;
-    --ok: #7bc596;
-    --ok-tint: #173424;
-    --ok-line: #2c5a3c;
-    --warn: #e3c06a;
-    --warn-tint: #3a2f12;
-    --warn-line: #5b4a1e;
-    --bad: #f09a8e;
-    --bad-tint: #3e1d19;
-    --bad-line: #6a2e27;
-    --bridge: #b8a2e6;
-    --bridge-tint: #2a2340;
-    --focus: #7fb3e6;
-    --primary: #e7ecef;
-    --on-primary: #11171b;
-    --link: #8cc3e6;
-    --generated-line: #6f7b83;
-    --shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+    --paper: #121619;
+    --surface: #191e22;
+    --surface-2: #1d2328;
+    --surface-3: #22292f;
+    --line: #2c353c;
+    --line-soft: #252d33;
+    --line-strong: #3a454d;
+    --ink: #e3e7ea;
+    --ink-2: #b2bcc3;
+    --ink-3: #96a1a9;
+    --source: #9ab4c9;
+    --source-tint: #1c262e;
+    --source-line: #34475a;
+    --target: #cfa58c;
+    --target-tint: #2a221d;
+    --target-line: #574032;
+    --ok: #8fc4a1;
+    --ok-tint: #18261e;
+    --ok-line: #2e4a38;
+    --warn: #d9be7e;
+    --warn-tint: #2a2518;
+    --warn-line: #4d4226;
+    --bad: #e6a59c;
+    --bad-tint: #2d1d1b;
+    --bad-line: #5a3530;
+    --bridge: #ab9fcb;
+    --bridge-tint: #231f2e;
+    --focus: #8bb4de;
+    --focus-halo: rgba(139, 180, 222, 0.25);
+    --primary: #e3e7ea;
+    --on-primary: #121619;
+    --link: #93bfde;
+    --generated-line: #6d7880;
+    --shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
   }
 }
 
@@ -403,6 +406,22 @@ code,
   color: var(--ink-2);
   font-size: 0.9375rem;
   line-height: 1.5;
+}
+
+/* An empty or unprepared category: a quiet sentence, not a boxed warning (21 F04/F09). */
+.empty-reason {
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  font: inherit;
 }
 
 .note-warn {

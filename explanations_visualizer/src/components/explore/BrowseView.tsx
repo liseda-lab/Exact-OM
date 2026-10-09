@@ -24,17 +24,31 @@ function reasonerStatus(meta: OntologyMeta | undefined): string {
   return typeof value === "string" ? value : value.status;
 }
 
+/**
+ * One scope indicator per ontology panel (21 F04). Only an unresolved declared import is a
+ * visible notice; loading from the root document is not a warning by itself, and provenance
+ * details stay one disclosure away.
+ */
 function ScopeNote({ meta }: { meta: OntologyMeta | undefined }) {
   if (!meta) return null;
-  const notes: string[] = [];
-  if (meta.completeness.scope === "root") notes.push("Root document only: imports were not loaded, so imported labels and axioms may be missing.");
-  if (meta.completeness.imports_complete === false) notes.push("Some declared imports were not resolved.");
-  if (meta.source_derivation?.status === "declared_derivative") notes.push("This copy is a declared derivative of the original file; its receipt is recorded in the bundle.");
-  if (!notes.length) return null;
+  const details: string[] = [];
+  if (meta.completeness.scope === "root") details.push("Loaded from its root document.");
+  if (meta.completeness.scope === "closure") details.push("Loaded with its resolved import closure.");
+  if (meta.source_derivation?.status === "declared_derivative") details.push("This copy is a declared derivative of the original file; its receipt is recorded in the bundle.");
   return (
-    <div className="note note-warn browser-note" role="note">
-      <span>{notes.join(" ")}</span>
-    </div>
+    <>
+      {meta.completeness.imports_complete === false && (
+        <p className="note note-warn browser-note" role="note">
+          Some declared imports were not resolved, so imported labels and axioms may be missing.
+        </p>
+      )}
+      {details.length > 0 && (
+        <details className="scope-details">
+          <summary>About this ontology</summary>
+          <p className="meta">{details.join(" ")}</p>
+        </details>
+      )}
+    </>
   );
 }
 

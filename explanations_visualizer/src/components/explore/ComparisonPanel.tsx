@@ -30,15 +30,13 @@ export function ComparisonPanel({ source, target, cite, headingLevel = 2 }: { so
     <section className="card comparison" aria-labelledby="comparison-h">
       <div className="comparison-head">
         <Heading id="comparison-h">How the two descriptions compare</Heading>
-        <span className="origin-tag origin-generated">Generated · prepared without Exact&apos;s score or verdict</span>
+        <span className="origin-tag origin-generated">Generated</span>
       </div>
       {state.error ? <ErrorNote error={state.error} onRetry={state.reload} what="Comparison" /> : null}
       {!data && !state.error ? <div className="comparison-grid skeleton-row" aria-busy="true" /> : null}
-      {data?.status === "not_requested" && (
-        <p className="note">No comparison was prepared for this pair. Read the two cards side by side, or open the evidence below.</p>
-      )}
-      {data?.status === "not_exported" && <p className="note">{data.reason}</p>}
-      {data?.status === "unverified" && <p className="note">A comparison exists but has not passed grounding review, so it is not shown.</p>}
+      {data?.status === "not_requested" && <p className="empty-reason">No comparison was prepared for this pair.</p>}
+      {data?.status === "not_exported" && <p className="empty-reason">{data.reason}</p>}
+      {data?.status === "unverified" && <p className="empty-reason">A comparison exists but did not pass grounding review, so it is not shown.</p>}
       {data?.status === "available" &&
         (() => {
           const claims = data.explanation.claims;
@@ -46,43 +44,26 @@ export function ComparisonPanel({ source, target, cite, headingLevel = 2 }: { so
           const excerpts = claims.filter((claim) => ["meaning", "key_fact"].includes(claim.category));
           return (
             <>
+              {/* Only groups with claims take space; the empty ones are named once (21 F04). */}
               <div className="comparison-grid">
-                {GROUPS.map((group) => {
-                  const items = byGroup(group.categories);
-                  return (
-                    <div key={group.key} className={items.length ? `comparison-group tone-${group.tone}` : "comparison-group"}>
-                      <Group>
-                        {group.icon}
-                        <span>{group.title}</span>
-                      </Group>
-                      {items.length ? (
-                        <ul>
-                          {items.map((claim, index) => (
-                            <ClaimItem key={claim.claim_id ?? index} claim={claim} ontologies={data.factOntologies} cite={cite} />
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="meta">
-                          {group.key === "incompatible"
-                            ? "No opposing statement is recorded in the cited facts."
-                            : group.key === "shared"
-                              ? "No shared recorded wording was found."
-                              : group.key === "open"
-                                ? "No open question was recorded."
-                                : "No difference was recorded."}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
+                {GROUPS.filter((group) => byGroup(group.categories).length).map((group) => (
+                  <div key={group.key} className={`comparison-group tone-${group.tone}`}>
+                    <Group>
+                      {group.icon}
+                      <span>{group.title}</span>
+                    </Group>
+                    <ul>
+                      {byGroup(group.categories).map((claim, index) => (
+                        <ClaimItem key={claim.claim_id ?? index} claim={claim} ontologies={data.factOntologies} cite={cite} />
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
-              {data.explanation.limitations.length > 0 && (
-                <div className="note">
-                  <span>
-                    <strong>Limits: </strong>
-                    {data.explanation.limitations.join(" ")}
-                  </span>
-                </div>
+              {GROUPS.some((group) => !byGroup(group.categories).length) && (
+                <p className="meta">
+                  Nothing recorded for: {GROUPS.filter((group) => !byGroup(group.categories).length).map((group) => group.title.toLowerCase()).join(" · ")}.
+                </p>
               )}
               {excerpts.length > 0 && (
                 <div>
@@ -98,7 +79,7 @@ export function ComparisonPanel({ source, target, cite, headingLevel = 2 }: { so
                   )}
                 </div>
               )}
-              <ProvenanceDetails provenance={data.provenance} />
+              <ProvenanceDetails provenance={data.provenance} limitations={data.explanation.limitations} note="Prepared without Exact's score or verdict." />
             </>
           );
         })()}
