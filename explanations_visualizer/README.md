@@ -33,6 +33,11 @@ R10–R11 (attempt-bound access checks, typed navigation) in the
 [second follow-up](../docs/verification/explanation-integration-frontend-followup-2.md), and
 R12–R13 (typed card parents in the tutorial and v1 publications, a race in a recovery test) in the
 [third follow-up](../docs/verification/explanation-integration-frontend-followup-3.md).
+The product-review S0 pass (guided tutorial, valid lesson evidence and recovery, reveal-and-focus,
+Exact matching trace, graph redesign, concise copy, calmer theme) is in the
+[S0 handoff](../docs/verification/explanation-product-review-frontend-s0.md); its regressions are
+`e2e/product-review-s0.spec.ts`, and `e2e/review-screenshots.spec.ts` captures review screenshots
+when `EXACT_SCREENSHOT_DIR` is set.
 
 exact-study/2.0 sessions run only against a study service that advertises
 `integration_contract: "study-integration/1"`; otherwise the page says the service needs an
