@@ -573,6 +573,7 @@ class ExplanationStore:
             stream.flush()
             os.fsync(stream.fileno())
         os.replace(temporary, path)
+        _sync_directory(self.overlays_dir)
         working = copy.deepcopy(self._index)
         working.setdefault("overlays", []).append(
             {
@@ -585,7 +586,15 @@ class ExplanationStore:
         try:
             self._write_index(working)
         except BaseException:
-            path.unlink(missing_ok=True)
+            try:
+                published = json.loads(self.index_path.read_text()) == working
+            except (OSError, ValueError):
+                published = False
+            if published:
+                self._index = working
+                self._overlay_cache = None
+            else:
+                path.unlink(missing_ok=True)
             raise
         self._index = working
         self._overlay_cache = None
@@ -594,7 +603,7 @@ class ExplanationStore:
     def compact(self) -> dict[str, int]:
         """Merge overlays into fresh shards and atomically switch the index."""
 
-        return self._replace_records(list(self.iter_all()))
+        return self._replace_records(self.iter_all())
 
     def truncate(self, record_count: int) -> dict[str, int]:
         """Roll the store back to a checkpoint's committed record boundary.
@@ -614,7 +623,7 @@ class ExplanationStore:
                 "after_bytes": self._stored_bytes(),
                 "records": keep,
             }
-        records = list(itertools.islice(self.iter_all(), keep))
+        records = itertools.islice(self.iter_all(), keep)
         return self._replace_records(records)
 
     def clear(self) -> dict[str, int]:
@@ -631,7 +640,7 @@ class ExplanationStore:
             for entry in self._index.get("overlays") or []
         )
 
-    def _replace_records(self, records: list[dict[str, Any]]) -> dict[str, int]:
+    def _replace_records(self, records: Iterable[dict[str, Any]]) -> dict[str, int]:
         """Atomically install ``records`` as the complete store contents."""
 
         before = self._stored_bytes()
@@ -643,7 +652,11 @@ class ExplanationStore:
             hash_buckets=int(self._index.get("hash_buckets", DEFAULT_HASH_BUCKETS)),
             compression=str(self._index.get("compression", "zstd")),
         )
-        temporary_store.append(records)
+        iterator = iter(records)
+        total = 0
+        while chunk := list(itertools.islice(iterator, 256)):
+            temporary_store.append(chunk)
+            total += len(chunk)
         replacement = copy.deepcopy(temporary_store._index)
         replacement["overlays"] = []
         moved: list[Path] = []
@@ -662,10 +675,19 @@ class ExplanationStore:
                 os.replace(source, destination)
                 moved.append(destination)
                 shard["path"] = f"shards/{destination.name}"
+            _sync_directory(self.shards_dir)
             self._write_index(replacement)
         except BaseException:
-            for path in moved:
-                path.unlink(missing_ok=True)
+            try:
+                published = json.loads(self.index_path.read_text()) == replacement
+            except (OSError, ValueError):
+                published = False
+            if published:
+                self._index = replacement
+                self._overlay_cache = None
+            else:
+                for path in moved:
+                    path.unlink(missing_ok=True)
             shutil.rmtree(temporary_dir, ignore_errors=True)
             raise
         self._index = replacement
@@ -676,7 +698,7 @@ class ExplanationStore:
         if self.overlays_dir.is_dir() and not any(self.overlays_dir.iterdir()):
             self.overlays_dir.rmdir()
         after = sum(path.stat().st_size for path in moved)
-        return {"before_bytes": before, "after_bytes": after, "records": len(records)}
+        return {"before_bytes": before, "after_bytes": after, "records": total}
 
     def export(
         self,
