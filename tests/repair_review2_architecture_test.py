@@ -19,6 +19,7 @@ from tests.repair_learning_v3_test import problem
 from tests.repair_training_completion_test import cache_for
 from tools.repair import train
 from tools.repair.corpus import generate_corpus
+from tools.repair.prepare import publish_label_cache
 
 
 def protocol_fixture(tmp_path, enabled):
@@ -54,6 +55,7 @@ def test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_sta
 
     path, protocol = protocol_fixture(tmp_path, enabled)
     cases = generate_corpus(
+        revision="v3",
         split_counts={"train": 1, "development": 1, "test": 0},
         siblings_per_parent=1,
         families=("interaction_complementary",),
@@ -87,7 +89,7 @@ def test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_sta
     def worker(function, *args, **kwargs):
         if function.__name__ == "generated_from_protocol":
             value = cases
-        elif function is train.label_case:
+        elif function is train._label_payload:
             case = args[0]
             cache = cache_for(case)
             hashes = dict(cache.hashes)
@@ -110,6 +112,7 @@ def test_protocol_architecture_reaches_entrypoint_model_preparation_and_warm_sta
                     for label in cache.labels
                 ),
             )
+            value = publish_label_cache(value, args[1])
         elif function is train._train_payload:
             assert args[2]["pairwise"] is enabled
             value = function(*args)

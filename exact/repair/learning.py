@@ -708,7 +708,12 @@ class OwlTeacherOracle:
 
 
 def interaction_loss(
-    predictions: Any, labels: Sequence[RepairLabel], *, max_quartets: int = 64, beta: float = 1.0
+    predictions: Any,
+    labels: Sequence[RepairLabel],
+    *,
+    max_quartets: int = 64,
+    beta: float = 1.0,
+    eligible_pairs: Sequence[tuple[int, int]] | None = None,
 ) -> dict[str, Any]:
     """Feasible, complete counterfactual differences on identical backgrounds."""
     import torch
@@ -724,6 +729,8 @@ def interaction_loss(
         if len(contrasts) >= max_quartets:
             break
         for i, j in itertools.combinations(range(len(base)), 2):
+            if eligible_pairs is not None and (i, j) not in eligible_pairs:
+                continue
             # Only the two changed positions differ; no invented infeasible benefit.
             for other, i11 in sorted(lookup.items()):
                 if not (base[i] < other[i] and base[j] < other[j]):
@@ -755,7 +762,14 @@ def interaction_loss(
         if contrasts
         else predictions.sum() * 0
     )
-    return {"loss": loss, "eligible": len(contrasts), "targets": tuple(targets)}
+    return {
+        "loss": loss,
+        "eligible": len(contrasts),
+        "targets": tuple(targets),
+        "positive": sum(t > 1e-12 for t in targets),
+        "negative": sum(t < -1e-12 for t in targets),
+        "zero": sum(abs(t) <= 1e-12 for t in targets),
+    }
 
 
 def risk_loss(logits: Any, labels: Sequence[RepairLabel]) -> dict[str, Any]:
@@ -893,6 +907,7 @@ def collect_sampled_repairs(
     exploration_fraction: float | None = None,
     counterfactual_attempts: int | None = None,
     quartet_attempts: int = 0,
+    eligible_pairs: Sequence[tuple[int, int]] | None = None,
     plan_quotas: Mapping[str, int] | None = None,
     resume_state: Mapping[str, Any] | None = None,
     progress: Callable | None = None,
@@ -902,6 +917,7 @@ def collect_sampled_repairs(
     Every stratum shares one finite interleaved schedule; quartet budgets count
     assignment attempts in groups of four. Probabilities describe draws, never
     deduplicated inclusion. No rejection-resampling removes unknown outcomes.
+    A zero remaining deadline finalizes unvisited slots without invoking the labeler.
     """
     from .records import canonical_hash
 
@@ -935,7 +951,7 @@ def collect_sampled_repairs(
     if (
         any(type(n) is not int or n < 1 for n in counts)
         or max_assignments < 0
-        or deadline_seconds <= 0
+        or deadline_seconds < 0
     ):
         raise ValueError("Invalid sample inventory/budgets")
     if object_candidate_ids and (
@@ -1001,6 +1017,8 @@ def collect_sampled_repairs(
                 sources["diversity"].append((tuple(candidate_row), None))
     rng.shuffle(sources["diversity"])
     for i, j in itertools.combinations(range(len(counts)), 2):
+        if eligible_pairs is not None and (i, j) not in eligible_pairs:
+            continue
         for left in range(counts[i]):
             if left == base[i]:
                 continue
@@ -1052,6 +1070,7 @@ def collect_sampled_repairs(
         exploration_fraction=exploration_fraction,
         counterfactual_attempts=counterfactual_attempts,
         quartet_attempts=quartet_attempts,
+        eligible_pairs=None if eligible_pairs is None else tuple(eligible_pairs),
     )
     sampler_hash = canonical_hash((settings, counts, schedule))
     dependencies = dict(
@@ -1240,6 +1259,8 @@ def generated_checkpoint_criterion(
     minimum_coverage: float = 1.0,
     uncertainty_z: float = 1.96,
     fallback: str = "stop",
+    expected_case_ids: Sequence[str] | None = None,
+    semantic_case_ids: Sequence[str] | None = None,
 ) -> tuple | None:
     """Coverage gate, external quality lower confidence bound, then verifier effort.
 
@@ -1253,6 +1274,40 @@ def generated_checkpoint_criterion(
         or fallback not in {"stop", "exploratory"}
     ):
         raise ValueError("Invalid generated checkpoint selection declaration")
+    if expected_case_ids is not None:
+        observed = [row.get("case_id") for row in reports]
+        if (
+            len(expected_case_ids) != len(set(expected_case_ids))
+            or len(observed) != len(set(observed))
+            or set(observed) != set(expected_case_ids)
+        ):
+            raise ValueError("Development case-ID set differs from the frozen schedule")
+    if semantic_case_ids is not None:
+        scheduled = set(semantic_case_ids)
+        if len(scheduled) != len(semantic_case_ids) or not scheduled <= {
+            r.get("case_id") for r in reports
+        }:
+            raise ValueError("Semantic subset differs from the frozen development schedule")
+        logical = [
+            r
+            for r in reports
+            if r.get("decoded", {}).get("logical_status") == "VERIFIED_FEASIBLE"
+            or r.get("decoded", {}).get("status") == "verified"
+        ]
+        logical_coverage = len(logical) / len(reports)
+        subset = [r for r in reports if r.get("case_id") in scheduled]
+        # Every preselected semantic slot is required; missing responses cannot
+        # improve the quality denominator. Logical coverage always uses all cases.
+        semantic = (
+            generated_checkpoint_criterion(
+                subset, minimum_coverage=1.0, uncertainty_z=uncertainty_z, fallback="stop"
+            )
+            if subset
+            else None
+        )
+        if semantic is None or (logical_coverage < minimum_coverage and fallback == "stop"):
+            return None
+        return (-logical_coverage, *semantic)
     known = [
         r["decoded"]
         for r in reports
@@ -1353,3 +1408,73 @@ def conditional_proposal_loss(
         "eligible": 0 if missing_mass else len(labels),
         "order": "canonical_inventory_object_order",
     }
+
+
+def training_supervision_audit(cases_with_caches, *, eligible_pairs=None):
+    """Audit TRAIN-only independent coverage; no zero/unknown pseudo-targets."""
+    import torch
+
+    families = {}
+    all_risk = []
+    for case, cache in cases_with_caches:
+        if case.split != "train":
+            raise ValueError("Supervision acquisition statistics are TRAIN-only")
+        row = families.setdefault(
+            case.family,
+            dict(
+                cases=0,
+                parents=set(),
+                usable_parents=set(),
+                attempted=0,
+                verified_feasible=0,
+                decided_infeasible=0,
+                usable=0,
+                unknown_policy=0,
+                unknown_semantics=0,
+                semantic_targets=[],
+                quartet_positive=0,
+                quartet_negative=0,
+                quartet_zero=0,
+            ),
+        )
+        row["cases"] += 1
+        row["parents"].add(case.structural_parent)
+        row["attempted"] += len(cache.labels)
+        for label in cache.labels:
+            row["verified_feasible"] += label.feasible is True
+            row["decided_infeasible"] += label.feasible is False
+            row["unknown_policy"] += label.feasible is None
+            row["unknown_semantics"] += label.feasible is True and label.benefit is None
+            if label.feasible is not None:
+                all_risk.append(float(label.feasible is False))
+            if label.usable:
+                row["usable"] += 1
+                row["usable_parents"].add(case.structural_parent)
+                row["semantic_targets"].append(label.benefit)
+        quartets = interaction_loss(
+            torch.zeros(len(cache.labels)),
+            cache.labels,
+            eligible_pairs=(eligible_pairs or {}).get(case.case_id, ()),
+        )
+        for name in ("positive", "negative", "zero"):
+            row["quartet_" + name] += quartets[name]
+    for row in families.values():
+        row["parents"] = sorted(row["parents"])
+        row["usable_parents"] = sorted(row["usable_parents"])
+        values = row.pop("semantic_targets")
+        mean = sum(values) / len(values) if values else None
+        row["semantic_target_variance"] = (
+            sum((v - mean) ** 2 for v in values) / len(values) if values else None
+        )
+    rate = sum(all_risk) / len(all_risk) if all_risk else None
+    return dict(
+        schema="exact-repair/training-head-coverage/v1",
+        families=families,
+        constant_risk_baseline=dict(
+            source="TRAIN",
+            eligible=len(all_risk),
+            probability=rate,
+            brier=(sum((v - rate) ** 2 for v in all_risk) / len(all_risk) if all_risk else None),
+        ),
+        scope="Observed unique assignment labels; no unobserved repair distribution claim",
+    )

@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_serializer, model_validator
 
 from exact.repair.records import canonical_hash
 from exact.repair.semantic_fidelity import _strict_json
@@ -24,7 +24,9 @@ class StrictSection(BaseModel):
 
 
 class Identity(StrictSection):
-    implementation_revision: Literal["exact-repair/review-corrections/v2"]
+    implementation_revision: Literal[
+        "exact-repair/review-corrections/v2", "exact-repair/preliminary-corrections/v1"
+    ]
     research_revision: Literal["XR-2.1"]
     record_schema: Literal["exact-repair/records/v3"]
     feature_schema: Literal["exact-repair/observable-features/v3"]
@@ -32,6 +34,7 @@ class Identity(StrictSection):
         "exact-repair/teacher-cache/v3",
         "exact-repair/fidelity-training/v3.3",
         "exact-repair/mixed-targets/v3.3",
+        "exact-repair/symbolic-plus-fidelity/v1",
     ]
     code_hash: Text
     dirty_hash: Text
@@ -113,6 +116,16 @@ class Generation(StrictSection):
     max_total_draws_per_object: Count
     elementary_guarantee: Literal["reserve_before_complex"]
     tie_rule: Literal["canonical_candidate_id"]
+    execution_schedule: Literal["one_stage", "staged_verified_repair"] = "one_stage"
+    elementary_seconds: PositiveAmount = 30.0
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        for name in ("execution_schedule", "elementary_seconds"):
+            if name not in self.model_fields_set:
+                result.pop(name, None)
+        return result
 
 
 class Circuit(StrictSection):
@@ -136,7 +149,25 @@ class Circuit(StrictSection):
     distribution_identity: Text
 
 
+class DeclaredGraphSchema(StrictSection):
+    schema_id: Literal["exact-repair/declared-graph-schema/v1"] = Field(alias="schema")
+    language: Literal["pyowl-core/public-structural-ast/v1"]
+    language_hash: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    node_types: Annotated[list[Text], Field(min_length=1)]
+    edge_types: Annotated[
+        list[Annotated[list[Text], Field(min_length=3, max_length=3)]], Field(min_length=1)
+    ]
+
+    @model_validator(mode="after")
+    def supported_language(self):
+        from exact.repair.graph_schema import declared_metadata
+
+        declared_metadata(self.model_dump(by_alias=True))
+        return self
+
+
 class Model(StrictSection):
+    graph_schema: DeclaredGraphSchema | None = None
     backbone: Literal["hgt", "rgcn", "no_graph"]
     readout: Literal["target_candidate_attention"]
     hidden_width: PositiveCount
@@ -162,6 +193,13 @@ class Model(StrictSection):
     support_enabled: bool = False
     support_target: Literal["qualified_witness_violation/v1"] = "qualified_witness_violation/v1"
     cost_predictor: Literal[False]
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        if self.graph_schema is None:
+            result.pop("graph_schema", None)
+        return result
 
 
 class Teacher(StrictSection):
@@ -198,7 +236,7 @@ class Collection(StrictSection):
 
 
 class Losses(StrictSection):
-    target_basis: Literal["symbolic", "ai_weak", "mixed"]
+    target_basis: Literal["symbolic", "ai_weak", "mixed", "symbolic_plus_llm"]
     scale_alignment: Text
     mixture_symbolic_weight: Fraction
     anchors: Text
@@ -212,6 +250,23 @@ class Losses(StrictSection):
     masks: Literal["complete_same_basis_per_loss"]
     normalization: Literal["eligible_terms"]
     sampled_target_approximation: Literal["sample_conditioned_ranking_imitation"]
+    loss_contract: Literal["provenance_additive/v1"] | None = None
+    weak_anchor_weight: Amount = 0.0
+    weak_comparison_weight: Amount = 0.0
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        for name in ("loss_contract", "weak_anchor_weight", "weak_comparison_weight"):
+            if name not in self.model_fields_set:
+                result.pop(name, None)
+        return result
+
+
+class PlanRatingAggregation(StrictSection):
+    revision: Literal["per_criterion_median/v1"]
+    minimum_ratings: PositiveCount
+    max_criterion_range: Fraction
 
 
 class LLMBudget(StrictSection):
@@ -243,6 +298,23 @@ class LLMLabels(StrictSection):
     independent_evaluator: bool
     annotation_manifest: str | None
     aggregation_revision: Literal["exact-repair/semantic-fidelity-aggregate/v3.3"]
+    development_use_policy: Literal["independent_evaluation", "development_selection/v1"] = (
+        "independent_evaluation"
+    )
+    plan_rating_aggregation: PlanRatingAggregation | None = None
+    post_decode_annotation_manifest: str | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        for name in (
+            "development_use_policy",
+            "plan_rating_aggregation",
+            "post_decode_annotation_manifest",
+        ):
+            if name not in self.model_fields_set:
+                result.pop(name, None)
+        return result
 
 
 class Objective(StrictSection):
@@ -329,6 +401,25 @@ class Training(StrictSection):
     checkpoint_criterion: Literal["generated_pool_verified_quality_effort"]
     proposal_loss: Literal["exact_and_sample_conditioned"]
     benefit_loss: Literal["anchored_value_rank_quartet_risk"]
+    development_epochs: list[PositiveCount] | None = None
+    development_case_ids: list[Text] | None = None
+    patience_enabled: bool | None = None
+    max_full_development_evaluations: PositiveCount | None = None
+    final_development_reserve_seconds: Amount | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_identity(self, handler):
+        result = handler(self)
+        for name in (
+            "development_epochs",
+            "development_case_ids",
+            "patience_enabled",
+            "max_full_development_evaluations",
+            "final_development_reserve_seconds",
+        ):
+            if name not in self.model_fields_set:
+                result.pop(name, None)
+        return result
 
 
 class Evaluation(StrictSection):
@@ -373,9 +464,18 @@ class RepairProtocolV3(StrictSection):
             "symbolic": "exact-repair/teacher-cache/v3",
             "ai_weak": "exact-repair/fidelity-training/v3.3",
             "mixed": "exact-repair/mixed-targets/v3.3",
+            "symbolic_plus_llm": "exact-repair/symbolic-plus-fidelity/v1",
         }[self.losses.target_basis]
         if self.identity.label_schema != target_schema:
             raise ValueError("Declared label schema does not match the target basis")
+        if self.losses.target_basis == "symbolic_plus_llm":
+            if (
+                self.losses.loss_contract != "provenance_additive/v1"
+                or self.losses.weak_anchor_weight + self.losses.weak_comparison_weight <= 0
+            ):
+                raise ValueError("Combined supervision requires explicit additive weak losses")
+            if self.llm_labels.plan_rating_aggregation is None:
+                raise ValueError("Combined supervision requires a frozen plan-rating aggregation")
         if self.model.hidden_width % self.model.attention_heads or self.model.dropout >= 1:
             raise ValueError("Invalid graph width/heads/dropout")
         collection = self.collection
@@ -447,6 +547,28 @@ class RepairProtocolV3(StrictSection):
             raise ValueError("Selected training generation stage is unavailable")
         if self.training.patience > self.training.max_epochs:
             raise ValueError("Patience exceeds epoch budget")
+        training = self.training
+        if training.development_epochs is not None:
+            epochs = training.development_epochs
+            if not epochs or epochs != sorted(set(epochs)) or epochs[-1] > training.max_epochs:
+                raise ValueError(
+                    "DEV epochs must be distinct, ordered and within the fitting budget"
+                )
+            if (
+                training.max_full_development_evaluations is None
+                or len(epochs) > training.max_full_development_evaluations
+            ):
+                raise ValueError("DEV schedule exceeds its explicit pass count")
+        if training.development_case_ids is not None:
+            if not training.development_case_ids or len(set(training.development_case_ids)) != len(
+                training.development_case_ids
+            ):
+                raise ValueError("DEV case schedule must be nonempty and unique")
+        if (
+            self.generation.execution_schedule == "staged_verified_repair"
+            and self.generation.elementary_seconds + r.cleanup_grace_seconds > r.case_wall_seconds
+        ):
+            raise ValueError("Elementary stage exceeds case budget")
         if (
             self.identity.purpose == "confirmatory"
             and not self.evaluation.fresh_confirmatory_parents
