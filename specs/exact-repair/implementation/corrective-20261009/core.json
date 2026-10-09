@@ -1,0 +1,99 @@
+{
+  "schema": "exact-repair/october-core-implementation-evidence/v1",
+  "source_files": {
+    "exact/repair/candidates.py": "54c5e277cab26815b0dd9748a23a8cac18fa2b2419f563dca1f9e2faf98684d9",
+    "exact/repair/compilation.py": "aec636715d213f86f3f67c2a417694d00777f88eceec0ba669c9f08cbe8b2998",
+    "exact/repair/detection.py": "ac9aa942e1d34ffff84c9436e68f46a52aa960694444354d7778f70955c3eb8d",
+    "exact/repair/grammar.py": "f6087826ec668656785c5fc25744f56d28c1cafc3c86a40cfbf91e9a829dbc3d",
+    "exact/repair/kernel.py": "11704c8c2ce5acf459f2cc0f6674c5187452668e085a199eebbd3c439cc79443",
+    "exact/repair/owl.py": "29e2c9f43fa6eee8e4c6a93b1e2801055e6a2a0c39d46026af003ef26b7ea274",
+    "exact/repair/pipeline.py": "e7c3cd0fba95f9b5e08869c37855d9ca5c9eeb3d08c6aeef619903aff920e586",
+    "exact/repair/proposals.py": "5c46e5ee719b6323f669edbc35444d64f658eaf5d5d8cadffd38ab4c1fe21fe7",
+    "exact/repair/records.py": "ce36f5aa11fbacb3703884840d5b565049f7f0d1004376c0454450285fa0dd8a",
+    "exact/repair/workers.py": "a9a1baf1a0dc8554240e69ae64a3335dfdae83ee66774abfbf68d6a79a02dbd1",
+    "tests/repair_endpoint_recovery_test.py": "8b6f651d6770d8b36cbb6728b79099cf2742067749d735e31d3fee745e41cc56",
+    "tests/repair_october_campaign_test.py": "64f6b04786a7be2518341fd97b09b44ff9a642c7c4796a7acf8747201c997a30",
+    "tests/repair_october_core_corrections_test.py": "5c63c6e435df8f2b295144a3c88476ba2f6edf78641088bf33b460333fa91d2e",
+    "tests/repair_october_decoder_test.py": "516c0721bba2dac93c6db7e6f9b8cf3bd1872297b56c31511c165844e19301ac",
+    "tools/repair/compare_proposals.py": "72772e663549dd36e60bb5140e9668ee7dff36c13de21b3e0026f74ebc97f6e9",
+    "tools/repair/corrective_calibration.py": "f205226e937c036b6b07b499f0900536db943e1620a720a042e481b7efeb0862",
+    "tools/repair/corrective_campaign.py": "44c8ca59262893108a51f00ba17712d47b450cdfd589a6602556a00111133700",
+    "tools/repair/corrective_study.py": "7da0b39000f12e6c00486a5e6ea035bd67e2a2db7a56d41260da0feb02856dcf",
+    "tools/repair/scaling.py": "5cc75fec2db92408e43cb1d6314c7e7bdc792bbd3d9cb885c43a2ee85b75846a"
+  },
+  "packages": {
+    "pyowl-core": "0.2.1",
+    "pyhermit": "0.2.1",
+    "pyelk-reasoner": "0.2.1",
+    "pysdd": "1.0.6",
+    "python-sat": "1.8.dev24",
+    "torch": "2.7.0+cu128",
+    "torch-geometric": "2.6.1"
+  },
+  "commands": [
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_core_corrections_test.py tests/repair_grammar_test.py tests/repair_compilation_test.py tests/repair_owl_test.py tests/repair_kernel_test.py tests/repair_v3_kernel_test.py tests/repair_candidates_test.py tests/repair_endpoint_recovery_test.py tests/repair_pipeline_completion_test.py --disable-warnings --maxfail=2",
+      "passed": 113,
+      "wall_seconds": 73.21,
+      "scope": "before final CUDA spawn broker and memory-cache additions; final additions covered by second command"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_supervision_test.py tests/repair_v3_resources_test.py tests/repair_review_transport_test.py tests/repair_label_transport_test.py tests/repair_october_core_corrections_test.py --disable-warnings --maxfail=2",
+      "passed": 71,
+      "wall_seconds": 73.87,
+      "scope": "final source including spawn broker, external per-task deadlines and compiler batch memory cache"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest tests/repair_october_decoder_test.py tests/repair_october_campaign_test.py tests/repair_review_learning_test.py::test_v3_freeze_requires_qualified_effective_preparation_for_supplied_graph -q --disable-warnings --maxfail=3",
+      "passed": 24,
+      "wall_seconds": 22.25,
+      "scope": "new E3b and preparation/native resume contracts before final optional-circuit type guards and public real-input support"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest tests/repair_october_decoder_test.py tests/repair_october_campaign_test.py tests/repair_proposals_test.py tests/repair_pipeline_completion_test.py -q --disable-warnings --maxfail=2",
+      "passed": 34,
+      "wall_seconds": 50.57,
+      "scope": "final source; E3b native probability/Boolean-alias/activation/proof-exclusion equivalence, shared unique-K stopping, historical receipt compatibility, inherited split/case hashes,32 native-qualified calibration slots, manifest resume/environment deadline/all-row denominators, public real input without fabricated truth, existing proposal and pipeline regressions"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/mypy -p exact.repair -m tools.repair.corrective_study -m tools.repair.corrective_campaign -m tools.repair.corrective_calibration -m tools.repair.compare_proposals",
+      "status": "passed",
+      "checked_source_files": 29,
+      "scope": "repair plus four actual entrypoints; unrelated repository modules outside selection"
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed"
+    },
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/black [owned Python source and tests]",
+      "status": "formatted",
+      "scope": "all final owned changed/new Python files"
+    }
+  ],
+  "corrections": {
+    "COR-03": "nested cleanup quarantine/propagation, atomic phase/menu evidence, bounded reusable batch compilation, per-task external deadlines, task-count/lifetime/tree-RSS ownership, durable partial completions, failed compiler telemetry",
+    "COR-04": "request-local prepared immutable Horn rules/completion, duplicate activation checks cached with same requested-check quota and replay proof validation, compiler exact-language bounded memory/disk cache",
+    "COR-05": "complete typed structural endpoint substitution, activations/unaffected bundle members preserved, explicit ambiguity/unavailability, elementary nonclass retained, canonical syntax-derived endpoint costs without producer authority",
+    "COR-06": "bounded initial coherence pass before model loading, elementary incumbent before rich generation, canonical-ID carry, fresh-objective rescore and native reverify; earlier scoped incumbent survives stalled expansion",
+    "COR-07": "shared auto capability routing with extra soft-query routing context, native feasibility-only early rejection preserving unchecked obligations; training route wiring owned by learning agent",
+    "COR-11": "new corrective_study actual row runner, native deletion direct elementary pool, separate observable-query support surrogate and external complete-plan search with explicit best-checked/optimal statuses, committed selection before evaluator reference probes, frozen denominator/resume receipts; E3b weighted grammar decoder on predeclared tractable completed support, exact alias/activation probabilities, proof exclusions, shared max-draw/candidate/time caps and explicit unique-K stopping; generic captured real input carries no fabricated clean-parent truth"
+  },
+  "remaining_qualification": [
+    "End-to-end empirical throughput and equal-budget staged/one-stage outcomes require campaign calibration; unit/native tests do not establish throughput.",
+    "E3b is restricted to predeclared tractable languages whose exhaustive support fully finishes; setup enumeration cost is charged. Incomplete circuit-family support is not eligible for a matched-distribution comparison. Equal declared unique target must actually be reached in both arms.",
+    "Full production ontology/import releases remain separately qualified; composite nonclass endpoint edits remain explicitly unavailable rather than silently narrowed.",
+    "Spawn-only GPU-parent path tested by forcing live-CUDA routing and forbidding os.fork; actual GPU qualification is owned by root.",
+    "Generic captured real-input runner preserves truth absence and reports independent_evaluation_not_provided until a separate valid evaluator is attached."
+  ],
+  "historical_changes": "Legacy endpoint-recovery test expecting abort amended to COR-05 unavailable outcome; immutable prior runs untouched.",
+  "pre_commit_revision": "500a942ecfa75437955d4908d710cd170e6bbb94",
+  "source_binding": "SHA256 final owned source files; pre_commit_revision is base HEAD, root binds final commit separately after publication.",
+  "preparation_review": {
+    "case_targets": "8 families x2 mirrors have desired and unwanted targets with nonvacuity, idempotent target transformation, no deployment-input change",
+    "lineage": "128 TRAIN/32 DEV/64 TEST inherited slots preserved including unknown/unavailable rows; new case hash binds changed target, prior case hash retained",
+    "observable_controls": "predictor only receives uniquely declared observable asserted-axiom queries, no hidden case reference probes",
+    "calibration": "exactly32 native-qualified TRAIN observations:4 authored constructions x4 approved teacher profiles x2 presentation orders; no paid transmissions during validation",
+    "identities": "real code file hashes, dirty diff, graph schema and precommit revision replace placeholders; draft metadata can change only before submission/paid reservations"
+  }
+}

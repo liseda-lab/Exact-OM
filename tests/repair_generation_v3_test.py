@@ -321,7 +321,9 @@ def test_v3_frozen_risk_snapshot_and_objective_survive_supervised_transport(tmp_
     result = bounded_freeze_neural_round(
         problem,
         model,
-        seconds=30,
+        # This checks immutable transport, not generation speed. Native compiler
+        # startup under concurrent Slurm work needs a separate finite fixture cap.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
@@ -389,7 +391,9 @@ def test_checkpoint_artifact_route_verifies_hash_inside_worker(tmp_path):
     )
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     options = dict(
-        seconds=30,
+        # Checkpoint integrity is independent of native compiler startup speed.
+        # Match the finite allowance of the other supervised transport fixtures.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
@@ -427,7 +431,9 @@ def test_cuda_owned_weights_use_cpu_artifact_for_supervised_inference(tmp_path):
     result = bounded_freeze_checkpoint(
         problem,
         str(path),
-        seconds=30,
+        # CPU artifact transport can exceed 30 seconds under concurrent Slurm
+        # work; this fixture checks correctness, not a scientific time budget.
+        seconds=120,
         draws_per_object=0,
         max_depth=0,
         max_constructors=0,
@@ -444,7 +450,9 @@ def test_typed_generation_records_are_actual_pipeline_output_and_roundtrip(tmp_p
     result = bounded_freeze_neural_round(
         problem,
         model,
-        seconds=30,
+        # This checks typed records and roundtrip integrity, not generation speed.
+        # Keep a finite startup allowance matching the transport fixture above.
+        seconds=120,
         draws_per_object=3,
         proposal_arm="grammar_uniform",
         max_depth=0,
