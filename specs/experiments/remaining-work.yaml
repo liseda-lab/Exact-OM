@@ -1,6 +1,21 @@
 schema_version: 1
 kind: planning_snapshot_not_campaign_lock
 recorded_at: '2026-09-29T18:28:17.277127+00:00'
+prospective_throughput_final_spec:
+  recorded_at: '2026-10-09'
+  status: specified_not_implemented_not_deployed
+  specification: specs/experiments/SCORING-THROUGHPUT-200.md
+  scientific_correction: specs/experiments/FINAL-STUDY-CORRECTION-20261009.md
+  planning_record: specs/experiments/throughput-final-plan-20261009.yaml
+  cold_unique_pairs_per_second_target: 200
+  target_measured: false
+  full_primary_exact_cells: 12
+  conditional_primary_label_free_cells: 2
+  unique_published_global_cells: 3
+  maximum_bounded_seed_diagnostic_cells: 54
+  maximum_conditional_additional_combined_diagnostic_cells: 20
+  changes_live_queue: false
+  historical_inventory_counts_below_preserved: true
 e25_benchmark_replay_amendment:
   approved_at: '2026-10-07'
   specification: specs/experiments/E25-BENCHMARK-REPLAY-AMENDMENT-20261007.md

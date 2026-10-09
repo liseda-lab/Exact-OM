@@ -1,5 +1,12 @@
 # Single-node run plan
 
+**Prospective correction, 2026-10-09 — specified, not applied:**
+[Final-study correction](FINAL-STUDY-CORRECTION-20261009.md) records the proposed mixed-scale
+matrix and narrower seed/supervision claim boundaries. [Scoring throughput](SCORING-THROUGHPUT-200.md)
+defines the 200 cold unique pairs/second implementation target and acceptance work.
+Apply them only through a new reviewed design/execution revision; this notice changes no
+active G4 or final runtime lock. Historical matrix/cap text below remains the design history.
+
 **Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
 supersedes time caps, full qualification repeats and the old dispatch dates below.
 Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.
