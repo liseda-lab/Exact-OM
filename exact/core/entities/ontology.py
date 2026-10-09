@@ -48,7 +48,7 @@ class OntologyGraph:
         self._dr_cache: Optional[Dict[str, Dict[str, List[str]]]] = None
         self._missing_dom_cache: Optional[List[str]] = None
         self._missing_rng_cache: Optional[List[str]] = None
-        self._example_triples_cache: Optional[Dict[str, List[Tuple[str]]]] = None
+        self._example_triples_cache: Dict[Tuple[int, bool], Dict] = {}
         self._context_subgraph_cache: Dict[Tuple[str, int, bool], List[Tuple[str]]] = {}
 
         # IC caches
@@ -269,7 +269,23 @@ class OntologyGraph:
         :param human_readable: if True, convert IRIs to their full list of labels
         :return: dict mapping each relation (IRI or label‐tuple) to a list of example triples
         """
+        # Cache raw examples; human-readable labels are resolved at return time.
+        key = (max(0, int(n)), bool(exclude_missing_dr))
         if self._example_triples_cache is None:
+            self._example_triples_cache = {}
+        if key not in self._example_triples_cache:
+            discovered = None
+            discovery_seconds = 0.0
+            if self._relations_cache is None:
+                started = time.perf_counter()
+                discovered = {}
+                for edge in self.edges:
+                    rows = discovered.setdefault(edge.rel, [])
+                    if len(rows) < key[0]:
+                        rows.append((str(edge.src), str(edge.rel), str(edge.dst)))
+                self._relations_cache = set(discovered)
+                discovery_seconds = time.perf_counter() - started
+            started = time.perf_counter()
             rels = set(self.get_relations(human_readable=False))
             if exclude_missing_dr:
                 missing = set(self.get_relations_missing_domain(human_readable=False)) | set(
@@ -277,29 +293,31 @@ class OntologyGraph:
                 )
                 rels = rels - missing
 
-            examples: Dict = {}
-            for rel in rels:
-
-                # gather up to n triples for this relation
-                exs = []
+            domain_range_seconds = time.perf_counter() - started
+            started = time.perf_counter()
+            examples: Dict = {rel: discovered[rel] if discovered is not None else [] for rel in rels}
+            pending = set(rels) if key[0] and discovered is None else set()
+            if pending:
                 for edge in self.edges:
-                    if edge.rel != rel:
-                        continue
-                    else:
-                        src, dst, rel_lbl = str(edge.src), str(edge.dst), str(edge.rel)
+                    if edge.rel in pending:
+                        rows = examples[edge.rel]
+                        rows.append((str(edge.src), str(edge.rel), str(edge.dst)))
+                        if len(rows) >= key[0]:
+                            pending.remove(edge.rel)
+                            if not pending:
+                                break
+            self._example_triples_cache[key] = examples
+            self.example_triples_timings = {
+                'domain_range_seconds': domain_range_seconds,
+                'gather_seconds': discovery_seconds + time.perf_counter() - started,
+            }
 
-                    exs.append((src, rel_lbl, dst))
-                    if len(exs) >= n:
-                        break
-
-                examples[rel] = exs
-
-            self._example_triples_cache = examples
+        raw_examples = self._example_triples_cache[key]
 
         if human_readable:
             # convert IRIs to their full list of labels
             examples = {}
-            for rel, exs in self._example_triples_cache.items():
+            for rel, exs in raw_examples.items():
                 examples[self.get_labels(rel)[0]] = [
                     (self.get_labels(src)[0], self.get_labels(rel_lbl)[0], self.get_labels(dst)[0])
                     for src, rel_lbl, dst in exs
@@ -308,7 +326,7 @@ class OntologyGraph:
 
         else:
             # return IRIs
-            return self._example_triples_cache
+            return raw_examples
 
     def get_labels(self, iri: str) -> List[str]:
         """

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 import hashlib  # noqa: F401
 import json  # noqa: F401
 import math
@@ -1729,9 +1731,21 @@ class PairAdaptiveSemanticScorer(
             struct_channel_qualities[key] = []
             struct_channel_active[key] = []
 
+        from exact.impl.models.pair_adaptive_batch import call_prepared, prepare_structural_block
+
+        context_batching = os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") == "1"
+        context_block = max(1, int(os.getenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", "32")))
+        prepared_rows = []
         for idx, (src_iri, tgt_iri) in enumerate(zip(src_iris, tgt_iris)):
             src_feats = src_feature_map[src_iri]
             tgt_feats = tgt_feature_map[tgt_iri]
+            if context_batching and idx % context_block == 0:
+                stop = min(n_pairs, idx + context_block)
+                prepared_rows = prepare_structural_block(self, [
+                    (src_iris[pos], tgt_iris[pos], src_feature_map[src_iris[pos]],
+                     tgt_feature_map[tgt_iris[pos]]) for pos in range(idx, stop)
+                ], family_names)
+            prepared = prepared_rows[idx % context_block] if context_batching else None
             src_best_label, tgt_best_label = best_pairs[idx]
             if not src_best_label:
                 src_best_label = src_feats["labels"][0] if src_feats.get("labels") else ""
@@ -1740,7 +1754,9 @@ class PairAdaptiveSemanticScorer(
 
             hierarchy_payloads: Dict[str, Dict[str, Any]] = {}
             for family in family_names:
-                family_payload = self._score_hierarchy_family(
+                family_payload = call_prepared(
+                    self, "hierarchy", self._score_hierarchy_family,
+                    prepared["hierarchy"][family] if prepared is not None else None,
                     family,
                     src_feats.get("hierarchy", {}).get(family, []),
                     tgt_feats.get("hierarchy", {}).get(family, []),
@@ -1757,7 +1773,9 @@ class PairAdaptiveSemanticScorer(
                     )
                 )
 
-            sim_payload = self._score_similarity_channel(
+            sim_payload = call_prepared(
+                self, "similarity", self._score_similarity_channel,
+                prepared["similarity"] if prepared is not None else None,
                 src_feats.get("object_triples", []),
                 tgt_feats.get("object_triples", []),
             )
@@ -1787,7 +1805,9 @@ class PairAdaptiveSemanticScorer(
                     inventory,
                     support_matrix=matrix,
                 )
-            attr_payload = self._score_attribute_channel(
+            attr_payload = call_prepared(
+                self, "attributes", self._score_attribute_channel,
+                prepared["attributes"] if prepared is not None else None,
                 src_feats.get("attributes", []),
                 tgt_feats.get("attributes", []),
                 src_feats.get("labels", []),
@@ -2084,6 +2104,9 @@ class PairAdaptiveSemanticScorer(
                 if self.force_llm_summaries and not self.llm_experiment_enabled
                 else list(decision_idxs)
             )
+        cache = getattr(self, "_numerical_cache", None)
+        if cache is not None:
+            cache.flush()
         if (
             decision_enabled
             and brief_idxs

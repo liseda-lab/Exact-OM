@@ -322,8 +322,7 @@ class PairAdaptiveEvidenceMixin:
 
         links: Dict[Tuple[str, str], Dict[str, Any]] = {}
 
-        def _upsert(src_idx: int, tgt_idx: int) -> None:
-            score = float(support_matrix[src_idx, tgt_idx].item())
+        def _upsert(src_idx: int, tgt_idx: int, score: float) -> None:
             if score <= 0.0:
                 return
             source_item_id = self._normalize_text(src_items[src_idx].get("item_id"))
@@ -340,12 +339,16 @@ class PairAdaptiveEvidenceMixin:
             if prev is None or score > float(prev.get("score", 0.0)):
                 links[key] = payload
 
-        for src_idx in range(support_matrix.shape[0]):
-            tgt_idx = int(torch.argmax(support_matrix[src_idx]).item())
-            _upsert(src_idx, tgt_idx)
-        for tgt_idx in range(support_matrix.shape[1]):
-            src_idx = int(torch.argmax(support_matrix[:, tgt_idx]).item())
-            _upsert(src_idx, tgt_idx)
+        row = support_matrix.max(dim=1)
+        col = support_matrix.max(dim=0)
+        packed = torch.cat([
+            torch.stack((row.indices.to(torch.float64), row.values.to(torch.float64)), dim=1),
+            torch.stack((col.indices.to(torch.float64), col.values.to(torch.float64)), dim=1),
+        ]).detach().cpu().tolist()
+        for src_idx, (tgt_idx, score) in enumerate(packed[:len(src_items)]):
+            _upsert(src_idx, int(tgt_idx), float(score))
+        for tgt_idx, (src_idx, score) in enumerate(packed[len(src_items):]):
+            _upsert(int(src_idx), tgt_idx, float(score))
 
         return sorted(
             links.values(),
