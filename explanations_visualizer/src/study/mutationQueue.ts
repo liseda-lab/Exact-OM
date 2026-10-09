@@ -29,6 +29,20 @@ interface Options {
   retryable: (error: unknown) => boolean;
   failed: (error: unknown) => Promise<void>;
 }
+/**
+ * A queued write that was never sent because an earlier one failed terminally. It carries the
+ * same message and the original failure as `cause`, so a caller can tell "the server rejected
+ * my request" from "my request was discarded behind a rejected one" (21 F01.5).
+ */
+export class DiscardedMutation extends Error {
+  readonly reason: unknown;
+  constructor(reason: unknown) {
+    super(reason instanceof Error ? reason.message : "An earlier change was not saved.");
+    this.name = "DiscardedMutation";
+    this.reason = reason;
+  }
+}
+
 const MAX_ENTRIES = 32;
 const MAX_BYTES = 256 * 1024;
 
@@ -158,7 +172,8 @@ export class MutationQueue {
               rejected.push(...this.entries.splice(0));
               this.persist();
             }
-            rejected.forEach((item) => item.reject(error));
+            // Only the entry that was sent received the server's answer.
+            rejected.forEach((item) => item.reject(item === entry ? error : new DiscardedMutation(error)));
             return;
           }
         }

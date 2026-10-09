@@ -115,17 +115,29 @@ export interface WorkspaceSource {
   labels: ((ontology: string) => (iri: string) => { status: "loading" | "available" | "absent" | "failed" | "not_included"; value: string | null } | undefined) | null;
 }
 
-/** Typed actions the workspace reports; the shell maps them to telemetry or lesson evidence. */
+/** What a selected graph line is. Only a matcher `feature` line rests on a selected original record. */
+export type GraphEdgeKind = "feature" | "asserted" | "structural" | "inferred" | "bridge";
+
+/**
+ * Typed actions the workspace reports; the shell maps them to telemetry or lesson evidence.
+ * An interaction is not evidence by itself: actions carry the exact identities a lesson needs
+ * (evidence ID, the inspected record, the typed entity) so a shell can decide whether it
+ * satisfies a requirement, and nothing else is inferred (21 F01).
+ */
 export type WorkspaceAction =
   | { type: "tab_open"; tab: string }
+  /** A citation under prepared generated text was opened. */
   | { type: "citation_open"; factId: string }
+  /** An original record or axiom was shown (a card's "Show original axiom" or an inspector opened on a record). */
   | { type: "axiom_open"; factId: string }
   | { type: "hierarchy_expand"; side: Side; iri: string }
   | { type: "hierarchy_collapse"; side: Side; iri: string }
-  | { type: "hierarchy_focus"; side: Side; iri: string; kind: EntityKind; via: "parent" | "child" | "search" | "card" | "return" }
+  /** `returned`: focus reached the compared entity again after being elsewhere (any route, not page load). */
+  | { type: "hierarchy_focus"; side: Side; iri: string; kind: EntityKind; via: "parent" | "child" | "search" | "card" | "return"; returned?: boolean }
   | { type: "search"; side: Side }
-  | { type: "evidence_select"; evidenceId: string; from: "graph" | "list" }
-  | { type: "graph_edge"; edgeKind: string; evidenceId: string | null }
+  /** A selected matcher feature, with the original records shown for it (first is the one inspected). */
+  | { type: "evidence_select"; evidenceId: string; from: "graph" | "list"; factIds?: string[] }
+  | { type: "graph_edge"; edgeKind: GraphEdgeKind; evidenceId: string | null; factId?: string | null }
   | { type: "graph_zoom" }
   | { type: "graph_fit" }
   | { type: "graph_reset" }

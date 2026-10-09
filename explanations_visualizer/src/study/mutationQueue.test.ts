@@ -118,7 +118,10 @@ test("edits during a conflict refresh are archived without retrying against stal
   await tick();
   const duringRefresh = queue.enqueue(draft("typed during refresh")).catch((error) => error);
   finishRefresh();
-  await Promise.all([first, duringRefresh]);
+  const [sentError, discardedError] = await Promise.all([first, duringRefresh]);
+  assert.equal(sentError.message, "conflict");
+  assert.equal(discardedError.name, "DiscardedMutation", "an unsent entry is told it was discarded, not rejected");
+  assert.equal(discardedError.reason, sentError);
   assert.equal(writes, 1);
   assert.deepEqual(archives.map((value) => JSON.parse(value).entries[0].body.value), ["original conflict", "typed during refresh"]);
   assert.equal(queue.size, 0);

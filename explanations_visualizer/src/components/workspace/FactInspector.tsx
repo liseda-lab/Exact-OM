@@ -19,8 +19,15 @@ import { interpretationText } from "@/lib/workspace/interpretation";
 import type { FactRef, ResolvedFact } from "@/lib/workspace/types";
 import { useResolvedFact, useSideOf, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
+/**
+ * Why a record is being opened. Opening a citation under prepared generated text is a
+ * different action from opening an original record from a list or card (21 F01.3), so each
+ * caller states its intent; the inspector never reports every opening as a citation.
+ */
+export type InspectIntent = "citation" | "record";
+
 interface Inspector {
-  open: (ref: FactRef, label?: string) => void;
+  open: (ref: FactRef, label?: string, intent?: InspectIntent) => void;
 }
 
 const InspectorContext = createContext<Inspector | null>(null);
@@ -30,19 +37,19 @@ export function useFactInspector(): Inspector | null {
 }
 
 export function FactInspectorProvider({ children }: { children: React.ReactNode }) {
-  const [current, setCurrent] = useState<{ ref: FactRef; label?: string } | null>(null);
+  const [current, setCurrent] = useState<{ ref: FactRef; label?: string; intent: InspectIntent } | null>(null);
   const report = useWorkspaceAction();
   const open = useCallback(
-    (ref: FactRef, label?: string) => {
-      setCurrent({ ref, label });
-      report({ type: "citation_open", factId: ref.factId });
+    (ref: FactRef, label?: string, intent: InspectIntent = "record") => {
+      setCurrent({ ref, label, intent });
+      report(intent === "citation" ? { type: "citation_open", factId: ref.factId } : { type: "axiom_open", factId: ref.factId });
     },
     [report],
   );
   return (
     <InspectorContext.Provider value={{ open }}>
       {children}
-      {current && <FactDialog reference={current.ref} label={current.label} onClose={() => setCurrent(null)} />}
+      {current && <FactDialog reference={current.ref} label={current.label} cited={current.intent === "citation"} onClose={() => setCurrent(null)} />}
     </InspectorContext.Provider>
   );
 }
@@ -77,7 +84,7 @@ function locate(factId: string): HTMLElement | null {
   return nodes.find((node) => !node.closest(".dialog") && node.offsetParent !== null) ?? null;
 }
 
-function FactDialog({ reference, label, onClose }: { reference: FactRef; label?: string; onClose: () => void }) {
+function FactDialog({ reference, label, cited, onClose }: { reference: FactRef; label?: string; cited: boolean; onClose: () => void }) {
   const state = useResolvedFact(reference);
   const report = useWorkspaceAction();
   const fact = state.data;
@@ -86,7 +93,7 @@ function FactDialog({ reference, label, onClose }: { reference: FactRef; label?:
   const readable = relation && hasReading(relation.other);
   const target = typeof document !== "undefined" ? locate(reference.factId) : null;
   return (
-    <Dialog title={label ? `Cited fact · ${label}` : "Original record"} onClose={onClose} wide>
+    <Dialog title={label ? `${cited ? "Cited fact" : "Original record"} · ${label}` : cited ? "Cited fact" : "Original record"} onClose={onClose} wide>
       {state.error ? <ErrorNote error={state.error} onRetry={state.reload} what="This record" /> : null}
       {!fact && !state.error ? <Skeleton lines={4} title={false} /> : null}
       {fact && fact.status !== "available" && (
