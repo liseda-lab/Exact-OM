@@ -13,6 +13,7 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--track", choices=TRACKS, required=True)
     parser.add_argument("--public-candidates", type=Path)
+    parser.add_argument("--fitted-artifacts", type=Path)
     args = parser.parse_args()
     print(
         prepare_public_inference(
@@ -22,6 +23,7 @@ def main():
             target=args.target,
             track=args.track,
             public_candidates=args.public_candidates,
+            fitted_artifacts=args.fitted_artifacts,
         )
     )
 

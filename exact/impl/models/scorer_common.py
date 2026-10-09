@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib  # noqa: F401
 import json  # noqa: F401
 import os
+import weakref
 import re  # noqa: F401
 import time  # noqa: F401
 from collections import OrderedDict  # noqa: F401
@@ -50,7 +51,7 @@ class _DeviceEmbeddingRows:
         missing = {}
         for key, value in zip(keys, values):
             entry = self.rows.get(key)
-            if entry is not None and entry[0] is value:
+            if entry is not None and entry[0]() is value:
                 self.rows.move_to_end(key)
                 outputs.append(entry[1])
             else:
@@ -69,7 +70,7 @@ class _DeviceEmbeddingRows:
                         self.bytes -= evicted.numel() * evicted.element_size()
                     # A row view would retain the whole transferred batch allocation.
                     row = row.clone()
-                    self.rows[key] = (value, row)
+                    self.rows[key] = (weakref.ref(value), row)
                     self.bytes += size
                 for index in indices:
                     outputs[index] = row
@@ -258,6 +259,26 @@ class ScorerCommonMixin:
         value: Any,
         limit: Optional[int],
     ) -> None:
+        if isinstance(value, torch.Tensor):
+            bound = max(0, int(os.getenv("EXACT_CPU_EMBEDDING_MAX_BYTES", str(64 * 1024**2))))
+            sizes = getattr(self, "_cpu_embedding_cache_sizes", {})
+            count, used = sizes.get(id(cache), (-1, 0))
+            if count != len(cache):
+                used = sum(row.numel() * row.element_size() for row in cache.values())
+            old = cache.pop(key, None)
+            if old is not None:
+                used -= old.numel() * old.element_size()
+            size = value.numel() * value.element_size()
+            while cache and (used + size > bound or (limit and limit > 0 and len(cache) >= limit)):
+                _, old = cache.popitem(last=False)
+                used -= old.numel() * old.element_size()
+            if size <= bound:
+                cache[key] = value.detach().clone()
+                used += size
+            sizes[id(cache)] = (len(cache), used)
+            self._cpu_embedding_cache_sizes = sizes
+            self._cache_dirty = True
+            return
         cache[key] = value
         cache.move_to_end(key)
         if limit and limit > 0 and len(cache) > limit:
@@ -276,6 +297,23 @@ class ScorerCommonMixin:
         if not texts:
             hidden = self._model_hidden_size(model)
             return torch.zeros((0, hidden), device=self.device)
+
+        from exact.experiments.runtime import encoder_identity
+
+        identity = encoder_identity(self, tokenizer, model, max_len)
+        if identity is not None:
+            bindings = getattr(self, "_resident_encoder_identities", {})
+            if bindings.get(id(cache)) != identity[0]:
+                cache.clear()
+                getattr(self, "_cpu_embedding_cache_sizes", {}).pop(id(cache), None)
+                resident = getattr(self, "_device_embedding_rows", None)
+                if resident is not None:
+                    for key in list(resident.rows):
+                        if key[0] == id(cache):
+                            _, row = resident.rows.pop(key)
+                            resident.bytes -= row.numel() * row.element_size()
+                bindings[id(cache)] = identity[0]
+                self._resident_encoder_identities = bindings
 
         outputs: List[Optional[torch.Tensor]] = [None] * len(texts)
         missing_keys: List[str] = []
@@ -303,6 +341,7 @@ class ScorerCommonMixin:
                     missing_keys,
                     max_len,
                     lambda rows: self._encode_texts(tokenizer, model, rows, max_len),
+                    return_cpu=True,
                 )
             else:
                 encodings = self._encode_texts(tokenizer, model, missing_keys, max_len)
@@ -310,7 +349,7 @@ class ScorerCommonMixin:
             for key, tensor in zip(missing_keys, encodings):
                 self._cache_store(cache, key, tensor, limit)
                 for idx in key_to_indices[key]:
-                    outputs[idx] = tensor
+                    outputs[idx] = cache.get(key, tensor)
 
         if torch.device(self.device).type != "cpu":
             resident = getattr(self, "_device_embedding_rows", None)

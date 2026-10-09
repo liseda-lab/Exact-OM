@@ -50,6 +50,50 @@ def test_failure_after_index_publication_keeps_referenced_data(tmp_path, monkeyp
     assert [r["tgt_iri"] for r in ExplanationStore(tmp_path).iter_all()] == ["1", "2"]
 
 
+@pytest.mark.parametrize("operation", ["overlay", "truncate", "compact"])
+def test_replacement_failure_after_publication_never_deletes_live_payload(tmp_path, monkeypatch, operation):
+    store = ExplanationStore(tmp_path)
+    store.append([row(1), row(2)])
+    original = store._write_index
+    def fail_after_write(value):
+        original(value)
+        raise OSError("directory fsync failed after publication")
+    monkeypatch.setattr(store, "_write_index", fail_after_write)
+    with pytest.raises(OSError, match="after publication"):
+        if operation == "overlay":
+            store.append_overlay([{**row(1), "recovered": True}])
+        elif operation == "truncate":
+            store.truncate(1)
+        else:
+            store.compact()
+    reopened = list(ExplanationStore(tmp_path).iter_all())
+    assert [r["tgt_iri"] for r in reopened] == (["1"] if operation == "truncate" else ["1", "2"])
+    if operation == "overlay":
+        assert reopened[0]["recovered"] is True
+
+
+def test_replacement_streams_bounded_chunks(tmp_path, monkeypatch):
+    store = ExplanationStore(tmp_path)
+    consumed = 0
+    written = 0
+    original = ExplanationStore.append
+    def append(self, records):
+        nonlocal written
+        assert len(records) <= 256
+        result = original(self, records)
+        written += len(records)
+        return result
+    monkeypatch.setattr(ExplanationStore, "append", append)
+    def rows():
+        nonlocal consumed
+        for i in range(777):
+            consumed += 1
+            assert consumed - written <= 256
+            yield row(i)
+    assert store._replace_records(rows())["records"] == 777
+    assert len(list(ExplanationStore(tmp_path).iter_all())) == 777
+
+
 def test_legacy_index_can_be_read_and_append_checks_new_frames(tmp_path):
     store = ExplanationStore(tmp_path, compression="none")
     store.append([row(1)])

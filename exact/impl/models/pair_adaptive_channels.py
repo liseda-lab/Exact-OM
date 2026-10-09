@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 import torch  # noqa: F401
 
 from exact.experiments.numerical_cache import cached_numerical
+from exact.impl.models.pair_adaptive_batch import score_evidence_job
 from exact.impl.annotation_semantics import deduplicate_annotations
 from exact.impl.models.pair_adaptive_experiments import (
     abbreviation_similarity,
@@ -402,6 +403,10 @@ class PairAdaptiveChannelsMixin:
         src_iri: Optional[str] = None,
         tgt_iri: Optional[str] = None,
     ) -> Dict[str, Any]:
+        return score_evidence_job(self, "hierarchy", self._hierarchy_family_job(
+            family, src_items, tgt_items, src_iri, tgt_iri))
+
+    def _hierarchy_family_job(self, family, src_items, tgt_items, src_iri=None, tgt_iri=None):
         payload = {
             "score": self.tau,
             "quality": 0.0,
@@ -425,7 +430,7 @@ class PairAdaptiveChannelsMixin:
 
         src_tails = [self._hier_item_triple(item)[2] for item in src_items]
         tgt_tails = [self._hier_item_triple(item)[2] for item in tgt_items]
-        support_mat = self._encode_label_matrix(src_tails, tgt_tails)
+        support_mat = yield ("label_matrix", src_tails, tgt_tails)
         row_best = (
             support_mat.max(dim=1).values
             if support_mat.numel()
@@ -465,9 +470,7 @@ class PairAdaptiveChannelsMixin:
         src_support = reduced.max(dim=1).values.detach().cpu().tolist()
         tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
         str_f = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
-        emb_f = self._context_similarity_from_sentences(
-            src_sentences, tgt_sentences, self.max_input_tokens_hier
-        )
+        emb_f = yield ("similarity", src_sentences, tgt_sentences, self.max_input_tokens_hier)
         spec_vals = [self._hier_item_specificity(item) for item in src_selected] + [
             self._hier_item_specificity(item) for item in tgt_selected
         ]
@@ -705,14 +708,17 @@ class PairAdaptiveChannelsMixin:
         src_items: Sequence[Dict[str, Any]],
         tgt_items: Sequence[Dict[str, Any]],
     ) -> torch.Tensor:
+        return score_evidence_job(self, "object_support", self._object_support_job(src_items, tgt_items))
+
+    def _object_support_job(self, src_items, tgt_items):
         if not src_items or not tgt_items:
             return torch.zeros((len(src_items), len(tgt_items)), device=self.device)
         src_rels = [str(item["triple"][1]) for item in src_items]
         tgt_rels = [str(item["triple"][1]) for item in tgt_items]
         src_neighbors = [str(item["triple"][2]) for item in src_items]
         tgt_neighbors = [str(item["triple"][2]) for item in tgt_items]
-        rel_mat = self._encode_label_matrix(src_rels, tgt_rels)
-        nbr_mat = self._encode_label_matrix(src_neighbors, tgt_neighbors)
+        rel_mat = yield ("label_matrix", src_rels, tgt_rels)
+        nbr_mat = yield ("label_matrix", src_neighbors, tgt_neighbors)
         support = (0.5 * rel_mat + 0.5 * nbr_mat).clamp(0.0, 1.0)
         if self.property_config.get("enabled"):
             for src_index, source in enumerate(src_items):
@@ -733,6 +739,9 @@ class PairAdaptiveChannelsMixin:
         src_items: Sequence[Dict[str, Any]],
         tgt_items: Sequence[Dict[str, Any]],
     ) -> Dict[str, Any]:
+        return score_evidence_job(self, "similarity", self._similarity_channel_job(src_items, tgt_items))
+
+    def _similarity_channel_job(self, src_items, tgt_items, *, staged=False):
         payload = {
             "score": self.tau,
             "quality": 0.0,
@@ -750,7 +759,10 @@ class PairAdaptiveChannelsMixin:
         if not self.use_context or not src_items or not tgt_items:
             return payload
 
-        support_mat = self._object_support_matrix(src_items, tgt_items)
+        if staged:
+            support_mat = yield from self._object_support_job(src_items, tgt_items)
+        else:
+            support_mat = self._object_support_matrix(src_items, tgt_items)
         row_best = (
             support_mat.max(dim=1).values
             if support_mat.numel()
@@ -788,9 +800,7 @@ class PairAdaptiveChannelsMixin:
         str_sim = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
-        emb_sim = self._context_similarity_from_sentences(
-            src_sentences, tgt_sentences, self.max_input_tokens_sim
-        )
+        emb_sim = yield ("similarity", src_sentences, tgt_sentences, self.max_input_tokens_sim)
         cov_sim = self._clip01(
             (len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_object_triples)
         )
@@ -1339,6 +1349,11 @@ class PairAdaptiveChannelsMixin:
         hierarchy_payloads: Dict[str, Dict[str, Any]],
         sim_payload: Dict[str, Any],
     ) -> Dict[str, Any]:
+        return score_evidence_job(self, "attributes", self._attribute_channel_job(
+            src_attrs, tgt_attrs, src_labels, tgt_labels, hierarchy_payloads, sim_payload))
+
+    def _attribute_channel_job(self, src_attrs, tgt_attrs, src_labels, tgt_labels,
+                               hierarchy_payloads, sim_payload):
         payload = {
             "score": self.tau,
             "quality": 0.0,
@@ -1477,7 +1492,7 @@ class PairAdaptiveChannelsMixin:
             texts = [self._normalize_text(item.get("text")) for item in side_items]
             weights = [self._attribute_weight(item) for item in side_items]
             bank_texts = [self._normalize_text(item.get("text")) for item in bank]
-            mat = self._encode_context_matrix(texts, bank_texts)
+            mat = yield ("context_matrix", texts, bank_texts)
             best = (
                 mat.max(dim=1).values.detach().cpu().tolist()
                 if mat.numel()
@@ -1538,10 +1553,10 @@ class PairAdaptiveChannelsMixin:
                     )
             return float(score), selected, weights, best, links
 
-        src_score, src_selected, src_weights, src_supports, src_links = _side_support(
+        src_score, src_selected, src_weights, src_supports, src_links = yield from _side_support(
             src_items, tgt_bank
         )
-        tgt_score, tgt_selected, tgt_weights, tgt_supports, tgt_links = _side_support(
+        tgt_score, tgt_selected, tgt_weights, tgt_supports, tgt_links = yield from _side_support(
             tgt_items, src_bank
         )
         side_scores = [

@@ -632,3 +632,145 @@ def test_channel_fusion_preserves_fp32_output_with_mixed_precision_embeddings(
     assert sum(
         contributions[key] for key in ("C_label", "C_strsim", "C_struct", "C_llm")
     ) == pytest.approx(result["S_final"][0].item() - scorer.tau, abs=1.0e-7)
+
+
+class _EvidenceDataset(_TinyDataset):
+    hierarchical_relation_families = {"part_of": {}}
+
+    def get_entity_features(self, iri, side):
+        width = 0 if iri.endswith("missing") else (1 if iri.endswith("short") else 3)
+        facts = [{"triple": (iri, "relation" if i < 2 else "other", f"tail {i % 2}"),
+                  "score": 0.5, "subject_iri": iri, "object_iri": f"urn:tail:{i}",
+                  "rel_iri": "urn:relation"} for i in range(width)]
+        hierarchy = [{"triple": (iri, "is_a", f"tail {i % 2}"), "specificity": 0.5,
+                      "subject_iri": iri, "object_iri": f"urn:ancestor:{i}"}
+                     for i in range(width)]
+        attrs = [{"prop": "definition", "prop_iri": "urn:definition", "value": iri,
+                  "text": f"definition {iri}", "entity_iri": iri}] if width else []
+        return {"labels": [iri, iri], "hierarchy": {"is_a": hierarchy, "part_of": hierarchy[:1]},
+                "object_triples": facts, "attributes": attrs}
+
+
+def _evidence_scorer(monkeypatch, **kwargs):
+    import hashlib
+    scorer = _scorer(return_explanations=True, **kwargs)
+    scorer.use_context = scorer.use_lexical = True
+    scorer.max_hierarchy_triples_per_family = 2
+    scorer.max_object_triples = 2
+    scorer.similarity_per_relation_cap = 1
+    scorer.max_input_tokens_hier = 6
+    scorer.max_input_tokens_sim = 4
+    scorer.attach_dataset(_EvidenceDataset())
+    calls = {"labels": [], "contexts": []}
+    def encode(texts, kind):
+        calls[kind].append(list(texts))
+        out = torch.zeros((len(texts), 4))
+        for index, text in enumerate(texts):
+            out[index, hashlib.sha256(text.encode()).digest()[0] % 4] = 1.0
+        return out
+    monkeypatch.setattr(scorer, "encode_labels_batch", lambda texts: encode(texts, "labels"))
+    monkeypatch.setattr(scorer, "encode_contexts_batch", lambda texts: encode(texts, "contexts"))
+    return scorer, calls
+
+
+def _evidence_forward(scorer):
+    sources = ["source", "source", "source", "source_short", "source_missing"]
+    targets = ["target", "target_short", "other", "target", "target_missing"]
+    return scorer(src_iris=sources, tgt_iris=targets,
+                  src_label_lists=[[s, s] for s in sources],
+                  tgt_label_lists=[[t, t] for t in targets])
+
+
+@pytest.mark.parametrize("block", [2, 32])
+@pytest.mark.parametrize("bank", ["full", "attrs_labels", "attrs_only"])
+def test_staged_channels_preserve_scores_evidence_routes_and_ties(monkeypatch, block, bank):
+    monkeypatch.setenv("EXACT_EVIDENCE_PREFETCH", "0")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "0")
+    scorer, calls = _evidence_scorer(monkeypatch, attr={"enabled": True, "bank": bank})
+    legacy = _evidence_forward(scorer)
+    calls["contexts"].clear()
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "1")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", str(block))
+    batched = _evidence_forward(scorer)
+    for key, value in legacy.items():
+        if isinstance(value, torch.Tensor):
+            torch.testing.assert_close(value, batched[key], rtol=0, atol=0, equal_nan=True)
+    assert legacy["explanations"] == batched["explanations"]
+    assert legacy["llm_evidence_packets"] == batched["llm_evidence_packets"]
+    assert torch.equal(torch.argsort(legacy["S_final"], stable=True), torch.argsort(batched["S_final"], stable=True))
+    assert any(len(batch) > 2 for batch in calls["contexts"])
+    assert all(len(batch) == len(set(batch)) for batch in calls["contexts"])
+    assert getattr(scorer, "_prepared_evidence_result", None) is None
+
+
+@pytest.mark.parametrize("formulation", ["off", "normalised", "absolute", "asymmetric", "missingness_aware"])
+def test_ordinary_inference_omits_synthetic_diagnostics_without_natural_changes(monkeypatch, formulation):
+    import json
+    import exact.experiments.evidence_diagnostics as diagnostics
+    scorer, _ = _evidence_scorer(monkeypatch, diff={"enabled": True, "formulation": formulation,
+        "relation_interpretation": "<" if formulation == "asymmetric" else None,
+        "dump_components": True, "controlled_perturbations": True})
+    with_diagnostics = _evidence_forward(scorer)
+    packets = [row["experiment_diagnostics"]["difference"]["controlled_perturbations"]
+               for row in with_diagnostics["explanations"]]
+    assert all(len(packet["variants"]) == 10 for packet in packets)
+    scorer.diff_config["controlled_perturbations"] = False
+    def forbidden(*args, **kwargs):
+        pytest.fail("ordinary inference invoked synthetic diagnostic replay")
+    monkeypatch.setattr(diagnostics, "difference_perturbation_inventory", forbidden)
+    monkeypatch.setattr(diagnostics, "replay_difference_diagnostics", forbidden)
+    ordinary = _evidence_forward(scorer)
+    for key, value in with_diagnostics.items():
+        if isinstance(value, torch.Tensor):
+            torch.testing.assert_close(value, ordinary[key], rtol=0, atol=0, equal_nan=True)
+    def natural(value):
+        if isinstance(value, dict):
+            return {key: natural(item) for key, item in value.items()
+                    if key not in {"controlled_perturbations", "difference_replay"}}
+        if isinstance(value, list):
+            return [natural(item) for item in value]
+        return value
+    assert natural(with_diagnostics["explanations"]) == natural(ordinary["explanations"])
+    assert len(json.dumps(ordinary["explanations"])) < len(json.dumps(with_diagnostics["explanations"]))
+
+
+def test_prepared_payload_scope_restores_after_failure():
+    from types import SimpleNamespace
+    from exact.impl.models.pair_adaptive_batch import call_prepared
+    scorer = SimpleNamespace(_prepared_evidence_result=("outer", {}))
+    def fail():
+        raise RuntimeError("fixture failure")
+    with pytest.raises(RuntimeError, match="fixture failure"):
+        call_prepared(scorer, "inner", fail, {"score": 0.5})
+    assert scorer._prepared_evidence_result == ("outer", {})
+
+
+def test_context_batch_oom_reduces_batch_without_losing_texts(monkeypatch):
+    from types import SimpleNamespace
+    from exact.impl.models.pair_adaptive_batch import _encode_unique
+    seen = []
+    def encode(texts):
+        if len(texts) > 2:
+            raise torch.cuda.OutOfMemoryError("fixture pressure")
+        seen.extend(texts)
+        return torch.tensor([[1.0, 0.0] for _ in texts])
+    scorer = SimpleNamespace(encode_contexts_batch=encode)
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_TEXT_BATCH", "64")
+    vectors = _encode_unique(scorer, ["a", "b", "a", "c", "d", "e"], "similarity")
+    assert seen == ["a", "b", "c", "d", "e"]
+    assert list(vectors) == seen
+
+
+def test_ordinary_diagnostic_amendment_is_explicit_and_does_not_mutate_e24():
+    from exact.experiments.evidence_diagnostics import ordinary_inference_config
+    original = {"matching":{"channels":{"diff":{"enabled":True,"formulation":"off",
+                "dump_components":True,"controlled_perturbations":True}}},
+                "pipeline":[{"name":"PairAdaptiveSemanticScorer", "params":{
+                    "diff":{"controlled_perturbations":True,"formulation":"off"}}}]}
+    resolved, receipt = ordinary_inference_config(original)
+    assert original["matching"]["channels"]["diff"]["controlled_perturbations"] is True
+    assert resolved["matching"]["channels"]["diff"] == {"enabled":True,"formulation":"off",
+                                          "dump_components":True,"controlled_perturbations":False}
+    assert resolved["pipeline"][0]["params"]["diff"]["controlled_perturbations"] is False
+    assert receipt["synthetic_replays_per_pair_avoided"] == 10
+    assert receipt["natural_evidence_preserved"] is True

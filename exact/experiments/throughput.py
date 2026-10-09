@@ -127,12 +127,13 @@ class Measurement:
                      duplicate_rows: int = 0, durable: bool, **metrics):
         if not durable or elapsed <= 0:
             raise ValueError("Only durably completed chunks with positive elapsed time count")
+        computed = list(computed)
         keys = set(computed)
         fresh = keys - self.seen
         self.seen.update(keys)
         self.chunks.append({"elapsed_seconds": elapsed, "distinct_computed_pairs": len(fresh),
                             "already_available_pairs": available,
-                            "duplicate_rows": duplicate_rows + len(keys - fresh), **metrics})
+                            "duplicate_rows": duplicate_rows + len(computed) - len(fresh), **metrics})
 
     def receipt(self) -> dict:
         elapsed = sum(c["elapsed_seconds"] for c in self.chunks)

@@ -13,6 +13,38 @@ from typing import Any, Callable, Mapping
 
 import torch
 
+ORDINARY_DIAGNOSTIC_AMENDMENT = "FINAL-STUDY-CORRECTION-20261009:T07"
+DIAGNOSTIC_ONLY_OUTPUTS = (
+    "experiment_diagnostics.difference.controlled_perturbations",
+    "experiment_diagnostics.difference_replay", "difference_replay.json",
+)
+
+
+def ordinary_inference_config(config: Mapping) -> tuple[dict, dict]:
+    """Materialize the explicit successor amendment; preserve natural evidence."""
+    updated = deepcopy(dict(config))
+    changed = []
+    difference = updated.setdefault("matching", {}).setdefault("channels", {}).setdefault("diff", {})
+    if difference.get("controlled_perturbations"):
+        changed.append("matching.channels.diff.controlled_perturbations")
+    difference["controlled_perturbations"] = False
+    for index, component in enumerate(updated.get("pipeline", [])):
+        if component.get("name") != "PairAdaptiveSemanticScorer":
+            continue
+        params = component.setdefault("params", {})
+        if "diff" in params:
+            if params["diff"].get("controlled_perturbations"):
+                changed.append(f"pipeline.{index}.params.diff.controlled_perturbations")
+            params["diff"]["controlled_perturbations"] = False
+    return updated, {
+        "schema_version": 1, "amendment": ORDINARY_DIAGNOSTIC_AMENDMENT,
+        "scope": "ordinary_successor_inference_only", "changed_paths": changed,
+        "diagnostic_only_outputs": list(DIAGNOSTIC_ONLY_OUTPUTS),
+        "natural_evidence_preserved": True,
+        "synthetic_replays_per_pair_avoided": 10 if changed else 0,
+        "historical_and_E24_configs_modified": False,
+    }
+
 
 def _hash(value):
     return hashlib.sha256(

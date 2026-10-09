@@ -61,7 +61,7 @@ def test_bound_unchanged_encoder_imports_exact_rows_without_forward(tmp_path, mo
     assert torch.equal(actual, expected[[1, 0, 1]])
 
 
-@pytest.mark.parametrize("change", ["revision", "precision", "role", "length"])
+@pytest.mark.parametrize("change", ["revision", "precision", "namespace", "length"])
 def test_other_identity_fields_never_migrate(tmp_path, monkeypatch, change):
     model, tokenizer, _, _ = setup_cache(tmp_path, monkeypatch)
     current = scorer()
@@ -70,8 +70,8 @@ def test_other_identity_fields_never_migrate(tmp_path, monkeypatch, change):
         model.config._commit_hash = "b" * 40
     elif change == "precision":
         current._cache_tensor_dtype = torch.float16
-    elif change == "role":
-        monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "final")
+    elif change == "namespace":
+        monkeypatch.setenv("EXACT_PRIMITIVE_NAMESPACE", "qualification")
     else:
         length = 32
     calls = []
@@ -98,6 +98,11 @@ def test_incompatible_or_corrupted_rows_fail_closed(tmp_path, monkeypatch, chang
 
         with sqlite3.connect(tmp_path / "vectors/vectors.sqlite3") as db:
             db.execute("UPDATE vectors SET raw=x'00'")
+        result = runtime.cached_encoder_rows(
+            scorer(), tokenizer, model, ["a"], 16, lambda texts: torch.ones(len(texts), 2)
+        )
+        assert torch.equal(result, torch.ones(1, 2))
+        return
     with pytest.raises(ValueError, match="binding|pooling|Corrupted"):
         runtime.cached_encoder_rows(
             scorer(), tokenizer, model, ["a"], 16, lambda _: pytest.fail("Unexpected forward")

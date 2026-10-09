@@ -251,6 +251,10 @@ class TrainingPoolMixin:
             self._json_safe_value(
                 {
                     "pairs": raw.to_dict("records"),
+                    "reference": sorted(reference),
+                    "negative_label_policy": policy,
+                    "batch_size": int(batch_size),
+                    "dataset": getattr(self.dataset, "cache_fingerprint", None),
                     "model": (
                         self.model.runtime_fingerprint_payload()
                         if hasattr(self.model, "runtime_fingerprint_payload")
@@ -261,14 +265,23 @@ class TrainingPoolMixin:
         )
         cache_dir = self.output_dir / "fitting" / identity
         frame_path = cache_dir / "training_scores.json"
-        from exact.experiments.numerical_cache import shared_training_scores
+        from exact.experiments.numerical_cache import shared_training_scores, training_score_reference
 
+        frame_source = frame_path
         if not frame_path.exists():
-            shared_rows = shared_training_scores(self.model, identity, application, batch_size)
-            if shared_rows is not None:
-                freeze_json(frame_path, {"identity": identity, "rows": shared_rows})
-        if frame_path.exists():
-            training = pd.DataFrame(json.loads(frame_path.read_text())["rows"])
+            shared_reference = training_score_reference(self.model, identity, application, batch_size)
+            if shared_reference is not None:
+                frame_source = Path(shared_reference["aggregate_uri"])
+                freeze_json(cache_dir / "training_scores.reference.json", shared_reference)
+            else:
+                shared_rows = shared_training_scores(self.model, identity, application, batch_size)
+                if shared_rows is not None:
+                    freeze_json(frame_path, {"identity": identity, "rows": shared_rows})
+        if frame_source.exists():
+            saved = json.loads(frame_source.read_text())
+            if saved.get("identity") != identity:
+                raise ValueError("Training aggregate identity mismatch")
+            training = pd.DataFrame(saved["rows"])
         else:
             view = copy.copy(self.dataset)
             view._candidates = raw.copy()
@@ -282,6 +295,8 @@ class TrainingPoolMixin:
             # Train-only head fitting never requests decision/brief/rationale calls.
             original_llm = getattr(self.model, "use_llm", False)
             original_scoring_role = getattr(self.model, "_numerical_scoring_role", None)
+            original_dataset = getattr(self.model, "_attached_dataset", None)
+            self.model._attached_dataset = view
             self.model.use_llm = False
             self.model._numerical_scoring_role = "train"
             try:
@@ -365,6 +380,7 @@ class TrainingPoolMixin:
                     )
                     records.extend(rows)
             finally:
+                self.model._attached_dataset = original_dataset
                 self.model.use_llm = original_llm
                 if original_scoring_role is None:
                     del self.model._numerical_scoring_role
@@ -382,6 +398,9 @@ class TrainingPoolMixin:
                     error,
                 )
             training = pd.DataFrame(records)
+        training_score_reference(
+            self.model, identity, application, batch_size, aggregate_path=frame_source
+        )
         from exact.impl.models.selector.label_budget import select_label_budget
 
         budget_reference, membership = select_label_budget(
