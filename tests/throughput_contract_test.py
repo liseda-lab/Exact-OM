@@ -28,6 +28,7 @@ def test_numerator_excludes_replayed_pairs_and_requires_durability():
     result = measurement.receipt()
     assert result["distinct_computed_pairs"] == 1
     assert result["pairs_per_second"] == 0.5
+    assert sum(c["duplicate_rows"] for c in result["chunks"]) == 100
     assert result["throughput_target_status"] == "unqualified"
 
 

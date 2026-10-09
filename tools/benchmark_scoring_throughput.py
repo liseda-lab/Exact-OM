@@ -235,6 +235,11 @@ def run(args):
             if str(args.device).startswith("cuda"):
                 torch.cuda.synchronize()
             started = time.perf_counter()
+            # Each original local query owns its complete pool. Repeated-source
+            # queries are separate calls, never the union of other query pools.
+            dataset._df = pd.DataFrame({"Src": sources, "Tgt": targets,
+                                       dataset.default_kind: [True] * len(sources)})
+            dataset._invalidate_active_dataframe_cache()
             with ExitStack() as instrumentation:
                 instrumentation.enter_context(phases.instrument(scorer, methods))
                 instrumentation.enter_context(phases.instrument(pair_adaptive_batch, {
@@ -246,15 +251,20 @@ def run(args):
                                 src_label_lists=source_labels, tgt_label_lists=target_labels)
             with phases.phase("durable_output"):
                 records = result["explanations"]
+                if len(records) != len(sources) or tuple(result["S_final"].shape) != (len(sources),):
+                    raise ValueError("Incomplete numerical result cannot count as completed pairs")
+                if not bool(torch.isfinite(result["S_final"]).all()):
+                    raise ValueError("Nonfinite numerical result cannot count as completed pairs")
+                query_ids = {q["source"]: q["qid"] for q in group}
                 for row, s, t in zip(records, sources, targets):
-                    row.update(src_iri=s, tgt_iri=t, qualification_fixture=True)
+                    row.update(src_iri=s, tgt_iri=t, original_query_id=query_ids[s], qualification_fixture=True)
                 store.append(records)
             if str(args.device).startswith("cuda"):
                 torch.cuda.synchronize()
             elapsed = time.perf_counter() - started
             measure.commit_chunk(elapsed=elapsed,
                 computed=[(s, t, workload["identity"]) for s, t in zip(sources, targets)] if mode == "cold" else [],
-                available=len(sources) if mode == "warm" else 0, durable=True,
+                available=len(sources) if mode != "cold" else 0, durable=True,
                 rows=len(sources), source_group_sizes=[len(q["candidates"]) for q in group],
                 output_bytes=store.stored_bytes,
                 exact_prefiltered_rows=sum((q["source"], t) in exact_pairs for q in group for t in q["candidates"]),
