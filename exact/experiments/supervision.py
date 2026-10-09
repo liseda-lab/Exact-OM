@@ -4,11 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
+import time
 import re
 import sqlite3
 from contextlib import closing
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+from exact.experiments.science_health import inspect_science
 
 _ACTIVE = {
     "RUNNING",
@@ -177,6 +181,18 @@ def _recovery_detail(value: Any, aliases: Mapping[str, str]) -> Any:
     return value
 
 
+def _batch_failure_detail(detail: Any) -> Any:
+    """Ignore only the wrapper command position, never the exit code or diagnosis."""
+    if isinstance(detail, dict) and detail.get("type") == "RuntimeError":
+        message = detail.get("message")
+        if isinstance(message, str):
+            return {
+                **detail,
+                "message": re.sub(r"^command [0-9]+(?= exited -?[0-9]+: )", "command 0", message),
+            }
+    return detail
+
+
 def inspection_incident(runs: Sequence[Mapping[str, Any]], finding: Mapping[str, Any]) -> dict:
     """Identify unreadable evidence by its error and registered recovery lineage."""
     _registry(runs)
@@ -218,7 +234,10 @@ def inspect_runs(
     snapshot means the step is no longer live. No scheduler query runs here.
     """
     observations = {}
-    for run in _registry(runs):
+    enabled = {run["id"] for run in _registry(runs)}
+    # Disabled ancestor receipts qualify migration of already charged retries.
+    # Their read errors never become active findings or authorize a new worker.
+    for run in runs:
         observation: dict[str, Any] = {"errors": []}
         for field, key in (
             ("status", "status_path"),
@@ -229,6 +248,13 @@ def inspect_runs(
                 observation[field] = _read(run.get(key), json_object=field != "exit_code")
             except (OSError, ValueError, UnicodeError) as exc:
                 observation["errors"].append(f"{field}: {type(exc).__name__}: {exc}")
+        scientific = (
+            inspect_science(run, observation.get("completion"))
+            if run["id"] in enabled
+            else dict(errors=[], failures=[])
+        )
+        observation["errors"].extend(scientific["errors"])
+        observation["scientific_failures"] = scientific["failures"]
         observations[run["id"]] = observation
     return assess_runs(runs, observations, step_states=step_states)
 
@@ -236,7 +262,7 @@ def inspect_runs(
 def _token_count(value: Any) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise ValueError("Hosted token counts must be nonnegative integers")
-    return value
+    return int(value)
 
 
 def _hosted_wire_usage(path: Path) -> dict[str, int]:
@@ -249,8 +275,9 @@ def _hosted_wire_usage(path: Path) -> dict[str, int]:
         )
         for raw, reserved in rows:
             usage = json.loads(raw or "{}")
-            known = sum(_token_count(usage.get(key) or 0)
-                        for key in ("prompt_tokens", "completion_tokens"))
+            known = sum(
+                _token_count(usage.get(key) or 0) for key in ("prompt_tokens", "completion_tokens")
+            )
             totals["reported_tokens"] += known
             if all(usage.get(key) is not None for key in ("prompt_tokens", "completion_tokens")):
                 totals["billable_tokens"] += known
@@ -298,21 +325,31 @@ def inspect_hosted_spending(registry: Mapping[str, Any]) -> dict[str, Any]:
     # Recheck the budget after SQLite to avoid double counting if finalization
     # replaces the reservation with actual charges while this observation runs.
     before = account
-    closed = [row for key, row in account["work"].items()
-              if row["status"] != "reserved" or key == "historical/G0"]
-    active = [(key, row) for key, row in account["work"].items()
-              if row["status"] == "reserved" and key != "historical/G0"]
+    closed = [
+        row
+        for key, row in account["work"].items()
+        if row["status"] != "reserved" or key == "historical/G0"
+    ]
+    active = [
+        (key, row)
+        for key, row in account["work"].items()
+        if row["status"] == "reserved" and key != "historical/G0"
+    ]
     closed_tokens = sum(_token_count(row["tokens"]) for row in closed)
     result = {
-        "status": "observed", "budget_path": str(path),
-        "closed_accounted_tokens": closed_tokens, "active_accounted_tokens": 0,
+        "status": "observed",
+        "budget_path": str(path),
+        "closed_accounted_tokens": closed_tokens,
+        "active_accounted_tokens": 0,
         "accounted_tokens": closed_tokens,
         "active_work_ids": [key for key, _ in active],
         "accounting": "Closed charged tokens plus live delta; unreported usage retains conservative reservations.",
     }
     if active:
         if len(active) != 1 or not isinstance(active[0][1].get("hosted_usage_baseline"), dict):
-            result.update(status="incomplete", error="Active work lacks a unique hosted usage baseline")
+            result.update(
+                status="incomplete", error="Active work lacks a unique hosted usage baseline"
+            )
             return result
         baseline = _token_count(active[0][1]["hosted_usage_baseline"]["billable_tokens"])
         wire_path = path.parent / "openrouter" / "requests.sqlite3"
@@ -321,21 +358,110 @@ def inspect_hosted_spending(registry: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError("Hosted request accounting fell below its admission baseline")
         delta = wire["billable_tokens"] - baseline
         result.update(
-            active_accounted_tokens=delta, accounted_tokens=closed_tokens + delta,
-            request_ledger_path=str(wire_path), request_ledger_usage=wire,
+            active_accounted_tokens=delta,
+            accounted_tokens=closed_tokens + delta,
+            request_ledger_path=str(wire_path),
+            request_ledger_usage=wire,
         )
     if _read(path, json_object=True) != before:
         raise ValueError("Cumulative accounting changed during observation; retry next check")
     return result
 
 
-def pending_batches(registry: Mapping[str, Any], health: Mapping[str, Any]) -> list[dict]:
+def gpu_devices(record: Mapping[str, Any]) -> frozenset[str] | None:
+    """None means an unspecified legacy GPU reservation; never guess its device."""
+    count = record.get("resources", {}).get("gpus", 0)
+    devices = record.get("gpu_devices")
+    if devices is None:
+        return None if count else frozenset()
+    if (
+        not isinstance(devices, list)
+        or any(not isinstance(x, str) or not x for x in devices)
+        or len(set(devices)) != len(devices)
+        or len(devices) != count
+    ):
+        raise ValueError("GPU identities must uniquely match the numeric reservation")
+    return frozenset(devices)
+
+
+def gpu_conflict(candidate: Mapping[str, Any], owners: Sequence[Mapping[str, Any]]) -> bool:
+    requested = gpu_devices(candidate)
+    if requested == frozenset():
+        return False
+    for owner in owners:
+        occupied = gpu_devices(owner)
+        if occupied != frozenset() and (
+            requested is None or occupied is None or requested.intersection(occupied)
+        ):
+            return True
+    return False
+
+
+def validate_admission(registry: Mapping[str, Any], batch: Mapping[str, Any]) -> None:
+    """Optional named profiles and UUIDs supplement existing aggregate reservations."""
+    resources = batch.get("resources", {})
+    if any(
+        not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v) or v < 0
+        for v in resources.values()
+    ):
+        raise ValueError("Resource reservations must be finite nonnegative numbers")
+    devices = gpu_devices(batch)
+    if devices and not devices.issubset(registry.get("gpu_devices", {})):
+        raise ValueError("Requested GPU is not qualified in this registry")
+    profile = batch.get("resource_profile")
+    if profile is not None and resources != registry.get("resource_profiles", {}).get(profile):
+        raise ValueError("Batch resources do not match its declared profile")
+    for field in ("priority", "deadline_epoch", "not_before_epoch"):
+        value = batch.get(field)
+        if value is not None and (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not math.isfinite(value)
+        ):
+            raise ValueError("Invalid batch scheduling field: " + field)
+    if batch.get("deadline_policy", "block") not in {"block", "defer"}:
+        raise ValueError("Unknown deadline disposition")
+
+
+def batch_schedule(batch: Mapping[str, Any], now: float) -> str:
+    if batch.get("deadline_epoch") is not None and now >= batch["deadline_epoch"]:
+        return "expired"
+    if batch.get("not_before_epoch") is not None and now < batch["not_before_epoch"]:
+        return "not_yet_open"
+    return "open"
+
+
+def deadline_incidents(registry: Mapping[str, Any], *, now: float | None = None) -> list[dict]:
+    """An expired contract is a scope decision, never a technical retry or extension."""
+    now = time.time() if now is None else now
+    result = []
+    for batch in registry.get("pending_batches", []):
+        validate_admission(registry, batch)
+        if (
+            batch_schedule(batch, now) == "expired"
+            and batch.get("deadline_policy", "block") == "block"
+        ):
+            incident = _incident(
+                None,
+                "batch_deadline",
+                "Batch deadline reached: " + batch["id"],
+                [batch["id"], batch["deadline_epoch"]],
+            )
+            incident.update(batch_id=batch["id"], deadline_epoch=batch["deadline_epoch"])
+            result.append(incident)
+    return result
+
+
+def pending_batches(
+    registry: Mapping[str, Any], health: Mapping[str, Any], *, now: float | None = None
+) -> list[dict]:
     """Identify explicitly registered batches whose prerequisites and capacity are ready.
 
     This opt-in registry extension leaves older supervisors' all-completed rule
     unchanged. Failed unrelated runs are not prerequisites. Recovery descendants
     retain the prerequisite identity, including disabled ancestors.
     """
+    now = time.time() if now is None else now
     runs = registry["runs"]
     _registry(runs)
     by_id = {run["id"]: run for run in runs}
@@ -345,9 +471,21 @@ def pending_batches(registry: Mapping[str, Any], health: Mapping[str, Any]) -> l
         if row.get("scheduler_state") in _ACTIVE:
             for key, value in by_id[name].get("resources", {}).items():
                 used[key] = used.get(key, 0) + value
+    owners = [
+        by_id[name] for name, row in findings.items() if row.get("scheduler_state") in _ACTIVE
+    ]
+    owners += registry.get("reserved_gpu_owners", [])
     result = []
-    for batch in registry.get("pending_batches", []):
-        if batch.get("needs_user"):
+    for batch in sorted(
+        registry.get("pending_batches", []), key=lambda row: -row.get("priority", 0)
+    ):
+        validate_admission(registry, batch)
+        if (
+            not batch.get("enabled", True)
+            or batch.get("needs_user")
+            or batch_schedule(batch, now) != "open"
+            or gpu_conflict(batch, owners)
+        ):
             continue
         parents: list[str | None] = []
         for name in batch.get("depends_on", []):
@@ -382,9 +520,90 @@ def assess_runs(
     enabled = _registry(runs)
     identities = _recovery_identities(runs)
 
+    by_id = {run["id"]: run for run in runs}
+    predecessors = {run["superseded_by"]: run["id"] for run in runs if run.get("superseded_by")}
+
     def failure(name: str, kind: str, reason: str, detail: Any = None) -> dict:
         scope, aliases = identities[name]
-        return _incident(name, kind, reason, _recovery_detail(detail, aliases), scope=scope)
+        original = _recovery_detail(detail, aliases)
+        members = [key for key, (root, _) in identities.items() if root == scope]
+        completion_error = (
+            original.get("error")
+            if kind == "completion_failed" and isinstance(original, dict)
+            else None
+        )
+        if (
+            isinstance(completion_error, dict)
+            and re.match(
+                r"^command [0-9]+ exited -?[0-9]+: ", str(completion_error.get("message", ""))
+            )
+            and completion_error.get("type") == "RuntimeError"
+            and len(members) > 1
+        ):
+            kind, original = "run_failed", completion_error
+        if kind != "run_failed" or len(members) < 2:
+            return _incident(name, kind, reason, original, scope=scope)
+        normalized = _batch_failure_detail(original)
+        incident = _incident(name, kind, reason, normalized, scope=scope)
+        legacy, failed_replacements, first_occurrences = set(), [], []
+
+        def owned_completion(member):
+            receipt = observations.get(member, {}).get("completion") or {}
+            row = by_id[member]
+            return (
+                receipt
+                if (
+                    receipt.get("step_id") == row["step_id"]
+                    and row.get("dispatch_nonce") is not None
+                    and receipt.get("dispatch_nonce") == row["dispatch_nonce"]
+                    and receipt.get("status") in {"failed", "complete"}
+                )
+                else None
+            )
+
+        for member in members:
+            observed = observations.get(member, {})
+            for source in (observed.get("status"), observed.get("completion")):
+                candidate = _recovery_detail((source or {}).get("error"), aliases)
+                if candidate is not None and _batch_failure_detail(candidate) == normalized:
+                    legacy.add(_incident(member, kind, reason, candidate, scope=scope)["id"])
+            completion = observed.get("completion") or {}
+            candidate = _recovery_detail(completion.get("error"), aliases)
+            if candidate is not None and _batch_failure_detail(candidate) == normalized:
+                legacy_detail = _recovery_detail(
+                    {key: completion.get(key) for key in ("status", "exit_code", "error")}, aliases
+                )
+                legacy.add(
+                    _incident(member, "completion_failed", reason, legacy_detail, scope=scope)["id"]
+                )
+                if (
+                    member != scope
+                    and completion.get("status") == "failed"
+                    and owned_completion(member)
+                ):
+                    parent, prior, qualified = predecessors[member], [], True
+                    while parent is not None:
+                        ancestor = owned_completion(parent)
+                        qualified = qualified and ancestor is not None
+                        if ancestor is not None:
+                            prior.append(
+                                _batch_failure_detail(
+                                    _recovery_detail(ancestor.get("error"), aliases)
+                                )
+                            )
+                        parent = predecessors.get(parent)
+                    if normalized in prior:
+                        failed_replacements.append(member)
+                    elif qualified:
+                        first_occurrences.append(member)
+        legacy.discard(incident["id"])
+        if legacy:
+            incident["legacy_incident_ids"] = sorted(legacy)
+        if failed_replacements:
+            incident["unsuccessful_recovery_run_ids"] = sorted(failed_replacements)
+        if first_occurrences:
+            incident["first_occurrence_recovery_run_ids"] = sorted(first_occurrences)
+        return incident
 
     findings = {}
     incidents = {}
@@ -433,6 +652,17 @@ def assess_runs(
         elif observed.get("errors"):
             finding.update(status="waiting", retryable=True, errors=observed["errors"])
             reason = "Receipt temporarily unreadable; retry without launching work"
+        elif observed.get("scientific_failures"):
+            failures = observed["scientific_failures"]
+            # One cause owns each intervention. Counts, affected row IDs and
+            # changing payload paths do not reset its retry budget.
+            first = min(failures, key=lambda row: json.dumps(row["signature"], sort_keys=True))
+            reason = (
+                f"{name} contains a completed nested software failure: "
+                + first["signature"]["detail"]
+            )
+            incident = failure(name, "scientific_software_error", reason, first["signature"])
+            finding["scientific_failures"] = failures
         elif completion is not None and (
             completion.get("status") != "complete" or completion.get("exit_code", 0) != 0
         ):

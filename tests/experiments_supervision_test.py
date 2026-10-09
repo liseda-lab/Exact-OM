@@ -7,7 +7,10 @@ import sqlite3
 import pytest
 
 from exact.experiments.supervision import (
-    assess_runs, inspect_hosted_spending, inspect_runs, inspection_incident,
+    assess_runs,
+    inspect_hosted_spending,
+    inspect_runs,
+    inspection_incident,
 )
 
 
@@ -39,17 +42,27 @@ def test_hosted_milestone_uses_one_cumulative_account_and_live_delta(tmp_path):
         "failed-attempt": {"status": "failed", "tokens": 95_000_000},
     }
     older = _spending_run(tmp_path, "old", history)
-    current = _spending_run(tmp_path, "new", {
-        **history,
-        "interrupted-attempt": {"status": "interrupted", "tokens": 1_000_000},
-        "live": {"status": "reserved", "tokens": 900_000_000,
-                 "hosted_usage_baseline": {"billable_tokens": 10_000_000}},
-    })
-    _request_usage(tmp_path / "new", [
-        ({"prompt_tokens": 9_000_000, "completion_tokens": 1_000_000}, 20_000_000),
-        ({"prompt_tokens": 1_000_000, "completion_tokens": 500_000}, 3_000_000),
-        ({"prompt_tokens": 100_000}, 500_000),
-    ])
+    current = _spending_run(
+        tmp_path,
+        "new",
+        {
+            **history,
+            "interrupted-attempt": {"status": "interrupted", "tokens": 1_000_000},
+            "live": {
+                "status": "reserved",
+                "tokens": 900_000_000,
+                "hosted_usage_baseline": {"billable_tokens": 10_000_000},
+            },
+        },
+    )
+    _request_usage(
+        tmp_path / "new",
+        [
+            ({"prompt_tokens": 9_000_000, "completion_tokens": 1_000_000}, 20_000_000),
+            ({"prompt_tokens": 1_000_000, "completion_tokens": 500_000}, 3_000_000),
+            ({"prompt_tokens": 100_000}, 500_000),
+        ],
+    )
     result = inspect_hosted_spending({"runs": [older, current]})
     assert result["status"] == "observed"
     assert result["closed_accounted_tokens"] == 98_000_000
@@ -67,20 +80,31 @@ def test_hosted_milestone_refuses_divergent_copied_accounts(tmp_path):
 
 
 def test_hosted_milestone_keeps_unbound_forecasts_out_of_actual_usage(tmp_path):
-    run = _spending_run(tmp_path, "current", {
-        "failed": {"status": "failed", "tokens": 19},
-        "live": {"status": "reserved", "tokens": 100_000_000},
-    })
+    run = _spending_run(
+        tmp_path,
+        "current",
+        {
+            "failed": {"status": "failed", "tokens": 19},
+            "live": {"status": "reserved", "tokens": 100_000_000},
+        },
+    )
     result = inspect_hosted_spending({"runs": [run]})
     assert result["status"] == "incomplete" and result["accounted_tokens"] == 19
     assert "baseline" in result["error"]
 
 
 def test_hosted_milestone_does_not_treat_unbounded_unknown_usage_as_zero(tmp_path):
-    run = _spending_run(tmp_path, "current", {
-        "live": {"status": "reserved", "tokens": 0,
-                 "hosted_usage_baseline": {"billable_tokens": 0}},
-    })
+    run = _spending_run(
+        tmp_path,
+        "current",
+        {
+            "live": {
+                "status": "reserved",
+                "tokens": 0,
+                "hosted_usage_baseline": {"billable_tokens": 0},
+            },
+        },
+    )
     _request_usage(tmp_path / "current", [({}, None)])
     with pytest.raises(ValueError, match="lacks a retained token reservation"):
         inspect_hosted_spending({"runs": [run]})
@@ -89,10 +113,18 @@ def test_hosted_milestone_does_not_treat_unbounded_unknown_usage_as_zero(tmp_pat
 def test_hosted_milestone_retries_when_work_finalizes_during_snapshot(tmp_path, monkeypatch):
     from exact.experiments import supervision
 
-    run = _spending_run(tmp_path, "current", {
-        "live": {"status": "reserved", "tokens": 0,
-                 "hosted_usage_baseline": {"billable_tokens": 0}},
-    })
+    run = _spending_run(
+        tmp_path,
+        "current",
+        {
+            "live": {
+                "status": "reserved",
+                "tokens": 0,
+                "hosted_usage_baseline": {"billable_tokens": 0},
+            },
+        },
+    )
+
     def finalized(_path):
         path = tmp_path / "current" / "budget.json"
         account = json.loads(path.read_text())
@@ -453,3 +485,112 @@ def test_independent_batches_advance_past_failed_runs_with_capacity():
     registry["capacity"]["gpus"] = 2
     registry["pending_batches"][1]["needs_user"] = True
     assert pending_batches(registry, health) == []
+
+
+def test_batch_command_position_is_stable_only_in_registered_recovery_lineage():
+    before = _recovery_runs()[:1]
+    before[0].pop("superseded_by")
+    before[0]["enabled"] = True
+    message = "command 0 exited 1: RuntimeError: Worker cleanup incomplete"
+    first = _failure_id(before, message, error_type="RuntimeError")
+    assert (
+        _failure_id(
+            _recovery_runs(), message.replace("command 0", "command 1"), error_type="RuntimeError"
+        )
+        == first
+    )
+    assert (
+        _failure_id(
+            _recovery_runs(), message.replace("exited 1", "exited 2"), error_type="RuntimeError"
+        )
+        != first
+    )
+    assert (
+        _failure_id(
+            _recovery_runs(),
+            message.replace("cleanup incomplete", "budget invalid"),
+            error_type="RuntimeError",
+        )
+        != first
+    )
+    # Ordinary, unlinked runs do not gain a broad command-number alias.
+    assert (
+        _failure_id(before, message.replace("command 0", "command 1"), error_type="RuntimeError")
+        != first
+    )
+    assert _failure_id(_recovery_runs(), "prefix " + message, error_type="RuntimeError") != first
+
+
+def test_disabled_original_receipts_qualify_legacy_command_identity(tmp_path):
+    from exact.experiments.supervision import inspect_runs, _incident
+
+    runs = _recovery_runs()
+    for index, run in enumerate(runs):
+        path = tmp_path / f"{index}.json"
+        run["status_path"] = str(path)
+        path.write_text(
+            __import__("json").dumps(
+                {
+                    "status": "failed",
+                    "error": {
+                        "type": "RuntimeError",
+                        "message": f"command {2 if index == 0 else 1} exited 1: same cause",
+                    },
+                }
+            )
+        )
+    incident = inspect_runs(runs, step_states={})["incidents"][0]
+    legacy = {
+        _incident(
+            None,
+            "run_failed",
+            "",
+            {"type": "RuntimeError", "message": f"command {index} exited 1: same cause"},
+            scope="E10-original",
+        )["id"]
+        for index in (1, 2)
+    }
+    assert set(incident["legacy_incident_ids"]) == legacy
+
+
+def test_batch_completion_only_failure_keeps_recovery_incident_identity():
+    runs = _recovery_runs()
+    detail = {"type": "RuntimeError", "message": "command 1 exited 1: RuntimeError: cleanup failed"}
+    ordinary = assess_runs(
+        runs, {runs[-1]["id"]: {"status": {"status": "failed", "error": detail}}}, step_states={}
+    )["incidents"][0]
+    fallback = assess_runs(
+        runs,
+        {runs[-1]["id"]: {"completion": {"status": "failed", "exit_code": 1, "error": detail}}},
+        step_states={},
+    )["incidents"][0]
+    assert fallback["kind"] == "run_failed"
+    assert fallback["id"] == ordinary["id"]
+
+
+@pytest.mark.parametrize(
+    "causes,expected,first",
+    [
+        (["A", "B"], [], ["cause1"]),
+        (["A", "B", "B"], ["cause2"], ["cause1"]),
+        (["A", "B", "A"], ["cause2"], []),
+        (["A", "B", "B", "B"], ["cause2", "cause3"], ["cause1"]),
+    ],
+)
+def test_new_cause_is_not_a_failed_repair_and_recurrence_keeps_ancestry(causes, expected, first):
+    runs, observations = [], {}
+    for index, cause in enumerate(causes):
+        row = dict(id=f"cause{index}", step_id=f"1.{index}", dispatch_nonce=f"owner{index}")
+        if index < len(causes) - 1:
+            row.update(enabled=False, superseded_by=f"cause{index+1}")
+        receipt = dict(
+            status="failed",
+            step_id=row["step_id"],
+            dispatch_nonce=row["dispatch_nonce"],
+            error=dict(type="RuntimeError", message=f"command {index} exited 1: {cause}"),
+        )
+        observations[row["id"]] = dict(status=receipt, completion=receipt)
+        runs.append(row)
+    incident = assess_runs(runs, observations, step_states={})["incidents"][0]
+    assert incident.get("unsuccessful_recovery_run_ids", []) == expected
+    assert incident.get("first_occurrence_recovery_run_ids", []) == first

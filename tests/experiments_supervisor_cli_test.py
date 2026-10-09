@@ -388,37 +388,47 @@ def test_semantic_config_accepts_only_inert_or_overridden_changes(cli, authentic
     policy, config, calls = authentication_policy
     policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
     config.write_text(
-        '# Reordered and reformatted by the CLI\n'
+        "# Reordered and reformatted by the CLI\n"
         'model_reasoning_effort="xhigh"\nmodel="gpt-6-astra"\n'
-        '[tui]\nnotifications=false\n[notice]\nhide_model_warning=true\n'
+        "[tui]\nnotifications=false\n[notice]\nhide_model_warning=true\n"
     )
     cli.authenticate(policy)
-    assert calls == [[
-        "/example/codex", "-c", 'forced_login_method="chatgpt"',
-        "-c", 'model_provider="openai"', "login", "status",
-    ]]
+    assert calls == [
+        [
+            "/example/codex",
+            "-c",
+            'forced_login_method="chatgpt"',
+            "-c",
+            'model_provider="openai"',
+            "login",
+            "status",
+        ]
+    ]
 
 
-@pytest.mark.parametrize("change", [
-    'model = "different-model"\n',
-    'model_provider = "another-provider"\n',
-    'service_tier = "priority"\n',
-    'forced_login_method = "api"\n',
-    'approval_policy = "never"\n',
-    'sandbox_mode = "danger-full-access"\n',
-    'personality = "friendly"\n',
-    'sqlite_home = "/different/history"\n',
-    'unknown_future_setting = true\n',
-    '[projects."/repo"]\ntrust_level = "trusted"\n',
-    '[model_providers.custom]\nbase_url = "https://example.test"\n',
-    '[plugins.example]\nenabled = true\n',
-    '[memories]\nenabled = true\n',
-])
+@pytest.mark.parametrize(
+    "change",
+    [
+        'model = "different-model"\n',
+        'model_provider = "another-provider"\n',
+        'service_tier = "priority"\n',
+        'forced_login_method = "api"\n',
+        'approval_policy = "never"\n',
+        'sandbox_mode = "danger-full-access"\n',
+        'personality = "friendly"\n',
+        'sqlite_home = "/different/history"\n',
+        "unknown_future_setting = true\n",
+        '[projects."/repo"]\ntrust_level = "trusted"\n',
+        '[model_providers.custom]\nbase_url = "https://example.test"\n',
+        "[plugins.example]\nenabled = true\n",
+        "[memories]\nenabled = true\n",
+    ],
+)
 def test_semantic_config_rejects_other_changes_before_login(cli, authentication_policy, change):
     policy, config, calls = authentication_policy
     policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
     original = config.read_text()
-    config.write_text(change if change.startswith('model =') else original + change)
+    config.write_text(change if change.startswith("model =") else original + change)
     with pytest.raises(ValueError, match="Codex configuration changed"):
         cli.authenticate(policy)
     assert calls == []
@@ -468,8 +478,11 @@ def test_legacy_config_pin_still_requires_exact_file(cli, authentication_policy)
 def test_semantic_config_still_requires_chatgpt_login(cli, authentication_policy, monkeypatch):
     policy, _, _ = authentication_policy
     policy["codex_config_semantic_sha256"] = cli.config_fingerprint(policy)
-    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k:
-                        cli.subprocess.CompletedProcess(a[0], 0, "Logged in using API key", ""))
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda *a, **k: cli.subprocess.CompletedProcess(a[0], 0, "Logged in using API key", ""),
+    )
     with pytest.raises(ValueError, match="API fallback is disabled"):
         cli.authenticate(policy)
 
@@ -479,12 +492,17 @@ def test_empty_pending_queue_only_falls_back_for_explicit_unfinished_scope(
     cli, controller, tmp_path, monkeypatch, remaining
 ):
     policy, state = controller
-    cli.write(tmp_path / "registry.json", {
-        "runs": [], "pending_batches": [], "capacity": {}, "remaining_work_status": remaining
-    })
-    observation = {"status": "complete", "findings": [], "incidents": [
-        {"id": "next", "kind": "next_batch", "run_ids": [], "reason": "All complete"}
-    ]}
+    cli.write(
+        tmp_path / "registry.json",
+        {"runs": [], "pending_batches": [], "capacity": {}, "remaining_work_status": remaining},
+    )
+    observation = {
+        "status": "complete",
+        "findings": [],
+        "incidents": [
+            {"id": "next", "kind": "next_batch", "run_ids": [], "reason": "All complete"}
+        ],
+    }
     monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: observation)
     cli.check(tmp_path, policy, state)
     assert bool(cli.read(tmp_path / "health.json")["incidents"]) == (remaining == "pending")
@@ -492,15 +510,23 @@ def test_empty_pending_queue_only_falls_back_for_explicit_unfinished_scope(
 
 def test_prepared_batch_handoff_never_invokes_model(cli, controller, tmp_path, monkeypatch):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'pending_batches': [{'id': 'prepared', 'launch': {'reviewed': True}}],
-        'capacity': {},
-    })
-    monkeypatch.setattr(cli, 'authenticate', lambda *a: pytest.fail('Prepared dispatch needs no model'))
-    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Prepared dispatch needs no model'))
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "pending_batches": [{"id": "prepared", "launch": {"reviewed": True}}],
+            "capacity": {},
+        },
+    )
+    monkeypatch.setattr(
+        cli, "authenticate", lambda *a: pytest.fail("Prepared dispatch needs no model")
+    )
+    monkeypatch.setattr(
+        cli, "run_agent", lambda *a: pytest.fail("Prepared dispatch needs no model")
+    )
     result = cli.check(tmp_path, policy, state, act=True)
-    assert not state['agent_runs']
-    assert result['status'] != 'repairing'
+    assert not state["agent_runs"]
+    assert result["status"] != "repairing"
 
 
 def test_dispatch_poll_is_independent_and_retries_errors(cli, controller, tmp_path, monkeypatch):
@@ -517,190 +543,272 @@ def test_dispatch_poll_is_independent_and_retries_errors(cli, controller, tmp_pa
     def dispatch(*args, **kwargs):
         calls.append(args)
         if len(calls) == 1:
-            raise OSError('temporary storage failure')
-        return {'status': 'registered', 'step_id': '14372.36'}
+            raise OSError("temporary storage failure")
+        return {"status": "registered", "step_id": "14372.36"}
 
-    monkeypatch.setattr(cli, 'dispatch_ready', dispatch)
-    monkeypatch.setattr(cli, 'authenticate', lambda *a: pytest.fail('Dispatch cannot invoke a model'))
+    monkeypatch.setattr(cli, "dispatch_ready", dispatch)
+    monkeypatch.setattr(
+        cli, "authenticate", lambda *a: pytest.fail("Dispatch cannot invoke a model")
+    )
     cli.dispatch_worker(tmp_path, policy, Stop())
     assert len(calls) == 2
-    assert cli.read(tmp_path / 'dispatch-status.json')['status'] == 'registered'
+    assert cli.read(tmp_path / "dispatch-status.json")["status"] == "registered"
 
 
 def test_ready_prepared_launch_defers_unprepared_science_but_allows_metadata(
     cli, controller, tmp_path, monkeypatch
 ):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'capacity': {'gpus': 1, 'cpus': 6},
-        'pending_batches': [
-            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
-            {'id': 'prepared-science', 'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
-            {'id': 'metadata', 'preparation_only': True, 'resources': {'gpus': 0, 'cpus': 1}},
-        ],
-    })
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {"gpus": 1, "cpus": 6},
+            "pending_batches": [
+                {"id": "unprepared-science", "resources": {"gpus": 1}},
+                {"id": "prepared-science", "resources": {"gpus": 1}, "launch": {"reviewed": True}},
+                {"id": "metadata", "preparation_only": True, "resources": {"gpus": 0, "cpus": 1}},
+            ],
+        },
+    )
     prompts = []
-    monkeypatch.setattr(cli, 'run_agent', lambda p, d, prompt, stop: (
-        prompts.append(prompt) or {'status': 'complete', 'result': _result('no_change')}
-    ))
+    monkeypatch.setattr(
+        cli,
+        "run_agent",
+        lambda p, d, prompt, stop: (
+            prompts.append(prompt) or {"status": "complete", "result": _result("no_change")}
+        ),
+    )
     cli.check(tmp_path, policy, state, act=True)
-    health = cli.read(tmp_path / 'health.json')
-    assert [item['batch_id'] for item in health['incidents']] == ['metadata']
+    health = cli.read(tmp_path / "health.json")
+    assert [item["batch_id"] for item in health["incidents"]] == ["metadata"]
     assert len(prompts) == 1
-    assert state['agent_runs'][0]['incident'] == health['incidents'][0]['id']
+    assert state["agent_runs"][0]["incident"] == health["incidents"][0]["id"]
 
 
-@pytest.mark.parametrize('reservation,suppressed', [
-    ('reserved', True), ('starting', True), ('failed', True),
-    ('registered', False), ('resolved', False),
-])
+@pytest.mark.parametrize(
+    "reservation,suppressed",
+    [
+        ("reserved", True),
+        ("starting", True),
+        ("failed", True),
+        ("registered", False),
+        ("resolved", False),
+    ],
+)
 def test_unregistered_prepared_reservation_holds_science_admission(
     cli, controller, tmp_path, reservation, suppressed
 ):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'capacity': {'gpus': 1},
-        'pending_batches': [{'id': 'unprepared-science', 'resources': {'gpus': 1}}],
-    })
-    cli.write(tmp_path / 'dispatch-state.json', {
-        'already-reserved': {'status': reservation, 'descriptor_sha256': 'bound', 'error': 'launch fault'},
-    })
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {"gpus": 1},
+            "pending_batches": [{"id": "unprepared-science", "resources": {"gpus": 1}}],
+        },
+    )
+    cli.write(
+        tmp_path / "dispatch-state.json",
+        {
+            "already-reserved": {
+                "status": reservation,
+                "descriptor_sha256": "bound",
+                "error": "launch fault",
+            },
+        },
+    )
     cli.check(tmp_path, policy, state)
-    incidents = cli.read(tmp_path / 'health.json')['incidents']
-    assert any(item['kind'] == 'next_batch' for item in incidents) is not suppressed
-    if reservation == 'failed':
-        assert any(item['kind'] == 'dispatch_failed' for item in incidents)
+    incidents = cli.read(tmp_path / "health.json")["incidents"]
+    assert any(item["kind"] == "next_batch" for item in incidents) is not suppressed
+    if reservation == "failed":
+        assert any(item["kind"] == "dispatch_failed" for item in incidents)
 
 
 def test_prepared_priority_preserves_real_failure_repair(cli, controller, tmp_path, monkeypatch):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'capacity': {'gpus': 1},
-        'pending_batches': [
-            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
-            {'id': 'prepared-science', 'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
-        ],
-    })
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {"gpus": 1},
+            "pending_batches": [
+                {"id": "unprepared-science", "resources": {"gpus": 1}},
+                {"id": "prepared-science", "resources": {"gpus": 1}, "launch": {"reviewed": True}},
+            ],
+        },
+    )
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation())
     called = []
-    monkeypatch.setattr(cli, 'run_agent', lambda *args: (
-        called.append(args) or {'status': 'complete', 'result': _result()}
-    ))
+    monkeypatch.setattr(
+        cli,
+        "run_agent",
+        lambda *args: (called.append(args) or {"status": "complete", "result": _result()}),
+    )
     cli.check(tmp_path, policy, state, act=True)
     assert len(called) == 1
-    assert state['agent_runs'][0]['incident'] == 'failure'
-    assert cli.read(tmp_path / 'health.json')['incidents'][0]['kind'] == 'run_failed'
+    assert state["agent_runs"][0]["incident"] == "failure"
+    assert cli.read(tmp_path / "health.json")["incidents"][0]["kind"] == "run_failed"
 
 
 def test_unready_prepared_descriptor_does_not_starve_independent_science(cli, controller, tmp_path):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'capacity': {'gpus': 1},
-        'pending_batches': [
-            {'id': 'unprepared-science', 'resources': {'gpus': 1}},
-            {'id': 'prepared-science', 'depends_on': ['missing-parent'],
-             'resources': {'gpus': 1}, 'launch': {'reviewed': True}},
-        ],
-    })
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {"gpus": 1},
+            "pending_batches": [
+                {"id": "unprepared-science", "resources": {"gpus": 1}},
+                {
+                    "id": "prepared-science",
+                    "depends_on": ["missing-parent"],
+                    "resources": {"gpus": 1},
+                    "launch": {"reviewed": True},
+                },
+            ],
+        },
+    )
     cli.check(tmp_path, policy, state)
-    assert [item['batch_id'] for item in cli.read(tmp_path / 'health.json')['incidents']] == ['unprepared-science']
+    assert [item["batch_id"] for item in cli.read(tmp_path / "health.json")["incidents"]] == [
+        "unprepared-science"
+    ]
 
 
 def test_reserved_prepared_launch_suppresses_generic_empty_queue_continuation(
     cli, controller, tmp_path, monkeypatch
 ):
     policy, state = controller
-    cli.write(tmp_path / 'registry.json', {
-        'runs': [], 'capacity': {}, 'pending_batches': [], 'remaining_work_status': 'pending',
-    })
-    cli.write(tmp_path / 'dispatch-state.json', {'reserved': {'status': 'starting'}})
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation('next_batch'))
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {},
+            "pending_batches": [],
+            "remaining_work_status": "pending",
+        },
+    )
+    cli.write(tmp_path / "dispatch-state.json", {"reserved": {"status": "starting"}})
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation("next_batch"))
     cli.check(tmp_path, policy, state)
-    assert not cli.read(tmp_path / 'health.json')['incidents']
+    assert not cli.read(tmp_path / "health.json")["incidents"]
 
 
-@pytest.mark.parametrize('stopped,reason', [(False, 'timeout'), (True, 'stop_requested')])
+@pytest.mark.parametrize("stopped,reason", [(False, "timeout"), (True, "stop_requested")])
 def test_agent_reports_timeout_separately_from_stop_and_persists_deadline(
     cli, controller, tmp_path, monkeypatch, stopped, reason
 ):
     policy, _ = controller
     _fake_child(cli, monkeypatch, tmp_path, result=json.dumps(_result()), running=True)
     clock = iter([0, 61])
-    monkeypatch.setattr(cli.time, 'monotonic', lambda: next(clock))
-    (tmp_path / 'HANDOFF.md').write_text('Prepared work; not submitted.')
-    report = cli.run_agent(policy, tmp_path, 'Authorized repair', lambda: stopped)
-    assert report['interruption_reason'] == reason
-    assert report['interrupted'] and report['status'] == 'failed'
-    assert report['handoff'] == str(tmp_path / 'HANDOFF.md')
-    prompt = (tmp_path / 'prompt.md').read_text()
-    assert report['deadline_at'] in prompt
-    assert 'Begin final handoff and result by:' in prompt
-    assert str(tmp_path / 'HANDOFF.md') in prompt
-    assert 'Distinguish saved preparation from queued/submitted work' in prompt
+    monkeypatch.setattr(cli.time, "monotonic", lambda: next(clock))
+    (tmp_path / "HANDOFF.md").write_text("Prepared work; not submitted.")
+    report = cli.run_agent(policy, tmp_path, "Authorized repair", lambda: stopped)
+    assert report["interruption_reason"] == reason
+    assert report["interrupted"] and report["status"] == "failed"
+    assert report["handoff"] == str(tmp_path / "HANDOFF.md")
+    prompt = (tmp_path / "prompt.md").read_text()
+    assert report["deadline_at"] in prompt
+    assert "Begin final handoff and result by:" in prompt
+    assert str(tmp_path / "HANDOFF.md") in prompt
+    assert "Distinguish saved preparation from queued/submitted work" in prompt
 
 
-def test_timeout_uses_remaining_attempt_for_saved_work_reconciliation(cli, controller, tmp_path, monkeypatch):
+def test_timeout_uses_remaining_attempt_for_saved_work_reconciliation(
+    cli, controller, tmp_path, monkeypatch
+):
     policy, state = controller
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation())
     prompts = []
 
     def repair(policy, directory, prompt, stopped):
         prompts.append(prompt)
         if len(prompts) == 1:
-            (directory / 'HANDOFF.md').write_text('Committed repair; descriptor not queued.')
-            return {'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout', 'result': None}
-        assert str(tmp_path / 'interventions/failure-1') in prompt
-        assert 'reconcile its saved HANDOFF.md' in prompt
+            (directory / "HANDOFF.md").write_text("Committed repair; descriptor not queued.")
+            return {
+                "status": "failed",
+                "interrupted": True,
+                "interruption_reason": "timeout",
+                "result": None,
+            }
+        assert str(tmp_path / "interventions/failure-1") in prompt
+        assert "reconcile its saved HANDOFF.md" in prompt
         assert '"interruption_reason": "timeout"' in prompt
-        return {'status': 'complete', 'result': _result()}
+        return {"status": "complete", "result": _result()}
 
-    monkeypatch.setattr(cli, 'run_agent', repair)
+    monkeypatch.setattr(cli, "run_agent", repair)
     cli.check(tmp_path, policy, state, act=True)
-    assert state['incidents']['failure']['attempts'] == 1
-    assert not state['incidents']['failure'].get('needs_user')
+    assert state["incidents"]["failure"]["attempts"] == 1
+    assert not state["incidents"]["failure"].get("needs_user")
     cli.check(tmp_path, policy, state, act=True)
     assert len(prompts) == 2
-    assert state['incidents']['failure']['attempts'] == 2
+    assert state["incidents"]["failure"]["attempts"] == 2
 
 
-def test_repeated_timeouts_escalate_at_existing_attempt_limit(cli, controller, tmp_path, monkeypatch):
+def test_repeated_timeouts_escalate_at_existing_attempt_limit(
+    cli, controller, tmp_path, monkeypatch
+):
     policy, state = controller
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation())
     calls = []
-    monkeypatch.setattr(cli, 'run_agent', lambda *args: calls.append(args) or {
-        'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout', 'result': None,
-    })
+    monkeypatch.setattr(
+        cli,
+        "run_agent",
+        lambda *args: calls.append(args)
+        or {
+            "status": "failed",
+            "interrupted": True,
+            "interruption_reason": "timeout",
+            "result": None,
+        },
+    )
     cli.check(tmp_path, policy, state, act=True)
     result = cli.check(tmp_path, policy, state, act=True)
-    assert result['notification']['outcome'] == 'incident_attempt_limit'
-    assert cli.check(tmp_path, policy, state, act=True)['action'] == 'incident_attempt_limit'
-    assert len(calls) == state['incidents']['failure']['attempts'] == 2
+    assert result["notification"]["outcome"] == "incident_attempt_limit"
+    assert cli.check(tmp_path, policy, state, act=True)["action"] == "incident_attempt_limit"
+    assert len(calls) == state["incidents"]["failure"]["attempts"] == 2
 
 
-@pytest.mark.parametrize('reason', ['stop_requested', None])
+@pytest.mark.parametrize("reason", ["stop_requested", None])
 def test_user_stop_and_unknown_interruption_still_require_intervention(
     cli, controller, tmp_path, monkeypatch, reason
 ):
     policy, state = controller
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation())
     calls = []
-    monkeypatch.setattr(cli, 'run_agent', lambda *args: calls.append(args) or {
-        'status': 'failed', 'interrupted': True, 'interruption_reason': reason, 'result': None,
-    })
+    monkeypatch.setattr(
+        cli,
+        "run_agent",
+        lambda *args: calls.append(args)
+        or {
+            "status": "failed",
+            "interrupted": True,
+            "interruption_reason": reason,
+            "result": None,
+        },
+    )
     cli.check(tmp_path, policy, state, act=True)
-    assert cli.check(tmp_path, policy, state, act=True)['action'] == 'requires_user'
+    assert cli.check(tmp_path, policy, state, act=True)["action"] == "requires_user"
     assert len(calls) == 1
 
 
-def test_explicit_decision_remains_blocking_even_if_repair_timed_out(cli, controller, tmp_path, monkeypatch):
+def test_explicit_decision_remains_blocking_even_if_repair_timed_out(
+    cli, controller, tmp_path, monkeypatch
+):
     policy, state = controller
-    monkeypatch.setattr(cli, 'inspect_runs', lambda *a, **k: _observation())
-    monkeypatch.setattr(cli, 'run_agent', lambda *args: {
-        'status': 'failed', 'interrupted': True, 'interruption_reason': 'timeout',
-        'result': _result('needs_user'),
-    })
+    monkeypatch.setattr(cli, "inspect_runs", lambda *a, **k: _observation())
+    monkeypatch.setattr(
+        cli,
+        "run_agent",
+        lambda *args: {
+            "status": "failed",
+            "interrupted": True,
+            "interruption_reason": "timeout",
+            "result": _result("needs_user"),
+        },
+    )
     cli.check(tmp_path, policy, state, act=True)
-    assert state['incidents']['failure']['needs_user'] is True
+    assert state["incidents"]["failure"]["needs_user"] is True
 
 
 @pytest.fixture
@@ -708,25 +816,50 @@ def queued_recovery(cli, controller, tmp_path, monkeypatch):
     import hashlib
 
     policy, state = controller
-    worker = tmp_path / 'reviewed-worker.sh'
-    worker.write_text('#!/bin/bash\nexit 0\n')
-    cli.write(tmp_path / 'old-status.json', {'status': 'blocked', 'error': 'saved error'})
-    cli.write(tmp_path / 'busy-status.json', {'status': 'running'})
-    failed = {'id': 'failed', 'step_id': '14372.34', 'pending_recovery': 'recovery',
-              'status_path': str(tmp_path / 'old-status.json')}
-    busy = {'id': 'busy', 'step_id': '14372.38', 'status_path': str(tmp_path / 'busy-status.json'),
-            'resources': {'gpus': 1, 'cpus': 6}}
-    batch = {'id': 'recovery', 'resources': {'gpus': 1, 'cpus': 6}, 'depends_on': ['busy'], 'launch': {
-        'run': {'id': 'recovery', 'status_path': str(tmp_path / 'new-status.json'),
-                'completion_path': str(tmp_path / 'new-complete.json'), 'exit_path': str(tmp_path / 'exit')},
-        'argv': ['/usr/bin/srun', '--jobid=14372', '/bin/bash', str(worker)],
-        'nonce': 'reviewed-recovery-001', 'tmux_socket': str(tmp_path / 'socket'),
-        'step_path': str(tmp_path / 'step.json'), 'launcher_log': str(tmp_path / 'launcher.log'),
-        'bindings': [{'path': str(worker), 'sha256': hashlib.sha256(worker.read_bytes()).hexdigest()}],
-    }}
-    registry = {'runs': [failed, busy], 'pending_batches': [batch], 'capacity': {'gpus': 1, 'cpus': 6}}
-    cli.write(tmp_path / 'registry.json', registry)
-    monkeypatch.setattr(cli, 'slurm_steps', lambda _: {'14372.0': 'RUNNING', '14372.38': 'RUNNING'})
+    worker = tmp_path / "reviewed-worker.sh"
+    worker.write_text("#!/bin/bash\nexit 0\n")
+    cli.write(tmp_path / "old-status.json", {"status": "blocked", "error": "saved error"})
+    cli.write(tmp_path / "busy-status.json", {"status": "running"})
+    failed = {
+        "id": "failed",
+        "step_id": "14372.34",
+        "pending_recovery": "recovery",
+        "status_path": str(tmp_path / "old-status.json"),
+    }
+    busy = {
+        "id": "busy",
+        "step_id": "14372.38",
+        "status_path": str(tmp_path / "busy-status.json"),
+        "resources": {"gpus": 1, "cpus": 6},
+    }
+    batch = {
+        "id": "recovery",
+        "resources": {"gpus": 1, "cpus": 6},
+        "depends_on": ["busy"],
+        "launch": {
+            "run": {
+                "id": "recovery",
+                "status_path": str(tmp_path / "new-status.json"),
+                "completion_path": str(tmp_path / "new-complete.json"),
+                "exit_path": str(tmp_path / "exit"),
+            },
+            "argv": ["/usr/bin/srun", "--jobid=14372", "/bin/bash", str(worker)],
+            "nonce": "reviewed-recovery-001",
+            "tmux_socket": str(tmp_path / "socket"),
+            "step_path": str(tmp_path / "step.json"),
+            "launcher_log": str(tmp_path / "launcher.log"),
+            "bindings": [
+                {"path": str(worker), "sha256": hashlib.sha256(worker.read_bytes()).hexdigest()}
+            ],
+        },
+    }
+    registry = {
+        "runs": [failed, busy],
+        "pending_batches": [batch],
+        "capacity": {"gpus": 1, "cpus": 6},
+    }
+    cli.write(tmp_path / "registry.json", registry)
+    monkeypatch.setattr(cli, "slurm_steps", lambda _: {"14372.0": "RUNNING", "14372.38": "RUNNING"})
     return policy, state, registry, batch
 
 
@@ -734,60 +867,93 @@ def test_verified_queued_recovery_waits_without_repair_or_false_recovery_alert(
     cli, queued_recovery, tmp_path, monkeypatch
 ):
     policy, state, registry, _ = queued_recovery
-    incidents = cli.inspect_runs(registry['runs'], step_states={'14372.38': 'RUNNING'})['incidents']
+    incidents = cli.inspect_runs(registry["runs"], step_states={"14372.38": "RUNNING"})["incidents"]
     incident = incidents[0]
-    state['incidents'][incident['id']] = {'attempts': 1, 'observations': 1, 'alerted': True, 'incident': incident}
-    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Verified replacement is already queued'))
-    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **k: pytest.fail('Waiting is neither failure nor recovery'))
+    state["incidents"][incident["id"]] = {
+        "attempts": 1,
+        "observations": 1,
+        "alerted": True,
+        "incident": incident,
+    }
+    monkeypatch.setattr(
+        cli, "run_agent", lambda *a: pytest.fail("Verified replacement is already queued")
+    )
+    monkeypatch.setattr(
+        cli,
+        "notify_blocker",
+        lambda *a, **k: pytest.fail("Waiting is neither failure nor recovery"),
+    )
     result = cli.check(tmp_path, policy, state, act=True)
-    assert result['status'] == 'waiting'
-    health = cli.read(tmp_path / 'health.json')
-    assert not health['incidents']
-    failed = next(row for row in health['findings'] if row['run_id'] == 'failed')
-    assert failed['status'] == 'waiting' and failed['pending_recovery'] == 'recovery'
-    assert failed['phase'] == 'blocked'  # Original terminal evidence is preserved.
-    assert state['incidents'][incident['id']]['attempts'] == 1
-    assert not state['incidents'][incident['id']].get('recovered')
+    assert result["status"] == "waiting"
+    health = cli.read(tmp_path / "health.json")
+    assert not health["incidents"]
+    failed = next(row for row in health["findings"] if row["run_id"] == "failed")
+    assert failed["status"] == "waiting" and failed["pending_recovery"] == "recovery"
+    assert failed["phase"] == "blocked"  # Original terminal evidence is preserved.
+    assert state["incidents"][incident["id"]]["attempts"] == 1
+    assert not state["incidents"][incident["id"]].get("recovered")
 
 
-@pytest.mark.parametrize('invalid', [
-    'missing', 'hash', 'run_id', 'allocation', 'dependency', 'self_dependency',
-    'disabled', 'decision', 'capacity', 'dispatch_failed', 'live_old_worker', 'malformed_pointer',
-])
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "missing",
+        "hash",
+        "run_id",
+        "allocation",
+        "dependency",
+        "self_dependency",
+        "disabled",
+        "decision",
+        "capacity",
+        "dispatch_failed",
+        "live_old_worker",
+        "malformed_pointer",
+    ],
+)
 def test_unverified_queued_recovery_leaves_original_failure_actionable(
     cli, queued_recovery, tmp_path, monkeypatch, invalid
 ):
     policy, state, registry, batch = queued_recovery
-    if invalid == 'missing':
-        registry['pending_batches'] = []
-    elif invalid == 'hash':
-        batch['launch']['bindings'][0]['sha256'] = 'wrong'
-    elif invalid == 'run_id':
-        batch['launch']['run']['id'] = 'unrelated'
-    elif invalid == 'allocation':
-        batch['launch']['argv'][1] = '--jobid=99999'
-    elif invalid == 'dependency':
-        batch['depends_on'] = ['missing-parent']
-    elif invalid == 'self_dependency':
-        batch['depends_on'] = ['failed']
-    elif invalid == 'disabled':
-        batch['enabled'] = False
-    elif invalid == 'decision':
-        batch['needs_user'] = True
-    elif invalid == 'capacity':
-        batch['resources']['gpus'] = 2
-    elif invalid == 'dispatch_failed':
-        cli.write(tmp_path / 'dispatch-state.json', {
-            'recovery': {'status': 'failed', 'descriptor_sha256': 'bound', 'error': 'launch failure'},
-        })
-    elif invalid == 'live_old_worker':
-        monkeypatch.setattr(cli, 'slurm_steps', lambda _: {'14372.0': 'RUNNING', '14372.34': 'RUNNING'})
+    if invalid == "missing":
+        registry["pending_batches"] = []
+    elif invalid == "hash":
+        batch["launch"]["bindings"][0]["sha256"] = "wrong"
+    elif invalid == "run_id":
+        batch["launch"]["run"]["id"] = "unrelated"
+    elif invalid == "allocation":
+        batch["launch"]["argv"][1] = "--jobid=99999"
+    elif invalid == "dependency":
+        batch["depends_on"] = ["missing-parent"]
+    elif invalid == "self_dependency":
+        batch["depends_on"] = ["failed"]
+    elif invalid == "disabled":
+        batch["enabled"] = False
+    elif invalid == "decision":
+        batch["needs_user"] = True
+    elif invalid == "capacity":
+        batch["resources"]["gpus"] = 2
+    elif invalid == "dispatch_failed":
+        cli.write(
+            tmp_path / "dispatch-state.json",
+            {
+                "recovery": {
+                    "status": "failed",
+                    "descriptor_sha256": "bound",
+                    "error": "launch failure",
+                },
+            },
+        )
+    elif invalid == "live_old_worker":
+        monkeypatch.setattr(
+            cli, "slurm_steps", lambda _: {"14372.0": "RUNNING", "14372.34": "RUNNING"}
+        )
     else:
-        registry['runs'][0]['pending_recovery'] = {'malformed': True}
-    cli.write(tmp_path / 'registry.json', registry)
+        registry["runs"][0]["pending_recovery"] = {"malformed": True}
+    cli.write(tmp_path / "registry.json", registry)
     cli.check(tmp_path, policy, state)
-    incidents = cli.read(tmp_path / 'health.json')['incidents']
-    assert any(row['kind'] == 'run_failed' and row['focus_run_id'] == 'failed' for row in incidents)
+    incidents = cli.read(tmp_path / "health.json")["incidents"]
+    assert any(row["kind"] == "run_failed" and row["focus_run_id"] == "failed" for row in incidents)
 
 
 def test_queued_recovery_chain_does_not_spawn_a_second_repair(
@@ -797,30 +963,39 @@ def test_queued_recovery_chain_does_not_spawn_a_second_repair(
 
     policy, state, registry, recovery = queued_recovery
     parent = copy.deepcopy(recovery)
-    parent.update(id='queued-main', depends_on=['busy'])
-    parent['launch']['run']['id'] = 'queued-main'
-    parent['launch']['nonce'] = 'reviewed-queued-main-001'
-    registry['pending_batches'].append(parent)
-    recovery['depends_on'] = ['queued-main']
-    cli.write(tmp_path / 'registry.json', registry)
-    incident = cli.inspect_runs(registry['runs'], step_states={'14372.38': 'RUNNING'})['incidents'][0]
-    state['incidents'][incident['id']] = {
-        'attempts': 1, 'observations': 1, 'alerted': True, 'incident': incident,
+    parent.update(id="queued-main", depends_on=["busy"])
+    parent["launch"]["run"]["id"] = "queued-main"
+    parent["launch"]["nonce"] = "reviewed-queued-main-001"
+    registry["pending_batches"].append(parent)
+    recovery["depends_on"] = ["queued-main"]
+    cli.write(tmp_path / "registry.json", registry)
+    incident = cli.inspect_runs(registry["runs"], step_states={"14372.38": "RUNNING"})["incidents"][
+        0
+    ]
+    state["incidents"][incident["id"]] = {
+        "attempts": 1,
+        "observations": 1,
+        "alerted": True,
+        "incident": incident,
     }
-    monkeypatch.setattr(cli, 'run_agent', lambda *a: pytest.fail('Queued recovery chain owns repair'))
-    monkeypatch.setattr(cli, 'notify_blocker', lambda *a, **k: pytest.fail('Still waiting'))
-    assert cli.check(tmp_path, policy, state, act=True)['status'] == 'waiting'
-    health = cli.read(tmp_path / 'health.json')
-    assert not health['incidents']
-    assert state['incidents'][incident['id']]['attempts'] == 1
-    assert not state['incidents'][incident['id']].get('recovered')
-    assert cli.read(tmp_path / 'registry.json') == registry
-    assert not (tmp_path / 'dispatch-state.json').exists()
-    assert not Path(recovery['launch']['step_path']).exists()
+    monkeypatch.setattr(
+        cli, "run_agent", lambda *a: pytest.fail("Queued recovery chain owns repair")
+    )
+    monkeypatch.setattr(cli, "notify_blocker", lambda *a, **k: pytest.fail("Still waiting"))
+    assert cli.check(tmp_path, policy, state, act=True)["status"] == "waiting"
+    health = cli.read(tmp_path / "health.json")
+    assert not health["incidents"]
+    assert state["incidents"][incident["id"]]["attempts"] == 1
+    assert not state["incidents"][incident["id"]].get("recovered")
+    assert cli.read(tmp_path / "registry.json") == registry
+    assert not (tmp_path / "dispatch-state.json").exists()
+    assert not Path(recovery["launch"]["step_path"]).exists()
 
 
 @pytest.mark.parametrize("storage", [False, True])
-def test_storage_pause_alerts_without_starting_repairs(cli, controller, tmp_path, monkeypatch, storage):
+def test_storage_pause_alerts_without_starting_repairs(
+    cli, controller, tmp_path, monkeypatch, storage
+):
     policy, state = controller
     cli.write(tmp_path / "registry.json", {"runs": [], "pending_batches": [], "capacity": {}})
     reason = "Storage safety guard: reserve reached" if storage else "User maintenance"
@@ -834,3 +1009,43 @@ def test_storage_pause_alerts_without_starting_repairs(cli, controller, tmp_path
     if storage:
         assert notifications[0][0][2]["kind"] == "storage_safety"
         assert notifications[0][0][3] == "requires_user"
+
+
+def test_deadline_blocker_never_invokes_model_or_prevents_independent_preparation(
+    cli,
+    controller,
+    tmp_path,
+    monkeypatch,
+):
+    policy, state = controller
+    monkeypatch.setattr(cli.time, "time", lambda: 100)
+    cli.write(
+        tmp_path / "registry.json",
+        {
+            "runs": [],
+            "capacity": {"cpus": 1},
+            "remaining_work_status": "pending",
+            "campaign_context": {"primary_freeze_utc": "2026-10-14T17:00:00Z"},
+            "pending_batches": [
+                {"id": "expired", "deadline_epoch": 99, "resources": {"cpus": 1}},
+                {"id": "independent", "deadline_epoch": 200, "resources": {"cpus": 1}},
+            ],
+        },
+    )
+    calls = []
+
+    def prepare(policy, directory, prompt, stop):
+        snapshot = cli.read(directory / "context.json")
+        calls.append(snapshot["incident"]["batch_id"])
+        assert snapshot["registry"]["campaign_context"]["primary_freeze_utc"].endswith("17:00:00Z")
+        return {"status": "complete", "result": _result("no_change")}
+
+    monkeypatch.setattr(cli, "run_agent", prepare)
+    current = cli.check(tmp_path, policy, state, act=True)
+    assert calls == ["independent"]
+    assert current["blocked_incidents"][0]["batch_id"] == "expired"
+    assert current["campaign_context"]["primary_freeze_utc"] == "2026-10-14T17:00:00Z"
+    expired = next(
+        row for row in state["incidents"].values() if row["incident"]["kind"] == "batch_deadline"
+    )
+    assert expired["attempts"] == expired["unsuccessful_attempts"] == 0
