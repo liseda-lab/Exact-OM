@@ -4,6 +4,8 @@
 
 This document defines the intended role of LLM supervision: weak judgments about how well a logically feasible repair retains or restores intended meaning. It is the semantic-fidelity component of the main learning methodology, not a user-personalization study. [07](07-corpus-and-training.md) specifies supervised data collection and loss routing; [09](09-graph-and-neural-model.md) specifies the learned heads; [04](04-minimal-exact-kernel.md) retains symbolic acceptance authority. Stable requirement identifiers are `SF-*`.
 
+**October campaign priority:** [15 COR-12](15-preliminary-corrections.md) and [16](16-liseda05-experiment-plan.md) make symbolic versus symbolic-plus-LLM supervision a primary three-seed comparison, require provenance-separated additive losses and reserve annotation/evaluation capacity. Their bounded experiment matrix supersedes SF-030 breadth for this campaign; all semantic, evidence, masking and independence requirements below remain in force.
+
 ## 1. What semantic fidelity means
 
 **SF-001 — Target.** A repair has high semantic fidelity when its selected correspondences and ontology changes preserve or restore the conceptual relationships supported by independent definitions, scope notes, examples and declared intended consequences, while avoiding unsupported commitments and collateral loss of intended knowledge. The provisional alignment is fallible evidence; its original assertions are not the definition of intended meaning. A change can improve fidelity by removing a wrong direction, changing an endpoint, adding a justified qualifier, or revising an eligible erroneous ontology assertion. The action family itself supplies no semantic credit.
