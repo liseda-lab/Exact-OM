@@ -1,0 +1,307 @@
+{
+  "schema": "exact-repair/corrective-experiment-plan/v1",
+  "status": "planning_contract_not_resolved_runtime_protocol",
+  "version_date": "2026-10-09",
+  "timezone": "Europe/London",
+  "runtime_protocol_schema": "exact-repair/protocol/v3",
+  "launch_authorized_by_this_file": false,
+  "deadlines": {
+    "primary_freeze_local": "2026-10-14T18:00:00+01:00",
+    "primary_measurements_finish_date": "2026-10-16",
+    "evidence_snapshot_date": "2026-10-17",
+    "abstract_date_user_supplied": "2026-10-18",
+    "paper_date_user_supplied": "2026-10-25",
+    "submission_cutoff_time_known": false
+  },
+  "hardware": {
+    "host": "liseda-05",
+    "advertised_cpus": 16,
+    "advertised_ram_gb": 128,
+    "gpus": [
+      "NVIDIA RTX 5090",
+      "NVIDIA RTX 2080 Ti"
+    ],
+    "optional_capacity_required": false
+  },
+  "admission": {
+    "worker_cpu_tokens": 14,
+    "reserved_cpu_tokens": 2,
+    "worker_ram_cap_gib": 100,
+    "worker_ram_cap_fraction_of_measured_allocation": 0.8,
+    "exclusive_gpu_ownership": true,
+    "heterogeneous_distributed_training": false,
+    "profiles": [
+      {
+        "id": "reasoner",
+        "maximum_concurrent": 3,
+        "cpu_tokens": 3,
+        "ram_gib": 20
+      },
+      {
+        "id": "primary_training",
+        "maximum_concurrent": 1,
+        "cpu_tokens": 4,
+        "ram_gib": 24,
+        "gpu": "NVIDIA RTX 5090"
+      },
+      {
+        "id": "scheduled_inference",
+        "maximum_concurrent": 1,
+        "cpu_tokens": 1,
+        "ram_gib": 8,
+        "gpu": "NVIDIA RTX 2080 Ti",
+        "requires_measured_fit": true,
+        "role": "candidate scoring, acquisition inference and development; yields GPU exclusively to admitted ablation"
+      },
+      {
+        "id": "hosted_annotation",
+        "maximum_concurrent": 1,
+        "cpu_tokens": 1,
+        "ram_gib": 2,
+        "maximum_in_flight_requests": 4,
+        "requires_releasing_reasoner_from_full_gpu_profile": true
+      }
+    ],
+    "worker_cpu_tokens_formula": "min(14, measured_allocated_cpus - reserved_cpu_tokens)",
+    "inference_device_ownership": "one admitted batched worker or serialised exclusive acquisition; queue time charged to caller",
+    "alternative_2080_training_profile": {
+      "cpu_tokens": 4,
+      "ram_gib": 24,
+      "gpu": "NVIDIA RTX 2080 Ti",
+      "replaces_inference_worker": true,
+      "maximum_concurrent_reasoners_with_5090_fit": 2,
+      "requires_measured_fit": true
+    },
+    "default_profiles": [
+      {
+        "id": "reasoning_and_two_gpus",
+        "reasoners": 3,
+        "cpu_tokens": 14,
+        "ram_gib": 92,
+        "annotation_worker": false
+      },
+      {
+        "id": "annotation_and_two_gpus",
+        "reasoners": 2,
+        "cpu_tokens": 12,
+        "ram_gib": 74,
+        "annotation_worker": true
+      }
+    ],
+    "timing_comparisons": "same qualified device and concurrent-load profile within each matched comparison",
+    "reasoning_capacity_formula": "sum of actually admitted reasoner-slot hours, reduced during annotation; final evaluation annotation reserve is not new reasoning capacity"
+  },
+  "stage_limits": {
+    "calibration_elapsed_hours": 4,
+    "primary_acquisition_elapsed_hours": 30,
+    "primary_training_gpu_hours": 18,
+    "per_primary_model_gpu_hours": 3,
+    "primary_evaluation_elapsed_hours": 48,
+    "conference_evaluation_reserved_fraction": 0.3333333333333333,
+    "scheduling_utilisation_fraction": 0.7,
+    "technical_retries_per_fixed_failure": 1,
+    "protected_date": "2026-10-17",
+    "primary_development_elapsed_hours": 12,
+    "primary_development_reasoner_service_hours": 36,
+    "combined_learning_elapsed_hours": 66,
+    "per_model_total_elapsed_hours": 6,
+    "primary_training_gpu_hours_across_all_devices": 18,
+    "secondary_gpu_learning_occupancy_hours": 36,
+    "secondary_gpu_evaluation_occupancy_hours": 48,
+    "unary_ablation_gpu_hours": 3,
+    "unary_ablation_included_in_secondary_learning_cap": true,
+    "hosted_acquisition_service_hours": 8,
+    "hosted_development_service_hours": 4,
+    "hosted_evaluation_service_hours": 8,
+    "hosted_service_within_existing_elapsed_windows": true,
+    "final_evaluation_annotation_reserve_hours": 8
+  },
+  "starting_case_limits": {
+    "wall_seconds": 300,
+    "cpu_seconds": 600,
+    "initial_diagnosis_seconds": 20,
+    "elementary_attempt_seconds": 30,
+    "rich_generation_seconds": 60,
+    "verification_call_seconds": 30,
+    "compilation_call_seconds": 20,
+    "cleanup_reserve_seconds": 2,
+    "limits_clip_to_remaining_case_and_stage_budget": true
+  },
+  "data_starting_quotas": {
+    "strata": 8,
+    "train_parents_per_stratum": 8,
+    "development_parents_per_stratum": 2,
+    "test_parents_per_stratum": 4,
+    "siblings_per_parent": 2,
+    "train_cases": 128,
+    "development_cases": 32,
+    "test_cases": 64,
+    "train_assignment_attempts_per_case_per_round": 16,
+    "maximum_acquisition_rounds": 2,
+    "counts_frozen_after_development_calibration_before_test": true,
+    "previously_exposed_test_parents_eligible": false
+  },
+  "primary_fitting": {
+    "encoders": [
+      "hgt"
+    ],
+    "benefit_models": [
+      "pair"
+    ],
+    "seeds": [
+      13,
+      37,
+      73
+    ],
+    "jobs": 6,
+    "maximum_epochs": 50,
+    "development_every_epochs": null,
+    "final_completed_epoch_evaluation": true,
+    "checkpoint_coverage_denominator": "all scheduled development case IDs",
+    "maximum_full_development_evaluations": 2,
+    "patience_early_stopping_enabled": false,
+    "intermediate_development_epoch": 5,
+    "full_development_pass_count_frozen_after_calibration": true,
+    "supervision_conditions": [
+      "symbolic",
+      "symbolic_plus_llm"
+    ],
+    "primary_gpu": "NVIDIA RTX 5090",
+    "paired_initialization_and_updates": true,
+    "fixed_edit_costs_across_conditions": true,
+    "combined_loss_contract": "COR-12 provenance-separated additive masked losses",
+    "primary_jobs_formula": "1 encoder * 1 benefit model * 2 supervision conditions * 3 seeds",
+    "shared_cohort": "generated_plus_conference_train when grounded training-side Conference cases are admitted; freeze actual composition and name"
+  },
+  "comparisons": [
+    {
+      "id": "E1",
+      "purpose": "end_to_end",
+      "priority": "primary"
+    },
+    {
+      "id": "E2",
+      "purpose": "common_inventory_scoring",
+      "priority": "primary",
+      "primary_scoring_conditions": [
+        "observable_symbolic",
+        "hgt_pair_symbolic",
+        "hgt_pair_symbolic_plus_llm"
+      ],
+      "unary_priority": "bounded_ablation"
+    },
+    {
+      "id": "E3",
+      "purpose": "matched_constrained_generation",
+      "priority": "bounded_primary_subset",
+      "initial_seed": 13,
+      "subcomparisons": [
+        "E3a learned vs uniform within circuits",
+        "E3b fixed identical proposal distribution with circuit vs grammar decoding"
+      ],
+      "checkpoint_supervision": "symbolic_plus_llm"
+    },
+    {
+      "id": "E4",
+      "purpose": "risk_on_off",
+      "priority": "bounded_primary_subset",
+      "initial_seed": 13,
+      "checkpoint_supervision": "symbolic_plus_llm"
+    },
+    {
+      "id": "E5",
+      "purpose": "staged_vs_one_stage",
+      "priority": "bounded_primary_subset",
+      "initial_seed": 13,
+      "checkpoint_supervision": "symbolic_plus_llm"
+    },
+    {
+      "id": "E6",
+      "purpose": "semantic_supervision",
+      "priority": "primary",
+      "seeds": [
+        13,
+        37,
+        73
+      ],
+      "reuses_verified_E1_E2_outputs": true,
+      "independent_test_semantic_evaluation": true
+    }
+  ],
+  "optional": [
+    "rgcn and no-graph unary/pair arms",
+    "expanded robustness and grammar depth",
+    "full Bio-ML",
+    "additional independent seeds",
+    "LLM-only supervision, larger annotation volume and additional judge panels",
+    "additional unary seeds and combined-supervision unary ablation",
+    "separately trained generated-only transfer"
+  ],
+  "llm": {
+    "priority": "primary",
+    "planned_enabled": true,
+    "paid_execution_enabled_by_this_file": false,
+    "spend_cap_usd": null,
+    "runtime_paid_calls_require_applicable_explicit_authorization_and_finite_cap": true,
+    "provider_path": "existing OpenRouter client and request ledger",
+    "target": "evidence-grounded semantic fidelity, not personalization or logical validity",
+    "training_loss": "COR-12 additive auxiliary anchor and comparison losses",
+    "cost_learning_enabled": false,
+    "online_repair_calls": false,
+    "unique_comparison_starting_quotas": {
+      "train": 256,
+      "development_across_all_fits_and_passes": 64,
+      "test": 128
+    },
+    "test_conference_reserved_fraction": 0.3333333333333333,
+    "test_conference_starting_slots": 43,
+    "test_slots_balanced_across_paired_seeds": true,
+    "order_swap_audit_fraction": 0.2,
+    "request_caps_including_swaps_and_corrections": {
+      "calibration": 32,
+      "train": 384,
+      "development": 96,
+      "test": 192,
+      "aggregate": 704
+    },
+    "maximum_in_flight": 4,
+    "maximum_input_tokens_per_request": 8000,
+    "maximum_output_tokens_per_request": 2000,
+    "maximum_attempt_seconds": 90,
+    "unknown_delivery_automatic_retry": false,
+    "final_evaluator_used_for_training_or_development": false,
+    "train_dev_may_share_teacher_family": true,
+    "exact_post_decode_plan_annotation_required": true,
+    "missing_primary_annotations_status": "incomplete_primary_comparison_not_optional",
+    "specification_reference": "../13-semantic-fidelity-supervision.md",
+    "development_use_policy": "versioned development_selection; same teacher family allowed without independent-assessment claim; legacy independent modes preserved"
+  },
+  "resolve_before_launch": [
+    "source and native environment identities",
+    "GPU UUIDs, actual allocation and measured fit",
+    "data/import/matcher licences and hashes",
+    "parent and ontology splits with exposure audit",
+    "typed schema and grammar/candidate identities",
+    "full desired/unwanted query basis and cost profile",
+    "resource-admitted frozen case/arm counts",
+    "complete expected DEV and TEST row schedules",
+    "artifact/cache/resume compatibility and cumulative budget records",
+    "both GPU scheduled roles, oversized graph routing and matched-device timings",
+    "LLM TRAIN/DEV/TEST slots, grounded evidence, exact plan identities and post-decode annotation schedule",
+    "teacher/development and held-out evaluator identities, prompts/rubric, source loss weights and scale calibration",
+    "applicable hosted-call authorization, finite aggregate and phase monetary caps, request/token budgets"
+  ],
+  "document": "../16-liseda05-experiment-plan.md",
+  "revision": 2,
+  "bounded_unary_ablation": {
+    "encoder": "hgt",
+    "benefit_model": "unary",
+    "supervision": "symbolic",
+    "seed": 13,
+    "gpu": "NVIDIA RTX 2080 Ti",
+    "maximum_gpu_hours": 3,
+    "yields_to_primary_inference": true,
+    "requires_measured_fit": true,
+    "priority": "bounded_ablation"
+  }
+}

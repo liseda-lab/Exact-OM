@@ -1,8 +1,8 @@
 # Exact-Repair specification suite
 
-**Current target:** XR-2.1, 30 September 2026. **Latest implementation reviewed:** `6f6a3e0038dbd5898126a34b28dee1faa06ef2f3`. **Status:** implementation present; corrective requirements remain open in [14 Implementation review](14-implementation-review.md). Experimental benefit and full conformance are not established by this status.
+**Current target:** XR-2.1 with the 9 October 2026 corrective programme. **Reviewed source baseline:** updated `dev` at `70c2c73189f4856c438827d896dae667a271bbcf` and published repair campaign at `9fa4c369d0d8a99a7f7272bc24835d033d80e5aa`. **Status:** [15 Corrective implementation requirements](15-preliminary-corrections.md) and [16 Single-node experiment plan](16-liseda05-experiment-plan.md) are specified, not implemented by this documentation change. Experimental benefit and full conformance remain unestablished.
 
-The repository contains the original XR-2 implementation and generated-data pilot results, followed by an XR-2.1 implementation. The methodology contracts supersede conflicting XR-2 design prose; they do not relabel archived experiments, rewrite their configuration, or assert that the new method outperforms the old one. [12](12-implementation-migration.md) records the original migration requirements against `b4c1ed0`; [14](14-implementation-review.md) reviews the subsequent implementation and defines the outstanding fixes, regression tests and artifact compatibility rules. [11](11-benchmark-evidence.md) separates preliminary experiment evidence from published benchmark statistics.
+The repository contains the original XR-2 implementation and generated-data pilot results, followed by an XR-2.1 implementation. The methodology contracts supersede conflicting XR-2 design prose; they do not relabel archived experiments, rewrite their configuration, or assert that the new method outperforms the old one. [12](12-implementation-migration.md) records the original migration requirements against `b4c1ed0`; [14](14-implementation-review.md) records the 30 September implementation review. [15](15-preliminary-corrections.md) is the current result-grounded corrective contract, distinguishes existing campaign fixes from new work, and explicitly identifies the staged-search amendment. [11](11-benchmark-evidence.md) separates preliminary experiment evidence from published benchmark statistics.
 
 ## Scope and decisions
 
@@ -10,7 +10,7 @@ Exact-Repair consumes shared ontology snapshots, a provisional alignment from an
 
 The method keeps HGT, probabilistic circuits, weighted MaxSAT and symbolic verification. Elementary alternatives are constructed directly; learned circuits generate bounded complex replacements. The value model estimates retained semantic benefit and action interactions. A separate plan-risk model orders expensive checks. MaxSAT still constructs the repair plan. Only symbolic evidence can make an exclusion logically binding or authorise acceptance. Reinforcement learning is outside the main method.
 
-The changes are: reliable small circuits with proof-supported ontology-context constraints; shared train/inference graph and interaction construction; supervised training on verified sampled repairs containing newly generated candidates; separate semantic-value and conflict-risk supervision; reusable proof-support cuts; and reasoning selected by supported constructs and queries before estimated cost. LLMs provide weak labels for preservation of intended meaning. User-personalisation remains an optional later study.
+The changes are: reliable small circuits with proof-supported ontology-context constraints; shared train/inference graph and interaction construction; supervised training on verified sampled repairs containing newly generated candidates; separate semantic-value and conflict-risk supervision; reusable proof-support cuts; and reasoning selected by supported constructs and queries before estimated cost. LLMs provide weak labels for preservation of intended meaning. The October primary study compares symbolic and symbolic-plus-LLM HGT-pair supervision across three seeds, schedules both the 5090 and 2080 Ti, and reserves independent semantic evaluation; unary fitting is a bounded ablation. User-personalisation remains an optional later study.
 
 ## Reading order and contract ownership
 
@@ -30,7 +30,11 @@ The changes are: reliable small circuits with proof-supported ontology-context c
 | [11 Evidence](11-benchmark-evidence.md) | Pilot and benchmark evidence, denominators and limits |
 | [05 Design audit](05-design-audit.md) | Decisions and remaining research risks |
 | [12 Implementation migration](12-implementation-migration.md) | Original XR-2 to XR-2.1 migration and acceptance requirements |
-| [14 Implementation review](14-implementation-review.md) | Review of the XR-2.1 implementation, corrective requirements and regression gates |
+| [14 Implementation review](14-implementation-review.md) | Historical 30 September implementation review and regression requirements |
+| [15 Preliminary corrections](15-preliminary-corrections.md) | Current implementation corrections, acceptance tests and methodological amendments |
+| [16 Single-node experiment plan](16-liseda05-experiment-plan.md) | `liseda-05` resource limits, calibration, primary comparisons and October deadlines |
+
+Documents 15 and 16 supersede conflicting campaign/implementation defaults only where they explicitly amend them; the unchanged formal contracts and invariants below remain in force. The [resource planning JSON](protocol/liseda05-20261009-plan.json) must be resolved into the runtime protocol and input manifests before use; it is not a launch instruction.
 
 [Work packages](implementation/XR-WP1-formal-kernel.md) and [study sheets](experiments/README.md) are implementation handoffs to these contracts. Where they disagree, the owning contract above governs; record and fix the discrepancy before running the affected study. All new experimental choices must be frozen in a new run manifest as described in [protocol/README.md](protocol/README.md).
 
@@ -49,7 +53,7 @@ The changes are: reliable small circuits with proof-supported ontology-context c
 
 ## Versions and preserved evidence
 
-Archived XR-2 results use version-2 records. The reviewed XR-2.1 implementation adds version-3 records and explicit legacy paths following [01](01-architecture-and-contracts.md). The remaining corrections must preserve historical evidence and update affected semantic identities as specified in [14](14-implementation-review.md). Earlier documents retain their original audited revision in their headers; use document 14 for the current implementation findings.
+Archived XR-2 results use version-2 records. The reviewed XR-2.1 implementation adds version-3 records and explicit legacy paths following [01](01-architecture-and-contracts.md). The remaining corrections must preserve historical evidence and update affected semantic identities as specified in [14](14-implementation-review.md). Earlier documents retain their original audited revision in their headers; use document 15 for the current implementation findings and document 16 for the new deadline-constrained campaign plan.
 
 `protocol/pilot.json`, `smoke.json`, `schema.json` and `batches.json` are preserved XR-2 campaign artefacts. Their numerical settings are historical exploratory values, not an XR-2.1 configuration. Likewise, the existing supervisor instructions describe an operational workflow; they do not authorise jobs, notifications or external model calls merely because an agent reads them.
 
@@ -57,4 +61,4 @@ The old labels “guard” and “qualification” are historical aliases. Use *
 
 ## Validation scope
 
-The finite model and static legacy-protocol checks in [reference](reference/README.md) remain useful narrow checks. The implementation also has a source-bound [Linux validation record](implementation/xr21-validation.json); document [14](14-implementation-review.md) distinguishes that recorded evidence from the subsequent review, local checks and unresolved defects. XR-2.1 completion requires the applicable gates in [12](12-implementation-migration.md) and the new regressions in [14](14-implementation-review.md), with actual evidence. These review-specification changes do not implement the fixes or launch experiments.
+The finite model and static legacy-protocol checks in [reference](reference/README.md) remain useful narrow checks. The implementation also has a source-bound [Linux validation record](implementation/xr21-validation.json); document [14](14-implementation-review.md) distinguishes that recorded evidence from the subsequent review, local checks and unresolved defects. XR-2.1 completion requires the applicable gates in [12](12-implementation-migration.md), the regressions in [14](14-implementation-review.md), and the current COR-01 through COR-12 requirements in [15](15-preliminary-corrections.md), with actual source-bound evidence. These review-specification changes do not implement the fixes or launch experiments.
