@@ -1,6 +1,7 @@
 """First-wave planning binds every gate without starting processes or paid calls."""
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -148,3 +149,14 @@ def test_unknown_preparation_dependency_fails_closed():
             ),
             "14451",
         )
+
+
+def test_plan_preserves_venv_interpreter_symlink_in_specification(campaign):
+    interpreter = campaign / "venv/bin/python"
+    interpreter.parent.mkdir(parents=True)
+    interpreter.symlink_to(Path(sys.executable).resolve())
+    specification = launch.plan(campaign, python=interpreter)
+    assert specification["python"] == str(interpreter)
+    assert specification["python"] != str(interpreter.resolve())
+    for job in specification["jobs"]:
+        assert all(command[0] == "{python}" for command in job["commands"])
