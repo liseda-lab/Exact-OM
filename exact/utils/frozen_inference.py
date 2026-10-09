@@ -14,6 +14,75 @@ def _binding(path):
     return {"path": str(path), "sha256": sha256_path(path)}
 
 
+def freeze_runtime_fitted_artifacts(trainer):
+    """Capture heads actually injected by fitting, without opening raw labels."""
+    if getattr(trainer.dataset, "frozen_inference_manifest", None) is not None:
+        return None
+    root = Path(trainer.output_dir)
+    config_path = root / "config.yaml"
+    if not config_path.is_file():
+        return None
+    artifacts = {}
+
+    def add(name, value):
+        if value:
+            bound = _binding(value)
+            if name in artifacts and artifacts[name] != bound:
+                raise ValueError(f"Multiple runtime fitted heads for {name}")
+            artifacts[name] = bound
+
+    for name in ('encoder_finetune', 'cross_encoder'):
+        add('candidates.' + name + '.artifact',
+            (getattr(trainer.dataset, '_candidate_generation_params', {}).get(name) or {}).get('artifact'))
+    model = trainer.model
+    for attribute, field in (("fusion_config", "matching.fusion.artifact"),
+                             ("graph_config", "matching.channels.graph.artifact")):
+        add(field, getattr(model, attribute, {}).get("artifact"))
+    add("matching.relation_artifact", getattr(trainer, "relation_artifact", None))
+    llm = getattr(model, "llm_experiment_config", {})
+    for key in ("exemplar_artifact", "distill_artifact"):
+        add("llm.experiment." + key, llm.get(key))
+    if llm.get("gate", {}).get("mode") == "learned":
+        add("llm.experiment.gate.artifact", llm["gate"].get("artifact"))
+    for selector in getattr(trainer, "models", [])[1:]:
+        for attribute, field in (("rerank_config", "selector.rerank.artifact"),
+                                  ("matching_calibration", "matching.calibration.artifact"),
+                                  ("nil_config", "matching.nil.artifact")):
+            add(field, getattr(selector, attribute, {}).get("artifact"))
+    return freeze_json(root / "fitting" / "deployment-artifacts.json", {
+        "schema_version": 1, "kind": "runtime_fitted_deployment_artifacts",
+        "selected_config": _binding(config_path), "dataset_signature": trainer.dataset.dataset_signature,
+        "artifacts": artifacts, "raw_training_inputs_read": False,
+    })
+
+
+def inject_runtime_fitted_artifacts(mapping, receipt, *, selected_config, source, target):
+    """Inject only verified runtime artifact slots into a resolved public recipe."""
+    payload = json.loads(Path(receipt).read_text())
+    if (payload.get("kind") != "runtime_fitted_deployment_artifacts"
+            or payload.get("selected_config") != _binding(selected_config)
+            or payload.get("dataset_signature") != dataset_signature_for_paths(source, target)):
+        raise ValueError("Runtime fitted-artifact receipt belongs to another recipe or ontology pair")
+    allowed = {"matching.fusion.artifact", "matching.channels.graph.artifact",
+               "matching.relation_artifact", "selector.rerank.artifact",
+               "matching.calibration.artifact", "matching.nil.artifact",
+               "llm.experiment.exemplar_artifact", "llm.experiment.distill_artifact",
+               "llm.experiment.gate.artifact", "candidates.encoder_finetune.artifact",
+               "candidates.cross_encoder.artifact"}
+    for field, entry in payload["artifacts"].items():
+        if field not in allowed or _binding(entry["path"]) != entry:
+            raise ValueError("Invalid or changed runtime fitted-artifact binding")
+        destination = mapping
+        keys = field.split(".")
+        for key in keys[:-1]:
+            destination = destination[key]
+        previous = destination.get(keys[-1])
+        if previous and _binding(previous) != entry:
+            raise ValueError("Runtime head conflicts with an explicitly selected fitted artifact")
+        destination[keys[-1]] = entry["path"]
+    return payload
+
+
 def _artifacts(mapping, prefix=""):
     result = {}
     for key, value in mapping.items():

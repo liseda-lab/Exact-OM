@@ -1409,6 +1409,9 @@ class SemanticAlignmentRunner(
         self.dataset.default_kind = kind
         fitting_started = time.perf_counter()
         self.fit_training_pool(batch_size=batch_size)
+        from exact.utils.frozen_inference import freeze_runtime_fitted_artifacts
+
+        freeze_runtime_fitted_artifacts(self)
         self._fitting_seconds = time.perf_counter() - fitting_started
         # Binary experimental judgment also selects the top displayed candidates
         # per source. Splitting a source across arbitrary batches changes that

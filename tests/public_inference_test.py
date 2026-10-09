@@ -173,3 +173,26 @@ def test_native_population_binds_import_options_and_rechecks_import_bytes(tmp_pa
         prepare_population(ontology, output, entity_kinds=["class"], source_options=options)
     with pytest.raises(ValueError, match="checksum mismatch"):
         validate_population(output.with_suffix(".txt.manifest.json"))
+
+
+def test_empty_original_queries_are_retained_without_fabricated_scores(tmp_path):
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.experiments.public_inference import prepare_public_inference
+    from exact.experiments.submission import _pools, _query_run_scores, export_submission
+    source, target = tmp_path / 's.owl', tmp_path / 't.owl'
+    source.write_text('not loaded by local preparation'); target.write_text('not loaded by local preparation')
+    config = ConfigModel.from_mapping({'config_version':2, 'supervision':{'mode':'label_free'}})
+    selected = tmp_path / 'config.yaml'; selected.write_text(json.dumps(config.model_dump(mode='json')))
+    pool = tmp_path / 'public.tsv'; pool.write_text("SrcEntity\tTgtCandidates\nurn:s\t[]\nurn:s\t[]\n")
+    manifest = prepare_public_inference(selected, tmp_path / 'public', source=source, target=target,
+                                        track='bioml-local', public_candidates=pool)
+    record = json.loads(manifest.read_text())
+    assert record['query_count'] == 2 and record['empty_query_indices'] == [0,1] and record['runs'] == []
+    assert _query_run_scores(manifest, pool, _pools(pool, 'bioml-local'), 'bioml-local', 'S_final') == [{},{}]
+    result = export_submission(tmp_path / 'public', tmp_path / 'export.tsv', 'bioml-local',
+                               public_candidates=pool, query_runs=manifest)
+    assert result.read_text().splitlines() == ['SrcEntity\tTgtCandidates', 'urn:s\t[]', 'urn:s\t[]']
+    record['queries'][0]['candidates'] = ['urn:t']
+    manifest.write_text(json.dumps(record))
+    with pytest.raises(ValueError, match='Empty query disposition'):
+        _query_run_scores(manifest, pool, record['queries'], 'bioml-local', 'S_final')

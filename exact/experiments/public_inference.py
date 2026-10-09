@@ -159,6 +159,9 @@ def _inference_config(config: Path, source: Path, target: Path) -> dict[str, Any
     from exact.experiments.rationale_policy import apply_rationale_policy
 
     resolved = apply_rationale_policy(ConfigModel.load_config(config).model_dump(mode="json"))
+    from exact.experiments.evidence_diagnostics import ordinary_inference_config
+
+    resolved, _ = ordinary_inference_config(resolved)
     selected = ConfigModel.load_config(config)
     # Resolve the original recipe, then apply only its immutable fitted artifacts.
     for name in (
@@ -219,6 +222,7 @@ def prepare_public_inference(
     target: Path,
     track: str,
     public_candidates: Path | None = None,
+    fitted_artifacts: Path | None = None,
 ) -> Path:
     """Write immutable configs and original-query assignment; do not run a model."""
     from exact.core.entities.configs.config import ConfigModel
@@ -229,6 +233,12 @@ def prepare_public_inference(
         raise ValueError(f"Unsupported submission track: {track}")
     destination = destination.resolve()
     base = _inference_config(config, source, target)
+    if fitted_artifacts is not None:
+        from exact.utils.frozen_inference import inject_runtime_fitted_artifacts
+
+        inject_runtime_fitted_artifacts(
+            base, fitted_artifacts, selected_config=config, source=source, target=target
+        )
     record: dict[str, Any] = {
         "schema_version": 1,
         "kind": "reference_free_inference",
@@ -239,8 +249,11 @@ def prepare_public_inference(
         "reference_labels_used": False,
         "run_eval": False,
         "generate_llm_rationales": False,
+        "synthetic_diagnostics": False,
         "runs": [],
     }
+    if fitted_artifacts is not None:
+        record["runtime_fitted_artifacts"] = _binding(fitted_artifacts)
     configs: list[tuple[dict[str, Any], list[int]]]
     if track.endswith("global"):
         if public_candidates is not None:
@@ -278,9 +291,12 @@ def prepare_public_inference(
         record["query_count"] = len(queries)
         record["queries"] = queries
         record["score_scope"] = "original_query"
+        record["empty_query_indices"] = [index for index, query in enumerate(queries) if not query["candidates"]]
         shards: list[list[int]] = []
         occurrences: dict[str, int] = defaultdict(int)
         for index, query in enumerate(queries):
+            if not query["candidates"]:
+                continue
             shard = occurrences[query["source"]]
             occurrences[query["source"]] += 1
             if len(shards) <= shard:

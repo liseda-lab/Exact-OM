@@ -11,7 +11,7 @@ from exact.core.entities.configs.config import ConfigModel
 from exact.experiments.public_inference import prepare_public_inference
 from exact.impl.models.selector import CandidateSetSelector
 from exact.impl.trainer.fitting import TrainingPoolMixin
-from exact.utils.frozen_inference import validate_inference_config
+from exact.utils.frozen_inference import validate_inference_config, freeze_runtime_fitted_artifacts
 from exact.utils.provenance import dataset_signature_for_paths
 
 
@@ -66,7 +66,6 @@ def test_full_native_deployment_applies_fitted_head_over_training_sources(tmp_pa
             "selector": {
                 "enabled": True,
                 "runtime_enabled": True,
-                "rerank": {"artifact": str(artifact)},
             },
             "supervision": {
                 "mode": "label_free",
@@ -74,14 +73,20 @@ def test_full_native_deployment_applies_fitted_head_over_training_sources(tmp_pa
             },
         }
     )
-    selected = tmp_path / "selected.yaml"
+    selected = tmp_path / "config.yaml"
     selected.write_text(json.dumps(config.model_dump(mode="json")))
+    runtime = SimpleNamespace(dataset=SimpleNamespace(dataset_signature=signature),
+                              output_dir=tmp_path, model=SimpleNamespace(),
+                              models=[SimpleNamespace(), fitted])
+    freeze_runtime_fitted_artifacts(runtime)
     plan = json.loads(
         prepare_public_inference(
-            selected, tmp_path / "public", source=source, target=target, track="bioml-global"
+            selected, tmp_path / "public", source=source, target=target, track="bioml-global",
+            fitted_artifacts=tmp_path / "fitting/deployment-artifacts.json",
         ).read_text()
     )
     deployed = ConfigModel.load_config(Path(plan["runs"][0]["config"]["path"]))
+    assert deployed.selector.rerank.artifact == artifact
     assert deployed.data.refs == {} and deployed.data.train_candidates is None
     assert set(deployed.data.source_universe.read_text().splitlines()) == {
         f"urn:s{i}" for i in range(4)

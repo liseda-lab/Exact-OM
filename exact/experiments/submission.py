@@ -89,7 +89,7 @@ def _pools(path: Path, track: str) -> list[dict[str, Any]]:
         candidates = row.get("candidates")
         if (
             not isinstance(candidates, list)
-            or not candidates
+            or (not candidates and track != "bioml-local")
             or (size is not None and len(candidates) != size)
         ):
             raise ValueError(
@@ -171,6 +171,13 @@ def _query_run_scores(manifest, public_candidates, queries, track, field):
     if _verify(plan["public_candidates"]).resolve() != public_candidates.resolve():
         raise ValueError("Original query input differs from the inference binding")
     results = [None] * len(queries)
+    empty_indices = plan.get("empty_query_indices", [])
+    if len(empty_indices) != len(set(empty_indices)):
+        raise ValueError("Duplicate empty original query assignment")
+    for index in empty_indices:
+        if type(index) is not int or index < 0 or index >= len(queries) or queries[index]["candidates"]:
+            raise ValueError("Empty query disposition does not match original candidate membership")
+        results[index] = {}
     for run in plan["runs"]:
         _verify(run["config"])
         for binding in run.get("inputs", {}).values():
@@ -185,6 +192,8 @@ def _query_run_scores(manifest, public_candidates, queries, track, field):
             ):
                 raise ValueError("Saved run configuration differs from frozen query config")
         indices = run["query_indices"]
+        if any(type(index) is not int or index < 0 or index >= len(queries) for index in indices):
+            raise ValueError("Invalid original query assignment")
         selected = [queries[index] for index in indices]
         _unique([query["source"] for query in selected], "sources in original-query shard")
         trace = _trace(reader)
