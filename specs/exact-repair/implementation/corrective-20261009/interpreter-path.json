@@ -1,0 +1,52 @@
+{
+  "budget_reservations_added": false,
+  "cause": "Path.resolve followed the virtual-environment interpreter symlink to /usr/bin/python3.12, losing pyvenv.cfg discovery and installed pyowl_core",
+  "failure_preservation": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/predeployment-failures/freeze-001",
+  "fix": "Path.absolute preserves interpreter invocation identity in frozen specification and supervisor launch/notification commands",
+  "frozen_native_import_check": {
+    "interpreter": "/home/pgcotovio/Exact-OM/.venv/bin/python",
+    "operation": "exact.repair.study.runtime_manifest in frozen export",
+    "preserved_source_paths": [
+      "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/sources/65642887bec62e79cc6d8f8d6907ad16621069cb/code"
+    ],
+    "reported_by": "root",
+    "source": "preserved frozen source656",
+    "status": "passed"
+  },
+  "jobs_started": false,
+  "recorded_epoch": 1791587700.564907,
+  "schema": "exact-repair/interpreter-path-correction/v1",
+  "source_bindings": [
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/corrective_launch.py",
+      "sha256": "353cb5e4f718714661f0b08e2579ee3f1a2ed12ee6c2631486bbe6e2baf93625"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/supervisor_bootstrap.py",
+      "sha256": "42cb35f53b6115bdbd8051b095f24c926135406e3b4e3b0830fd79cc630e1454"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_corrective_launch_test.py",
+      "sha256": "8e3abc24dc5dfcd492b86ce257fb501b818a65ba16a9853742b7f0f7fbaa4957"
+    },
+    {
+      "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_supervisor_bootstrap_test.py",
+      "sha256": "c35cf3777330cd9fb5118f0597f60c6a1a0fab98d584dead2d735ad0d44c3b7f"
+    }
+  ],
+  "tests": {
+    "command": [
+      "/home/pgcotovio/Exact-OM/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/repair_corrective_launch_test.py",
+      "tests/repair_supervisor_bootstrap_test.py",
+      "tests/repair_batch_test.py",
+      "tests/experiments_dispatch_test.py"
+    ],
+    "passed": 106,
+    "result": "passed",
+    "seconds": 6.5
+  }
+}

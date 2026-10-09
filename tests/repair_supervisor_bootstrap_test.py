@@ -1,11 +1,38 @@
 """Bootstrap preparation remains inert and binds retained-allocation ownership."""
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
 
 from tools.repair import supervisor_bootstrap as bootstrap
+
+
+def test_policy_and_commands_preserve_venv_interpreter_symlink(tmp_path):
+    interpreter = tmp_path / "venv/bin/python"
+    interpreter.parent.mkdir(parents=True)
+    interpreter.symlink_to(Path(sys.executable).resolve())
+    config, instructions = tmp_path / "config.toml", tmp_path / "instructions.md"
+    config.write_text('model="gpt-6-astra"\n')
+    instructions.write_text("Preserve the authorized allocation and virtual environment.")
+    target = tmp_path / "supervisor"
+    launch = bootstrap.prepare(
+        target,
+        allocation="14451",
+        node="liseda-05",
+        code=tmp_path,
+        repository=tmp_path,
+        python=interpreter,
+        instructions=instructions,
+        codex="/home/user/.local/bin/codex",
+        codex_config=config,
+    )
+    policy = json.loads((target / "policy.json").read_text())
+    assert policy["python"] == str(interpreter) != str(interpreter.resolve())
+    assert launch["argv"][-2] == str(interpreter)
+    assert policy["notifications"]["command"][0] == str(interpreter)
+    assert "os.execv(" + repr(str(interpreter)) in (target / "entry.py").read_text()
 
 
 def test_preparation_pins_login_model_schedule_and_owned_launch_without_starting(

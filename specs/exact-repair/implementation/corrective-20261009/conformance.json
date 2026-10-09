@@ -16,6 +16,10 @@
       "path": "specs/exact-repair/implementation/corrective-20261009/deployment.json",
       "sha256": "3832b0ddaa5edfb5f87252f925189e96a97f96ca00d162601c2d1fa564802182"
     },
+    "interpreter_path": {
+      "path": "specs/exact-repair/implementation/corrective-20261009/interpreter-path.json",
+      "sha256": "0adfbbd34020b5939b141aaefcc852d8293f7682a57922245b4ac0102c729980"
+    },
     "learning": {
       "path": "specs/exact-repair/implementation/corrective-20261009/learning.json",
       "sha256": "77c8c92a15197b0eb3beaa54fff9bbe59a1cbbaf14a9e3df2a5d6ae57a887562"
@@ -27,7 +31,8 @@
       "evidence": [
         "core",
         "learning",
-        "deployment"
+        "deployment",
+        "interpreter_path"
       ],
       "implementation": "Integrated selected published corrections and their dependency closure; retained unrelated matcher safeguards.",
       "qualification_limit": "Imported test segments and all identified compatibility regressions completed; scientific campaign gates remain separate.",
@@ -129,6 +134,7 @@
   "root_checks": {
     "calibration_packets": "32locallyvalidated; no paidtransmissions",
     "dry_launch": "7 reviewed jobs planned from actual draft inputs;4launch tests passed",
+    "exported_environment": "Literal virtualenv interpreter imports native libraries from frozen source;106 launch/bootstrap/batch/dispatch regressions passed after preserving venv symlinks",
     "import_boundaries": "5contracts kept,0broken",
     "imported_regressions": {
       "annotation_consumption": 8,

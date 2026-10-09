@@ -24,7 +24,9 @@ PROFILES = {
 
 def plan(campaign=CAMPAIGN, repository=REPOSITORY, python=PYTHON):
     """Validate actual prepared inputs and compile a finite declarative first queue."""
-    campaign, repository, python = (Path(v).resolve() for v in (campaign, repository, python))
+    campaign, repository = (Path(v).resolve() for v in (campaign, repository))
+    # Invoking the venv symlink, not its system target, selects pyvenv.cfg.
+    python = Path(python).absolute()
     contract = batch.read(campaign / "campaign.json")
     authorization = batch.read(campaign / "authorization.json")
     ledger = batch.read(campaign / "ledger.json")

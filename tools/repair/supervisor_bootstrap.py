@@ -39,7 +39,8 @@ def prepare(
         node=node,
         code_root=str(code),
         repository=str(Path(repository).resolve()),
-        python=str(Path(python).resolve()),
+        # Preserve the venv interpreter symlink so Python finds its pyvenv.cfg.
+        python=str(Path(python).absolute()),
         codex=str(Path(codex).absolute()),
         codex_config=str(Path(codex_config).resolve()),
         authentication="chatgpt",
