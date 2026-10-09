@@ -402,6 +402,12 @@ def cached_numerical(*, channels=False):
 
     def decorate(function):
         def invoke(model, *args, **kwargs):
+            if (not channels and function.__name__ == "forward"
+                    and function.__module__ == "exact.impl.models.pair_adaptive_scorer"):
+                from exact.impl.models.pair_adaptive_batch import validate_batching_admission
+
+                # Admission also precedes cache hits and the cache-disabled path.
+                validate_batching_admission()
             # Hosted responses retain their own request ledger and are never hidden
             # behind full-forward replay. Raw channels have no decision calls.
             gate = getattr(model, "llm_experiment_config", {}).get("gate", {}).get("mode")

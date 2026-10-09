@@ -684,6 +684,8 @@ def _evidence_forward(scorer):
 @pytest.mark.parametrize("block", [2, 32])
 @pytest.mark.parametrize("bank", ["full", "attrs_labels", "attrs_only"])
 def test_staged_channels_preserve_scores_evidence_routes_and_ties(monkeypatch, block, bank):
+    monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "throughput_fixture")
+    monkeypatch.setenv("EXACT_PRIMITIVE_NAMESPACE", "qualification-staged-fixture")
     monkeypatch.setenv("EXACT_EVIDENCE_PREFETCH", "0")
     monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "0")
     scorer, calls = _evidence_scorer(monkeypatch, attr={"enabled": True, "bank": bank})
@@ -701,6 +703,42 @@ def test_staged_channels_preserve_scores_evidence_routes_and_ties(monkeypatch, b
     assert any(len(batch) > 2 for batch in calls["contexts"])
     assert all(len(batch) == len(set(batch)) for batch in calls["contexts"])
     assert getattr(scorer, "_prepared_evidence_result", None) is None
+
+
+@pytest.mark.parametrize("role,namespace", [
+    (None, None),
+    ("reporting", "scientific"),
+    ("reporting", "qualification-fixture"),
+    ("throughput_fixture", "scientific"),
+    ("throughput_fixture", "qualification-"),
+])
+@pytest.mark.parametrize("cache_enabled", ["0", "1"])
+def test_unqualified_batching_rejected_before_cache_or_evidence(
+    monkeypatch, role, namespace, cache_enabled
+):
+    import exact.experiments.numerical_cache as numerical
+
+    scorer, calls = _evidence_scorer(monkeypatch)
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "1")
+    monkeypatch.setenv("EXACT_NUMERICAL_CACHE", cache_enabled)
+    for name, value in (("EXACT_EXPERIMENT_ROLE", role), ("EXACT_PRIMITIVE_NAMESPACE", namespace)):
+        if value is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value)
+    monkeypatch.setattr(numerical, "_scope", lambda *_a, **_k: pytest.fail("cache accessed before admission"))
+    monkeypatch.setattr(scorer, "_experiment_entity_features", lambda *_a: pytest.fail("evidence accessed before admission"))
+    with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+        _evidence_forward(scorer)
+    assert calls == {"labels": [], "contexts": []}
+
+
+def test_default_unbatched_scoring_remains_admitted_outside_qualification(monkeypatch):
+    monkeypatch.delenv("EXACT_PAIR_CONTEXT_BATCHING", raising=False)
+    monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "reporting")
+    monkeypatch.setenv("EXACT_PRIMITIVE_NAMESPACE", "scientific")
+    scorer, _ = _evidence_scorer(monkeypatch)
+    assert len(_evidence_forward(scorer)["explanations"]) == 5
 
 
 @pytest.mark.parametrize("formulation", ["off", "normalised", "absolute", "asymmetric", "missingness_aware"])
