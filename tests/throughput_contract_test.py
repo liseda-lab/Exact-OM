@@ -1,6 +1,6 @@
 import pytest
 
-from exact.experiments.throughput import Measurement, PhaseCounters, forecast, freeze_workload, group_chunks
+from exact.experiments.throughput import Measurement, PhaseCounters, forecast, freeze_workload, group_chunks, stress_coverage
 
 
 def test_workload_preserves_original_query_context_and_empty_groups():
@@ -50,3 +50,14 @@ def test_profiler_restores_inherited_method_after_failure():
             worker.work()
     assert "work" not in worker.__dict__
     assert phases.calls == {"raw_matrices": 1}
+
+
+def test_stress_coverage_keeps_missing_separate_from_uneven_nonempty_contexts():
+    result = stress_coverage([
+        {"context_sentences": {"hierarchy_source": {"is_a": ["x" * 1024]}, "hierarchy_target": ["x" * 20]},
+         "qualities": {"q_attr": 0}},
+        {"context_sentences": {"hierarchy_source": [], "hierarchy_target": ["x"]}},
+    ], [100, 0])
+    assert result["pair_counts"] == {"long_context_1024_characters": 1, "uneven_nonempty_contexts_4x": 1, "missing_natural_channel": 1}
+    assert result["high_candidate_queries_100"] == 1
+    assert result["separate_stress_timing"] is None

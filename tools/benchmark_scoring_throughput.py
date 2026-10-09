@@ -23,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if __package__ in {None, ""}:
     sys.path.insert(0, str(ROOT))
 
-from exact.experiments.throughput import Measurement, PhaseCounters, freeze_workload, group_chunks, identity
+from exact.experiments.throughput import Measurement, PhaseCounters, freeze_workload, group_chunks, identity, stress_coverage
 from exact.utils.provenance import sha256_file
 
 
@@ -193,6 +193,15 @@ def run(args):
         encoding["counter_seconds"] += time.perf_counter() - started
         return original_encode(tokenizer, model, texts, max_len)
     scorer._encode_texts = counted_encode
+    routing = {"would_route": 0, "pairs": 0}
+    original_gate = scorer._llm_gate_mask
+    @wraps(original_gate)
+    def counted_gate(**kwargs):
+        mask, rows = original_gate(**kwargs)
+        routing["would_route"] += int(mask.detach().cpu().sum())
+        routing["pairs"] += mask.numel()
+        return mask, rows
+    scorer._llm_gate_mask = counted_gate
     def encoded_batch(_model, _args, kwargs):
         started = time.perf_counter()
         ids = kwargs["input_ids"]
@@ -216,6 +225,7 @@ def run(args):
         phases = PhaseCounters()
         encoded_texts.clear()
         encoding.update(calls=0, rows=0, tokens=0, batch_sizes=Counter(), counter_seconds=0.0)
+        routing.update(would_route=0, pairs=0)
         if mode == "warm":
             # Warm vectors, cold numerical primitives; replay is a separate pass.
             cache = getattr(scorer, "_numerical_cache", None)
@@ -269,9 +279,13 @@ def run(args):
                 output_bytes=store.stored_bytes,
                 exact_prefiltered_rows=sum((q["source"], t) in exact_pairs for q in group for t in q["candidates"]),
                 scores=result["S_final"].detach().cpu().tolist(),
+                stress_coverage=stress_coverage(records, [len(q["candidates"]) for q in group]),
                 query_ids=[q["qid"] for q in group])
             write(args.output / f"{mode}.json", {**measure.receipt(), "phases": phases.receipt(),
                 "encoder": {**encoding, "distinct_texts": len(encoded_texts)},
+                "routing": {**routing, "fraction": routing["would_route"] / routing["pairs"] if routing["pairs"] else None,
+                            "hosted_queue_backlog": 0, "scope": "offline_fixture_only"},
+                "numerical_scope_rebuilds_cumulative": getattr(scorer, "_numerical_scope_rebuilds", 0),
                 "encoder_cache_cumulative": encoder_cache_stats(),
                 "numerical_cache_cumulative": scorer._numerical_cache.stats() if hasattr(scorer, "_numerical_cache") else None})
             print(json.dumps({"mode": mode, "chunk": number, "rows": len(sources), "seconds": elapsed}), flush=True)
@@ -286,6 +300,9 @@ def run(args):
         "peak_vram_bytes": torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0,
         "gpu": torch.cuda.get_device_name() if torch.cuda.is_available() else None,
         "torch": torch.__version__, "host": platform.node(), "slurm_job": os.getenv("SLURM_JOB_ID"),
+        "allocated_cpus": os.getenv("SLURM_CPUS_PER_TASK"),
+        "python": sys.version, "platform": platform.platform(),
+        "precision": {"fp16": scorer.fp16, "cuda_matmul_allow_tf32": torch.backends.cuda.matmul.allow_tf32},
         "slurm_step": os.getenv("SLURM_STEP_ID"), "config": binding(args.config),
         "workload": binding(args.workload), "templates": binding(args.templates),
         "source_revision": ((ROOT / "source-revision.txt").read_text().strip()

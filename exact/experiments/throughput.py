@@ -68,6 +68,23 @@ def group_chunks(queries: Iterable[Mapping], maximum_pairs: int):
         yield chunk
 
 
+def stress_coverage(records: Iterable[Mapping], group_sizes: Iterable[int]) -> dict:
+    """Report predeclared label-free stress predicates without changing sampling."""
+    counts = Counter()
+    for row in records:
+        lengths = []
+        for value in row.get("context_sentences", {}).values():
+            texts = [text for family in value.values() for text in family] if isinstance(value, dict) else value
+            lengths.append(sum(len(text) for text in texts))
+        counts["long_context_1024_characters"] += bool(lengths and max(lengths) >= 1024)
+        positive = [n for n in lengths if n]
+        counts["uneven_nonempty_contexts_4x"] += bool(positive and max(positive) >= 4 * min(positive))
+        qualities = row.get("qualities", {})
+        counts["missing_natural_channel"] += any(qualities.get(key) == 0 for key in ("q_hier", "q_sim", "q_attr", "q_diff"))
+    return {"pair_counts": dict(counts), "high_candidate_queries_100": sum(n >= 100 for n in group_sizes),
+            "selection_changed": False, "separate_stress_timing": None}
+
+
 class PhaseCounters:
     """Opt-in inclusive host timers; no synchronization or hooks when not installed."""
 
