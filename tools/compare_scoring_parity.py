@@ -79,8 +79,8 @@ def compare(left_path, right_path, output):
     left_receipt = json.loads((left_path / "cold.json").read_text())
     right_receipt = json.loads((right_path / "cold.json").read_text())
     count = sum(chunk["rows"] for chunk in left_receipt["chunks"])
-    left = list(ExplanationStore(left_path / "cold/ordinary-evidence").iter_all())
-    right = list(itertools.islice(ExplanationStore(right_path / "cold/ordinary-evidence").iter_all(), count))
+    left = list(ExplanationStore(left_path / "cold/ordinary-evidence", read_only=True).iter_all())
+    right = list(itertools.islice(ExplanationStore(right_path / "cold/ordinary-evidence", read_only=True).iter_all(), count))
     if len(left) != count:
         raise ValueError("Legacy numerator differs from durably stored ordinary records")
     prefix = right_receipt["chunks"][:len(left_receipt["chunks"])]
@@ -90,9 +90,11 @@ def compare(left_path, right_path, output):
         # Older immutable qualification snapshots did not stamp query IDs. Rebind
         # them using the original hashed workload and exact chunk boundaries.
         if records and any("original_query_id" not in row for row in records):
-            measured = json.loads((root / "measurement.json").read_text())
-            workload_path = Path(measured["workload"]["path"])
-            if sha256_file(workload_path) != measured["workload"]["sha256"]:
+            measured = root / "measurement.json"
+            workload_binding = (json.loads(measured.read_text())["workload"] if measured.exists()
+                                else json.loads((root / "recovery-runtime.json").read_text())["identity"]["inputs"]["workload"])
+            workload_path = Path(workload_binding["path"])
+            if sha256_file(workload_path) != workload_binding["sha256"]:
                 raise ValueError("Changed qualification workload binding")
             queries = {q["qid"]: q for q in json.loads(workload_path.read_text())["queries"]}
             start = 0

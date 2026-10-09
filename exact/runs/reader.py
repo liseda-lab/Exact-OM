@@ -126,7 +126,7 @@ class RunReader:
     @property
     def _explanation_store(self) -> ExplanationStore:
         if self._store is None:
-            self._store = ExplanationStore(self.layout.explanations_dir)
+            self._store = ExplanationStore(self.layout.explanations_dir, read_only=True)
         return self._store
 
     def _load_legacy_explanations(self) -> list[dict[str, Any]]:

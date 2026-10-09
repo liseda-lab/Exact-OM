@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import socket
 import uuid
 from collections import defaultdict
 from pathlib import Path
@@ -45,11 +46,12 @@ def _sync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
-def _atomic_json(path: Path, payload: Mapping[str, Any]) -> None:
+def _atomic_json(path: Path, payload: Mapping[str, Any], *, compact: bool = False) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
     with temporary.open("w", encoding="utf-8") as stream:
-        json.dump(payload, stream, indent=2, ensure_ascii=False, sort_keys=True)
+        json.dump(payload, stream, indent=None if compact else 2, ensure_ascii=False, sort_keys=True,
+                  separators=(",", ":") if compact else None)
         stream.write("\n")
         stream.flush()
         os.fsync(stream.fileno())
@@ -110,19 +112,24 @@ class ExplanationStore:
         shard_mb: float = DEFAULT_SHARD_MB,
         hash_buckets: int = DEFAULT_HASH_BUCKETS,
         compression: str = "zstd",
+        read_only: bool = False,
     ) -> None:
         self.directory = Path(directory).expanduser().resolve()
         self.shards_dir = self.directory / "shards"
         self.index_path = self.directory / "index.json"
         self.overlays_dir = self.directory / "overlays"
         self.run_id = run_id
+        self.read_only = read_only
         self.shard_reads = 0
         self._overlay_cache: Optional[dict[tuple[str, str, str, str], dict[str, Any]]] = None
-        self.directory.mkdir(parents=True, exist_ok=True)
-        self.shards_dir.mkdir(parents=True, exist_ok=True)
+        if not read_only:
+            self.directory.mkdir(parents=True, exist_ok=True)
+            self.shards_dir.mkdir(parents=True, exist_ok=True)
         if self.index_path.is_file():
             self._index = self._load_index()
         else:
+            if read_only:
+                raise FileNotFoundError(self.index_path)
             if compression not in {"zstd", "none"}:
                 raise ValueError(f"Unsupported explanation compression: {compression!r}")
             self._index = {
@@ -139,7 +146,8 @@ class ExplanationStore:
                 "overlays": [],
             }
             self._write_index(self._index)
-        self._recover_uncommitted_files()
+        if not read_only:
+            self._recover_uncommitted_files()
 
     @classmethod
     def open(
@@ -204,7 +212,9 @@ class ExplanationStore:
         return cast(dict[str, Any], payload)
 
     def _write_index(self, payload: Mapping[str, Any]) -> None:
-        _atomic_json(self.index_path, payload)
+        if self.read_only:
+            raise ValueError("Read-only explanation store cannot publish changes")
+        _atomic_json(self.index_path, payload, compact=True)
 
     def _resolve_store_path(self, relative: str) -> Path:
         path = (self.directory / relative).resolve()
@@ -215,6 +225,21 @@ class ExplanationStore:
         return path
 
     def _recover_uncommitted_files(self) -> None:
+        # Single-writer recovery may reclaim only dead local owners. Readers
+        # never enter this path; uncertain remote/PID-reused owners are retained.
+        for temporary in self.directory.glob(".compact-*"):
+            if temporary.is_symlink() or not re.fullmatch(r"\.compact-[0-9a-f]{12}", temporary.name):
+                continue
+            try:
+                owner = json.loads((temporary / "owner.json").read_text())
+                if (not isinstance(owner, dict) or owner.get("host") != socket.gethostname()
+                        or type(owner.get("pid")) is not int or owner["pid"] <= 0):
+                    continue
+                os.kill(owner["pid"], 0)
+            except ProcessLookupError:
+                shutil.rmtree(temporary)
+            except (OSError, ValueError, KeyError):
+                pass
         referenced: set[Path] = set()
         for shard in (self._index.get("shards") or {}).values():
             path = self._resolve_store_path(str(shard["path"]))
@@ -333,6 +358,8 @@ class ExplanationStore:
     ) -> int:
         """Append records and commit their index offsets as one transaction."""
 
+        if self.read_only:
+            raise ValueError("Read-only explanation store cannot append")
         materialized = [dict(record) for record in records]
         if not materialized:
             return 0
@@ -376,6 +403,7 @@ class ExplanationStore:
                         source_records
                     )
             for shard_id, shard_records in pending_records.items():
+                shard_records.sort(key=lambda record: int(record[_SEQUENCE_FIELD]))
                 shard = working["shards"][shard_id]
                 path = self._resolve_store_path(str(shard["path"]))
                 if path not in baselines:
@@ -390,6 +418,8 @@ class ExplanationStore:
                     "offset": baselines[path], "bytes": len(encoded),
                     "sha256": hashlib.sha256(encoded).hexdigest(),
                     "records": len(shard_records),
+                    "first_sequence": int(shard_records[0][_SEQUENCE_FIELD]),
+                    "last_sequence": int(shard_records[-1][_SEQUENCE_FIELD]),
                 })
                 shard["bytes"] = (
                     int(shard.get("bytes", 0)) - pending_estimates[shard_id] + len(encoded)
@@ -425,7 +455,10 @@ class ExplanationStore:
         self._verify_frames(path, shard)
         count = 0
         with self._open_text(path) as stream:
-            for line in stream:
+            while count < int(shard["records"]):
+                line = stream.readline()
+                if not line:
+                    break
                 if not line.strip():
                     continue
                 try:
@@ -523,6 +556,41 @@ class ExplanationStore:
         """Stream all records in append order using a shard-wise merge."""
 
         overlays = self._overlay_lookup()
+        frames = self._ordered_frame_index()
+        if frames is not None:
+            # Files close before rows enter the merge heap. Overlap is bounded by
+            # one append transaction, rather than the total number of shards.
+            pending = []
+            for first, path, frame in frames:
+                while pending and pending[0][0] < first:
+                    _, record = heapq.heappop(pending)
+                    key = _pair(record)
+                    if key is not None and key in overlays:
+                        record = self._merge_overlay(record, overlays[key])
+                    yield _without_internal_fields(record)
+                with path.open("rb") as stream:
+                    stream.seek(int(frame["offset"]))
+                    encoded = stream.read(int(frame["bytes"]))
+                if (len(encoded) != int(frame["bytes"])
+                        or hashlib.sha256(encoded).hexdigest() != frame["sha256"]):
+                    raise ValueError(f"Explanation frame checksum mismatch: {path}")
+                self.shard_reads += 1
+                raw = zstd.ZstdDecompressor().decompress(encoded) if self._index["compression"] == "zstd" else encoded
+                records = [json.loads(line) for line in raw.splitlines() if line.strip()]
+                sequences = [int(row[_SEQUENCE_FIELD]) for row in records]
+                if (len(records) != int(frame["records"]) or not sequences
+                        or sequences != sorted(set(sequences)) or sequences[0] != first
+                        or sequences[-1] != int(frame["last_sequence"])):
+                    raise ValueError(f"Explanation frame sequence/count mismatch: {path}")
+                for sequence, record in zip(sequences, records):
+                    heapq.heappush(pending, (sequence, record))
+            while pending:
+                _, record = heapq.heappop(pending)
+                key = _pair(record)
+                if key is not None and key in overlays:
+                    record = self._merge_overlay(record, overlays[key])
+                yield _without_internal_fields(record)
+            return
         heap: list[tuple[int, int, dict[str, Any], Iterator[dict[str, Any]]]] = []
         counter = 0
         for shard_id in sorted(self._index.get("shards") or {}):
@@ -536,6 +604,7 @@ class ExplanationStore:
                 (int(record.get(_SEQUENCE_FIELD, 0)), counter, record, iterator),
             )
             counter += 1
+
         while heap:
             _, _, record, iterator = heapq.heappop(heap)
             key = _pair(record)
@@ -552,9 +621,33 @@ class ExplanationStore:
             )
             counter += 1
 
+
+    def _ordered_frame_index(self):
+        """Legacy prefixes retain their original reader; new stores use one fd."""
+        frames = []
+        total = 0
+        for shard in self._index.get("shards", {}).values():
+            offset, count = 0, 0
+            for frame in shard.get("frames", []):
+                if "first_sequence" not in frame or "last_sequence" not in frame:
+                    return None
+                if int(frame["offset"]) != offset:
+                    return None
+                offset += int(frame["bytes"])
+                count += int(frame["records"])
+                frames.append((int(frame["first_sequence"]), self._resolve_store_path(shard["path"]), frame))
+            if offset != int(shard["bytes"]) or count != int(shard["records"]):
+                return None
+            total += count
+        if total != self.record_count:
+            raise ValueError("Explanation frame index total mismatch")
+        return sorted(frames, key=lambda item: item[0])
+
     def append_overlay(self, records: Iterable[Mapping[str, Any]]) -> int:
         """Write crash-safe transient corrections for existing pairs."""
 
+        if self.read_only:
+            raise ValueError("Read-only explanation store cannot append overlays")
         materialized = [dict(record) for record in records]
         if not materialized:
             return 0
@@ -643,20 +736,27 @@ class ExplanationStore:
     def _replace_records(self, records: Iterable[dict[str, Any]]) -> dict[str, int]:
         """Atomically install ``records`` as the complete store contents."""
 
+        if self.read_only:
+            raise ValueError("Read-only explanation store cannot replace records")
         before = self._stored_bytes()
         token = uuid.uuid4().hex[:12]
         temporary_dir = self.directory / f".compact-{token}"
-        temporary_store = ExplanationStore(
-            temporary_dir,
-            shard_mb=float(self._index.get("shard_bytes", 1)) / (1024 * 1024),
-            hash_buckets=int(self._index.get("hash_buckets", DEFAULT_HASH_BUCKETS)),
-            compression=str(self._index.get("compression", "zstd")),
-        )
-        iterator = iter(records)
-        total = 0
-        while chunk := list(itertools.islice(iterator, 256)):
-            temporary_store.append(chunk)
-            total += len(chunk)
+        try:
+            temporary_store = ExplanationStore(
+                temporary_dir,
+                shard_mb=float(self._index.get("shard_bytes", 1)) / (1024 * 1024),
+                hash_buckets=int(self._index.get("hash_buckets", DEFAULT_HASH_BUCKETS)),
+                compression=str(self._index.get("compression", "zstd")),
+            )
+            _atomic_json(temporary_dir / "owner.json", {"host": socket.gethostname(), "pid": os.getpid()})
+            iterator = iter(records)
+            total = 0
+            while chunk := list(itertools.islice(iterator, 256)):
+                temporary_store.append(chunk)
+                total += len(chunk)
+        except BaseException:
+            shutil.rmtree(temporary_dir, ignore_errors=True)
+            raise
         replacement = copy.deepcopy(temporary_store._index)
         replacement["overlays"] = []
         moved: list[Path] = []

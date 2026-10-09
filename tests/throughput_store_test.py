@@ -94,6 +94,106 @@ def test_replacement_streams_bounded_chunks(tmp_path, monkeypatch):
     assert len(list(ExplanationStore(tmp_path).iter_all())) == 777
 
 
+def test_interleaved_sources_keep_original_order_after_replacement(tmp_path):
+    store = ExplanationStore(tmp_path, hash_buckets=1)
+    records = [{**row(i), "src_iri": source} for i, source in enumerate(("a", "b", "a", "c", "b"))]
+    store.append(records)
+    assert [r["tgt_iri"] for r in store.iter_all()] == [str(i) for i in range(5)]
+    store.compact()
+    store.truncate(4)
+    assert [r["tgt_iri"] for r in store.iter_all()] == [str(i) for i in range(4)]
+
+
+def test_many_shards_reader_opens_only_one_file_at_a_time(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+    from pathlib import Path
+    store = ExplanationStore(tmp_path, hash_buckets=1, shard_mb=.00001)
+    store.append([{**row(i), "src_iri": f"source{i}"} for i in range(130)])
+    assert len(store._index["shards"]) == 130
+    original = Path.open
+    live = peak = 0
+    @contextmanager
+    def tracked(path, *args, **kwargs):
+        nonlocal live, peak
+        with original(path, *args, **kwargs) as stream:
+            counted = path.parent.name == "shards"
+            live += counted
+            peak = max(peak, live)
+            try:
+                yield stream
+            finally:
+                live -= counted
+    monkeypatch.setattr(Path, "open", tracked)
+    assert [r["tgt_iri"] for r in store.iter_all()] == [str(i) for i in range(130)]
+    assert peak == 1
+
+
+def test_read_only_inspection_does_not_recover_an_active_append(tmp_path, monkeypatch):
+    store = ExplanationStore(tmp_path)
+    store.append([row(1)])
+    original = store._append_bytes
+    def during_append(path, encoded):
+        original(path, encoded)
+        size = path.stat().st_size
+        reader = ExplanationStore(tmp_path, read_only=True)
+        assert [r["tgt_iri"] for r in reader.iter_all()] == ["1"]
+        assert path.stat().st_size == size
+        with pytest.raises(ValueError, match="Read-only"):
+            reader.append([row(99)])
+    monkeypatch.setattr(store, "_append_bytes", during_append)
+    store.append([row(2)])
+    assert [r["tgt_iri"] for r in store.iter_all()] == ["1", "2"]
+
+
+def test_failed_compaction_build_cleans_owned_temporary_payload(tmp_path, monkeypatch):
+    store = ExplanationStore(tmp_path)
+    store.append([row(1)])
+    original = ExplanationStore.append
+    def fail(self, records, **kwargs):
+        result = original(self, records, **kwargs)
+        if self.directory.name.startswith(".compact-"):
+            raise OSError("ENOSPC in temporary rebuild")
+        return result
+    monkeypatch.setattr(ExplanationStore, "append", fail)
+    with pytest.raises(OSError, match="ENOSPC"):
+        store.compact()
+    assert not list(tmp_path.glob(".compact-*"))
+    assert [r["tgt_iri"] for r in store.iter_all()] == ["1"]
+
+
+def test_only_recovery_reclaims_dead_owned_compaction(tmp_path, monkeypatch):
+    import json
+    import socket
+    import exact.runs.store as storage
+    store = ExplanationStore(tmp_path)
+    store.append([row(1)])
+    orphan = tmp_path / ".compact-0123456789ab"
+    orphan.mkdir()
+    (orphan / "owner.json").write_text(json.dumps({"host": socket.gethostname(), "pid": 999999}))
+    (orphan / "payload").write_bytes(b"interrupted temporary shard")
+    def dead(*args):
+        raise ProcessLookupError()
+    monkeypatch.setattr(storage.os, "kill", dead)
+    assert list(ExplanationStore(tmp_path, read_only=True).iter_all())
+    assert orphan.exists()
+    assert list(ExplanationStore(tmp_path).iter_all())
+    assert not orphan.exists()
+
+
+@pytest.mark.parametrize("owner", [None, [], {"host": "local", "pid": None}])
+def test_uncertain_compaction_owner_is_retained(tmp_path, monkeypatch, owner):
+    import json
+    import exact.runs.store as storage
+    store = ExplanationStore(tmp_path)
+    store.append([row(1)])
+    orphan = tmp_path / ".compact-0123456789ab"
+    orphan.mkdir()
+    (orphan / "owner.json").write_text(json.dumps(owner))
+    monkeypatch.setattr(storage.socket, "gethostname", lambda: "local")
+    assert list(ExplanationStore(tmp_path).iter_all())
+    assert orphan.exists()
+
+
 def test_legacy_index_can_be_read_and_append_checks_new_frames(tmp_path):
     store = ExplanationStore(tmp_path, compression="none")
     store.append([row(1)])
