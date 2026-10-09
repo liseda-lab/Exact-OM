@@ -933,48 +933,83 @@
   border-style: dashed;
 }
 
-/* tutorial */
+/* tutorial: a compact header, one sticky guided task beside the workspace (21 F02) */
 
 .tutorial-page {
   max-width: 110rem;
+  gap: 0.75rem;
 }
 
+.tutorial-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+}
+
+.tutorial-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.375rem;
+  min-width: 0;
+  flex: 1 1 28rem;
+}
+
+.tutorial-title h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  font-size: clamp(1.5rem, 1.25rem + 0.8vw, 2rem);
+  line-height: 1.15;
+}
+
+.tutorial-intro {
+  max-width: 72rem;
+  color: var(--ink-2);
+}
+
+/* Lesson stepper: one row of numbered marks; titles are in each button's name and tooltip. */
 .lesson-nav ol {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.lesson-nav li {
-  max-width: 100%;
-  min-width: 0;
-}
-
-.lesson-link > span:last-child {
-  min-width: 0;
-  overflow-wrap: anywhere;
+  gap: 0.375rem;
 }
 
 .lesson-link {
-  max-width: 100%;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  min-width: 2.75rem;
   min-height: 2.75rem;
-  padding: 0.25rem 0.875rem 0.25rem 0.375rem;
+  padding: 0.25rem;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface);
+  color: var(--ink-2);
+}
+
+.lesson-link:hover {
+  border-color: var(--line-strong);
   color: var(--ink);
-  text-align: left;
 }
 
 .lesson-link.current {
   border: 2px solid var(--ink);
+  color: var(--ink);
   font-weight: 600;
+}
+
+.lesson-link-text {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .lesson-mark {
@@ -985,14 +1020,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  background: var(--surface-3);
   font-size: 0.875rem;
-}
-
-.lesson-card {
-  display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: 1rem 2rem;
 }
 
 .lesson-steps {
@@ -1004,32 +1032,137 @@
   line-height: 1.55;
 }
 
-.lesson-checklist {
+/* The guided task bar stays under the study header while the workspace scrolls. */
+.coach-wrap {
+  position: sticky;
+  top: calc(var(--study-header-h, 0px) + 0.5rem);
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.coach {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--ink-3);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 0.375rem 1.25rem rgba(0, 0, 0, 0.07);
+}
+
+.coach-done {
+  border-left-color: var(--ok);
+}
+
+.coach-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+.coach-text {
+  flex: 1 1 24rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.coach-task {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.coach-hint {
+  color: var(--ink-2);
+}
+
+.coach-actions {
+  flex: 1 1 26rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.coach-spacer {
+  flex: 1 1 0;
+}
+
+.coach-status {
+  padding: 0.125rem 0.625rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink-2);
+  font-size: 0.8125rem;
+}
+
+.coach-status-saving {
+  border-style: dashed;
+}
+
+.coach .lesson-checklist {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
   gap: 0.375rem;
 }
 
-.lesson-checklist li {
-  display: grid;
-  grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+.coach .lesson-checklist li {
+  display: inline-flex;
+}
+
+/* The per-step status words stay available to assistive technology and tests. */
+.coach .lesson-checklist .meta {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.checklist-step {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.375rem 0.5rem;
-  border-radius: var(--radius-sm);
+  gap: 0.25rem;
+  min-height: 2rem;
+  padding: 0.125rem 0.625rem;
   border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  font-size: 0.875rem;
+  text-align: left;
 }
 
-.lesson-checklist li.done {
-  background: var(--ok-tint);
-  border-color: var(--ok-line, var(--line-soft));
+.checklist-step:disabled {
+  cursor: default;
 }
 
-.lesson-checklist li.saving {
+.lesson-checklist li.current .checklist-step {
+  border-color: var(--ink-3);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lesson-checklist li.saving .checklist-step {
   border-style: dashed;
+}
+
+.lesson-checklist li.done .checklist-step {
+  color: var(--ok);
+  border-color: var(--line-soft);
 }
 
 .check-mark {
@@ -1037,8 +1170,45 @@
   color: var(--ok);
 }
 
+.check-mark:empty {
+  display: none;
+}
+
+.coach-why {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--line-soft);
+}
+
+.coach-notice {
+  margin: 0;
+}
+
+/* Controls scrolled to under the header and the task bar stay visible (WCAG 2.4.11). */
+:root:has(.coach-wrap) {
+  scroll-padding-top: calc(var(--study-header-h, 0px) + var(--coach-h, 0px) + 1.25rem);
+}
+
+.lesson-workspace .case-rail {
+  top: calc(var(--study-header-h, 7rem) + var(--coach-h, 0px) + 1.25rem);
+  max-height: calc(100vh - var(--study-header-h, 7rem) - var(--coach-h, 0px) - 2rem);
+}
+
+/* "Show me": outline and halo, never colour alone; no animation. */
+.tour-target {
+  outline: 3px solid var(--focus) !important;
+  outline-offset: 3px;
+  box-shadow: 0 0 0 6px var(--focus-halo);
+}
+
 .lesson-actions {
   flex-wrap: wrap;
+}
+
+.question-steps {
+  justify-content: space-between;
 }
 
 .assessment-item.passed {
@@ -1106,15 +1276,28 @@
   font-size: 0.9375rem;
 }
 
-@container study (max-width: 68.75rem) {
-  .lesson-card {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-
 @container study (max-width: 43.75rem) {
   .study-header {
     position: static;
+  }
+  /* Narrow: a compact task strip; the hint and step list move behind "Why?". */
+  .coach-wrap {
+    top: 0;
+  }
+  .coach {
+    padding: 0.5rem 0.75rem;
+  }
+  .coach .coach-hint,
+  .coach .lesson-checklist,
+  .coach .coach-step {
+    display: none;
+  }
+  .coach-task {
+    font-size: 1rem;
+  }
+  .lesson-link {
+    min-width: 2.25rem;
+    min-height: 2.25rem;
   }
   .study-header-row,
   .study-steps,

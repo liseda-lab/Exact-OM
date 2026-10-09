@@ -146,7 +146,7 @@ export function CandidateRows({
                   {candidate.position}
                 </span>
                 {onInspect ? (
-                  <button type="button" className="initial-text inspect-target" aria-pressed={isInspecting} aria-label={`Inspect ${candidate.label}`} aria-describedby={`inspect-state-${candidate.id}`} onClick={() => onInspect(candidate.id)}>
+                  <button type="button" className="initial-text inspect-target" data-tour="inspect" data-position={candidate.position} data-viewed={seen ? "true" : undefined} aria-pressed={isInspecting} aria-label={`Inspect ${candidate.label}`} aria-describedby={`inspect-state-${candidate.id}`} onClick={() => onInspect(candidate.id)}>
                     <span className="initial-label">{candidate.label}</span>
                     <span className="meta">
                       <span className="iri">{candidate.identifier}</span> · {practice ? "illustrative score" : "matching score"} {candidate.score}
@@ -170,7 +170,7 @@ export function CandidateRows({
                       Your #{rank + 1}
                     </span>
                   ) : (
-                    <button type="button" className="btn btn-sm add-btn" disabled={controlsLocked} onClick={() => controller.add(candidate.id)} aria-label={`Add ${candidate.label} as rank ${n + 1}`}>
+                    <button type="button" className="btn btn-sm add-btn" data-tour="rank-add" disabled={controlsLocked} onClick={() => controller.add(candidate.id)} aria-label={`Add ${candidate.label} as rank ${n + 1}`}>
                       Add as #{n + 1}
                     </button>
                   )}
@@ -236,10 +236,10 @@ export function AnswerPanel({
           {answerNote}
         </span>
         <span className="ranking-head-spacer" />
-        <button type="button" className="btn btn-sm" onClick={controller.undo} disabled={controlsLocked || !controller.canUndo}>
+        <button type="button" className="btn btn-sm" data-tour="rank-undo" onClick={controller.undo} disabled={controlsLocked || !controller.canUndo}>
           <IconUndo /> Undo
         </button>
-        <button type="button" className="btn btn-sm" onClick={controller.keepInitial} disabled={controlsLocked}>
+        <button type="button" className="btn btn-sm" data-tour="rank-keep" onClick={controller.keepInitial} disabled={controlsLocked}>
           Keep initial order
         </button>
       </div>
@@ -275,13 +275,13 @@ export function AnswerPanel({
                   </span>
                 </span>
                 <span className="initial-actions">
-                  <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} up`} disabled={controlsLocked || index === 0} onClick={() => controller.move(index, index - 1)}>
+                  <button type="button" className="icon-btn" data-tour="rank-move" aria-label={`Move ${candidate?.label} up`} disabled={controlsLocked || index === 0} onClick={() => controller.move(index, index - 1)}>
                     <IconArrowUp />
                   </button>
-                  <button type="button" className="icon-btn" aria-label={`Move ${candidate?.label} down`} disabled={controlsLocked || index === n - 1} onClick={() => controller.move(index, index + 1)}>
+                  <button type="button" className="icon-btn" data-tour="rank-move" aria-label={`Move ${candidate?.label} down`} disabled={controlsLocked || index === n - 1} onClick={() => controller.move(index, index + 1)}>
                     <IconArrowDown />
                   </button>
-                  <button type="button" className="btn btn-sm" aria-label={`Remove ${candidate?.label}`} disabled={controlsLocked} onClick={() => controller.remove(index)}>
+                  <button type="button" className="btn btn-sm" data-tour="rank-remove" aria-label={`Remove ${candidate?.label}`} disabled={controlsLocked} onClick={() => controller.remove(index)}>
                     Remove
                   </button>
                 </span>
@@ -297,7 +297,7 @@ export function AnswerPanel({
             ["insufficient_evidence", "Insufficient information", "I cannot judge from what is available"],
           ] as const
         ).map(([type, title, note]) => (
-          <button key={type} type="button" role="radio" aria-checked={value.responseType === type} className={value.responseType === type ? "explicit-option on" : "explicit-option"} onClick={() => controller.explicit(type)} disabled={controlsLocked}>
+          <button key={type} type="button" role="radio" data-tour={`explicit-${type}`} aria-checked={value.responseType === type} className={value.responseType === type ? "explicit-option on" : "explicit-option"} onClick={() => controller.explicit(type)} disabled={controlsLocked}>
             <span className="explicit-title">{title}</span>
             <span className="meta">{note}</span>
           </button>
@@ -305,7 +305,7 @@ export function AnswerPanel({
       </div>
       {!locked && (
         <div className="submit-row">
-          <button type="button" className="btn btn-primary btn-large" disabled={!canSubmit || submitting} onClick={onSubmit}>
+          <button type="button" className="btn btn-primary btn-large" data-tour="answer-submit" disabled={!canSubmit || submitting} onClick={onSubmit}>
             {submitting ? "Submitting…" : submitLabel}
           </button>
           <span className="meta" role="status">

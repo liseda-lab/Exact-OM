@@ -16,11 +16,14 @@ export function EntitySearch({
   label,
   placeholder,
   onChoose,
+  tourId,
 }: {
   ontology: string;
   label: string;
   placeholder: string;
   onChoose: (item: SearchItem) => void;
+  /** Stable hook for guided "Show me" targets (never a coordinate or nth element). */
+  tourId?: string;
 }) {
   const workspace = useWorkspace();
   // Search restarts only for a different term, ontology or workspace scope, never because
@@ -129,6 +132,7 @@ export function EntitySearch({
           aria-autocomplete="list"
           aria-activedescendant={open && results[active] ? `${id}-opt-${active}` : undefined}
           className="search-input"
+          data-tour={tourId}
           placeholder={placeholder}
           value={term}
           onChange={(event) => setTerm(event.target.value)}

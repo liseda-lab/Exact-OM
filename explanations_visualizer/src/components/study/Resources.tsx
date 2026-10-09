@@ -104,6 +104,7 @@ export function ResourceAccessButton({
         type="button"
         className="btn btn-sm"
         aria-haspopup="dialog"
+        data-tour="downloads"
         onClick={() => {
           setOpen(true);
           onOpen?.();

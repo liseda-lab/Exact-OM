@@ -20,10 +20,11 @@ import { IdentityCard } from "@/components/study/IdentityCard";
 import { AnswerPanel, CandidateRows, useRanking, type RankingEvent, type RankingValue } from "@/components/study/RankingPanel";
 import { ResourceAccessButton, ResourceList } from "@/components/study/Resources";
 import { METHOD_LABELS } from "@/components/study/SetupV2";
+import { LessonCoach, TOUR_TARGETS, findTarget, highlight, type RequirementState } from "@/components/study/LessonCoach";
 import { MessagePage } from "@/components/study/Stages";
 import { Paragraphs } from "@/components/study/StudyChrome";
 import { PairWorkspace, type Focus } from "@/components/workspace/PairWorkspace";
-import { describeError, getJson } from "@/lib/api";
+import { ApiError, describeError, getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
 import { indexResources } from "@/lib/workspace/resourceIndex";
 import { createResourceSource } from "@/lib/workspace/resourceSource";
@@ -33,8 +34,9 @@ import type { Telemetry } from "@/study/telemetry";
 import { workspaceEvent } from "@/study/workspaceEvents";
 import { uuid, type StudySession } from "@/study/session";
 import { assessmentPosition, followAcknowledged, lessonPosition, restoredPosition } from "@/study/tutorialPosition";
-import { requirementsFor, evidenceFor, type TutorialActionEvidence, type LessonSignal } from "@/study/tutorialProgress";
-import type { AssessmentItem, AssessmentResponse, ExplanationResource, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
+import { DiscardedMutation } from "@/study/mutationQueue";
+import { LessonEvidence, evidenceFor, type LessonSignal } from "@/study/tutorialProgress";
+import type { AssessmentItem, AssessmentResponse, ExplanationResource, LessonRequirement, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
 
 const PRACTICE_KEY = "practice-case";
 
@@ -76,10 +78,20 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
   const focusAfterNavigation = useRef(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const [restoredPending] = useState(() => session.pendingCount() > 0);
-  const [pending, setPending] = useState<Set<string>>(new Set());
   const [helpOpen, setHelpOpen] = useState(false);
   const acknowledged = useMemo(() => new Set(progress?.completed_requirements ?? []), [progress?.completed_requirements]);
-  const completed = useMemo(() => new Set([...acknowledged, ...pending]), [acknowledged, pending]);
+  const acknowledgedRef = useRef(acknowledged);
+  acknowledgedRef.current = acknowledged;
+
+  // Valid lesson evidence that the server has not acknowledged yet (21 F01.4–5). "Saving…" is
+  // shown for it; a tick only for acknowledged requirements.
+  const evidence = useRef(new LessonEvidence());
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const [notice, setNotice] = useState<{ tone: "info" | "warn"; text: string } | null>(null);
+  useEffect(() => {
+    evidence.current.acknowledge(acknowledged);
+    setPending(evidence.current.pending());
+  }, [acknowledged]);
 
   useEffect(() => {
     let cancelled = false;
@@ -112,13 +124,49 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resources, tutorial.version, state.session_id, ontologyName]);
 
-  const actionEvidence = useRef<Map<string, TutorialActionEvidence>>(new Map());
-  // Evidence and drafts never carry a position; only navigation changes it.
+  const lesson = tutorial.lessons.find((item) => item.lesson_id === view) ?? null;
+  const labelOf = useCallback((id: string) => tutorial.lessons.flatMap((item) => item.requirements).find((requirement) => requirement.requirement_id === id)?.label ?? id, [tutorial]);
+  const practiceRef = useRef<Record<string, unknown> | null>(null);
+
+  // Every lesson save carries only valid unacknowledged evidence; acknowledged work is never
+  // resent, and evidence a terminal validation failure rejected is dropped, so a later save
+  // (help, a practice change, the next lesson) cannot carry it again (U02).
+  const saveRef = useRef<(body: Record<string, unknown>, coalesce: string) => void>(() => undefined);
   const save = useCallback(
-    (body: Record<string, unknown>, coalesce: string) =>
-      session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, actions: Array.from(actionEvidence.current.values()), ...body }, coalesce, debounceMs: 400 }).catch(() => undefined),
-    [session, tutorial.version],
+    (body: Record<string, unknown>, coalesce: string) => {
+      evidence.current.acknowledge(acknowledgedRef.current);
+      const sent = evidence.current.snapshot();
+      const completed = Array.from(new Set([...acknowledgedRef.current, ...sent.map((item) => item.requirement_id)]));
+      session
+        .mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, actions: sent, ...body, completed_requirements: completed }, coalesce, debounceMs: 400 })
+        .catch((error) => {
+          if (error instanceof DiscardedMutation) {
+            // Never sent: keep the evidence and send it again after the failure is handled.
+            if (evidence.current.size) window.setTimeout(() => saveRef.current({}, "tutorial:resync"), 0);
+            return;
+          }
+          if (!(error instanceof ApiError)) return; // replaced by a newer draft, or the session ended
+          if (error.status === 409) {
+            // The session refreshed to the other tab's state; resend only still-missing evidence.
+            if (evidence.current.size) window.setTimeout(() => saveRef.current({}, "tutorial:resync"), 0);
+            return;
+          }
+          if (error.status < 400 || error.status >= 500 || error.status === 401) return;
+          const removed = evidence.current.reject(sent);
+          setPending(evidence.current.pending());
+          session.clearNotice();
+          setNotice({
+            tone: "warn",
+            text: removed.length
+              ? `Not saved: ${removed.map((id) => `“${labelOf(id)}”`).join(", ")}. The study server did not accept that action as lesson evidence. Try the step again; your other progress is kept.`
+              : "A tutorial change was not saved. Try the step again; your other progress is kept.",
+          });
+          if (evidence.current.size) window.setTimeout(() => saveRef.current({}, "tutorial:resync"), 0);
+        });
+    },
+    [session, tutorial.version, labelOf],
   );
+  saveRef.current = save;
 
   // Follow the server's acknowledged position when it changes underneath an unchanged screen
   // (an outbox entry replayed after reload), and adopt it after a conflict.
@@ -136,38 +184,29 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
     setPosition(restoredPosition(tutorial, progress?.position));
   }, [session.save, progress?.position, tutorial]);
 
-  // Clear local pending marks once the server has acknowledged them.
-  useEffect(() => {
-    setPending((current) => {
-      const next = new Set([...current].filter((id) => !acknowledged.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [acknowledged]);
-
-  const lesson = tutorial.lessons.find((item) => item.lesson_id === view) ?? null;
-  // One cumulative draft per lesson (requirements so far plus the practice answer), so
-  // coalescing replaces only an older snapshot of the same lesson and never drops evidence.
-  const practiceRef = useRef<Record<string, unknown> | null>(null);
   const record = useCallback(
     (signal: LessonSignal | null, practice?: Record<string, unknown>) => {
       if (!lesson) return;
       const observation = signal?.kind === "workspace" ? workspaceEvent(signal.action) : signal?.kind === "rank" ? { type: signal.event, component: "ranking" } : signal?.kind === "inspect" ? { type: "candidate_inspected" as const } : signal?.kind === "downloads" ? { type: "resources_open" as const, component: "downloads" } : null;
       if (observation) telemetry.emit(observation.type, { component: observation.component, scope: "tutorial", lessonId: lesson.lesson_id });
       if (practice) practiceRef.current = practice;
-      if (signal) evidenceFor(lesson, signal, tutorial, resources ?? [], practiceRef.current).forEach((action) => actionEvidence.current.set(action.requirement_id, action));
-      const satisfied = signal ? requirementsFor(lesson, signal).filter((id) => !completed.has(id)) : [];
-      if (!satisfied.length && !practice) return;
-      const all = Array.from(new Set([...completed, ...satisfied]));
-      if (satisfied.length) setPending((current) => new Set([...current, ...satisfied]));
-      void save({ lesson_id: lesson.lesson_id, completed_requirements: all, ...(practiceRef.current ? { practice: practiceRef.current } : {}) }, `tutorial:lesson:${lesson.lesson_id}`);
+      const produced = signal ? evidenceFor(lesson, signal, tutorial, resources ?? [], practiceRef.current) : [];
+      const added = evidence.current.observe(produced, acknowledgedRef.current);
+      if (added.length) {
+        setPending(evidence.current.pending());
+        setNotice(null);
+      }
+      if (!added.length && !practice) return;
+      save({ lesson_id: lesson.lesson_id, ...(practiceRef.current ? { practice: practiceRef.current } : {}) }, `tutorial:lesson:${lesson.lesson_id}`);
     },
-    [lesson, completed, save, tutorial, resources, telemetry],
+    [lesson, save, tutorial, resources, telemetry],
   );
 
   // Build the destination first, then save exactly that object; a newer destination may
   // replace an unsent one, but never another lesson's evidence, drafts or attempts.
   const navigate = (destination: TutorialPosition) => {
     focusAfterNavigation.current = true;
+    setNotice(null);
     setPosition(destination);
     void session.mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, position: destination }, coalesce: "tutorial:position", debounceMs: 300 }).catch(() => undefined);
   };
@@ -194,94 +233,98 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
 
   const index = tutorial.lessons.findIndex((item) => item.lesson_id === view);
   const outstandingLessons = tutorial.lessons.filter((item) => !item.optional && item.requirements.some((requirement) => !acknowledged.has(requirement.requirement_id)));
+  const states: Record<string, RequirementState> = {};
+  for (const item of tutorial.lessons) for (const requirement of item.requirements) states[requirement.requirement_id] = acknowledged.has(requirement.requirement_id) ? "saved" : pending.has(requirement.requirement_id) ? "saving" : "todo";
+  const openHelp = () => {
+    setHelpOpen(true);
+    telemetry.emit("help_open", { component: "tutorial_help", scope: "help", lessonId: lesson?.lesson_id });
+    save({ help_opened: true }, "tutorial:help");
+  };
   return (
     <div className="study-page study-page-wide tutorial-page">
-      <div className="study-intro">
-        <span className="pill pill-warn">Practice · not scored · synthetic</span>
-        <h1 ref={heading} id="tutorial-heading" tabIndex={-1}>
-          {lesson ? `Lesson ${index + 1} of ${tutorial.lessons.length}: ${lesson.title}` : "Check your understanding"}
-        </h1>
-        {index <= 0 && view !== "assessment" && <p className="lead">{tutorial.intro}</p>}
-        {restoredPending && session.pendingCount() > 0 && (
-          <p className="note" role="status">
-            Changes made before this page was reloaded are still being saved. Until the study server confirms them, this page shows your last saved position and steps.
-          </p>
-        )}
+      <div className="tutorial-head">
+        <div className="tutorial-title">
+          <span className="pill">Practice · not scored · invented examples</span>
+          <h1 ref={heading} id="tutorial-heading" tabIndex={-1}>
+            {lesson ? `Lesson ${index + 1} of ${tutorial.lessons.length}: ${lesson.title}` : "Check your understanding"}
+          </h1>
+        </div>
+        <nav className="lesson-nav" aria-label="Tutorial lessons">
+          <ol>
+            {tutorial.lessons.map((item, number) => {
+              const finished = item.requirements.every((requirement) => acknowledged.has(requirement.requirement_id));
+              return (
+                <li key={item.lesson_id}>
+                  <button type="button" className={item.lesson_id === view ? "lesson-link current" : "lesson-link"} aria-current={item.lesson_id === view ? "step" : undefined} title={item.title} onClick={() => go(item.lesson_id)}>
+                    <span className="lesson-mark" aria-hidden="true">{finished ? <IconCheck /> : number + 1}</span>
+                    <span className="lesson-link-text">
+                      {item.title}
+                      {item.optional ? <span className="meta"> · optional</span> : null}
+                      <span className="sr-only">{finished ? " (done)" : " (not finished)"}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+            <li>
+              <button type="button" className={view === "assessment" ? "lesson-link current" : "lesson-link"} aria-current={view === "assessment" ? "step" : undefined} title="Five short questions" onClick={() => go("assessment")}>
+                <span className="lesson-mark" aria-hidden="true">{(progress?.passed_items.length ?? 0) === tutorial.assessment.length ? <IconCheck /> : "?"}</span>
+                <span className="lesson-link-text">Five short questions</span>
+              </button>
+            </li>
+          </ol>
+        </nav>
       </div>
-      <nav className="lesson-nav" aria-label="Tutorial lessons">
-        <ol>
-          {tutorial.lessons.map((item, position) => {
-            const finished = item.requirements.every((requirement) => acknowledged.has(requirement.requirement_id));
-            return (
-              <li key={item.lesson_id}>
-                <button type="button" className={item.lesson_id === view ? "lesson-link current" : "lesson-link"} aria-current={item.lesson_id === view ? "step" : undefined} onClick={() => go(item.lesson_id)}>
-                  <span className="lesson-mark" aria-hidden="true">{finished ? <IconCheck /> : position + 1}</span>
-                  <span>
-                    {item.title}
-                    {item.optional ? <span className="meta"> · optional</span> : null}
-                    <span className="sr-only">{finished ? " (done)" : " (not finished)"}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-          <li>
-            <button type="button" className={view === "assessment" ? "lesson-link current" : "lesson-link"} aria-current={view === "assessment" ? "step" : undefined} onClick={() => go("assessment")}>
-              <span className="lesson-mark" aria-hidden="true">{(progress?.passed_items.length ?? 0) === tutorial.assessment.length ? <IconCheck /> : "?"}</span>
-              <span>Five short questions</span>
-            </button>
-          </li>
-        </ol>
-      </nav>
+      {index === 0 && view !== "assessment" && <p className="tutorial-intro">{tutorial.intro}</p>}
+      {restoredPending && session.pendingCount() > 0 && (
+        <p className="note" role="status">
+          Changes made before this page was reloaded are still being saved. Until the study server confirms them, this page shows your last saved position and steps.
+        </p>
+      )}
 
       {lesson ? (
         <>
-          <section className="study-card lesson-card" aria-labelledby="lesson-steps-h">
-            <h2 id="lesson-steps-h" className="sr-only">
-              What to do
-            </h2>
-            <ol className="lesson-steps">
-              {lesson.steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-            <ul className="lesson-checklist" aria-label="Steps in this lesson">
-              {lesson.requirements.map((requirement) => {
-                const saved = acknowledged.has(requirement.requirement_id);
-                const local = pending.has(requirement.requirement_id);
-                return (
-                  <li key={requirement.requirement_id} className={saved ? "done" : local ? "saving" : ""}>
-                    <span className="check-mark" aria-hidden="true">{saved || local ? <IconCheck /> : null}</span>
-                    <span>{requirement.label}</span>
-                    <span className="meta">{saved ? "Done · saved" : local ? "Done · saving" : "To do"}</span>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-          <LessonWorkspace key={lesson.lesson_id} tutorial={tutorial} lesson={lesson} state={state} source={source} record={record} />
+          <LessonWorkspace
+            key={lesson.lesson_id}
+            tutorial={tutorial}
+            lesson={lesson}
+            state={state}
+            source={source}
+            record={record}
+            coach={(showMe, tools) => (
+              <LessonCoach
+                tools={tools}
+                lessonNumber={index + 1}
+                lessonCount={tutorial.lessons.length}
+                lesson={lesson}
+                states={states}
+                notice={notice}
+                onShowMe={(requirement) => {
+                  const missing = showMe(requirement);
+                  setNotice(missing ? { tone: "info", text: missing } : null);
+                }}
+                onBack={() => go(tutorial.lessons[index - 1].lesson_id)}
+                canGoBack={index > 0}
+                onNext={() => go(tutorial.lessons[index + 1]?.lesson_id ?? "assessment")}
+                nextLabel={index + 1 < tutorial.lessons.length ? "Next lesson" : "Go to the five questions"}
+                extra={
+                  <p className="meta">
+                    Practice answers are never scored. You can move on and come back to any step.{" "}
+                    <button type="button" className="link-btn" onClick={openHelp}>
+                      Open help
+                    </button>
+                  </p>
+                }
+              />
+            )}
+          />
           <div className="study-actions lesson-actions">
-            <button type="button" className="btn" disabled={index <= 0} onClick={() => go(tutorial.lessons[index - 1].lesson_id)}>
-              Back
-            </button>
-            <button type="button" className="btn btn-primary" onClick={() => go(tutorial.lessons[index + 1]?.lesson_id ?? "assessment")}>
-              {index + 1 < tutorial.lessons.length ? "Next lesson" : "Go to the five questions"}
-            </button>
-            <button
-              type="button"
-              className="btn"
-              onClick={() => {
-                setHelpOpen(true);
-                telemetry.emit("help_open", { component: "tutorial_help", scope: "help", lessonId: lesson?.lesson_id });
-                void save({ completed_requirements: Array.from(completed), help_opened: true }, "tutorial:help");
-              }}
-            >
+            <button type="button" className="btn" onClick={openHelp}>
               Help
             </button>
             <button type="button" className="btn btn-quiet" onClick={onPause}>
               Save and return later
             </button>
-            {lesson.requirements.some((requirement) => !completed.has(requirement.requirement_id)) && <span className="meta">You can move on and come back to the remaining steps later.</span>}
           </div>
         </>
       ) : (
@@ -308,12 +351,15 @@ function LessonWorkspace({
   state,
   source,
   record,
+  coach,
 }: {
   tutorial: TutorialPublic;
   lesson: TutorialLesson;
   state: StudyState;
   source: ReturnType<typeof createResourceSource>;
   record: (signal: LessonSignal | null, practice?: Record<string, unknown>) => void;
+  /** The guided task bar, given "Show me" and the lesson's secondary tools. */
+  coach: (showMe: (requirement: LessonRequirement) => string | null, tools: React.ReactNode) => React.ReactNode;
 }) {
   const saved = state.tutorial_progress?.practice?.[PRACTICE_KEY];
   const [value, setValue] = useState<RankingValue>(() => ({ responseType: saved?.response_type ?? null, ranked: saved?.ranked_candidate_ids ?? [] }));
@@ -325,6 +371,7 @@ function LessonWorkspace({
   const [feedback, setFeedback] = useState<string | null>(null);
   const tabRef = useRef(tab);
   tabRef.current = tab;
+  const root = useRef<HTMLDivElement>(null);
   const candidates = tutorial.case.candidates.map((candidate) => ({
     id: candidate.candidate_id,
     position: candidate.display_position,
@@ -350,15 +397,51 @@ function LessonWorkspace({
     setViewed((current) => new Set([...current, id]));
     record({ kind: "inspect", position: tutorial.case.candidates.find((candidate) => candidate.candidate_id === id)?.display_position ?? 1, returning });
   };
-  const onAction = useCallback((action: WorkspaceAction) => record({ kind: "workspace", action, ...(action.type === "copy_iri" ? { entity: action.side === "source" ? tutorial.case.source : inspected.entity } : {}) }), [record, tutorial.case.source, inspected.entity]);
+  const onAction = useCallback(
+    (action: WorkspaceAction) => record({ kind: "workspace", action, candidateId: inspected.candidate_id, ...(action.type === "copy_iri" ? { entity: action.side === "source" ? tutorial.case.source : inspected.entity } : {}) }),
+    [record, tutorial.case.source, inspected.entity, inspected.candidate_id],
+  );
+
+  // "Show me": open the view the step needs, then reveal and focus its control once mounted.
+  const [showing, setShowing] = useState<{ requirement: LessonRequirement; nonce: number } | null>(null);
+  const showMe = useCallback(
+    (requirement: LessonRequirement): string | null => {
+      const target = TOUR_TARGETS[requirement.action];
+      if (lesson.view === "baseline" && target.tab) return target.missing;
+      if (target.tab && tabRef.current !== target.tab) setTab(target.tab);
+      setShowing((current) => ({ requirement, nonce: (current?.nonce ?? 0) + 1 }));
+      return null;
+    },
+    [lesson.view],
+  );
+  const [missing, setMissing] = useState<string | null>(null);
+  useEffect(() => {
+    if (!showing) return;
+    const target = TOUR_TARGETS[showing.requirement.action];
+    let frames = 0;
+    let handle = 0;
+    const attempt = () => {
+      const element = findTarget(document, target);
+      if (element) {
+        setMissing(null);
+        highlight(element);
+        return;
+      }
+      if (frames++ < 60) handle = requestAnimationFrame(attempt);
+      else setMissing(target.missing);
+    };
+    handle = requestAnimationFrame(attempt);
+    return () => cancelAnimationFrame(handle);
+  }, [showing]);
+
   const check = () => {
     const n = value.ranked.length;
     if (value.responseType === "ranked_candidates" && n >= 1 && n <= 4) {
       record({ kind: "practice_check", partial: true });
-      setFeedback(`Practice answer checked: ${n} of 5 ranked, the rest left unranked. This checks the action only; practice answers are never scored.`);
-    } else if (value.responseType === "ranked_candidates") setFeedback("All five are ranked. For this step, leave at least one candidate unranked, then check again.");
-    else if (value.responseType) setFeedback(`“${value.responseType === "none_of_these" ? "None of these" : "Insufficient information"}” is a valid answer. For this step, make a partial ranking of one to four candidates and check it.`);
-    else setFeedback("Your practice answer is empty. An empty answer is never submitted; add one to four candidates for this step.");
+      setFeedback(`Checked: ${n} of 5 ranked, the rest left unranked. Practice answers are never scored.`);
+    } else if (value.responseType === "ranked_candidates") setFeedback("All five are ranked. For this step, leave at least one unranked, then check again.");
+    else if (value.responseType) setFeedback(`“${value.responseType === "none_of_these" ? "None of these" : "Insufficient information"}” is a valid answer. For this step, rank one to four candidates and check it.`);
+    else setFeedback("Your practice answer is empty. Add one to four candidates for this step.");
   };
   const question = (names: { source: string | null; target: string | null }) => (
     <div className="pair-header">
@@ -408,37 +491,43 @@ function LessonWorkspace({
       </WorkspaceProvider>
     );
   return (
-    <CaseLayout
-      answerId="practice-answer"
-      answerSummary={answerSummaryOf(value, false)}
-      railLabel="Practice candidates and your practice answer"
-      toolbar={
-        <div className="case-toolbar">
-          <p className="note synthetic-banner">Synthetic practice: every name, fact, score and description here is invented. No matcher or model was run.</p>
-          <ResourceAccessButton resources={resources} onOpen={() => record({ kind: "downloads" })} onDownload={() => record({ kind: "downloads" })} />
-        </div>
-      }
-      rows={<CandidateRows controller={controller} practice inspecting={inspected.candidate_id} viewed={viewed} onInspect={inspect} compact />}
-      answer={
-        <AnswerPanel
-          id="practice-answer"
-          controller={controller}
-          practice
-          onSubmit={check}
-          submitting={false}
-          submitLabel="Check practice answer"
-          compact
-          footer={
-            feedback ? (
-              <p className="note note-info" role="status">
-                {feedback}
+    <div ref={root} className="lesson-workspace">
+      <CaseLayout
+        answerId="practice-answer"
+        answerSummary={answerSummaryOf(value, false)}
+        railLabel="Practice candidates and your practice answer"
+        toolbar={
+          <div className="coach-wrap">
+            {coach(showMe, <ResourceAccessButton resources={resources} onOpen={() => record({ kind: "downloads" })} onDownload={() => record({ kind: "downloads" })} />)}
+            {missing && (
+              <p className="note coach-missing" role="status">
+                {missing}
               </p>
-            ) : null
-          }
-        />
-      }
-      workspace={workspace}
-    />
+            )}
+          </div>
+        }
+        rows={<CandidateRows controller={controller} practice inspecting={inspected.candidate_id} viewed={viewed} onInspect={inspect} compact />}
+        answer={
+          <AnswerPanel
+            id="practice-answer"
+            controller={controller}
+            practice
+            onSubmit={check}
+            submitting={false}
+            submitLabel="Check practice answer"
+            compact
+            footer={
+              feedback ? (
+                <p className="note note-info" role="status">
+                  {feedback}
+                </p>
+              ) : null
+            }
+          />
+        }
+        workspace={workspace}
+      />
+    </div>
   );
 }
 
@@ -460,7 +549,7 @@ function PracticeReports({ record }: { record: (signal: LessonSignal | null) => 
           setFeedback((current) => ({ ...current, [task.id]: "" }));
         };
         return (
-          <fieldset key={task.id} className="question">
+          <fieldset key={task.id} className="question" data-tour={task.id === "multi" ? "report-multi" : "report-none"}>
             <legend className="question-label">{task.title}</legend>
             <p>{task.situation} Did you inspect ontology information outside the study pages for that case?</p>
             <div className="option-grid">
@@ -532,15 +621,13 @@ function Assessment({
   focusedQuestion: string | null;
   outstandingLessons: TutorialLesson[];
 }) {
-  // A restored question is brought into view without taking keyboard focus.
-  const restored = useRef(focusedQuestion);
-  useEffect(() => {
-    if (restored.current) document.getElementById(`assessment-${restored.current}`)?.scrollIntoView({ block: "start" });
-  }, []);
   const progress = state.tutorial_progress ?? null;
   const passed = new Set(progress?.passed_items ?? []);
   const [busy, setBusy] = useState(false);
   const outstanding = progress?.outstanding ?? [...outstandingLessons.map((lesson) => lesson.lesson_id), ...tutorial.assessment.filter((item) => !passed.has(item.question_id)).map((item) => item.question_id)];
+  // One question at a time (21 F02). The landing position (no question) shows the first one.
+  const currentIndex = Math.max(0, tutorial.assessment.findIndex((item) => item.question_id === focusedQuestion));
+  const current = tutorial.assessment[currentIndex];
   const finish = async () => {
     setBusy(true);
     try {
@@ -554,7 +641,7 @@ function Assessment({
   const labelOf = (id: string) => tutorial.lessons.find((lesson) => lesson.lesson_id === id)?.title ?? tutorial.assessment.find((item) => item.question_id === id)?.title ?? id;
   return (
     <>
-      <section className="study-card">
+      <section className="study-card assessment-intro">
         <p>
           These five questions check that the task is clear. They are not a test of medical or ontology knowledge, and you can try each one again as often as you like. Each answer is checked on the study server, which explains it straight away.
         </p>
@@ -562,7 +649,8 @@ function Assessment({
           <ol className="question-nav">
             {tutorial.assessment.map((item, index) => (
               <li key={item.question_id}>
-                <button type="button" className={item.question_id === focusedQuestion ? "btn btn-sm current" : "btn btn-sm"} aria-current={item.question_id === focusedQuestion ? "location" : undefined} onClick={() => onQuestion(item.question_id)}>
+                <button type="button" className={index === currentIndex ? "btn btn-sm current" : "btn btn-sm"} aria-current={item.question_id === focusedQuestion ? "location" : index === currentIndex ? "step" : undefined} onClick={() => onQuestion(item.question_id)}>
+                  {passed.has(item.question_id) ? <IconCheck /> : null}
                   {index + 1} · {item.title}
                   {passed.has(item.question_id) ? <span className="sr-only"> (passed)</span> : null}
                 </button>
@@ -571,9 +659,17 @@ function Assessment({
           </ol>
         </nav>
       </section>
-      {tutorial.assessment.map((item, index) => (
-        <AssessmentCard key={item.question_id} item={item} number={index + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(item.question_id)} onRevisit={onRevisit} />
-      ))}
+      <AssessmentCard key={current.question_id} item={current} number={currentIndex + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(current.question_id)} onRevisit={onRevisit} />
+      <div className="study-actions question-steps">
+        <button type="button" className="btn" disabled={currentIndex === 0} onClick={() => onQuestion(tutorial.assessment[currentIndex - 1].question_id)}>
+          Previous question
+        </button>
+        {currentIndex + 1 < tutorial.assessment.length && (
+          <button type="button" className={passed.has(current.question_id) ? "btn btn-primary" : "btn"} onClick={() => onQuestion(tutorial.assessment[currentIndex + 1].question_id)}>
+            Next question
+          </button>
+        )}
+      </div>
       <section className="study-card" aria-labelledby="finish-h">
         <h2 id="finish-h">Finish the tutorial</h2>
         {outstanding.length ? (
@@ -587,7 +683,9 @@ function Assessment({
                       Lesson: {labelOf(id)}
                     </button>
                   ) : (
-                    <span>Question: {labelOf(id)}</span>
+                    <button type="button" className="btn btn-quiet btn-sm" onClick={() => onQuestion(id)}>
+                      Question: {labelOf(id)}
+                    </button>
                   )}
                 </li>
               ))}
