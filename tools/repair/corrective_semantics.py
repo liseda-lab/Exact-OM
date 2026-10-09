@@ -17,7 +17,7 @@ import time
 from pathlib import Path
 
 from exact.repair.api import write_artifact
-from exact.repair.records import canonical_hash, canonical_json, read_record
+from exact.repair.records import VerificationReportV2, canonical_hash, canonical_json, read_record
 from exact.repair.semantic_fidelity import (
     AGGREGATION_REVISION,
     CRITERIA,
@@ -30,6 +30,7 @@ from exact.repair.semantic_fidelity import (
     SemanticAnnotationAdapter,
     SemanticConsequenceReportV3,
     SemanticEvidencePacketV3,
+    SemanticPlanV3,
     ValidatedFidelityAggregateV3,
     aggregate_comparisons,
     consequence_basis_from_probes,
@@ -675,11 +676,13 @@ def _verified_plan(case_record, assignment):
     return plan
 
 
-def annotate_comparison(packet, manifest, output, *, comparison_id, order_swap_audit, seconds):
+def annotate_comparison(
+    packet, manifest, output: str | Path, *, comparison_id, order_swap_audit, seconds
+) -> Path | None:
     """Original plus a scheduled audit; missing or discordant audits cannot label."""
     started = time.monotonic()
     output = Path(output)
-    original = annotate_packet(
+    original: Path | None = annotate_packet(
         packet,
         manifest,
         output / "original",
@@ -689,7 +692,7 @@ def annotate_comparison(packet, manifest, output, *, comparison_id, order_swap_a
     )
     if original is None or not order_swap_audit:
         return original
-    swapped = annotate_packet(
+    swapped: Path | None = annotate_packet(
         packet,
         manifest,
         output / "swapped",
@@ -711,9 +714,12 @@ def annotate_comparison(packet, manifest, output, *, comparison_id, order_swap_a
             ),
         )
         return None
-    aggregates = [
-        read_record(read(path)["comparisons"][0]["comparison"]) for path in (original, swapped)
-    ]
+    aggregates: list[ValidatedFidelityAggregateV3] = []
+    for path in (original, swapped):
+        aggregate = read_record(read(path)["comparisons"][0]["comparison"])
+        if not isinstance(aggregate, ValidatedFidelityAggregateV3):
+            raise ValueError("Order-swap artifact lacks a validated fidelity aggregate")
+        aggregates.append(aggregate)
     if any(value.schedule.packet != packet for value in aggregates):
         raise ValueError("Order-swap audit changed the exact comparison packet")
     if aggregates[0].schedule.parser_versions != aggregates[1].schedule.parser_versions:
@@ -768,8 +774,10 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
     from exact.repair.kernel import _valid_report
 
     verification = read_record(request["verification"])
-    if not verification.authorizes or not _valid_report(
-        case.problem, tuple(request["assignment"]), verification
+    if (
+        not isinstance(verification, VerificationReportV2)
+        or not verification.authorizes
+        or not _valid_report(case.problem, tuple(request["assignment"]), verification)
     ):
         raise ValueError("Post-decode request lacks exact qualified verification")
     if case.split != "development" or manifest["phase"] != "development":
@@ -808,7 +816,7 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
     )
     if assignments[0] == assignments[1]:
         return None
-    plans = []
+    plans: list[SemanticPlanV3] = []
     from exact.repair.kernel import materialize
 
     for assignment in assignments:
@@ -831,7 +839,10 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
             committed = read(saved_plan)
             if committed["context_hash"] != context_hash:
                 raise ValueError("Committed annotation plan context changed")
-            plans.append(read_record(committed["plan"]))
+            plan = read_record(committed["plan"])
+            if not isinstance(plan, SemanticPlanV3):
+                raise ValueError("Committed annotation artifact is not a verified semantic plan")
+            plans.append(plan)
             continue
         left = seconds - (time.monotonic() - started)
         if left <= 4:
@@ -845,6 +856,8 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         )
         if outcome.status != "complete" or not outcome.cleanup_complete or outcome.value is None:
             return None
+        if not isinstance(outcome.value, SemanticPlanV3):
+            raise ValueError("Annotation verifier returned an invalid semantic plan record")
         immutable(saved_plan, dict(context_hash=context_hash, plan=outcome.value.to_dict()))
         plans.append(outcome.value)
     packet = SemanticEvidencePacketV3(
@@ -855,7 +868,8 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         tuple(entry["original_observation"]),
         entry["evidence"],
         tuple(entry["local_context"]),
-        *plans,
+        plans[0],
+        plans[1],
         manifest["rubric_version"],
         manifest["criterion_weights"],
         tuple(p.probe_id for p in case.probes),

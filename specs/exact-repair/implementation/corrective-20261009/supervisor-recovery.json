@@ -30,6 +30,11 @@
     {
       "command": "git diff --check",
       "status": "passed"
+    },
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/python -m mypy --explicit-package-bases --follow-imports=silent exact/experiments/science_health.py exact/experiments/supervision.py tools/repair/supervisor_bootstrap.py tools/repair/batch.py",
+      "status": "passed",
+      "checked_source_files": 4
     }
   ],
   "contracts": [

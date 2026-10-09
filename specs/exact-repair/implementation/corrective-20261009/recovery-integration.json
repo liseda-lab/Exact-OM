@@ -1,0 +1,17 @@
+{
+  "checked_at": "2026-10-09T23:36:33.655353+00:00",
+  "confirmed_credential_path": "/home/pgcotovio/Exact-OM/api_key",
+  "credential_content_in_record": false,
+  "historical_records_preserved": true,
+  "import_contracts": {
+    "broken": 0,
+    "dependencies": 2497,
+    "files": 365,
+    "kept": 5
+  },
+  "integrated_dev_revision": "f4dfbdf8979f93f5274d7aac4bae9284d106a55f",
+  "mypy": "corrective_semantics and supervisor-owned files checked with explicit-package-bases; no errors",
+  "provider_and_postdecode_tests_passed": 24,
+  "schema": "exact-repair/recovery-integration-check/v1",
+  "supervisor_batch_conference_tests_passed": 312
+}

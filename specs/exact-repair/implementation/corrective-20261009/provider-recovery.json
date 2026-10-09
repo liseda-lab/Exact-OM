@@ -267,6 +267,18 @@
       "exit_code": 0,
       "log": "...................                                                      [100%]\n19 passed in 5.26s\n",
       "log_sha256": "8173039c7ce8839a3476e7c81de1c987a1e95fd1094fe6390ae017e61e741f92"
+    },
+    {
+      "command": "/home/pgcotovio/Exact-OM/.venv/bin/python -m mypy --explicit-package-bases tools/repair/corrective_semantics.py",
+      "exit_code": 0,
+      "log": "pyproject.toml: note: unused section(s): module = ['exact.analysis.study_visualizer', 'exact.analysis.user_study.*', 'exact.core.actions.alignment', 'exact.core.actions.evaluation', 'exact.core.contracts.dataset', 'exact.core.contracts.model', 'exact.core.contracts.trainer', 'exact.core.entities.mappings.reference', 'exact.core.entities.ontology', 'exact.delivery.cli.llm_debug', 'exact.impl.datasets.contextgraph', 'exact.impl.datasets.pair_adaptive_context', 'exact.impl.evaluator', 'exact.impl.metrics.full', 'exact.impl.metrics.local', 'exact.impl.models.pair_adaptive_channels', 'exact.impl.models.pair_adaptive_evidence', 'exact.impl.models.pair_adaptive_scorer', 'exact.impl.models.scorer_common', 'exact.impl.models.selector.*', 'exact.impl.models.semantic_llm', 'exact.impl.models.semantic_scorer', 'exact.impl.trainer.audit_io', 'exact.impl.trainer.checkpointing', 'exact.impl.trainer.overlays', 'exact.impl.trainer.rationales', 'exact.impl.trainer.runner', 'exact.utils.candidate_generation', 'exact.utils.data', 'exact.utils.eval', 'exact.utils.graph_search', 'exact.utils.logs', 'study_visualizer_runtime.app']\nSuccess: no issues found in 1 source file\n",
+      "log_sha256": "748852b7974b9abeac38e413a764aba5d0dc02c02379a35644d1115943058299"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 PYTHONPATH=. /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest -q tests/repair_october_learning_annotation_runner_test.py tests/repair_october_learning_semantics_test.py --disable-warnings --maxfail=1",
+      "exit_code": 0,
+      "log": "........................                                                 [100%]\n24 passed, 4 warnings in 11.71s\n",
+      "log_sha256": "d8ec7ca700f7a975d04e40ca16784a73d125181d9f6465cb149504b92713f4d3"
     }
   ],
   "compatibility": "Legacy mixed supervision retains old blending; new symbolic_plus_llm requires provenance_additive/v1. New protocol optional fields are omitted when absent. Changed schema/targets/source retain strict incompatible-resume rejection; no old experiment data was modified.",
@@ -349,7 +361,8 @@
     "Before batch annotation, a free GET /api/v1/key through the existing router checks each distinct endpoint/credential pair. No scientific request reservation is consumed; error proof is immutable and contains no key or authorization header. GET success records no account body.",
     "Explicit user-approved request reallocation preserves704 aggregate attempts: calibration64, TRAIN352, DEV96, TEST192. Unique comparison quotas and $35 campaign/$2 calibration bounds remain. Exactly32 previous phase rows must match the immutable snapshot; each successor binds its original definitive401 request and same packet/model/provider/order. New provenance run identity produces a distinct wire request, with all old attempts retained.",
     "Actual replacement manifest32 slots qualified through read-only SQLite; live phase ledger byte-for-byte unchanged. Real SQLite tests prove old401 then successful mocked successor, idempotent replay, cross-phase budgets, and rejection of unapproved, tampered, unsupported, reset or changed-comparison amendments.",
-    "The initial calibration produced32 wire attempts already classified rejected withHTTP401 and no provider usage fields, not unknown deliveries. Its conservative32 phase reservations/$0.50512 remain intact; absence of reported usage is not evidence of measured zero billing. No live reconciliation/reset performed."
+    "The initial calibration produced32 wire attempts already classified rejected withHTTP401 and no provider usage fields, not unknown deliveries. Its conservative32 phase reservations/$0.50512 remain intact; absence of reported usage is not evidence of measured zero billing. No live reconciliation/reset performed.",
+    "Post-decode deserialization explicitly narrows VerificationReportV2, SemanticPlanV3 and ValidatedFidelityAggregateV3 with runtime validation; fixed pair positions and Path|None results remove eight static errors without suppression. Provider mypy passes and all24 focused annotation/postdecode tests pass."
   ],
   "original_hosted_auth_accounting": {
     "ledger_files": 1,
@@ -416,7 +429,7 @@
     "tests/repair_october_learning_semantics_test.py": "bb64109bf12160ae489f85e1882d47dd7262acc8ff298eb9418d7a9e159f8ae1",
     "tests/repair_report_recovery_test.py": "50c44b7649f8203cfd9855175443999287ef1739ecc578aa6ead50fecffe25e1",
     "tools/repair/acquisition.py": "00f0d54ccc133bd13c5b4a52a3320aa51b75eb959ed7902a21d78d6fddf2b062",
-    "tools/repair/corrective_semantics.py": "3e0ceaa24cff181058cab7b594079dc19120eea0ddf77b9944b4919f1f8b9c8a",
+    "tools/repair/corrective_semantics.py": "9f67252a3fc64d50bc37c302af61140d2fd8e891fd3017d2f3f40ec2c9b1ea8a",
     "tools/repair/development_collection.py": "6d0a9a5bdbf494608c28ab02a34e167a605f2fac6ebe7238ebae530f1f68545e",
     "tools/repair/qualify_learning.py": "3e47c7bfd72734a65e24f1c17b7349e193399f5679360ca0c27a31226cc7c585",
     "tools/repair/train.py": "7b82e6e4e2e52ce479e957e717098bbc4eb0cdadaf06b51906837c08abddd11f"
