@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import pytest
+import pyowl_core as owl
 
 from exact.repair.records import read_record
 from tools.repair import scaling
@@ -20,21 +21,77 @@ def policy(count):
 
 
 @pytest.mark.parametrize("depth", [13, 14])
-def test_complete_composite_control_requires_explicit_endpoint_ablation(depth):
+def test_complete_composite_control_supports_full_substitution_and_explicit_ablation(depth):
     original = scaling.extend_case(parent_case("papers", depth, 13), 4)
     clean = coherent_control(original)
     assert len(clean.problem.objects[0].original_axioms) == 3
     config = scaling.configurations()[0]
     for schedule in ({}, {"endpoint_policy": policy(2)}):
-        # The old contract still materializes elementary mappings, and still
-        # rejects guessing a relation for the complete three-axiom control.
+        # COR-05 keeps elementary recovery and substitutes the complete
+        # explicitly bound composite, without guessing an elementary relation.
         _, observed, retrieval = scaling.generation_input(
             original.problem.to_dict(), config, schedule
         )
         assert any(m.endpoint_alternatives for m in retrieval.menus)
         assert observed.objects[0].original_axioms == original.problem.objects[0].original_axioms
-        with pytest.raises(ValueError, match="cannot infer complete original relation"):
-            scaling.generation_input(clean.problem.to_dict(), config, schedule)
+        _, prepared, clean_retrieval = scaling.generation_input(
+            clean.problem.to_dict(), config, schedule
+        )
+        obj, supplied = prepared.objects[0], clean.problem.objects[0]
+        assert obj.original_axioms == supplied.original_axioms
+        assert (
+            obj.source_entity == supplied.source_entity
+            and obj.target_entity == supplied.target_entity
+        )
+        by_id = {c.candidate_id: c for c in obj.candidates}
+        for old in supplied.candidates:
+            assert by_id[old.candidate_id].axioms == old.axioms
+            assert by_id[old.candidate_id].active_expressions == old.active_expressions
+        # The observed definition has both necessary directions and a jointly
+        # sufficient condition. Check all emitted axioms independently.
+        source, target = obj.source_entity, obj.target_entity
+        condition = next(
+            a.super_class
+            for a in obj.original_axioms
+            if a.sub_class == target and a.super_class != source
+        )
+        menu = clean_retrieval.for_object(obj.object_id)
+        assert {side for side, _ in menu.endpoint_alternatives} == {"source", "target"}
+        for side, endpoint in menu.endpoint_alternatives:
+            candidate = next(
+                c
+                for c in obj.candidates
+                if ("endpoint_contract", "complete-bound-substitution/v1") in c.provenance
+                and ("endpoint_side", side) in c.provenance
+                and ("bound_replacement", str(endpoint.iri.value)) in c.provenance
+            )
+            left = endpoint if side == "source" else source
+            right = endpoint if side == "target" else target
+            conjunction = (
+                left
+                if left == condition
+                else owl.ObjectIntersectionOf(owl.CanonicalSet((left, condition)))
+            )
+            expected = {
+                owl.SubClassOf(right, left),
+                owl.SubClassOf(right, condition),
+                owl.SubClassOf(conjunction, right),
+            }
+            assert set(candidate.axioms) == expected
+            costs = dict(candidate.cost_features)
+            assert costs["endpoint_change"] == 1
+            assert (
+                costs["new_constructor"]
+                == costs["removed_direction"]
+                == costs["necessary_condition"]
+                == 0
+            )
+            assert ("cost_contract", "syntax-delta/v2") in candidate.provenance
+            from exact.repair.owl import OwlVerifier, snapshot_from_axioms
+
+            snapshot = snapshot_from_axioms(candidate.axioms)
+            report = OwlVerifier("auto", backend="auto").check_theory(snapshot, (left, right))
+            assert report.complete and report.logical_status == "VERIFIED_FEASIBLE"
     for case in (original, clean):
         before = case.problem.to_dict()
         observed, prepared, retrieval = scaling.generation_input(

@@ -100,6 +100,20 @@
     "torch": "2.7.0+cu128",
     "torch-geometric": "2.6.1"
   },
+  "post_audit_context_correction": {
+    "current_foreign_work": "none; matcher supervisor remains14372/node3",
+    "historical_foreign_steps": [
+      "14451.4",
+      "14451.5",
+      "14451.6"
+    ],
+    "launch_regressions": "4passed after context correction",
+    "node5_exclusive_to_repair": true,
+    "preserve_interactive_steps": [
+      "14451.0",
+      "14451.extern"
+    ]
+  },
   "predeployment_engineering_costs": {
     "accounting": "bound provenance for costs; no Slurm steps or paid calls in this audit",
     "diagnostic_worker_resources": {
@@ -255,11 +269,11 @@
     },
     {
       "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tools/repair/corrective_launch.py",
-      "sha256": "6999d21833d88caf3091c0bb788fcc29349bce0b640a1ae70d159901334223d6"
+      "sha256": "dc245619dba6a8f3497589103ea8145151d1bdda56640ef6451d1b16de045611"
     },
     {
       "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_corrective_launch_test.py",
-      "sha256": "58dce1d200307daa47ccbe82cf15e98568a8ed7eca4cbb0feadeccc52f5d8f2e"
+      "sha256": "1190182e5278abf222cd5727b9c1f2b502a835f671125fda66b4846608654e84"
     },
     {
       "path": "/home/pgcotovio/Exact-OM/.worktrees/repair-liseda05-corrective-20261009/tests/repair_corrective_conference_test.py",

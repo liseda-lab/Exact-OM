@@ -177,3 +177,23 @@ def test_spend_ceiling_masks_slot_without_transmission_or_retry(tmp_path, monkey
     assert runner.read(output / "receipt.json")["status"] == "budget_unavailable"
     assert runner.annotate_packet(packet(), settings, output, slot_id="s", seconds=300) is None
     assert calls == []
+
+
+def test_calibration_consumption_is_frozen_before_any_hosted_attempt(tmp_path, monkeypatch):
+    path = tmp_path / "calibration" / "manifest.json"
+    declaration = {**manifest(tmp_path), "slots": [], "seconds": 0}
+    runner.write_artifact(path, declaration)
+    monkeypatch.setattr(
+        runner,
+        "annotate_packet",
+        lambda *a, **k: pytest.fail("Empty calibration must not invoke a provider"),
+    )
+    assert runner.run(path, tmp_path / "output") == []
+    used = runner.read(path.parent / "used.json")
+    assert used["manifest_path"] == str(path.resolve())
+    assert used["manifest_sha256"] == runner.sha(path)
+    assert not (tmp_path / "ledger").exists()
+    assert runner.run(path, tmp_path / "output") == []
+    runner.write_artifact(path, {**declaration, "seconds": 1})
+    with pytest.raises(ValueError, match="Frozen corpus artifact changed"):
+        runner.run(path, tmp_path / "output")

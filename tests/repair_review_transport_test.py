@@ -2,6 +2,8 @@
 
 import time
 
+import pytest
+
 from exact.repair.workers import bounded_call, emit_event
 
 
@@ -233,21 +235,26 @@ def test_rev01_committed_failure_survives_hang_and_broken_frame(record_property)
         assert len(result.events) == 1
 
 
-def test_rev02_stalled_persistence_is_killable_and_uncommitted_rows_are_invisible(
-    monkeypatch, tmp_path
-):
-    import hashlib
-    import os
-    import pickle
+class StallSecondPersistence:
+    """Install the fault inside the broker, including a clean CUDA-safe spawn."""
 
-    from exact.repair import workers
+    def __init__(self, marker):
+        self.marker = marker
 
-    original = workers._commit_event_batch
-    marker = tmp_path / "transaction-started"
+    def __call__(self, event):
+        from exact.repair import workers
 
-    def blocked(directory, prior, values):
-        if prior.batches == 0:
-            return original(directory, prior, values)
+        if event == ("coverage", 1):
+            workers._commit_event_batch = self.blocked
+        return True
+
+    def blocked(self, directory, prior, values):
+        import hashlib
+        import os
+        import pickle
+        from exact.repair import workers
+
+        assert prior.batches == 1  # The first event has already committed.
         payload = pickle.dumps((prior.batches, prior.digest, values), protocol=5)
         conn = workers._journal_connection(directory, os.getpid())
         conn.execute(
@@ -259,16 +266,36 @@ def test_rev02_stalled_persistence_is_killable_and_uncommitted_rows_are_invisibl
                 prior.event_count + len(values),
             ),
         )
-        marker.write_text("uncommitted")
+        self.marker.write_text("uncommitted")
         time.sleep(30)
 
-    monkeypatch.setattr(workers, "_commit_event_batch", blocked)
+
+@pytest.mark.parametrize("force_spawn", (False, True))
+def test_rev02_stalled_persistence_is_killable_and_uncommitted_rows_are_invisible(
+    monkeypatch, tmp_path, force_spawn
+):
+    from exact.repair import workers
+
+    if force_spawn:
+        monkeypatch.setattr(workers, "_cuda_context_is_live", lambda: True)
+    marker = tmp_path / "transaction-started"
     started = time.monotonic()
-    result = bounded_call(many_events, 2, timeout=0.8)
+    result = bounded_call(many_events, 2, timeout=0.8, event_handler=StallSecondPersistence(marker))
     assert time.monotonic() - started < 1.4
     assert result.status == "timeout" and marker.exists()
+    assert result.cleanup_complete
     assert list(result.events) == [("coverage", 0)]
     assert list(workers.committed_events(result.events.directory)) == [("coverage", 0)]
+
+
+class MarkAndStall:
+    def __init__(self, marker):
+        self.marker = marker
+
+    def __call__(self, event):
+        self.marker.write_text("ready")
+        time.sleep(30)
+        return True
 
 
 def test_rev02_resource_monitor_runs_during_blocked_callback(monkeypatch, tmp_path):
@@ -276,16 +303,13 @@ def test_rev02_resource_monitor_runs_during_blocked_callback(monkeypatch, tmp_pa
 
     marker = tmp_path / "validation-started"
 
-    def blocking(event):
-        marker.write_text("ready")
-        time.sleep(30)
-        return True
-
     original = workers._resident_tree_bytes
     monkeypatch.setattr(
         workers, "_resident_tree_bytes", lambda pid: 10**12 if marker.exists() else original(pid)
     )
-    result = bounded_call(one_event, timeout=4, memory_mb=100000, event_handler=blocking)
+    result = bounded_call(
+        one_event, timeout=4, memory_mb=100000, event_handler=MarkAndStall(marker)
+    )
     assert marker.exists() and result.status == "memory_limit"
 
 

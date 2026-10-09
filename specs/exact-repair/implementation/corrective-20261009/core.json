@@ -12,14 +12,16 @@
     "exact/repair/records.py": "ce36f5aa11fbacb3703884840d5b565049f7f0d1004376c0454450285fa0dd8a",
     "exact/repair/workers.py": "a9a1baf1a0dc8554240e69ae64a3335dfdae83ee66774abfbf68d6a79a02dbd1",
     "tests/repair_endpoint_recovery_test.py": "8b6f651d6770d8b36cbb6728b79099cf2742067749d735e31d3fee745e41cc56",
-    "tests/repair_october_campaign_test.py": "64f6b04786a7be2518341fd97b09b44ff9a642c7c4796a7acf8747201c997a30",
+    "tests/repair_october_campaign_test.py": "90a4360a79f8fc33f83d69bd450a7fe7eb3105d0c6718fef165b082c5f90971d",
     "tests/repair_october_core_corrections_test.py": "5c63c6e435df8f2b295144a3c88476ba2f6edf78641088bf33b460333fa91d2e",
     "tests/repair_october_decoder_test.py": "516c0721bba2dac93c6db7e6f9b8cf3bd1872297b56c31511c165844e19301ac",
     "tools/repair/compare_proposals.py": "72772e663549dd36e60bb5140e9668ee7dff36c13de21b3e0026f74ebc97f6e9",
-    "tools/repair/corrective_calibration.py": "f205226e937c036b6b07b499f0900536db943e1620a720a042e481b7efeb0862",
+    "tools/repair/corrective_calibration.py": "9ad43997d081d805826682be4950165839c84c6eca338d8002e4a4493fb024bb",
     "tools/repair/corrective_campaign.py": "44c8ca59262893108a51f00ba17712d47b450cdfd589a6602556a00111133700",
     "tools/repair/corrective_study.py": "7da0b39000f12e6c00486a5e6ea035bd67e2a2db7a56d41260da0feb02856dcf",
-    "tools/repair/scaling.py": "5cc75fec2db92408e43cb1d6314c7e7bdc792bbd3d9cb885c43a2ee85b75846a"
+    "tools/repair/scaling.py": "5cc75fec2db92408e43cb1d6314c7e7bdc792bbd3d9cb885c43a2ee85b75846a",
+    "tests/repair_review_transport_test.py": "72ecfab573802b78b6fc66e3bff6a978134d720a3ec080c24ce4c104e5466fe0",
+    "tests/repair_scaling_endpoint_policy_test.py": "ed217aba9da9992c8749247b0f78bfec53314edf9e7a5b3b4ddf28b9cedf1229"
   },
   "packages": {
     "pyowl-core": "0.2.1",
@@ -69,6 +71,33 @@
       "command": "/home/pgcotovio/Exact-OM/.venv/bin/black [owned Python source and tests]",
       "status": "formatted",
       "scope": "all final owned changed/new Python files"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -c 'import pytest; from exact.repair import workers; workers._cuda_context_is_live=lambda:True; raise SystemExit(pytest.main([\"tests/repair_review_transport_test.py\", \"-k\", \"not large_event_count\", \"-q\", \"--disable-warnings\", \"--maxfail=2\"]))' ",
+      "passed": 11,
+      "deselected": 1,
+      "wall_seconds": 24.03,
+      "scope": "forced CUDA-safe spawned broker on all transport tests; large cardinality already separately qualified"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest tests/repair_review_transport_test.py -k 'not large_event_count' tests/repair_october_core_corrections_test.py::test_cuda_owning_parent_uses_clean_spawn_broker_without_fork tests/repair_october_core_corrections_test.py::test_external_task_deadline_retains_prior_batch_commit_and_accounts_cleanup -q --disable-warnings --maxfail=2",
+      "passed": 13,
+      "deselected": 1,
+      "wall_seconds": 21.39,
+      "scope": "default broker and explicit no-live-CUDA-fork/per-task deadline regressions"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest tests/repair_scaling_endpoint_policy_test.py -q --disable-warnings --maxfail=2",
+      "passed": 12,
+      "wall_seconds": 5.21,
+      "scope": "actual scaling endpoint entrypoint, full composite native qualifier and costs, zero-endpoint ablation, malformed policies"
+    },
+    {
+      "command": "OMP_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 MKL_NUM_THREADS=1 /home/pgcotovio/Exact-OM/.venv/bin/python -m pytest tests/repair_october_campaign_test.py -k 'calibration or hosted_ledger' -q --disable-warnings --maxfail=2",
+      "passed": 8,
+      "deselected": 20,
+      "wall_seconds": 2.34,
+      "scope": "final draft refresh guard: repeated native preparation,32 slots, frozen batches/attempts/hosted/used/results reject before any mutation, empty initialized seven-table ledger unchanged, each populated table rejected"
     }
   ],
   "corrections": {
@@ -95,5 +124,19 @@
     "observable_controls": "predictor only receives uniquely declared observable asserted-axiom queries, no hidden case reference probes",
     "calibration": "exactly32 native-qualified TRAIN observations:4 authored constructions x4 approved teacher profiles x2 presentation orders; no paid transmissions during validation",
     "identities": "real code file hashes, dirty diff, graph schema and precommit revision replace placeholders; draft metadata can change only before submission/paid reservations"
+  },
+  "post_integration_review": {
+    "base_revision": "5b8a0ece093480a564f0069b47e4401f645f4ca8",
+    "production_changes": "none",
+    "transport_issue": "Confirmed fault-injection fixture assumed a fork-inherited monkeypatch. Live CUDA correctly forces a clean spawned broker; old parent-only patch was absent. Moved injection into picklable broker-local callback, exercised default and forced spawn, preserved0.8s deadline/1.4s bound and committed-prefix checks.",
+    "scaling_issue": "Historical test required rejecting complete composites, contradicting COR05. Replacement assertions cover actual complete source/target bundles, canonical conjunction collapse, preserved supplied candidate identities/activations, one endpoint cost and zero introduced constructor/direction cost, and native qualified feasibility of emitted bundles.",
+    "unmodified_controls": "No production safety/coverage/resource check relaxed. Endpoint-disabled historical ablation still tested."
+  },
+  "draft_calibration_refresh": {
+    "issue": "Fresh qualified native verification reports have new IDs/times; immutable prelaunch packets incorrectly blocked draft regeneration.",
+    "fix": "Centralized unpublished guard before native work or any writes, repeated before packet publication. Qualify all constructions before replacing draft packets and manifest. Preserve published batches, attempted campaigns, used manifests, results and nonempty hosted reservations/request ledgers.",
+    "empty_ledger": "Read-only SQLite inspection of exact seven known tables admits untouched empty initialized ledgers. Unknown schema/records fail closed. Empty DB and lock bytes remain identical across repeated preparation.",
+    "used_marker": "Learning agent added immutable used.json consumption binding in corrective_semantics.run before slots/output/budget/network work; separate learning test evidence.",
+    "paid_calls": 0
   }
 }

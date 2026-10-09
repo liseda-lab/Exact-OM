@@ -245,7 +245,7 @@ def registry_for(specification, descriptors):
             monetary_ceiling_usd=35,
             calibration_ceiling_usd=2,
             production_matcher="deferred; publisher LogMap only",
-            preserve_steps=["14451.0", "14451.4", "14451.extern"],
+            preserve_steps=["14451.0", "14451.extern"],
             reference_alignments="evaluator bindings only; not repair truth",
         ),
         plan=str(campaign / "planning-contract.json"),

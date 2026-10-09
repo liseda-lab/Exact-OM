@@ -27,7 +27,7 @@ from tools.repair.batch import read, sha
 from tools.repair.corpus import GeneratedCase
 from tools.repair.prepare import case_to_dict
 from tools.repair.corrective_semantics import _verified_plan, run as annotate, PHASE_LIMITS
-from tools.repair.expanded_corpus import binding, immutable
+from tools.repair.expanded_corpus import binding
 
 SHORTLIST = ("deepseek", "qwen", "glm", "sonnet_reference")
 MODELS = {
@@ -65,8 +65,98 @@ SETTINGS = (
 )
 
 
+_HOSTED_TABLES = frozenset(
+    {
+        "requests",
+        "reservations",
+        "attempts",
+        "retry_authorizations",
+        "spending_policies",
+        "repair_annotation_reserves",
+        "repair_annotation_labels",
+    }
+)
+
+
+def _hosted_has_usage(directory):
+    """Inspect existing ledgers read-only; empty adapter initialization is no spend."""
+    import sqlite3
+    from contextlib import closing
+
+    if not directory.exists():
+        return False
+    if not directory.is_dir():
+        return True
+    allowed = {
+        "requests.sqlite3",
+        "requests.sqlite3-wal",
+        "requests.sqlite3-shm",
+        "requests.transaction.lock",
+        "phase-reservations.json",
+        "phase-reservations.lock",
+    }
+    if any(child.name not in allowed or not child.is_file() for child in directory.iterdir()):
+        return True
+    phases = directory / "phase-reservations.json"
+    if phases.exists():
+        reservations = read(phases).get("reservations")
+        if not isinstance(reservations, dict):
+            raise ValueError("Cannot prove hosted phase reservation ledger is unused")
+        if reservations:
+            return True
+    database = directory / "requests.sqlite3"
+    if not database.exists():
+        return any(
+            (directory / name).exists() for name in ("requests.sqlite3-wal", "requests.sqlite3-shm")
+        )
+    try:
+        with closing(
+            sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True, timeout=1)
+        ) as db:
+            db.execute("BEGIN")
+            names = {
+                row[0]
+                for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+                if not row[0].startswith("sqlite_")
+            }
+            if not names <= _HOSTED_TABLES:
+                return True
+            return any(
+                db.execute(f'SELECT 1 FROM "{name}" LIMIT 1').fetchone() is not None
+                for name in sorted(names)
+            )
+    except sqlite3.Error as error:
+        raise ValueError("Cannot prove hosted annotation ledger is unused") from error
+
+
+def _require_unpublished_draft(campaign):
+    """One fail-closed guard, before verification or replacing any draft byte."""
+    campaign = Path(campaign)
+    directory = campaign / "annotations/calibration"
+    if (campaign / "batches").exists():
+        raise ValueError("Calibration is published in batches; prepare an explicit successor")
+    ledger = campaign / "ledger.json"
+    if ledger.exists() and read(ledger).get("attempts"):
+        raise ValueError("Calibration has recorded attempts; preserve its frozen artifacts")
+    manifest = directory / "manifest.json"
+    hosted = {campaign / "annotations/ledger"}
+    if manifest.exists():
+        captured = read(manifest)
+        if captured.get("ledger_directory"):
+            hosted.add(Path(captured["ledger_directory"]))
+    if any(_hosted_has_usage(path) for path in hosted):
+        raise ValueError(
+            "Hosted annotation ledger has usage; preserve reservations and frozen evidence"
+        )
+    if directory.exists() and any(
+        child.name not in {"packets", "manifest.json"} for child in directory.iterdir()
+    ):
+        raise ValueError("Calibration manifest was used; preserve its frozen artifacts")
+
+
 def prepare(campaign):
     campaign = Path(campaign)
+    _require_unpublished_draft(campaign)
     directory = campaign / "annotations/calibration"
     profiles = {}
     prices = {}
@@ -86,6 +176,7 @@ def prepare(campaign):
         )
         prices[name] = dict(input=input_price, output=output_price)
     rows = []
+    packets = []
     parents = {}
     gold = {}
     for i, (left, right, definitions, decision) in enumerate(SETTINGS):
@@ -150,8 +241,14 @@ def prepare(campaign):
                 byte_budget=8000,
             ),
         )
-        bnd = immutable(directory / "packets" / f"{i}.json", packet.to_dict())
+        packets.append((i, packet))
         gold[packet.case_id] = decision
+    # Qualify every construction before mutating an earlier usable draft.
+    _require_unpublished_draft(campaign)
+    for i, packet in packets:
+        path = directory / "packets" / f"{i}.json"
+        write_artifact(path, packet.to_dict())
+        bnd = binding(path)
         for profile in SHORTLIST:
             for swapped in (False, True):
                 rows.append(
@@ -200,13 +297,7 @@ def prepare(campaign):
         calibration_gate=None,
     )
     manifest_path = directory / "manifest.json"
-    # Source identity can change while authoring an unsubmitted draft. Once
-    # batches or hosted reservations exist, the manifest is immutable.
-    deployed = (campaign / "batches").exists() or (campaign / "annotations/ledger").exists()
-    if deployed:
-        immutable(manifest_path, manifest)
-    else:
-        write_artifact(manifest_path, manifest)
+    write_artifact(manifest_path, manifest)
     return directory / "manifest.json"
 
 

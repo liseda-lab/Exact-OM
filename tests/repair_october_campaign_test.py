@@ -241,3 +241,91 @@ def test_public_real_input_does_not_require_invented_generated_truth(tmp_path, m
     assert report["semantic_benefit"] is None
     assert report["semantic_status"] == "independent_evaluation_not_provided"
     assert report["control"] == "observed_matcher_input"
+
+
+def test_calibration_drafts_can_be_reprepared_with_fresh_native_reports_without_spending(tmp_path):
+    from tools.repair import corrective_calibration as calibration
+
+    path = calibration.prepare(tmp_path)
+    first = json.loads(path.read_text())
+    refreshed_path = calibration.prepare(tmp_path)
+    assert refreshed_path == path
+    second = json.loads(path.read_text())
+    assert len(second["slots"]) == 32 and second["gold"] == first["gold"]
+    assert second["implementation_source"] == first["implementation_source"]
+    for row in second["slots"]:
+        packet = read_record(bound(row["packet"]))
+        assert packet.eligible
+    assert not (tmp_path / "annotations/ledger").exists()
+    assert not (tmp_path / "batches").exists()
+
+
+@pytest.mark.parametrize("frozen_by", ("batches", "attempts", "hosted", "used", "results"))
+def test_calibration_reprepare_rejects_before_any_write_or_native_work(
+    tmp_path, monkeypatch, frozen_by
+):
+    from tools.repair import corrective_calibration as calibration
+
+    directory = tmp_path / "annotations/calibration"
+    write_artifact(
+        directory / "manifest.json", dict(ledger_directory=str(tmp_path / "annotations/ledger"))
+    )
+    write_artifact(directory / "packets/0.json", dict(evidence="already frozen"))
+    if frozen_by == "batches":
+        (tmp_path / "batches").mkdir()
+    elif frozen_by == "attempts":
+        write_artifact(tmp_path / "ledger.json", dict(attempts={"job": {"state": "submitted"}}))
+    elif frozen_by == "hosted":
+        write_artifact(
+            tmp_path / "annotations/ledger/phase-reservations.json",
+            dict(reservations={"one": {"state": "reserved", "reserved_cost_usd": 0.05}}),
+        )
+    elif frozen_by == "used":
+        write_artifact(directory / "used.json", dict(manifest_sha256="recorded"))
+    else:
+        write_artifact(directory / "results/report.json", dict(status="unavailable"))
+
+    def contents():
+        return {
+            str(p.relative_to(tmp_path)): p.read_bytes() if p.is_file() else None
+            for p in tmp_path.rglob("*")
+        }
+
+    before = contents()
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("freeze guard must precede native verification")
+
+    monkeypatch.setattr(calibration, "_verified_plan", forbidden)
+    with pytest.raises(ValueError, match="Calibration|Hosted"):
+        calibration.prepare(tmp_path)
+    assert contents() == before
+
+
+def test_initialized_empty_hosted_ledger_allows_draft_refresh_without_changing_ledger(tmp_path):
+    import sqlite3
+    from tools.repair import corrective_calibration as calibration
+
+    directory = tmp_path / "annotations/ledger"
+    directory.mkdir(parents=True)
+    database = directory / "requests.sqlite3"
+    with sqlite3.connect(database) as db:
+        for name in calibration._HOSTED_TABLES:
+            db.execute(f'CREATE TABLE "{name}" (identity TEXT)')
+    (directory / "requests.transaction.lock").touch()
+    before = {p.name: p.read_bytes() for p in directory.iterdir()}
+    calibration.prepare(tmp_path)
+    calibration.prepare(tmp_path)
+    assert {p.name: p.read_bytes() for p in directory.iterdir()} == before
+    assert not calibration._hosted_has_usage(directory)
+    # Every recognized table is evidence of use, including pending reservations
+    # and approvals; do not require an actual successful API response.
+    for name in calibration._HOSTED_TABLES:
+        with sqlite3.connect(database) as db:
+            db.execute(f'INSERT INTO "{name}" VALUES (?)', ("consumed",))
+        before_reject = {p.name: p.read_bytes() for p in directory.iterdir()}
+        with pytest.raises(ValueError, match="Hosted annotation ledger has usage"):
+            calibration.prepare(tmp_path)
+        assert {p.name: p.read_bytes() for p in directory.iterdir()} == before_reject
+        with sqlite3.connect(database) as db:
+            db.execute(f'DELETE FROM "{name}"')

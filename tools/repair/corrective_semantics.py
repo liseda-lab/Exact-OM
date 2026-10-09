@@ -581,6 +581,16 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
 
 def run(manifest_path, output):
     manifest = validate_manifest(read(manifest_path))
+    if manifest["phase"] == "calibration":
+        path = Path(manifest_path).resolve()
+        immutable(
+            path.parent / "used.json",
+            dict(
+                schema="exact-repair/calibration-consumption/v1",
+                manifest_path=str(path),
+                manifest_sha256=sha(path),
+            ),
+        )
     started = time.monotonic()
     rows = []
     for row in manifest["slots"]:
