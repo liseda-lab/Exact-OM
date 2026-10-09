@@ -433,6 +433,18 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
             manifest = read_binding(dependencies[cell["id"]])
             if manifest.get("kind") != "reference_free_inference" or manifest.get("run_eval") is not False:
                 raise ValueError("Full inference requires the reference-free deployment manifest")
+            if frozen is None or cell["id"] not in frozen["fitting_recipes"]:
+                raise ValueError("Deployment requires its exact corrected selection/fitting recipe binding")
+            recipe_binding = frozen["fitting_recipes"][cell["id"]]
+            recipe = read_binding(recipe_binding)
+            if (recipe.get("kind") != "frozen_final_fitting_recipe" or recipe.get("cell_id") != cell["id"]
+                    or recipe.get("selected_config") != manifest.get("selected_config")
+                    or recipe.get("runtime_fitted_artifacts") != manifest.get("runtime_fitted_artifacts")
+                    or not isinstance(recipe.get("artifacts"), dict)):
+                raise ValueError("Deployment differs from its corrected frozen fitting recipe")
+            verified(recipe["selected_config"])
+            if recipe.get("runtime_fitted_artifacts"):
+                verified(recipe["runtime_fitted_artifacts"])
             populations = _validate_case_deployment(manifest, cases[cell["case"]], cell)
             for run in manifest["runs"]:
                 config = ConfigModel.load_config(verified(run["config"]))
@@ -445,6 +457,8 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                 fitted = validate_inference_config(config)
                 if fitted is None:
                     raise ValueError("Deployment must load immutable fitted artifacts")
+                if fitted["artifacts"] != recipe["artifacts"]:
+                    raise ValueError("Deployment fitted artifact lineage differs from the frozen recipe")
                 if config.seed != cell["seed"] or config.data.execution_mode != cell["mode"]:
                     raise ValueError("Deployment seed/mode differs from corrected logical cell")
                 for side in ("source", "target"):
@@ -473,6 +487,7 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                             for name in components) or fitted["artifacts"]):
                         raise ValueError("Label-free control cannot reuse fitted heads without verified target-label-independent lineage")
             row.update(status="bound_not_admitted", inference=dependencies[cell["id"]],
+                       fitting_recipe=recipe_binding,
                        physical_execution=dependencies[cell["id"]]["sha256"])
         logical.append(row)
     pending = live.get("pending", live.get("pending_batches", []))

@@ -241,7 +241,7 @@ def test_h2_validation_gate_precedes_any_validation_input_read(tmp_path, monkeyp
             public_queries=missing, target_population=missing, selection_freeze=frozen)
 
 
-def test_control_rejects_supervised_artifact_despite_relabelled_component_modes(tmp_path):
+def test_control_rejects_supervised_artifact_despite_relabelled_component_modes(tmp_path, monkeypatch):
     from exact.core.entities.configs.config import ConfigModel
     case, source, target, queries = native_case(tmp_path)
     head = saved(tmp_path / "fitted-fusion.json", {"kind": "fitted_fusion", "fit_provenance": {
@@ -257,9 +257,60 @@ def test_control_rejects_supervised_artifact_despite_relabelled_component_modes(
     registry = tmp_path / "registry.json"
     registry.write_text('{"pending": []}')
     inputs = saved(tmp_path / "inputs.json", {name: case for name in ("H0", "H1", "H2")})
+    frozen = deployment_selection(tmp_path, monkeypatch, manifest,
+                                  "supervision/H0/label_free/local_ranking/seed-17")
     with pytest.raises(ValueError, match="target-label-independent lineage"):
         mixed.prepare_successor_bundle(tmp_path / "successor", registry=registry, public_inputs=inputs["path"],
-            deployments={"supervision/H0/label_free/local_ranking/seed-17": mixed.binding(manifest)})
+            selection_freeze=frozen, deployments={"supervision/H0/label_free/local_ranking/seed-17": mixed.binding(manifest)})
+
+
+def deployment_selection(tmp_path, monkeypatch, manifest_path, cell_id, *, selected_config=None):
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.utils.frozen_inference import validate_inference_config
+    manifest = json.loads(manifest_path.read_text())
+    config = ConfigModel.load_config(mixed.verified(manifest["runs"][0]["config"]))
+    recipe = saved(tmp_path / "fitting-recipe.json", {
+        "kind": "frozen_final_fitting_recipe", "cell_id": cell_id,
+        "selected_config": selected_config or manifest["selected_config"],
+        "runtime_fitted_artifacts": manifest.get("runtime_fitted_artifacts"),
+        "artifacts": validate_inference_config(config)["artifacts"],
+    })
+    frozen = mixed.read_binding(selection_freeze(tmp_path / "selection", monkeypatch))
+    frozen["fitting_recipes"] = {cell_id: recipe}
+    frozen.pop("identity")
+    frozen["identity"] = mixed.fingerprint(frozen)
+    return saved(tmp_path / "deployment-freeze.json", frozen)
+
+
+def test_successor_deployment_cannot_substitute_an_unselected_recipe(tmp_path, monkeypatch):
+    from exact.core.entities.configs.config import ConfigModel
+    case, source, target, queries = native_case(tmp_path)
+    config = ConfigModel.from_mapping({"config_version": 2, "run": {"seed": 17},
+        "supervision": {"mode": "label_free"}, "dataset": {"filter_ignored_alignment_classes": False}})
+    selected = tmp_path / "selected.json"
+    selected.write_text(json.dumps(config.model_dump(mode="json")))
+    manifest = prepare_public_inference(selected, tmp_path / "inference", source=source,
+        target=target, track="bioml-local", public_candidates=queries)
+    registry = tmp_path / "registry.json"
+    registry.write_text('{"pending": []}')
+    inputs = saved(tmp_path / "inputs.json", {name: case for name in ("H0", "H1", "H2")})
+    cell = "primary/H0/stack_all/local_ranking/seed-17"
+    with pytest.raises(ValueError, match="exact corrected selection/fitting"):
+        mixed.prepare_successor_bundle(tmp_path / "unfrozen", registry=registry, public_inputs=inputs["path"],
+            deployments={cell: mixed.binding(manifest)})
+    valid = deployment_selection(tmp_path / "bound", monkeypatch, manifest, cell)
+    bundle = mixed.prepare_successor_bundle(tmp_path / "prepared", registry=registry, public_inputs=inputs["path"],
+        selection_freeze=valid, deployments={cell: mixed.binding(manifest)})
+    row = next(row for row in bundle["logical_to_physical"] if row["id"] == cell)
+    assert row["status"] == "bound_not_admitted" and row["fitting_recipe"]
+    assert bundle["launchable"] is False
+    other = tmp_path / "other-selected.json"
+    config.matching.threshold = 0.9
+    other.write_text(json.dumps(config.model_dump(mode="json")))
+    frozen = deployment_selection(tmp_path, monkeypatch, manifest, cell, selected_config=mixed.binding(other))
+    with pytest.raises(ValueError, match="corrected frozen fitting recipe"):
+        mixed.prepare_successor_bundle(tmp_path / "substituted", registry=registry, public_inputs=inputs["path"],
+            selection_freeze=frozen, deployments={cell: mixed.binding(manifest)})
 
 
 def test_h2_cohort_is_fixed_report_only_and_retains_duplicate_source_queries(tmp_path, monkeypatch):
