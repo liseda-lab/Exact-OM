@@ -379,6 +379,9 @@ class FeatureEngineeringMixin:
     def _record_evidence_items(self, record: Mapping[str, Any]) -> List[Tuple[str, float]]:
         if not record:
             return []
+        if record.get("resident_evidence_schema") == 1:
+            return [(str(item["key"]), float(item["strength"]))
+                    for item in record["selector_evidence_items"]]
         linked_ids = self._linked_item_ids(record.get("cross_side_provenance") or {})
         items: List[Tuple[str, float]] = []
 

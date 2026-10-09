@@ -97,6 +97,13 @@ class CheckpointingMixin:
         # experimental extractor changes reusable inference output.
         if extraction != {"mode": "greedy", "assignment_component_cap": 500}:
             payload["trainer"] = {"extraction": extraction}
+        primary = getattr(self, "model", None)
+        if (getattr(primary, "llm_experiment_enabled", False)
+                and getattr(primary, "llm_experiment_config", {}).get("decision", {}).get("mode", "binary") == "binary"):
+            # The old binary experimental path could select displayed candidates
+            # over an arbitrary tile. Such checkpoints cannot prove full-query
+            # routing compatibility, even when the scorer recipe is unchanged.
+            payload.setdefault("trainer", {})["complete_binary_source_groups"] = 1
         return payload
 
     def _build_checkpoint_fingerprint(
@@ -420,9 +427,10 @@ class CheckpointingMixin:
             self._explanation_store = store
             self._audit_manifest_path = store.index_path
             self._audit_total_records = store.record_count
-            results_json = list(store.iter_all())
+            results_json = []
             candidate_rows = []
-            for record in results_json:
+            for record in store.iter_all():
+                results_json.append(self._resident_evidence_record(record))
                 row = self._candidate_row_from_explanation_record(record)
                 if row is None:
                     continue

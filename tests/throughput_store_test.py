@@ -77,3 +77,31 @@ def test_external_output_root_quota_prevents_worker_admission(tmp_path, monkeypa
     )
     assert result == 75
     assert "usage ceiling" in (tmp_path / "STOP").read_text()
+
+
+def test_compact_resident_evidence_preserves_selector_and_full_durable_record(tmp_path, monkeypatch):
+    import copy
+    from types import SimpleNamespace
+    import pandas as pd
+    from exact.impl.trainer.audit_io import AuditIOMixin
+    from exact.impl.models.selector.selector import CandidateSetSelector
+
+    selector = CandidateSetSelector(enabled=True, use_no_match=False, llm={"enabled": False})
+    owner = AuditIOMixin()
+    owner.model = SimpleNamespace(generate_llm_rationales=False)
+    owner.models = [owner.model, selector]
+    owner._explanation_store = ExplanationStore(tmp_path)
+    records = [{"src_iri": "s", "tgt_iri": t, "confidences": {"S_final": 0.8},
+                "attributes": {"source": [], "target": [{"property": "definition", "value": t,
+                                                         "item_id": t, "weight": 1.0}]},
+                "cross_side_provenance": {}}
+               for t in ("one", "two")]
+    owner._explanation_store.append(records)
+    monkeypatch.setenv("EXACT_COMPACT_RESIDENT_EVIDENCE", "1")
+    compact = [owner._resident_evidence_record(r) for r in records]
+    assert all("attributes" not in r for r in compact)
+    frame = pd.DataFrame({"Src": ["s", "s"], "Tgt": ["one", "two"], "S_pair_final": [0.8, 0.79]})
+    full_scores = selector._distinctive_scores(frame, selector._record_lookup(copy.deepcopy(records)))
+    compact_scores = selector._distinctive_scores(frame, selector._record_lookup(compact))
+    assert full_scores == compact_scores
+    assert all("attributes" in r for r in owner._explanation_store.iter_all())

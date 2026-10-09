@@ -144,6 +144,7 @@ class Measurement:
                 "device": self.device, "workload_identity": self.workload["identity"],
                 "chunks": self.chunks, "elapsed_seconds": elapsed,
                 "distinct_computed_pairs": count, "pairs_per_second": rate,
+                "processed_rows_per_second": sum(c.get("rows", 0) for c in self.chunks) / elapsed if elapsed else 0.0,
                 "median_chunk_pairs_per_second": statistics.median(rates) if rates else None,
                 "worst_chunk_pairs_per_second": min(rates) if rates else None,
                 "minimum_measurement_contract_met": valid,
