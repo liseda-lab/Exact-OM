@@ -124,9 +124,14 @@ def render(axioms):
     ).decode()
 
 
-def controlled_evidence(case, source_ref):
-    if case.split != "train" or case.origin != "generated" or case.family not in SETTINGS:
-        raise ValueError("Controlled evidence only supports the frozen generated TRAIN families")
+def controlled_evidence(case, source_ref, *, allowed_split="train"):
+    if (
+        allowed_split not in {"train", "development"}
+        or case.split != allowed_split
+        or case.origin != "generated"
+        or case.family not in SETTINGS
+    ):
+        raise ValueError("Controlled evidence requires an explicit matching TRAIN or DEV split")
     if not case.intended_theory:
         raise ValueError("Authored setting requires original intended construction")
     fixed = set(case.problem.fixed_axioms)
@@ -161,7 +166,7 @@ def controlled_evidence(case, source_ref):
         symbolic_value=None,
     )
     return dict(
-        schema="exact-repair/controlled-train-evidence/v1",
+        schema=f"exact-repair/controlled-{allowed_split}-evidence/v1",
         revision=REVISION,
         case_id=case.case_id,
         parent=case.structural_parent,

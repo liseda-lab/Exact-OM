@@ -117,6 +117,11 @@ def validate_manifest(value):
 
     if value.get("schema") != "exact-repair/corrective-annotation/v1":
         raise ValueError("Unknown corrective annotation manifest")
+    if value.get("packet_encoding") is not None:
+        from tools.repair.semantic_packet_encoding import REVISION
+
+        if value["phase"] != "development" or value["packet_encoding"] != REVISION:
+            raise ValueError("Unsupported post-decode packet encoding")
     if value.get("postprocessing_only"):
         raise PermissionError("Postprocessing contracts cannot transmit annotations")
     if not 0 < value["cost_ceiling_usd"] <= 35:
@@ -1247,6 +1252,25 @@ def annotate_comparison(
     return labels
 
 
+def decoded_transport_packet(packet, manifest, directory):
+    """Preserve original native evidence and an exact reversible transport proof."""
+    from tools.repair.semantic_packet_encoding import REVISION, encode, decode
+
+    encoding = manifest.get("packet_encoding")
+    if encoding is None:
+        return packet
+    if encoding != REVISION or packet.split != "development":
+        raise ValueError("Unsupported post-decode packet encoding or split")
+    compact, proof = encode(packet)
+    if decode(compact, proof).to_dict() != packet.to_dict():
+        raise ValueError("Post-decode transport changed complete native evidence")
+    directory = Path(directory)
+    immutable(directory / "original-packet.json", packet.to_dict())
+    immutable(directory / "transport-packet.json", compact.to_dict())
+    immutable(directory / "transport-proof.json", proof)
+    return compact
+
+
 def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float) -> Path | None:
     """Attach fresh DEV labels only to the exact decoded, verified generated pool."""
     from exact.repair.workers import bounded_call
@@ -1364,6 +1388,7 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         tuple(p.probe_id for p in case.probes),
         entry["coverage"],
     )
+    packet = decoded_transport_packet(packet, manifest, request_path.parent / "transport")
     return annotate_comparison(
         packet,
         manifest,

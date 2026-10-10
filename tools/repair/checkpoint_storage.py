@@ -3,6 +3,7 @@
 The candidate preserves tensor bytes, all optimizer/RNG state, atomic replacement,
 and both file/directory fsync. It is not enabled in scientific training by this module.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,11 +35,16 @@ def save_compressed(path, state):
     try:
         with os.fdopen(descriptor, "wb") as stream:
             with zipfile.ZipFile(serialized) as source, zipfile.ZipFile(
-                stream, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=1,
+                stream,
+                "w",
+                compression=zipfile.ZIP_DEFLATED,
+                compresslevel=1,
                 allowZip64=True,
             ) as target:
                 for entry in source.infolist():
-                    with source.open(entry) as incoming, target.open(entry.filename, "w", force_zip64=True) as outgoing:
+                    with source.open(entry) as incoming, target.open(
+                        entry.filename, "w", force_zip64=True
+                    ) as outgoing:
                         shutil.copyfileobj(incoming, outgoing, length=1024 * 1024)
             stream.flush()
             os.fsync(stream.fileno())
@@ -62,7 +68,9 @@ def run(manifest_path, output):
     if manifest["scope"] != "terminal_train_engineering_storage_only":
         raise ValueError("Storage qualification scope changed")
     deadline = float(os.environ["EXACT_REPAIR_DEADLINE_EPOCH"])
-    immutable(output / "started.json", dict(epoch=time.time(), manifest=binding(Path(manifest_path))))
+    immutable(
+        output / "started.json", dict(epoch=time.time(), manifest=binding(Path(manifest_path)))
+    )
     if (output / "report.json").exists():
         raise ValueError("Do not replay terminal storage qualification")
     rows = []
@@ -76,7 +84,10 @@ def run(manifest_path, output):
             if best:
                 value["best_state"] = copy.deepcopy(state["model"])
             for repeat in range(2):
-                for codec, writer in (("stored", save_training_state), ("deflate1", save_compressed)):
+                for codec, writer in (
+                    ("stored", save_training_state),
+                    ("deflate1", save_compressed),
+                ):
                     if time.time() + 15 >= deadline:
                         raise TimeoutError("Storage qualification cleanup reserve reached")
                     key = f"{source.parent.name}-{best}-{repeat}-{codec}"
@@ -89,19 +100,37 @@ def run(manifest_path, output):
                     read_seconds = time.monotonic() - started
                     if not identical(value, restored):
                         raise ValueError("Storage roundtrip changed checkpoint state")
-                    row = dict(source=reference, best_state_present=best, repeat=repeat, codec=codec,
-                               write_seconds=write_seconds, read_seconds=read_seconds,
-                               bytes=path.stat().st_size, exact_all_state=True)
+                    row = dict(
+                        source=reference,
+                        best_state_present=best,
+                        repeat=repeat,
+                        codec=codec,
+                        write_seconds=write_seconds,
+                        read_seconds=read_seconds,
+                        bytes=path.stat().st_size,
+                        exact_all_state=True,
+                    )
                     immutable(output / "rows" / (key + ".json"), row)
                     rows.append(row)
                     path.unlink()  # Disposable measured copies; original remains immutable.
             del value
         authenticate(reference)
-    result = dict(schema="exact-repair/checkpoint-storage-qualification/v1", status="complete",
-                  rows=rows, optimizer_updates_executed=0, selected_model=False,
-                  test_outcomes_opened=False, hosted_calls=0, source_states_unchanged=True,
-                  training_writer_changed=False, measured_cpu_only=True,
-                  remaining_gate="Compare total write/read overhead; qualify any selected writer under actual GPU load before endpoint admission")
+    result = dict(
+        schema="exact-repair/checkpoint-storage-qualification/v1",
+        status="complete",
+        rows=rows,
+        optimizer_updates_executed=0,
+        selected_model=False,
+        test_outcomes_opened=False,
+        hosted_calls=0,
+        source_states_unchanged=True,
+        training_writer_changed=False,
+        measured_cpu_only=True,
+        remaining_gate=(
+            "Compare total write/read overhead; qualify any selected writer under "
+            "actual GPU load before endpoint admission"
+        ),
+    )
     immutable(output / "report.json", result)
     return result
 
