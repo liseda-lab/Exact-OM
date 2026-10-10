@@ -2,6 +2,17 @@
 
 `tools.repair.primary_runtime` adds separate fit and DEV processes. `train_cases(execution_phase=...)` commits optimizer, RNG, minibatch position, phase and original start time before returning a `PhaseBoundary`. A fitting phase cannot enter DEV, and a DEV phase cannot update weights. Only declared epochs execute DEV; unscheduled epochs do not run additional DEV losses. DEV consumes its own RNG stream and restores fitting RNG before the next fit segment. Every remaining frozen DEV case is reserved before further fitting; begun case deadlines survive process changes.
 
+The control exception lives in `tools.repair.phase_boundary`, so the `python -m`
+entry point and the imported training module catch the same class. Subprocess
+regressions cover fit, DEV and qualification entry points; the original runner
+missed this signal after saving the first DEV boundary. A bound recovery contract
+can authenticate that specific failure and an untouched, finite first-DEV
+checkpoint. The normal training loader must still pass its exact input/source
+resume checks and refuse further fitting while DEV is pending. Only then can the
+successor publish the missing phase receipt, with zero replayed updates and an
+unchanged checkpoint hash. It preserves the failed attempt and all clocks/costs.
+No training/model source or scientific identity changes for this correction.
+
 The resolved entry point rejects inert protocols and unresolved teacher, shared weak-label, scale, measured endpoint and resource gates. Each phase requires exactly one Slurm-visible GPU, checked by UUID, and the batch deadline. Fit stays on the5090. DEV holds the2080 through inference/annotation, charging idle GPU time; an oversized result can be routed only after an owned boundary, preserving the same state, case deadline and cumulative ledger. Both devices count against each model's three GPU hours and the aggregate18GPU hours. DEV also counts against development and secondary-learning caps. The dispatcher must see a terminal nonce-bound step before starting a dependent phase.
 
 `qualify` is a disposable symbolic engineering epoch on the126 committed TRAIN caches, retaining128 declared cases. It cannot enter DEV, call a teacher or produce a selectable checkpoint. It measures actual update time, setup/checkpoint-inclusive wall time and peak GPU memory. Combined-loss and concurrent-load measurements remain necessary for final admission. Profiling output is not primary model fitting.
