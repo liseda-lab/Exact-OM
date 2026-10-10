@@ -739,3 +739,49 @@ def test_publication_status_does_not_inspect_an_unowned_database(tmp_path, monke
     state = review.publication_state(config)
     assert state["published"] is None and state["closed"] is None
     assert state["available_for_test_sessions"] is False
+
+
+def test_start_detects_exited_child_without_waiting_for_admission_timeout(tmp_path, monkeypatch):
+    config = {"root": str(tmp_path), "database_name": "review"}
+    old = {"pid": 3, "nonce": "old", "identity": "previously-owned"}
+    monkeypatch.setattr(review, "preflight", lambda _: None)
+    monkeypatch.setattr(review, "require_open_publication", lambda _: None)
+    monkeypatch.setattr(review, "processes", lambda _: {"postgres": old})
+    monkeypatch.setattr(review, "owned", lambda config, role, record: role == "postgres")
+    monkeypatch.setattr(review, "pg_ready", lambda *args: True)
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, *args):
+            return self
+
+        def fetchone(self):
+            return (1,)
+
+    monkeypatch.setattr(review, "database", lambda *args: Connection())
+    monkeypatch.setattr(review, "launch", lambda *args: {"pid": 4})
+    monkeypatch.setattr(review, "http", lambda *args: pytest.fail("Exited worker cannot be probed"))
+    ticks = iter((0, 0, 0, 0, 601))
+    monkeypatch.setattr(review.time, "monotonic", lambda: next(ticks))
+    sleeps = []
+    monkeypatch.setattr(review.time, "sleep", sleeps.append)
+    stopped = []
+    monkeypatch.setattr(review, "stop_role", lambda config, role: stopped.append(role))
+    with pytest.raises(review.ReviewError, match="study.*exited or changed ownership"):
+        review.start(config)
+    assert sleeps == []
+    assert stopped == ["study"]
+
+
+def test_service_wait_rechecks_identity_after_readiness_probe(monkeypatch):
+    identities = iter((True, False))
+    monkeypatch.setattr(review, "owned", lambda *args: next(identities))
+    monkeypatch.setattr(review, "service_ready", lambda *args: True)
+    monkeypatch.setattr(review.time, "sleep", lambda _: pytest.fail("No delay after lost identity"))
+    with pytest.raises(review.ReviewError, match="exploration.*exited or changed ownership"):
+        review.wait_for_service({}, "exploration", {"pid": 4}, timeout=90)

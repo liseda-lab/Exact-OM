@@ -814,6 +814,26 @@ def service_ready(config, role, record):
     return bool(ready and owned(config, role, record))
 
 
+def wait_for_service(config, role, record, *, timeout=40):
+    """Stop startup promptly if its worker exits or is replaced before readiness."""
+
+    def ready():
+        if not owned(config, role, record):
+            raise ReviewError(
+                f"The {role} review service exited or changed ownership before readiness; "
+                "consult its private log"
+            )
+        result = service_ready(config, role, record)
+        if not owned(config, role, record):
+            raise ReviewError(
+                f"The {role} review service exited or changed ownership before readiness; "
+                "consult its private log"
+            )
+        return result
+
+    wait_for(ready, timeout=timeout)
+
+
 def start(config):
     preflight(config)
     started = []
@@ -827,7 +847,7 @@ def start(config):
                 record = launch(config, role)
                 started.append(role)
             if role == "postgres":
-                wait_for(lambda: service_ready(config, role, record))
+                wait_for_service(config, role, record)
                 from psycopg import sql
 
                 with database(config, "postgres") as db:
@@ -843,10 +863,7 @@ def start(config):
             else:
                 # Study admission runs before its listener binds; large frozen ontology
                 # bundles need the same bounded budget as an explicit publication POST.
-                wait_for(
-                    lambda: service_ready(config, role, record),
-                    timeout=600 if role == "study" else 90,
-                )
+                wait_for_service(config, role, record, timeout=600 if role == "study" else 90)
         result = status(config, preflight_checked=True)
         if not all(
             value["state"] == "owned" and value.get("ready")
