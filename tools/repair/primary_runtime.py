@@ -17,21 +17,11 @@ from pathlib import Path
 from exact.repair.records import canonical_hash
 from tools.repair.batch import read
 from tools.repair.historical_regression import binding
+from tools.repair.phase_boundary import PhaseBoundary
 from tools.repair.shared_release import authenticate, bound, immutable
 
 FIT_GPU = "GPU-19b25b77-7f5b-79a9-0c39-843ea57bd484"
 DEV_GPU = "GPU-7b3f1042-3c17-9c54-5653-415de63df835"
-
-
-class PhaseBoundary(Exception):
-    def __init__(self, next_phase, completed_epoch, optimizer_updates):
-        self.receipt = dict(
-            status="phase_complete",
-            next_phase=next_phase,
-            completed_epoch=completed_epoch,
-            optimizer_updates=optimizer_updates,
-        )
-        super().__init__(next_phase)
 
 
 def remaining_dev_reserve(epochs, limits, seed, condition, case_ids, history, progress, default):
@@ -242,6 +232,11 @@ def run_phase(manifest_path, phase, output):
             (c, caches[c.case_id]) for c in cases if c.split == "train" and c.case_id in caches
         ]
         dev = scheduled_runtime_development(cases, caches, config)
+        recovery = None
+        if manifest.get("phase_boundary_recovery"):
+            from tools.repair.phase_boundary_recovery import validate_recovery
+
+            recovery = validate_recovery(manifest, phase, config, fitting)
         try:
             # Normal completion has the existing full selection report. Publish
             # selected weights only after both scheduled passes and common endpoint.
@@ -273,9 +268,18 @@ def run_phase(manifest_path, phase, output):
         except TimeoutError as error:
             result = dict(status="resource_limited", detail=str(error), retryable=False)
         except ValueError as error:
-            if not str(error).startswith("No eligible development checkpoint"):
+            if recovery is not None and str(error) == "Fit cannot bypass a pending DEV pass":
+                # train_cases has already checked the unchanged resume identity
+                # and restored model/optimizer/RNG. It refuses to optimize while
+                # DEV is pending, so only the missing boundary receipt is recovered.
+                result = recovery
+            elif str(error).startswith("No eligible development checkpoint"):
+                result = dict(status="incomplete_selection", detail=str(error), retryable=False)
+            else:
                 raise
-            result = dict(status="incomplete_selection", detail=str(error), retryable=False)
+        if recovery is not None:
+            if result is not recovery or binding(state / "training-state.pt") != recovery["state"]:
+                raise ValueError("Boundary recovery changed the checkpoint or crossed its phase")
         result.update(
             manifest=binding(Path(manifest_path)),
             phase=phase,
@@ -353,7 +357,9 @@ def qualify(prepared_path, output, seconds=600, *, shared_weak_labels=None, rati
             raise
         result = dict(status="resource_limited", detail=str(error), retryable=False)
     state_path = output / "engineering-state.pt"
-    saved = torch.load(state_path, weights_only=True, map_location="cpu") if state_path.exists() else {}
+    saved = (
+        torch.load(state_path, weights_only=True, map_location="cpu") if state_path.exists() else {}
+    )
     result.update(
         schema="exact-repair/current-inventory-throughput/v1",
         prepared=binding(Path(prepared_path)),
