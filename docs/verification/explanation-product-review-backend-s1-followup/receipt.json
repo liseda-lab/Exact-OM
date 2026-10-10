@@ -1,6 +1,6 @@
 {
   "schema": "exact-review-backend-s1-followup/1",
-  "recorded_at": "2026-10-10T18:33:35.199477+00:00",
+  "recorded_at": "2026-10-10T18:52:07.404887+00:00",
   "reviewed_commit": "7a6028c032962d0afae0e7de5a479090f330f3e1",
   "implementation_commit": "4f9dad94ecf288164e3d5f5ee922387e8822c4b2",
   "status": "qualified_handoff_with_open_gates",
@@ -33,7 +33,7 @@
     "S1-06": {
       "priority": "P2",
       "owner": "backend/runtime",
-      "disposition": "integrity_preserving_optimizations_tested; new_HTTPS_startup_and_journey_pending_at_snapshot"
+      "disposition": "integrity_preserving_optimizations_tested; fresh_HTTPS_journey_and_restart_resume_passed; startup_speed_and_clean_cold_timing_gates_open"
     }
   },
   "bundle": {
@@ -101,14 +101,65 @@
     "publication_audit": "passed_514_claims_zero_failures",
     "full_pool_preservation": "passed_no_score_or_decision_changes",
     "auxiliary_smoke_ASGI": "nine_pair_responses_passed",
-    "fresh_HTTPS_journey": "running_tutorial_real_elapsed_dwell; not_yet_passed",
+    "fresh_HTTPS_journey": {
+      "status": "passed",
+      "HTTP_checks": 5206,
+      "elapsed_seconds": 647.652,
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "receipt": "https-journey.json",
+      "rendered_browser": false
+    },
     "new_environment_startup": "ready_in_106.066_s_after_initial_failure; not_clean_cold_publication_start",
-    "new_environment_restart_resume": "background_pipeline_pending",
+    "new_environment_restart_resume": {
+      "status": "passed",
+      "warm_restart_seconds": 156.55655126692727,
+      "same_session_revision_completed_stage": true,
+      "content_length_checked": true,
+      "post_restart_CSP_recheck": false,
+      "limitation": "Running helper predated added verifier-hash and post-restart CSP instrumentation; complete journey CSP checks are recorded separately."
+    },
     "relocation": "new independent root audit passed; hidden-original serving check remains open",
     "R16": "unresolved_not_reproduced_or_fixed_here",
     "fresh_API_tutorial_rejections": {
       "tutorial_rejection:omitted_entity_kind": 422,
       "tutorial_rejection:unadmitted_fact": 422
+    },
+    "first_observed_request_timings": {
+      "current_case": {
+        "n": 24,
+        "first_seconds": 0.053,
+        "median_seconds": 0.027500000000000004,
+        "max_seconds": 0.065
+      },
+      "current_explanation_resource": {
+        "n": 12,
+        "first_seconds": 0.053,
+        "median_seconds": 0.032,
+        "max_seconds": 0.06
+      },
+      "study_pair_metadata": {
+        "n": 60,
+        "first_seconds": 0.051,
+        "median_seconds": 0.096,
+        "max_seconds": 0.139
+      },
+      "main_pair_metadata": {
+        "n": 60,
+        "first_seconds": 0.016,
+        "median_seconds": 0.043,
+        "max_seconds": 0.204
+      },
+      "entity_context_full": {
+        "n": 12,
+        "first_seconds": 0.08,
+        "median_seconds": 0.08,
+        "max_seconds": 0.087
+      },
+      "scope": "After readiness preparation and preceding verifier reads; not an isolated OS-cache-cold benchmark."
     }
   },
   "environment": {
@@ -126,7 +177,9 @@
     "normal_CSP": true,
     "certificate_trust_bypassed": false,
     "existing_environment_preserved": true,
-    "ready_observed": true
+    "ready_observed": true,
+    "serving_publication_sha256": "e5d2ee62de2093b3492da4cbeb3b2e19b832becf302fb11a5d2f7203cfec70fe",
+    "serving_publication_note": "New local serving revision/expiry derived from immutable source publication; source and serving hashes intentionally differ."
   },
   "receipts": {
     "publication-audit.json": {
@@ -212,6 +265,22 @@
     "smoke-harness.executed.py": {
       "sha256": "64b0301adeefa3589b4a667b9b628988816add94518f00eea4baef5d5e14cd80",
       "bytes": 5602
+    },
+    "https-journey.json": {
+      "sha256": "354a2f48dbfa309a241660b55dda79764390bea7c29145c08da5eae5a7d8d469",
+      "bytes": 1309023
+    },
+    "ready-study.json": {
+      "sha256": "3977009c03ec13ac35d97d1c497fbb52d913df5909d1fd99520683cdd01a58b4",
+      "bytes": 713
+    },
+    "ready-exploration.json": {
+      "sha256": "f7b6a9aa71e094c111f3f4b43518ee2db24906c314f353107046de5b62d6e020",
+      "bytes": 627
+    },
+    "background-snapshot.json": {
+      "sha256": "4636b6c34458a9b2b76303190fe482c2373608e29f2e7b74392d9f1320464385",
+      "bytes": 637
     }
   },
   "conclusions": {
@@ -223,7 +292,7 @@
     "working provider credential, bounded successful preflight and independent semantic prose audit",
     "original pinned DOID/import closure native admission",
     "missing sparse/restriction/final-decision coverage",
-    "verified cold/warm/first-use timing",
+    "cold-start and restart performance acceptance",
     "frontend S2 and complete rendered journey",
     "manual accessibility",
     "usability and pilot",
@@ -238,12 +307,13 @@
     "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/environment-verification",
     "log": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/environment-verification.log",
     "command": "python -m tools.complete_review_environment_checks <environment> <new-output>",
-    "status": "running",
-    "completion_not_claimed": true,
-    "last_observed_phase": "fresh_https_journey",
+    "status": "passed",
+    "completion_not_claimed": false,
+    "last_observed_phase": "complete",
     "startup_seconds": 106.06601747288369,
-    "journey_status": "running",
-    "checkpoint_HTTP_checks": 34
+    "journey_status": "passed",
+    "checkpoint_HTTP_checks": 5206,
+    "warm_restart_seconds": 156.55655126692727
   },
   "first_startup_limitation": "Study completed admission in 51.972 s and workspace readiness in .409 s (total 53.612 s); exploration did not become ready within its existing timeout, so the start command stopped all its newly owned processes. No fresh complete HTTP journey resulted from that attempt.",
   "schema_contract_hashes": {
@@ -266,5 +336,6 @@
     "archive": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/trace-review-v2/trace-smoke.zip",
     "archive_sha256": "712b600cf70c4ff1d8e9832654929e4d2267c2f5fe43a1200e459d324e738e77",
     "exact_basis": "producer normalization/label basis not recorded; actual completed prefilter route events are recorded"
-  }
+  },
+  "handoff_commit": "cdddb44407145cb85478aef8ef39884f2cb54a50"
 }

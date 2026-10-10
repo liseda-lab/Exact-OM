@@ -119,8 +119,15 @@ remaining bounded preparation and independent semantic review can proceed.
   protected flags. The producer still did not export an exact label/normalization basis. Their
   bypassed scoring is not counted as the missing sparse-selected-evidence stratum.
 - Fresh HTTPS/PostgreSQL verification and startup receipts are listed in the machine receipt.
-  A pending or failed receipt remains an open check. The prior independently verified 656-request
-  journey belongs to the earlier publication and is not relabelled as a fresh result.
+  The new complete journey passed **5,206 HTTP checks in 647.652 s**, all 24 cases (12 per
+  condition), five rejected and five correct assessment attempts, typed/admitted-fact rejection
+  with unchanged progress, per-case consultation, completion and immutable JSON/CSV exports.
+  All 100 observed participant states withheld the owner catalogue. All 4,570 inventory pages
+  were freshly checked across study and main, with equal complete typed-entity inventories.
+  Three early-closed responses were followed by identical complete 36,434-byte responses;
+  this does not prove browser reload or server-side cancellation behavior. The study log
+  observation found no h11/Content-Length/ASGI exception signatures. Earlier journeys are
+  not relabelled as this result.
 - The first new start failed exploration readiness within the unchanged timeout. Its study worker
   completed publication admission in 51.972 s and workspace readiness in 0.409 s (53.612 s total).
   The lifecycle tool stopped its newly owned processes and preserved the database. A background
@@ -129,6 +136,15 @@ remaining bounded preparation and independent semantic review can proceed.
   deliberately handed off rather than keeping the chat waiting for it.
   The rerun reached readiness in **106.066 s** with the preserved cluster/publication. This is
   fresh-worker readiness after the failed initial attempt, not a clean cold-publication result.
+  Its first explanation-resource request took 0.053 s; first study/main pair metadata took
+  0.051/0.016 s, with maxima 0.139/0.204 s. These are first observed requests after readiness
+  preparation and the verifier's preceding reads, not isolated OS-cache-cold benchmarks.
+  Restart/resume completed while the handoff was being committed: **156.557 s**, with the
+  same completed session, revision and complete response length preserved. This validates
+  persistence, not acceptable startup speed. The complete API, lifecycle and readiness phase
+  receipts are committed alongside the handoff. The running lifecycle helper predated its
+  added verifier-hash and post-restart CSP instrumentation; CSP/body checks in the complete
+  journey are separate evidence. The committed helper includes those additions for later runs.
 - Cloud-backed checkout reads blocked several checks, including Python bytecode, Git object
   reads and unrelated files during Git index refresh. Local bytecode caching and a materialized,
   hash-identical graph module avoided some of those delays. These observations do not prove the

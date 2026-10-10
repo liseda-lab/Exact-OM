@@ -1,0 +1,16 @@
+{
+  "backend": {
+    "file_count": 53,
+    "git_commit": "7a6028c032962d0afae0e7de5a479090f330f3e1",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "a947750cb6070d81ec5521e96357713cb208dccb0abeb4a6de37e0528039e2f8"
+  },
+  "phase": "complete",
+  "publication_sha256": "e5d2ee62de2093b3492da4cbeb3b2e19b832becf302fb11a5d2f7203cfec70fe",
+  "resumed_stage": "completed",
+  "schema": "exact-review-environment-followup/1",
+  "session_sha256": "f2115f4104a14ecf3e3bc024157ed869ab371950fcd79800b422dfe3963b29e4",
+  "startup_seconds": 106.06601747288369,
+  "status": "passed",
+  "warm_restart_seconds": 156.55655126692727
+}
