@@ -44,6 +44,16 @@ def write(path, value):
     _atomic_json(Path(path), value)
 
 
+def _forbid_hosted_generation():
+    """Reject accidental hosted work before any request or spending ledger opens."""
+    from exact.llm.routing import OpenRouterClient
+
+    def denied(*_args, **_kwargs):
+        raise RuntimeError("Hosted generation forbidden in throughput qualification before ledger access")
+
+    OpenRouterClient._generation = denied
+
+
 def prepare(args):
     panel = json.loads(args.public_inputs.read_text())
     cases = panel.get("cases", panel)
@@ -87,6 +97,7 @@ def prepare(args):
 def run(args):
     # Hugging Face reads these flags at import time, before model construction.
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", OPENROUTER_API_KEY="")
+    _forbid_hosted_generation()
     import resource
     import torch
     import pandas as pd
@@ -294,6 +305,7 @@ def run(args):
                           "encoder": {**encoding, "distinct_texts": len(encoded_texts)}}
     write(args.output / "measurement.json", {
         "schema_version": 1, "namespace": "qualification_only", "paid_calls": 0,
+        "hosted_generation_guard": "deny_before_ledger",
         "fixture_calls": fixture_calls, "cold": receipts["cold"], "warm": receipts["warm"],
         "replay": receipts["replay"],
         "native_preparation_seconds": native_seconds, "model_loading_seconds": model_seconds,

@@ -53,6 +53,8 @@ def compare_records(left, right, *, tolerance=1e-5):
 
     if len(left) != len(right):
         discrete.append("ordinary record count")
+    if not left or not right:
+        discrete.append("no ordinary records to compare")
     for index, (a, b) in enumerate(zip(left, right)):
         check(a, b, f"pair[{index}]")
     for field in ("S_final", "S_base", "S_struct", "s_label"):
@@ -123,6 +125,8 @@ def main():
     args = parser.parse_args()
     result = compare(args.baseline, args.candidate, args.output)
     print(json.dumps({k: result[k] for k in ("status", "compared_rows", "max_absolute_error", "numeric_mismatch_count", "discrete_mismatch_count")}, indent=2))
+    if result["status"] != "passed":
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":
