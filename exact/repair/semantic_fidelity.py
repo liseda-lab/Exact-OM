@@ -965,9 +965,14 @@ def _parameter_context(parameters: Mapping[str, Any]) -> dict[str, Any]:
             "messages",
             "max_tokens",
             "temperature",
-        },
+        }
+        | ({"reasoning", "response_format"} if "response_format" in parameters else set()),
         "annotation parameters",
     )
+    if "response_format" in parameters:
+        from exact.repair.annotation_controls import validate_wire_controls
+
+        validate_wire_controls({k: parameters[k] for k in ("reasoning", "response_format")})
     messages = parameters["messages"]
     if (
         parameters["role"] not in ROLES
@@ -1026,6 +1031,7 @@ def _receipt_response(receipt: Mapping[str, Any], parameters: Mapping[str, Any])
         name: parameters[name]
         for name in ("model", "messages", "max_tokens", "temperature", "provider")
     }
+    expected.update({k: parameters[k] for k in ("reasoning", "response_format") if k in parameters})
     if (
         identity.get("role") != parameters["role"]
         or identity.get("revision") != parameters["revision"]
@@ -1521,12 +1527,28 @@ class SelectionAnnotationRunV1(AnnotationRun):
             raise ValueError("TEST assessor requires independent evaluation policy")
 
 
+@dataclasses.dataclass(frozen=True)
+class ControlledSelectionAnnotationRunV1(SelectionAnnotationRunV1):
+    role_request_controls: Mapping[str, Mapping[str, Any]] = dataclasses.field(default_factory=dict)
+    input_tokenizer: Mapping[str, str] = dataclasses.field(default_factory=dict)
+
+    def __post_init__(self):
+        super().__post_init__()
+        from exact.repair.annotation_controls import validate_wire_controls
+
+        if not self.role_request_controls or set(self.role_request_controls) - set(ROLES):
+            raise ValueError("Controlled annotation requires declared role controls")
+        for controls in self.role_request_controls.values():
+            validate_wire_controls(controls)
+
+
 def _annotation_wire(
     profile: LLMProfile,
     messages: list[dict[str, str]],
     max_output_tokens: int,
     role: str,
     directory: str,
+    controls=None,
 ) -> dict[str, Any]:
     """Run the existing client inside the same killable worker used by repair."""
     emit_event({"kind": "annotation_sender", "pid": os.getpid(), "host": socket.gethostname()})
@@ -1535,6 +1557,12 @@ def _annotation_wire(
     client.max_retries = 0
     client.retry_unknown_requests = False
     try:
+        if controls:
+            from exact.repair.annotation_controls import controlled_completion
+
+            return controlled_completion(
+                client, profile, messages, max_output_tokens, role, controls
+            )
         return client.chat_completion(
             profile, messages, max_output_tokens, temperature=0.0, role=role
         )
@@ -1664,6 +1692,12 @@ class SemanticAnnotationAdapter:
             self.run.max_output_tokens,
             role,
             str(self.ledger.path.parent),
+            *(
+                [self.run.role_request_controls[role]]
+                if isinstance(self.run, ControlledSelectionAnnotationRunV1)
+                and role in self.run.role_request_controls
+                else []
+            ),
             timeout=self.run.max_seconds_per_request,
         )
         if outcome.status == "complete":
@@ -1726,6 +1760,13 @@ class SemanticAnnotationAdapter:
             "max_tokens": self.run.max_output_tokens,
             "temperature": 0.0,
         }
+        if (
+            isinstance(self.run, ControlledSelectionAnnotationRunV1)
+            and role in self.run.role_request_controls
+        ):
+            from exact.repair.annotation_controls import validate_wire_controls
+
+            identity.update(validate_wire_controls(self.run.role_request_controls[role]))
         return identity
 
     def _annotation_policy(self, role):
@@ -1805,6 +1846,17 @@ class SemanticAnnotationAdapter:
                 identity.get("role") != parameters["role"]
                 or identity.get("payload", {}).get("messages") != parameters["messages"]
                 or identity.get("payload", {}).get("model") != parameters["model"]
+                or any(
+                    canonical_hash(identity.get("payload", {}).get(k))
+                    != canonical_hash(parameters.get(k))
+                    for k in (
+                        "reasoning",
+                        "response_format",
+                        "max_tokens",
+                        "provider",
+                        "temperature",
+                    )
+                )
             ):
                 continue
             receipt = {
@@ -1899,12 +1951,16 @@ class SemanticAnnotationAdapter:
                 raise ValueError(
                     "Correction must cite the retained parser error for this same request"
                 )
-        # UTF-8 bytes are a conservative text-token bound; add message framing.
+        from exact.repair.annotation_controls import input_token_bound
+
+        controls = {k: identity[k] for k in ("reasoning", "response_format") if k in identity}
+        # UTF-8 bytes are a conservative text-token bound; include schema framing.
         self._reserve(
             key,
             role,
             packet.case_id,
-            len(json.dumps(messages).encode()) + 256 + self.run.max_output_tokens,
+            input_token_bound(messages, controls, getattr(self.run, "input_tokenizer", None))
+            + self.run.max_output_tokens,
         )
         try:
             response = self._dispatch(profile, messages, role)

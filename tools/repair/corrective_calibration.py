@@ -305,13 +305,16 @@ def summarize(manifest_path, output):
     manifest = read(manifest_path)
     output = Path(output)
     metrics = {}
-    for profile in SHORTLIST:
+    profiles = tuple(manifest.get("calibration_profiles", SHORTLIST))
+    if len(set(profiles)) != len(profiles) or any(p not in manifest["profiles"] for p in profiles):
+        raise ValueError("Invalid frozen calibration profile denominator")
+    for profile in profiles:
         valid = correct = consistent = 0
         decisions = {}
         for slot in manifest["slots"]:
             if slot["profile"] != profile:
                 continue
-            path = output / slot["id"] / "labels.json"
+            path = Path(slot.get("output_directory", output)) / slot["id"] / "labels.json"
             if not path.exists():
                 continue
             receipt_path = path.with_name("receipt.json")
@@ -338,6 +341,26 @@ def summarize(manifest_path, output):
                 for observation in aggregate.observations
             ):
                 raise ValueError("Calibration result changed model or presentation identity")
+            if profile in manifest.get("request_profiles", {}):
+                from tools.repair.annotation_profile import request_profile
+                from exact.repair.annotation_controls import response_format
+
+                controls = request_profile(manifest, profile)
+                for observation in aggregate.observations:
+                    parameters = observation.annotator["request_parameters"]
+                    expected_controls = dict(
+                        reasoning=controls["reasoning"],
+                        response_format=response_format(packet, slot["swapped"]),
+                        max_tokens=controls["max_output_tokens"],
+                        provider=manifest["profiles"][profile]["provider"],
+                    )
+                    if any(
+                        canonical_hash(parameters.get(k)) != canonical_hash(v)
+                        for k, v in expected_controls.items()
+                    ):
+                        raise ValueError(
+                            "Calibration result changed its controlled request profile"
+                        )
             if not aggregate.global_target_eligible:
                 continue
             valid += 1
@@ -352,19 +375,29 @@ def summarize(manifest_path, output):
             order_consistent=consistent,
             eligible=(valid, correct, consistent) == (8, 8, 4),
         )
-    eligible = [p for p in SHORTLIST[:-1] if metrics[p]["eligible"]]
-    if not eligible and metrics["sonnet_reference"]["eligible"]:
+    eligible = [p for p in profiles if p != "sonnet_reference" and metrics[p]["eligible"]]
+    if not eligible and metrics.get("sonnet_reference", {}).get("eligible"):
         eligible = ["sonnet_reference"]
 
     def price(name):
         value = manifest["prices_per_million"][name]
-        return 8000 * value["input"] + 2000 * value["output"]
+        output_cap = (
+            manifest.get("request_profiles", {}).get(name, {}).get("max_output_tokens", 2000)
+        )
+        return 8000 * value["input"] + output_cap * value["output"]
 
     chosen = min(eligible, key=lambda p: (price(p), p)) if eligible else None
+    if manifest.get("defer_teacher_selection"):
+        chosen = None
     report = dict(
         schema="exact-repair/semantic-calibration-gate/v1",
         status="qualified" if chosen else "not_qualified",
         selected_profile=chosen,
+        **(
+            dict(selection_deferred=True, eligible_profiles=eligible)
+            if manifest.get("defer_teacher_selection")
+            else {}
+        ),
         manifest=binding(manifest_path),
         metrics=metrics,
         selection_model_ids=manifest["selection_model_ids"],

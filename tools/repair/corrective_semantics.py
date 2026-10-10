@@ -33,6 +33,7 @@ from exact.repair.semantic_fidelity import (
     AnnotationBudget,
     AnnotationScheduleV3,
     SelectionAnnotationRunV1,
+    ControlledSelectionAnnotationRunV1,
     SemanticAnnotationAdapter,
     SemanticConsequenceReportV3,
     SemanticEvidencePacketV3,
@@ -78,6 +79,10 @@ def _confirmed_provider_failure(ledger, parameters):
             identity.get("role") != parameters["role"]
             or payload.get("model") != parameters["model"]
             or canonical_hash(payload.get("messages")) != canonical_hash(parameters["messages"])
+            or any(
+                canonical_hash(payload.get(k)) != canonical_hash(parameters.get(k))
+                for k in ("reasoning", "response_format", "max_tokens", "provider", "temperature")
+            )
         ):
             continue
         raw = bytes(attempt["raw"] or b"")
@@ -115,6 +120,12 @@ def validate_manifest(value):
         raise ValueError("Unregistered annotation phase")
     _request_budget(value)
     _manifest_prompt(value)
+    from tools.repair.annotation_profile import request_profile
+
+    for name in value.get("request_profiles", {}):
+        request_profile(value, name)
+    if value.get("request_profiles") and not value.get("teacher_panel"):
+        raise PermissionError("Controlled profiles require their explicit teacher-panel amendment")
     if value["phase"] != "calibration":
         gate = value["calibration_gate"]
         if sha(gate["path"]) != gate["sha256"] or read(gate["path"])["status"] != "qualified":
@@ -478,6 +489,12 @@ def _calibration_exclusions(manifest):
 
 
 def _request_budget(manifest):
+    if manifest.get("teacher_panel"):
+        from tools.repair.teacher_panel import panel_contract
+
+        proposal, prior, previous = panel_contract(manifest)
+        _, amendment = _request_budget(previous)
+        return proposal["request_limits"], {**amendment, "panel": proposal, "panel_prior": prior}
     binding = manifest.get("request_budget_amendment")
     if binding is None:
         if manifest["request_limits"] != PHASE_LIMITS:
@@ -711,6 +728,15 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
                 for key, value in amendment["prior"]["reservations"].items()
             ):
                 raise ValueError("Request amendment would reset or modify original attempts")
+        if amendment and amendment.get("panel"):
+            prior = amendment["panel_prior"]
+            if state["request_limits"] == prior["request_limits"]:
+                if canonical_hash(state) != canonical_hash(prior):
+                    raise ValueError("Teacher panel prior ledger changed before amendment")
+                state["request_limits"] = limits
+                state["teacher_panel_amendment"] = manifest["teacher_panel"]
+            if state.get("teacher_panel_amendment") != manifest["teacher_panel"]:
+                raise ValueError("Teacher panel amendment binding changed")
         if state["request_limits"] != limits:
             raise ValueError("Annotation request limits changed without compatible amendment")
         identity = canonical_hash((manifest["phase"], slot))
@@ -726,7 +752,21 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
         comparison_id = comparison_id or slot
         replacement = None
         interface_recovery = None
-        if manifest.get("interface_recovery"):
+        teacher_panel = None
+        if amendment and amendment.get("panel"):
+            from tools.repair.teacher_panel import reserve_panel
+
+            teacher_panel = reserve_panel(
+                manifest,
+                amendment["panel"],
+                amendment["panel_prior"],
+                records,
+                slot,
+                packet_hash,
+                comparison_id,
+                cost,
+            )
+        elif manifest.get("interface_recovery"):
             proposal, prior, interface_recovery = _interface_recovery_proof(
                 manifest, slot, packet_hash, comparison_id
             )
@@ -766,7 +806,12 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
             ):
                 raise AnnotationBudgetExhausted("Replacement calibration exposure exhausted")
         unique = {row.get("comparison_id", row["slot"]) for row in same}
-        if comparison_id not in unique and len(unique) >= COMPARISON_LIMITS[manifest["phase"]]:
+        comparison_limit = (
+            amendment["panel"]["calibration_comparison_identity_limit"]
+            if teacher_panel
+            else COMPARISON_LIMITS[manifest["phase"]]
+        )
+        if comparison_id not in unique and len(unique) >= comparison_limit:
             raise AnnotationBudgetExhausted("Cumulative unique comparison quota exhausted")
         if len(same) >= limits[manifest["phase"]] or len(records) >= 704:
             raise AnnotationBudgetExhausted("Cumulative annotation request quota exhausted")
@@ -789,6 +834,7 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
             admitted_epoch=time.time(),
             comparison_id=comparison_id,
             request_basis=canonical_hash((manifest, slot, packet_hash)),
+            **(dict(teacher_panel=teacher_panel) if teacher_panel else {}),
             **(dict(replacement=replacement) if replacement else {}),
             **(dict(interface_recovery=interface_recovery) if interface_recovery else {}),
         )
@@ -846,7 +892,12 @@ def annotate_packet(
     profile_name = manifest["profile"]
     prices = manifest["prices_per_million"][profile_name]
     # Conservative maximum includes billed reasoning tokens in the output cap.
-    cost = (8000 * prices["input"] + 2000 * prices["output"]) / 1_000_000
+    from tools.repair.annotation_profile import request_profile
+    from exact.repair.annotation_controls import response_format, input_token_bound
+
+    controls = request_profile(manifest, profile_name)
+    output_cap = controls["max_output_tokens"] if controls else 2000
+    cost = (8000 * prices["input"] + output_cap * prices["output"]) / 1_000_000
     if cost <= 0:
         raise ValueError("Finite positive frozen provider prices required")
     role = TEACHER if packet.split == "train" else EVALUATOR
@@ -861,7 +912,21 @@ def annotate_packet(
     parent_splits = manifest["parent_splits"]
     if parent_splits.get(packet.parent_group_id) != packet.split:
         raise ValueError("Decoded packet changed frozen parent split")
-    run = SelectionAnnotationRunV1(
+    run_type = ControlledSelectionAnnotationRunV1 if controls else SelectionAnnotationRunV1
+    run = run_type(
+        **(
+            dict(
+                input_tokenizer=controls["tokenizer"],
+                role_request_controls={
+                    role: dict(
+                        reasoning=controls["reasoning"],
+                        response_format=response_format(packet, swapped),
+                    )
+                },
+            )
+            if controls
+            else {}
+        ),
         run_id=canonical_hash((identity, "run")),
         lineage_id=manifest["lineage_id"],
         authorized=True,
@@ -869,7 +934,7 @@ def annotate_packet(
         role_budgets=budgets,
         aggregate_budget=AnnotationBudget(704, 704 * 10000, manifest["cost_ceiling_usd"], 704 * 90),
         max_input_bytes=8000,
-        max_output_tokens=2000,
+        max_output_tokens=output_cap,
         max_cost_per_request_usd=cost,
         max_seconds_per_request=90,
         comparisons_per_case=1000,
@@ -900,7 +965,18 @@ def annotate_packet(
     # Bound the ENTIRE message, not just evidence, before spending. UTF-8 bytes
     # plus framing is conservative for all shortlisted text tokenizers.
     messages = schedule.slots[0]["parameters"]["messages"]
-    if len(json.dumps(json.loads(canonical_json(messages))).encode()) + 256 > 8000:
+    if (
+        input_token_bound(
+            messages,
+            (
+                {k: schedule.slots[0]["parameters"][k] for k in ("reasoning", "response_format")}
+                if controls
+                else None
+            ),
+            controls["tokenizer"] if controls else None,
+        )
+        > 8000
+    ):
         write_artifact(
             receipt_path,
             dict(
