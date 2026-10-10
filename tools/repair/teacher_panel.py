@@ -23,6 +23,37 @@ def contract(manifest):
     return {k: v for k, v in manifest.items() if k not in {"authorized", "teacher_panel"}}
 
 
+def stage_elapsed(proposal):
+    """Keep the original clock; admit a later window only with bound user approval."""
+    stage = proposal["stage"]
+    elapsed = 21600
+    if proposal.get("timing_authorization"):
+        approval = bound(proposal["timing_authorization"])
+        previous = bound(approval["previous_proposal"])["stage"]
+        approved, window = approval["approved_epoch"], approval["window_seconds"]
+        if not (
+            approval.get("schema") == "exact-repair/teacher-panel-timing-authorization/v1"
+            and approval.get("status") == "approved"
+            and approval.get("approval_text")
+            and all(type(v) in (int, float) and math.isfinite(v) for v in (approved, window))
+            and previous["deadline_epoch"] <= approved <= time.time()
+            and 900 / 0.7 <= window <= 7200
+            and stage["started_epoch"] == previous["started_epoch"]
+            and stage["original_elapsed_seconds"] == previous["original_elapsed_seconds"]
+            and stage["deadline_epoch"] == approved + window
+        ):
+            raise ValueError("Invalid approved teacher panel timing successor")
+        elapsed = stage["deadline_epoch"] - stage["started_epoch"]
+    if not (
+        stage["original_elapsed_seconds"] == 14400
+        and stage["proposed_elapsed_seconds"] == elapsed
+        and stage["deadline_epoch"] == stage["started_epoch"] + elapsed
+        and stage["latest_admission_epoch"] == stage["deadline_epoch"] - 900 / 0.7
+    ):
+        raise ValueError("Teacher panel cannot reset calibration time")
+    return elapsed
+
+
 def panel_contract(manifest, *, require_approval=True):
     ref = manifest["teacher_panel"]
     proposal = bound(ref["proposal"])
@@ -36,6 +67,7 @@ def panel_contract(manifest, *, require_approval=True):
             or approval.get("status") != "approved"
             or not approval.get("approval_text")
             or approval.get("proposal") != ref["proposal"]
+            or approval.get("timing_authorization") != proposal.get("timing_authorization")
         ):
             raise PermissionError("Teacher panel requires approval of the exact prepared amendment")
     four_models = proposal["max_requests"] == 32
@@ -75,14 +107,7 @@ def panel_contract(manifest, *, require_approval=True):
     actual = {(r["packet"]["path"], r["packet"]["sha256"], r["swapped"]) for r in manifest["slots"]}
     if actual != expected or len(expected) != 8 or len({r["id"] for r in manifest["slots"]}) != 8:
         raise ValueError("Teacher panel must retain all four packets and both orders")
-    stage = proposal["stage"]
-    if not (
-        stage["original_elapsed_seconds"] == 14400
-        and stage["proposed_elapsed_seconds"] == 21600
-        and stage["deadline_epoch"] == stage["started_epoch"] + 21600
-        and stage["latest_admission_epoch"] == stage["deadline_epoch"] - 900 / 0.7
-    ):
-        raise ValueError("Teacher panel cannot reset calibration time")
+    stage_elapsed(proposal)
     if profile == "glm":
         for row in manifest["slots"]:
             lineage = proposal["glm_recovery"][row["id"]]
@@ -139,7 +164,7 @@ def reserve_panel(manifest, proposal, prior, records, slot, packet_hash, compari
     actual = stage["stages"]["calibration"]
     if (
         actual["started_epoch"] != proposal["stage"]["started_epoch"]
-        or stage["stage_limits"]["calibration"]["elapsed_seconds"] != 21600
+        or stage["stage_limits"]["calibration"]["elapsed_seconds"] != stage_elapsed(proposal)
     ):
         raise ValueError("Approved stage amendment has not been applied without resetting time")
     if time.time() + 92 > proposal["stage"]["deadline_epoch"]:

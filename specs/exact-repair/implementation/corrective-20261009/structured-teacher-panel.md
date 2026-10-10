@@ -25,6 +25,17 @@ for GPT-4o mini. Account privacy
 eligibility remains unproved until an authorized measured request; no privacy
 setting is relaxed and no paid exploratory call is made.
 
+On 10 October, after being told the earlier window had expired, the user approved
+execution: "I authorise please run this experiments". An immutable timing
+successor records this approval and a finite launch window of at most two hours
+from its recording. The validator binds that receipt to both the expired proposal
+and the new panel authorization. It preserves the original stage start and all
+costs; the deadline and cumulative elapsed cap must agree exactly. The 32 calls,
+four 900-second workers, $0.13296 maximum extra reservation and scientific
+contracts remain unchanged. An expired successor still fails admission and does
+not renew itself. Tests cover valid resume, missing approval, unbound approval,
+clock resets, excessive windows, unapplied ledger changes and late admission.
+
 All message text is counted by digest-bound public model tokenizers. GPT-4o
 uses an o200k_base conversion checked against tiktoken0.12.0 on29 strings,
 including the fixed packets; it does not claim a Hugging Face model repository. The full
