@@ -621,6 +621,7 @@ def offline_plan_label(
     use_policy: str = "independent_evaluation",
     rating_aggregation: Mapping[str, Any] | None = None,
     aggregate_receipts: dict[str, Any] | None = None,
+    rating_context_packets: Mapping[str, Any] | None = None,
 ) -> Any:
     """Exact frozen-plan lookup, with no interpolation or model-generated target.
 
@@ -642,6 +643,8 @@ def offline_plan_label(
     allowed = {"train"} if role_id == TEACHER else {"development", "test"}
     if case.split not in allowed:
         raise ValueError("Offline label role does not permit this case split")
+    if rating_context_packets is not None and case.split != "train":
+        raise ValueError("Lossless rating context preparation is TRAIN-only")
     theory_hash = canonical_hash(materialize(case.problem, assignment))
     selected = {
         obj.object_id: obj.candidates[index].candidate_id
@@ -717,6 +720,15 @@ def offline_plan_label(
                         raise ValueError(
                             "Repeated plan ratings require validated observation provenance"
                         )
+                    context_packet = packet
+                    if rating_context_packets is not None:
+                        from tools.repair.semantic_rating_context import rating_context
+
+                        # Only exact lossless representation normalization is
+                        # permitted. The wire packet/claims above remain unchanged.
+                        context_packet = rating_context(
+                            packet, rating_context_packets[packet.content_hash]
+                        )
                     context = canonical_hash(
                         (
                             case.case_id,
@@ -724,10 +736,10 @@ def offline_plan_label(
                             case.split,
                             selected,
                             theory_hash,
-                            packet.task,
-                            packet.original_observation,
-                            packet.evidence,
-                            packet.local_context,
+                            context_packet.task,
+                            context_packet.original_observation,
+                            context_packet.evidence,
+                            context_packet.local_context,
                             packet.rubric_version,
                             packet.criterion_weights,
                             packet.required_query_ids,
