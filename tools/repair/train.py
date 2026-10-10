@@ -1649,6 +1649,9 @@ def train_cases(
             0.0,
             min(
                 deadline_seconds - elapsed,
+                float(os.environ.get("EXACT_REPAIR_OPTIMIZER_DEADLINE_EPOCH", "inf"))
+                - time.time()
+                - 2.0,
                 float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")) - time.time() - 2.0,
                 total_training_seconds
                 - previous_elapsed

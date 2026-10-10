@@ -206,3 +206,67 @@ def test_unresolved_primary_entry_point_cannot_run(tmp_path):
     with pytest.raises(ValueError, match="not admitted"):
         run_phase(path, "fit", tmp_path / "output")
     assert not (tmp_path / "output").exists()
+
+
+def test_model_gpu_stage_reserves_dev_after_queue_and_prior_failed_costs():
+    from tools.repair.primary_runtime import fit_reservation_deadline
+
+    model = "model-symbolic-13"
+    ledger = dict(
+        stage_limits={model: dict(gpu_seconds=10800)},
+        attempts={
+            "old": dict(
+                budget_stages=[model],
+                status="settled",
+                elapsed_seconds=1000,
+                reserved_seconds=1800,
+                resources=dict(gpus=1),
+            ),
+            "current": dict(
+                budget_stages=[model],
+                status="reserved",
+                reserved_seconds=600,
+                started_epoch=100,
+                resources=dict(gpus=1),
+            ),
+            "pending": dict(
+                budget_stages=[model],
+                status="reserved",
+                reserved_seconds=400,
+                started_epoch=110,
+                resources=dict(gpus=1),
+            ),
+        },
+    )
+    # Used1000failed +100own queue/run +400other reserved. Reserve5000DEV.
+    assert fit_reservation_deadline(ledger, model, "current", 5000, 200) == 200 + 4300
+    assert fit_reservation_deadline(ledger, model, "current", 10000, 200) == 200
+    # Later continuation cannot recover already elapsed model GPU occupancy.
+    assert fit_reservation_deadline(ledger, model, "current", 5000, 250) == 4500
+
+
+def test_entry_point_missing_dev_caches_bind_actual_costs_and_target():
+    from exact.repair.learning import SemanticTargetSpec
+    from tools.repair.primary_runtime import scheduled_runtime_development
+
+    cases = generate_corpus(
+        split_counts={"train": 0, "development": 1, "test": 0},
+        siblings_per_parent=1,
+        families=("range",),
+        revision="v3",
+    )
+    config = dict(
+        profile=(("delete", 0.3), ("edit", 0.7)),
+        desired_family_weight=0.75,
+        false_positive_weight=1.5,
+        development_case_ids=[c.case_id for c in cases],
+    )
+    scheduled = scheduled_runtime_development(cases, {}, config)
+    assert len(scheduled) == len(cases)
+    for case, cache in scheduled:
+        assert cache.stop_reason == "missing_development_cache" and not cache.labels
+        assert dict(cache.hashes)["profile"] == canonical_hash(config["profile"])
+        assert (
+            dict(cache.hashes)["semantic_target"]
+            == SemanticTargetSpec(canonical_hash(case.probes), 0.75, 1.5).content_hash
+        )
