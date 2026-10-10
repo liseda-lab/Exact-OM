@@ -571,6 +571,14 @@ class StudyStore:
             return assignment["presentations"][state["case_index"]]
         return None
 
+    @staticmethod
+    def _participant_state(result):
+        # The owner catalogue names future cases, even before allocation. Project
+        # only at the read boundary; frozen publications and old receipts stay intact.
+        if result.get("purpose") == "development_review" and result.get("review_bundle"):
+            return {**result, "review_bundle": {**result["review_bundle"], "cases": []}}
+        return result
+
     def _public_state(self, row, state, study):
         current = self._current(state)
         case_id = current["case_id"] if current else None
@@ -658,7 +666,7 @@ class StudyStore:
                     "telemetry": declaration(),
                 }
             )
-        return result
+        return self._participant_state(result)
 
     def _allocate(self, db, row, state, study):
         # The study row is locked only at allocation; invitations alone consume no slot.
@@ -727,7 +735,7 @@ class StudyStore:
                         "Idempotency key was used for different content",
                         state["revision"],
                     )
-                return json.loads(previous["result"])
+                return self._participant_state(json.loads(previous["result"]))
             if data["expected_revision"] != state["revision"]:
                 raise StudyError(
                     409, "Stale revision; restore the acknowledged state", state["revision"]

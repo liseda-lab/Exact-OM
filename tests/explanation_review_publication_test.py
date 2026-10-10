@@ -30,8 +30,36 @@ def review_fixture(root):
     return payload
 
 
+def with_catalogue(payload):
+    from exact_inspect.review_metadata import ReviewBundleSummary
+
+    definition = payload["definition"]
+    definition["review_bundle"] = ReviewBundleSummary(
+        title="Synthetic contract check",
+        prepared_at="2026-10-10T00:00:00Z",
+        source_run_id="test-contract-only",
+        run_manifest_sha256="sha256:" + "a" * 64,
+        selection_sha256="sha256:" + "b" * 64,
+        policy_sha256="sha256:" + definition["policy_hash"],
+        source_count=len(definition["cases"]),
+        presented_pairs=sum(len(c["candidates"]) for c in definition["cases"]),
+        coverage={},
+        limitations=[],
+        ontologies=[],
+        cases=[
+            {
+                "case_id": c["case_id"],
+                "source": c["source"],
+                "targets": [t["entity"] for t in c["candidates"]],
+            }
+            for c in definition["cases"]
+        ],
+    ).model_dump()
+    return payload
+
+
 def test_review_purpose_is_explicit_and_test_only_at_actual_api(tmp_path):
-    frozen = review_fixture(tmp_path)
+    frozen = with_catalogue(review_fixture(tmp_path))
     app = create_study_app(
         database_url=os.environ.get(
             "EXACT_STUDY_TEST_DATABASE_URL", "sqlite:///" + str(tmp_path / "study.sqlite")
@@ -65,6 +93,10 @@ def test_review_purpose_is_explicit_and_test_only_at_actual_api(tmp_path):
         assert state["purpose"] == "development_review"
         assert state["correctness_metrics"] == "disabled"
         assert state["revision"] == 0
+        public_about = {**frozen["definition"]["review_bundle"], "cases": []}
+        assert state["review_bundle"] == public_about
+        assert state["assignment_id"] is None
+        assert client.get("/api/v1/study/state").json()["review_bundle"] == public_about
         export = client.post(
             f"/api/v1/admin/studies/{revision}/exports?include_test=true", headers=headers
         ).json()
@@ -74,6 +106,42 @@ def test_review_purpose_is_explicit_and_test_only_at_actual_api(tmp_path):
         before = response.json()
         assert client.post("/api/v1/admin/studies", json=frozen, headers=headers).status_code == 200
         assert client.get("/api/v1/study/state").json() == before
+        # Project participant metadata without mutating the immutable publication.
+        with app.state.study_store.transaction() as db:
+            _, saved = app.state.study_store._study(db, revision)
+        assert saved["review_bundle"] == frozen["definition"]["review_bundle"]
+        assert len(saved["review_bundle"]["cases"]) == len(saved["cases"])
+
+        consent = {
+            "idempotency_key": "review-about-consent",
+            "expected_revision": state["revision"],
+            "information_version": frozen["definition"]["information_version"],
+            "accepted": True,
+        }
+        response = client.put("/api/v1/study/consent", json=consent)
+        assert response.status_code == 200, response.text
+        acknowledged = response.json()
+        assert acknowledged["review_bundle"] == public_about
+        # Exercise a previously stored development receipt, not merely fresh saves.
+        from exact_inspect.study.store import canonical
+
+        historical = canonical(
+            {**acknowledged, "review_bundle": frozen["definition"]["review_bundle"]}
+        )
+        with app.state.study_store.transaction() as db:
+            db.execute(
+                "UPDATE mutations SET result = ? WHERE session_id = ? AND key = ?",
+                (historical, state["session_id"], consent["idempotency_key"]),
+            )
+        replay = client.put("/api/v1/study/consent", json=consent)
+        assert replay.status_code == 200 and replay.json() == acknowledged
+        assert client.get("/api/v1/study/state").json() == acknowledged
+        with app.state.study_store.transaction() as db:
+            retained = db.execute(
+                "SELECT result FROM mutations WHERE session_id = ? AND key = ?",
+                (state["session_id"], consent["idempotency_key"]),
+            ).fetchone()
+        assert retained["result"] == historical
 
 
 def test_development_purpose_cannot_bypass_research_approval_or_adjudication(tmp_path):

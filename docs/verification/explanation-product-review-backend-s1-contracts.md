@@ -262,11 +262,15 @@ analysis/2–3 files and codebooks are unchanged.
 ## Review discovery and exact S2 work
 
 GET `/api/v1/review-bundle` provides strict public-safe `exact-review-about/1` metadata;
-review study state includes the same `review_bundle`. It identifies counts, ontology scope,
+review study state includes an aggregate projection of `review_bundle`. It identifies counts, ontology scope,
 policy/provenance hashes, coverage and limitations without private paths, credentials or keys.
-Its `cases` array gives each review `case_id`, typed `source` and ordered typed `targets`;
+The main review endpoint's `cases` array gives each review `case_id`, typed `source` and ordered typed `targets`;
 `source_run_id` selects the corresponding exploration run. Use these actual identities to
-open the same 24 sources and 120 pairs in main and study views. The underlying exploration
+compare the same 24 sources and 120 pairs during owner review. Participant state always has
+`cases: []`, including before assignment, both conditions and historical mutation replay.
+Obtain only the current authorized study case through its existing case route; do not fetch
+the main catalogue from the participant app. Frozen publication and receipt bytes are unchanged.
+The underlying exploration
 run retains the larger recorded candidate universe. Private original production ranks remain
 empty when the producer did not record ranks; recorded array positions are catalogue provenance,
 not matcher ranks. Non-review publications cannot use unresolved correctness keys.

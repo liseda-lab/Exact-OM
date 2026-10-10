@@ -79,7 +79,7 @@ def test_existing_receipt_cannot_overwrite_private_input(tmp_path):
     assert receipt.read_text() == "private existing configuration"
 
 
-def test_public_catalogue_requires_identical_24_frozen_typed_cases():
+def test_main_catalogue_binds_24_frozen_typed_cases_and_participant_projection_withholds_them():
     from copy import deepcopy
     from tools.verify_review_environment import validate_catalogues
 
@@ -119,18 +119,23 @@ def test_public_catalogue_requires_identical_24_frozen_typed_cases():
             for case in cases
         ],
     }
-    result = validate_catalogues(about, deepcopy(about), definition, 24)
+    participant = {**about, "cases": []}
+    result = validate_catalogues(participant, about, definition, 24)
     assert result["case_count"] == 24 and result["target_count"] == 120
+    assert result["participant_case_catalogue_withheld"]
+    assert result["same_public_review_provenance"]
+    with pytest.raises(VerificationError, match="participant_catalogue_not_exposed"):
+        validate_catalogues(about, about, definition, 24)
     forged = deepcopy(about)
     forged["cases"][0]["source"]["kind"] = "individual"
-    with pytest.raises(VerificationError, match="shared_public_catalogue"):
-        validate_catalogues(about, forged, definition, 24)
     with pytest.raises(VerificationError, match="catalogue_frozen_typed_identities"):
-        validate_catalogues(forged, forged, definition, 24)
+        validate_catalogues(participant, forged, definition, 24)
+    with pytest.raises(VerificationError, match="shared_public_review_provenance"):
+        validate_catalogues(participant, {**about, "source_run_id": "other"}, definition, 24)
     duplicated = deepcopy(about)
     duplicated["cases"][-1] = deepcopy(duplicated["cases"][0])
     with pytest.raises(VerificationError, match="catalogue_exact_case_count"):
-        validate_catalogues(duplicated, duplicated, definition, 24)
+        validate_catalogues(participant, duplicated, definition, 24)
 
 
 def test_empty_catalogue_is_only_optional_for_explicit_synthetic_fixture():
@@ -141,5 +146,5 @@ def test_empty_catalogue_is_only_optional_for_explicit_synthetic_fixture():
     journey.catalogue()
     assert journey.report["public_catalogue"]["status"] == "not_in_synthetic_contract_fixture"
     journey.scope = "real_bundle"
-    with pytest.raises(VerificationError, match="real_public_catalogue_available"):
+    with pytest.raises(VerificationError, match="participant_review_metadata_present"):
         journey.catalogue()

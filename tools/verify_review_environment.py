@@ -202,9 +202,24 @@ def actions_for(tutorial, resource):
         yield lesson["lesson_id"], actions
 
 
+def validate_participant_catalogue(state, *, scope):
+    """Participant state must never disclose the frozen future-case catalogue."""
+    about = state.get("review_bundle")
+    if scope == "synthetic_contract_fixture" and about is None:
+        return False
+    require(isinstance(about, dict), "participant_review_metadata_present")
+    require(about.get("cases") == [], "participant_catalogue_not_exposed")
+    return True
+
+
 def validate_catalogues(study_about, main_about, definition, expected_cases):
-    """Bind both public catalogues to the admitted typed case inventory."""
-    require(study_about == main_about, "shared_public_catalogue")
+    """Bind main's full catalogue while checking the participant-safe projection."""
+    validate_participant_catalogue({"review_bundle": study_about}, scope="real_bundle")
+    require(
+        {key: value for key, value in study_about.items() if key != "cases"}
+        == {key: value for key, value in main_about.items() if key != "cases"},
+        "shared_public_review_provenance",
+    )
     require(
         study_about.get("purpose") == "development_review"
         and study_about.get("correctness_metrics") == "disabled",
@@ -218,9 +233,9 @@ def validate_catalogues(study_about, main_about, definition, expected_cases):
         }
         for case in definition["cases"]
     }
-    actual = {case["case_id"]: case for case in study_about["cases"]}
+    actual = {case["case_id"]: case for case in main_about["cases"]}
     require(
-        len(study_about["cases"]) == len(actual) == len(expected) == expected_cases,
+        len(main_about["cases"]) == len(actual) == len(expected) == expected_cases,
         "catalogue_exact_case_count",
     )
     require(actual == expected, "catalogue_frozen_typed_identities")
@@ -231,8 +246,10 @@ def validate_catalogues(study_about, main_about, definition, expected_cases):
     return {
         "case_count": len(actual),
         "target_count": sum(len(case["targets"]) for case in actual.values()),
-        "sha256": fingerprint(study_about),
-        "same_public_study_and_exploration_catalogue": True,
+        "main_sha256": fingerprint(main_about),
+        "participant_sha256": fingerprint(study_about),
+        "same_public_review_provenance": True,
+        "participant_case_catalogue_withheld": True,
     }
 
 
@@ -370,6 +387,15 @@ class Journey:
             }
         )
         require(response.status_code == expected, label + ":http_status")
+        if csp != "not_promised_by_exploration_api" and response.headers.get(
+            "content-type", ""
+        ).startswith("application/json"):
+            data = response.json()
+            if isinstance(data, dict) and "session_id" in data and "stage" in data:
+                if validate_participant_catalogue(data, scope=self.scope):
+                    self.report["participant_states_with_catalogue_withheld"] = (
+                        self.report.get("participant_states_with_catalogue_withheld", 0) + 1
+                    )
         return response
 
     def mutate(self, method, path, **payload):
@@ -704,7 +730,7 @@ class Journey:
         if self.scope == "synthetic_contract_fixture" and not (about or {}).get("cases"):
             self.report["public_catalogue"] = {"status": "not_in_synthetic_contract_fixture"}
             return
-        require(bool((about or {}).get("cases")), "real_public_catalogue_available")
+        validate_participant_catalogue(self.state, scope=self.scope)
         record = environment.processes(self.config).get("exploration")
         require(
             record and environment.owned(self.config, "exploration", record),

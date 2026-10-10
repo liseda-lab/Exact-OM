@@ -68,3 +68,34 @@ def test_study_html_requires_actual_strict_script_and_style_directives(weaken):
         assert (
             validate_response_csp(response, study_origin=ORIGIN, label="probe") == "strict_document"
         )
+
+
+@pytest.mark.parametrize("stage", ["consent", "tutorial", "case", "consultation", "completed"])
+@pytest.mark.parametrize("disclosed", [False, True])
+def test_every_participant_state_checks_catalogue_before_allocation_through_baseline(
+    stage, disclosed
+):
+    journey = Journey.__new__(Journey)
+    journey.scope = "real_bundle"
+    journey.report = {"checks": []}
+    payload = {
+        "session_id": "test-only",
+        "stage": stage,
+        "current_case": {"condition": "ontology_baseline"} if stage == "case" else None,
+        "review_bundle": {"cases": [{"case_id": "future"}] if disclosed else []},
+    }
+    with httpx.Client(
+        base_url=ORIGIN,
+        transport=httpx.MockTransport(
+            lambda request: httpx.Response(
+                200, json=payload, headers={"Content-Security-Policy": POLICY}
+            )
+        ),
+    ) as client:
+        journey.client = client
+        if disclosed:
+            with pytest.raises(VerificationError, match="participant_catalogue_not_exposed"):
+                journey.request("GET", "/api/v1/study/state", label="state")
+        else:
+            assert journey.request("GET", "/api/v1/study/state", label="state").json() == payload
+            assert journey.report["participant_states_with_catalogue_withheld"] == 1
