@@ -114,6 +114,8 @@ def _remaining_seconds(seconds, manifest):
 def validate_manifest(value):
     if value.get("schema") != "exact-repair/corrective-annotation/v1":
         raise ValueError("Unknown corrective annotation manifest")
+    if value.get("postprocessing_only"):
+        raise PermissionError("Postprocessing contracts cannot transmit annotations")
     if not 0 < value["cost_ceiling_usd"] <= 35:
         raise ValueError("The authorized campaign ceiling is $35")
     if value["phase"] not in PHASE_LIMITS:
@@ -124,7 +126,9 @@ def validate_manifest(value):
 
     for name in value.get("request_profiles", {}):
         request_profile(value, name)
-    if value.get("request_profiles") and not value.get("teacher_panel"):
+    if value.get("request_profiles") and not (
+        value.get("teacher_panel") or value.get("qualified_teacher")
+    ):
         raise PermissionError("Controlled profiles require their explicit teacher-panel amendment")
     if value["phase"] != "calibration":
         gate = value["calibration_gate"]
@@ -489,6 +493,16 @@ def _calibration_exclusions(manifest):
 
 
 def _request_budget(manifest):
+    if manifest.get("qualified_teacher"):
+        from tools.repair.teacher_selection import qualified_contract
+
+        proposal, phase, source, previous = qualified_contract(manifest)
+        _, amendment = _request_budget(previous)
+        return proposal["request_limits"], {
+            **amendment,
+            "qualified_phase": phase,
+            "qualified_panel_binding": source["teacher_panel"],
+        }
     if manifest.get("teacher_panel"):
         from tools.repair.teacher_panel import panel_contract
 
@@ -737,6 +751,12 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
                 state["teacher_panel_amendment"] = manifest["teacher_panel"]
             if state.get("teacher_panel_amendment") != manifest["teacher_panel"]:
                 raise ValueError("Teacher panel amendment binding changed")
+        if amendment and amendment.get("qualified_phase"):
+            prior = amendment["qualified_phase"]
+            if (state.get("teacher_panel_amendment") != amendment["qualified_panel_binding"]
+                    or any(state["reservations"].get(k) != v
+                           for k, v in prior["reservations"].items())):
+                raise ValueError("Qualified teacher successor would reset calibration history")
         if state["request_limits"] != limits:
             raise ValueError("Annotation request limits changed without compatible amendment")
         identity = canonical_hash((manifest["phase"], slot))

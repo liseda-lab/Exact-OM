@@ -301,7 +301,7 @@ def prepare(campaign):
     return directory / "manifest.json"
 
 
-def summarize(manifest_path, output):
+def summarize(manifest_path, output, *, local_run=False):
     manifest = read(manifest_path)
     output = Path(output)
     metrics = {}
@@ -314,7 +314,10 @@ def summarize(manifest_path, output):
         for slot in manifest["slots"]:
             if slot["profile"] != profile:
                 continue
-            path = Path(slot.get("output_directory", output)) / slot["id"] / "labels.json"
+            # A worker writes under its actual output argument. Cross-worker
+            # paths belong to the separate aggregate postprocessing contract.
+            directory = output if local_run else Path(slot.get("output_directory", output))
+            path = directory / slot["id"] / "labels.json"
             if not path.exists():
                 continue
             receipt_path = path.with_name("receipt.json")
@@ -426,7 +429,7 @@ def main():
         print(prepare(args.path))
     elif args.action == "run":
         annotate(args.path, args.output)
-        summarize(args.path, args.output)
+        summarize(args.path, args.output, local_run=True)
     else:
         summarize(args.path, args.output)
 
