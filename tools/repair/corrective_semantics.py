@@ -18,12 +18,17 @@ import time
 from pathlib import Path
 
 from exact.repair.api import write_artifact
-from exact.repair.records import VerificationReportV2, canonical_hash, canonical_json, read_record
+from exact.repair.records import (
+    VerificationReportV2,
+    canonical_hash,
+    canonical_json,
+    read_record,
+)
 from exact.repair.semantic_fidelity import (
     AGGREGATION_REVISION,
-    CRITERIA,
     EVALUATOR,
     FIDELITY_TRAINING_SCHEMA,
+    PROMPT_VERSION,
     TEACHER,
     AnnotationBudget,
     AnnotationScheduleV3,
@@ -34,12 +39,12 @@ from exact.repair.semantic_fidelity import (
     SemanticPlanV3,
     ValidatedFidelityAggregateV3,
     aggregate_comparisons,
+    annotation_prompt,
     consequence_basis_from_probes,
     semantic_plan_from_verification,
 )
 from tools.repair.batch import read, sha
 from tools.repair.expanded_corpus import immutable
-
 
 PHASE_LIMITS = {"calibration": 32, "train": 384, "development": 96, "test": 192}
 COMPARISON_LIMITS = {"calibration": 32, "train": 256, "development": 64, "test": 128}
@@ -109,6 +114,7 @@ def validate_manifest(value):
     if value["phase"] not in PHASE_LIMITS:
         raise ValueError("Unregistered annotation phase")
     _request_budget(value)
+    _manifest_prompt(value)
     if value["phase"] != "calibration":
         gate = value["calibration_gate"]
         if sha(gate["path"]) != gate["sha256"] or read(gate["path"])["status"] != "qualified":
@@ -129,13 +135,124 @@ def validate_manifest(value):
         raise PermissionError("Frozen annotation execution is not authorized")
     _provider_deferrals(value)
     _calibration_exclusions(value)
+    if value.get("interface_recovery"):
+        _interface_recovery(value)
     return value
+
+
+def _manifest_prompt(manifest):
+    """Legacy manifests retain their wire bytes; revisions require both bindings."""
+    if "prompt_version" not in manifest and "prompt_hash" not in manifest:
+        return PROMPT_VERSION
+    version = manifest.get("prompt_version")
+    prompt = annotation_prompt(version)
+    if manifest.get("prompt_hash") != canonical_hash(prompt):
+        raise ValueError("Frozen manifest prompt identity mismatch")
+    return version
 
 
 def _read_bound(reference):
     if sha(reference["path"]) != reference["sha256"]:
         raise ValueError("Frozen request amendment evidence changed")
     return read(reference["path"])
+
+
+def _interface_recovery(manifest):
+    """An explicit, finite approval is separate from the original 401 replacement.
+
+    Preparing a proposal or leaving headroom in a request cap grants no new
+    transmission authority. Bind every executable setting and retain all costs.
+    """
+    recovery = manifest["interface_recovery"]
+    if not manifest.get("authorized") or not recovery.get("authorization"):
+        raise PermissionError("Interface recovery requires its explicit scope amendment")
+    proposal = _read_bound(recovery["proposal"])
+    approval = _read_bound(recovery["authorization"])
+    contract = {k: v for k, v in manifest.items() if k not in {"authorized", "interface_recovery"}}
+    # run() specializes the default profile for each frozen slot.
+    contract["profile"] = proposal["profile"]
+    if not (
+        proposal.get("schema") == "exact-repair/annotation-interface-recovery-proposal/v1"
+        and approval.get("schema") == "exact-repair/annotation-interface-recovery-authorization/v1"
+        and approval.get("status") == "approved"
+        and approval.get("approval_text")
+        and approval.get("proposal") == recovery["proposal"]
+        and proposal["request_contract_hash"] == canonical_hash(contract)
+        and manifest["phase"] == "calibration"
+        and manifest["request_limits"] == REALLOCATED_LIMITS
+        and manifest.get("prompt_version") == "semantic-fidelity-prompt/v3.2"
+        and 0 < proposal["max_requests"] <= 13
+        and 0 < proposal["max_reserved_usd"] <= 2
+        and len(manifest["slots"]) == proposal["max_requests"]
+        and len({row["id"] for row in manifest["slots"]}) == len(manifest["slots"])
+        and set(proposal["slot_lineage"]) == {row["id"] for row in manifest["slots"]}
+        and all(row["profile"] == proposal["profile"] for row in manifest["slots"])
+    ):
+        raise ValueError("Interface recovery differs from its approved finite contract")
+    prior = _read_bound(proposal["previous_phase_state"])
+    if (
+        prior["lineage"] != manifest["lineage_id"]
+        or prior["request_limits"] != REALLOCATED_LIMITS
+        or prior["cost_ceiling_usd"] != manifest["cost_ceiling_usd"]
+    ):
+        raise ValueError("Interface recovery cannot change cumulative accounting")
+    return proposal, prior
+
+
+def _interface_recovery_proof(manifest, slot, packet_hash, comparison_id):
+    from exact.repair.semantic_fidelity import _receipt_response, validate_comparison
+
+    proposal, prior = _interface_recovery(manifest)
+    rows = [row for row in manifest["slots"] if row["id"] == slot]
+    if len(rows) != 1:
+        raise ValueError("Interface recovery requires an exact scheduled slot")
+    row = rows[0]
+    lineage = proposal["slot_lineage"][slot]
+    receipt = _read_bound(lineage["receipt"])
+    schedule = read_record(_read_bound(lineage["schedule"]))
+    wire = _read_bound(lineage["wire_receipt"])
+    parameters = schedule.slots[0]["parameters"]
+    response = _receipt_response(wire, parameters)
+    old = prior["reservations"].get(canonical_hash(("calibration", lineage["slot_id"])))
+    if (
+        len(schedule.slots) != 1
+        or receipt["status"] != "annotation_unavailable"
+        or old is None
+        or old["packet_hash"] != packet_hash
+        or schedule.packet.content_hash != packet_hash
+        or schedule.packet.split != "train"
+        or old.get("comparison_id", old["slot"]) != comparison_id
+        or row["comparison_id"] != comparison_id
+        or manifest["profile"] != row["profile"]
+        or parameters["model"] != manifest["profiles"][row["profile"]]["model"]
+        or canonical_hash(parameters["provider"])
+        != canonical_hash(manifest["profiles"][row["profile"]]["provider"])
+        or json.loads(parameters["messages"][1]["content"])["swapped"] != row["swapped"]
+        or response.get("model") != parameters["model"]
+        or response.get("provider") not in parameters["provider"].get("only", [])
+        or response.get("choices", [{}])[0].get("finish_reason") != "stop"
+        or response["choices"][0].get("message", {}).get("refusal")
+    ):
+        raise ValueError("Interface recovery changed its failed request lineage")
+    from exact.llm.routing import extract_chat_text
+
+    try:
+        validate_comparison(extract_chat_text(response), schedule.packet, swapped=row["swapped"])
+    except ValueError:
+        pass
+    else:
+        raise ValueError("A valid scientific judgment is not an interface failure to replay")
+    return (
+        proposal,
+        prior,
+        dict(
+            proposal_sha256=manifest["interface_recovery"]["proposal"]["sha256"],
+            parent_request_id=wire["request_id"],
+            parent_slot=lineage["slot_id"],
+            cause="annotation-request-interface/v3.1",
+            technical_attempt=2,
+        ),
+    )
 
 
 def _provider_policy_failure(manifest, evidence):
@@ -608,7 +725,32 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
         same = [row for row in records.values() if row["phase"] == manifest["phase"]]
         comparison_id = comparison_id or slot
         replacement = None
-        if amendment and manifest["phase"] == "calibration":
+        interface_recovery = None
+        if manifest.get("interface_recovery"):
+            proposal, prior, interface_recovery = _interface_recovery_proof(
+                manifest, slot, packet_hash, comparison_id
+            )
+            if any(records.get(key) != value for key, value in prior["reservations"].items()):
+                raise ValueError("Interface recovery would reset earlier attempts")
+            recovered = [row for row in records.values() if row.get("interface_recovery")]
+            if (
+                not recovered
+                and time.time() > proposal["time"]["latest_full_panel_admission_epoch"]
+            ):
+                raise AnnotationBudgetExhausted("Complete interface panel no longer fits stage")
+            if any(
+                row["interface_recovery"]["parent_request_id"]
+                == interface_recovery["parent_request_id"]
+                for row in recovered
+            ):
+                raise ValueError("Interface failure already has its one technical retry")
+            if (
+                len(recovered) >= proposal["max_requests"]
+                or sum(row["reserved_cost_usd"] for row in recovered) + cost
+                > proposal["max_reserved_usd"] + 1e-9
+            ):
+                raise AnnotationBudgetExhausted("Interface recovery allowance exhausted")
+        elif amendment and manifest["phase"] == "calibration":
             replacement = _replacement_proof(manifest, slot, packet_hash, comparison_id, amendment)
             if any(
                 row.get("replacement", {}).get("original_slot") == replacement["original_slot"]
@@ -648,6 +790,7 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
             comparison_id=comparison_id,
             request_basis=canonical_hash((manifest, slot, packet_hash)),
             **(dict(replacement=replacement) if replacement else {}),
+            **(dict(interface_recovery=interface_recovery) if interface_recovery else {}),
         )
         write_artifact(path, state)
         return None  # The only state that permits a new transmission.
@@ -701,7 +844,6 @@ def annotate_packet(
     if _remaining_seconds(seconds, manifest) < 92 or not packet.eligible:
         return None
     profile_name = manifest["profile"]
-    profile = manifest["profiles"][profile_name]
     prices = manifest["prices_per_million"][profile_name]
     # Conservative maximum includes billed reasoning tokens in the output cap.
     cost = (8000 * prices["input"] + 2000 * prices["output"]) / 1_000_000
@@ -743,6 +885,7 @@ def annotate_packet(
         data_permissions=manifest["data_permissions"],
         retention="campaign durable raw receipts",
         aggregation_rule=AGGREGATION_REVISION,
+        prompt_version=_manifest_prompt(manifest),
         evaluator_split="test" if packet.split == "train" else packet.split,
         development_use_policy=(
             "development_selection/v1"
