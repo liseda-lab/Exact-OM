@@ -57,7 +57,9 @@ def prepare(bundle_path, destination, *, admissions=None):
                     or admission.get("commit") != bundle["source_revision"]
                     or admission.get("scientific_step") != "E17"):
                 raise ValueError("Launch requires a reviewed cell-specific corrected rollout admission")
-            _, spending = admission_environment(admission, policy)
+            environment, spending = admission_environment(admission, policy)
+            from exact.experiments.corrected_worker import checked_write_roots
+            row["checked_write_roots"] = checked_write_roots(read_binding(cell["worker"]), admission, policy, environment)
             root, code = Path(admission["root"]).resolve(), Path(admission["code_root"]).resolve()
             root.mkdir(parents=True, exist_ok=True)
             python = Path(admission["python"]).resolve()
@@ -65,8 +67,12 @@ def prepare(bundle_path, destination, *, admissions=None):
             worker, step = root / "worker-entry.sh", root / "step.json"
             content = ("#!/usr/bin/env bash\nset -euo pipefail\n" +
                 f"cd {shlex.quote(str(code))}\n" +
-                f"trap 'result=$?; printf \"%s\\n\" \"$result\" > {shlex.quote(str(root / 'exit-code'))}' EXIT\n" +
-                f"printf '{{\"step_id\":\"%s.%s\",\"dispatch_nonce\":\"{nonce}\"}}\\n' \"$SLURM_JOB_ID\" \"$SLURM_STEP_ID\" > {shlex.quote(str(step))}\n" +
+                "finish() {\n  result=$?\n" +
+                f"  printf '%s\\n' \"$result\" > {shlex.quote(str(root / 'exit-code'))}\n" +
+                f"  {shlex.quote(str(python))} -m tools.run_corrected_cell --descriptor {shlex.quote(cell['worker']['path'])} --admission {shlex.quote(admissions[cell['id']]['path'])} --record-exit \"$result\" || true\n" +
+                "  exit \"$result\"\n}\ntrap finish EXIT\n" +
+                f"printf '{{\"step_id\":\"%s.%s\",\"dispatch_nonce\":\"{nonce}\"}}\\n' \"$SLURM_JOB_ID\" \"$SLURM_STEP_ID\" > {shlex.quote(str(step) + '.pending')}\n" +
+                f"mv {shlex.quote(str(step) + '.pending')} {shlex.quote(str(step))}\n" +
                 f"{shlex.quote(str(python))} -m tools.run_corrected_cell --descriptor {shlex.quote(cell['worker']['path'])} --admission {shlex.quote(admissions[cell['id']]['path'])}\n")
             with worker.open("x") as stream:
                 stream.write(content)

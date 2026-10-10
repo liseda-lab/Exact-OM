@@ -5,6 +5,7 @@ import csv
 import hashlib
 import io
 import json
+import os
 from pathlib import Path
 
 from exact.experiments.mixed_scale import binding, read_binding, verified
@@ -183,3 +184,45 @@ def runtime_record(descriptor, entry, config, *, runtime, code):
     return {"root": str(runtime), "identity": identity, "stop_after_checkpoint": False,
             "original_query_indices": entry["query_indices"], "inference": descriptor["inference"],
             "inputs": {name: manifest[name] for name in ("source", "target")}}
+
+
+def checked_write_roots(descriptor, admission, policy, environment):
+    """All durable outputs and cache/scratch files must be inside measured envelopes."""
+    from exact.core.entities.configs.config import ConfigModel
+    guard = policy.get("storage_guard")
+    if not guard:
+        raise ValueError("Corrected workers require an approved storage guard covering every write root")
+    allowed = [Path(guard["usage_root"]).resolve()] + [Path(row["usage_root"]).resolve()
+        for row in guard.get("additional_roots", [])]
+    env = {**os.environ, **environment}
+    base_cache = env.get("XDG_CACHE_HOME", str(Path.home() / ".cache"))
+    roots = [admission["root"], *[row["run_dir"] for row in descriptor["runs"]],
+             env.get("HF_HOME", str(Path(base_cache) / "huggingface")),
+             env.get("TORCH_HOME", str(Path(base_cache) / "torch")), env.get("TMPDIR", "/tmp")]
+    if descriptor["executor"] == "pinned_published_matcher":
+        import shlex
+        roots.append("/tmp")  # Java's default temporary directory ignores Python's TMPDIR.
+        roots += [item.split("=", 1)[1] for item in shlex.split(env.get("JAVA_TOOL_OPTIONS", ""))
+                  if item.startswith("-Djava.io.tmpdir=")]
+    roots += [value for name, value in env.items() if value and (
+        name.endswith(("CACHE_DIR", "CACHE_ROOT")) or name in {"HUGGINGFACE_HUB_CACHE", "HF_HUB_CACHE",
+        "TRANSFORMERS_CACHE", "EXACT_DATASET_CACHE_LOCAL_DIR", "EXACT_EXPERIMENT_SHARED_CACHE_ROOT",
+        "EXACT_NUMERICAL_CACHE_ROOT", "TEMP", "TMP"})]
+    def configured(value):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in {"cache_dir", "cache_root", "cache_path", "output_dir", "checkpoint_dir",
+                           "log_dir", "scratch_dir", "scratch_root", "temporary_dir"} and isinstance(item, str) and item:
+                    roots.append(item)
+                else:
+                    configured(item)
+        elif isinstance(value, list):
+            for item in value:
+                configured(item)
+    for row in descriptor["runs"]:
+        configured(ConfigModel.load_config(verified(row["config"])).model_dump(mode="json", by_alias=True))
+    resolved = sorted({str((Path(admission["code_root"]) / path).resolve()) for path in roots})
+    outside = [path for path in resolved if not any(Path(path).is_relative_to(root) for root in allowed)]
+    if outside:
+        raise ValueError("Uncovered corrected worker write roots: " + repr(outside))
+    return resolved

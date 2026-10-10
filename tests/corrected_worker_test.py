@@ -197,14 +197,19 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
         public_inputs=inputs["path"], selection_freeze=frozen, deployments={cell_id: mixed.binding(manifest)},
         source_revision="a" * 40)
     descriptor = next(row["worker"] for row in result["logical_to_physical"] if row["id"] == cell_id)
-    environment = saved(tmp_path / "env.json", {"EXACT_OPENROUTER_RETRY_UNKNOWN": "1"})
+    environment = saved(tmp_path / "env.json", {"EXACT_OPENROUTER_RETRY_UNKNOWN": "1",
+        "HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+        "TMPDIR": str(tmp_path / "scratch"), "XDG_CACHE_HOME": str(tmp_path / "cache")})
     spending = saved(tmp_path / "spending.json", {"schema_version": 2, "kind": "exact_om_hosted_spending_policy",
         "mode": "hard_pause", "authorization": "fixture", "notification_tokens": 100,
         "campaign_id": "campaign", "campaign_tokens_cap": 500, "experiment_tokens_cap": 200,
         "experiment_warning_tokens": 100, "admission_store": str(tmp_path / "central.sqlite"),
         "bootstrap": {"path": str(parent), "sha256": mixed.binding(parent)["sha256"]}})
+    code_root = Path(worker.__file__).resolve().parent.parent
     policy = saved(supervisor / "policy.json", {"allocation": "14372", "repository": str(tmp_path),
-        "hosted_spending_policy": spending})
+        "hosted_spending_policy": spending, "storage_guard": {"usage_root": str(tmp_path),
+            "python": str(Path(os.sys.executable)), "source": mixed.binding(code_root / "tools/storage_guard.py"),
+            "min_free_bytes": 1, "max_used_bytes": 1000000000, "growth_reserve_bytes": 1000}})
     run_id = "corrected-" + cell_id.replace("/", "--")
     admission = saved(tmp_path / "admission.json", {"kind": "corrected_worker_rollout_admission",
         "rollout_authorized": True, "descriptor": descriptor, "supervisor": str(supervisor), "root": str(root),
@@ -213,11 +218,22 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
         "forecast": {"seconds": 1, "requests": 0, "tokens": 0, "usd": 0},
         "commit": "a" * 40, "scientific_step": "E17", "python": str(Path(os.sys.executable)),
         "resources": {"cpus": 1, "gpus": 0, "memory_mb": 100}, "gres": "none"})
+    from exact.experiments.corrected_worker import checked_write_roots
+    for field in ("output", "cache"):
+        changed = mixed.read_binding(descriptor)
+        env = mixed.read_binding(environment)
+        if field == "output":
+            changed["runs"][0]["run_dir"] = str(tmp_path.parent / "uncovered-output")
+        else:
+            env["EXACT_NUMERICAL_CACHE_ROOT"] = str(tmp_path.parent / "uncovered-cache")
+        with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+            checked_write_roots(changed, mixed.read_binding(admission), mixed.read_binding(policy), env)
     proposal = prepare(tmp_path / "bundle/successor-bundle.json", tmp_path / "queue",
                        admissions={cell_id: admission})
     declared = next(row for row in proposal["proposed_pending_batches"] if row["logical_cell"] == cell_id)
     assert not declared["enabled"] and declared["launch"]["argv"][0] == "/usr/bin/srun"
     assert declared["launch"]["run"]["hosted_scope"]["experiment_id"] == "E17"
+    worker.subprocess.run(["/bin/bash", "-n", str(root / "worker-entry.sh")], check=True)
     nonce = declared["launch"]["nonce"]
     write(root / "step.json", {"step_id": "14372.999", "dispatch_nonce": nonce})
     registry["runs"].append({"id": run_id, "status_path": str(root / "status.json"),
@@ -261,6 +277,7 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
     monkeypatch.setattr(worker.subprocess, "Popen", Process)
     result = worker.run(Path(descriptor["path"]), Path(admission["path"]))
     assert result["status"] == "complete" and len(calls) == 2
+    assert result["dispatch_nonce"] == nonce and result["exit_code"] == 0
     assert all(not {"-e", "-r", "-f"} & set(command) for command in calls)
     account = json.loads((root / "runtime/budget.json").read_text())
     assert account["limits"] == limits and account["work"]["historical/closed"] == history["work"]["historical/closed"]
@@ -287,3 +304,18 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
         with pytest.raises(ValueError, match="Changed final-study input binding"):
             worker.run(Path(descriptor["path"]), Path(admission["path"]))
         changed_path.write_bytes(original)
+
+
+def test_early_worker_failure_has_reconcilable_terminal_receipt(tmp_path, monkeypatch):
+    from tools.run_corrected_cell import record_exit
+    from exact.experiments.dispatch import _step
+    monkeypatch.setenv("SLURM_JOB_ID", "14372")
+    monkeypatch.setenv("SLURM_STEP_ID", "999")
+    admission = saved(tmp_path / "admission.json", {"root": str(tmp_path)})
+    saved(tmp_path / "step.json", {"step_id": "14372.999", "dispatch_nonce": "fixture-nonce-123"})
+    (tmp_path / "exit-code").write_text("1\n")
+    record_exit(Path(admission["path"]), 1)
+    launch = {"step_path": str(tmp_path / "step.json"), "nonce": "fixture-nonce-123",
+              "run": {"completion_path": str(tmp_path / "completion.json"), "exit_path": str(tmp_path / "exit-code")}}
+    assert _step(launch, "14372", set()) == "14372.999"
+    assert json.loads((tmp_path / "completion.json").read_text())["status"] == "failed"

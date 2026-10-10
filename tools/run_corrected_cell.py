@@ -68,6 +68,8 @@ def run(descriptor_path, admission_path):
             or Path(__file__).resolve().parent.parent != code):
         raise ValueError("Corrected worker must execute the reviewed clean frozen source")
     environment, spending = admission_environment(admission, policy)
+    from exact.experiments.corrected_worker import checked_write_roots
+    checked_write_roots(descriptor, admission, policy, environment)
     registered = None
     for _ in range(30):
         registry = controls(supervisor, root)
@@ -175,17 +177,49 @@ def run(descriptor_path, admission_path):
                 ledger.record_allocation(os.environ["SLURM_JOB_ID"], start=observation["start"], end=time.time())
             result = {"status": outcome, "descriptor": binding(descriptor_path), "cumulative_budget": str(ledger.path),
                 "step_id": os.environ["SLURM_JOB_ID"] + "." + os.environ["SLURM_STEP_ID"],
+                "dispatch_nonce": receipt["dispatch_nonce"], "exit_code": 0 if outcome == "complete" else 1,
                 "scientific_acceptance": "pending_output_coverage_and_reporting"}
             write(root / "completion.json", result, immutable=True)
             status(root, outcome, cumulative_budget=str(ledger.path))
     return result
 
 
+def record_exit(admission_path, result):
+    """Retain terminal evidence even when validation fails before normal accounting."""
+    from tools.prepared_batch import status, write
+    admission = json.loads(Path(admission_path).read_text())
+    root = Path(admission["root"])
+    receipt = json.loads((root / "step.json").read_text())
+    step = os.environ.get("SLURM_JOB_ID", "") + "." + os.environ.get("SLURM_STEP_ID", "")
+    if receipt.get("step_id") != step or not receipt.get("dispatch_nonce"):
+        raise ValueError("Exit recorder requires this worker's numeric step receipt")
+    with (root / "worker.lock").open("a") as lock:
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return
+        path = root / "completion.json"
+        previous = json.loads(path.read_text()) if path.exists() else {}
+        if previous and previous.get("step_id") != step:
+            raise ValueError("Exit recorder cannot overwrite another attempt")
+        completed = previous.get("status") == "complete" and result == 0
+        record = {**previous, "status": "complete" if completed else "failed",
+                  "step_id": step, "dispatch_nonce": receipt["dispatch_nonce"], "exit_code": result}
+        write(path, record)
+        if not completed:
+            status(root, "failed", exit_code=result, error="Corrected worker exited before completion",
+                   cumulative_budget=str(root / "runtime/budget.json"))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--descriptor", required=True, type=Path)
     parser.add_argument("--admission", required=True, type=Path)
+    parser.add_argument("--record-exit", type=int)
     args = parser.parse_args()
+    if args.record_exit is not None:
+        record_exit(args.admission, args.record_exit)
+        return
     print(json.dumps(run(args.descriptor, args.admission), sort_keys=True))
 
 
