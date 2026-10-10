@@ -113,6 +113,8 @@ def _remaining_seconds(seconds, manifest):
 
 
 def validate_manifest(value):
+    from tools.repair.annotation_backoff import validate_policy
+
     if value.get("schema") != "exact-repair/corrective-annotation/v1":
         raise ValueError("Unknown corrective annotation manifest")
     if value.get("postprocessing_only"):
@@ -149,6 +151,7 @@ def validate_manifest(value):
             )
     if not value.get("authorized"):
         raise PermissionError("Frozen annotation execution is not authorized")
+    validate_policy(value)
     _provider_deferrals(value)
     _calibration_exclusions(value)
     if value.get("interface_recovery"):
@@ -1467,8 +1470,12 @@ def run(manifest_path, output):
         left = _remaining_seconds(manifest["seconds"] - (time.monotonic() - started), manifest)
         failure = None
         try:
+            if manifest.get("rate_limit_policy"):
+                from tools.repair.annotation_backoff import annotate as annotate_with_backoff
+            else:
+                annotate_with_backoff = annotate_packet
             artifact = (
-                annotate_packet(
+                annotate_with_backoff(
                     packet,
                     {**manifest, "profile": profile},
                     Path(output) / row["id"],
@@ -1495,6 +1502,12 @@ def run(manifest_path, output):
                 )
                 failure = None
         policy_failure = deferred and deferred["failed_slot"] == row["id"]
+        transport_receipt = Path(output) / row["id"] / "receipt.json"
+        waiting_capacity = (
+            manifest.get("rate_limit_policy") and artifact is None
+            and transport_receipt.exists()
+            and read(transport_receipt).get("status") == "rate_limit_deferred"
+        )
         rows.append(
             (
                 excluded["retained_rows"].get(
@@ -1511,6 +1524,7 @@ def run(manifest_path, output):
                     else (
                         "not_attempted_provider_policy"
                         if deferred
+                        else "rate_limit_deferred" if waiting_capacity
                         else "complete" if artifact else "unavailable"
                     )
                 ),
