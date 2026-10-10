@@ -64,3 +64,37 @@ def test_precision_validation_does_not_change_fitting_scores_or_gradients():
     grad_after = torch.autograd.grad(after.sum(), tau)[0]
     assert torch.equal(before, after)
     assert torch.equal(grad_before, grad_after)
+
+
+def test_saved_g4_development_channels_replay_without_widening_tolerance():
+    # Numeric-only evidence from row 3 of the D0 global training aggregate.
+    # No source IDs, reference labels or training labels are needed to replay it.
+    values = {
+        "attr_aux": (0.8515251278877258, 0.679847240447998, 1),
+        "diff": (0.5, 0, 0),
+        "hier__has_part": (0.5, 0, 0),
+        "hier__is_a": (0.7962849736213684, 0.5106331706047058, 1),
+        "hier__part_of": (0.5, 0, 0),
+        "label": (0.73681640625, 1, 1),
+        "sim_obj": (0.5, 0, 0),
+        "strsim": (0.5, 0, 0),
+    }
+    names = sorted(values) + ["lex", "struct"]
+    channels = tuple(
+        torch.tensor([[values.get(name, (0, 0, 0))[field] for name in names]],
+                     dtype=torch.float64)
+        for field in range(3)
+    )
+    expected = torch.tensor([0.7893407344818115], dtype=torch.float64)
+    parameters = (torch.tensor(0.5), torch.tensor(2.0), torch.ones(len(names)))
+    original = fusion_scores(channels, names, parameters, mode="analytic_fitted")
+    assert not torch.isclose(original, expected, atol=2e-6, rtol=2e-6).all()
+    with pytest.raises(ValueError, match="does not replay"):
+        validate_neutral_fusion(channels, names, expected)
+    validate_neutral_fusion(channels, names, expected, fp16_lexical=True)
+
+    # The precision binding cannot excuse changed structural evidence.
+    changed = tuple(channel.clone() for channel in channels)
+    changed[0][0, names.index("hier__is_a")] += 0.01
+    with pytest.raises(ValueError, match="does not replay"):
+        validate_neutral_fusion(changed, names, expected, fp16_lexical=True)
