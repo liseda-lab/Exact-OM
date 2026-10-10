@@ -1,7 +1,5 @@
 """Validate frozen repair request profiles against digest-bound public metadata."""
 
-import json
-from pathlib import Path
 from exact.repair.annotation_controls import SCHEMA_VERSION
 from tools.repair.batch import read, sha
 
@@ -10,14 +8,16 @@ def request_profile(manifest, name):
     controls = manifest.get("request_profiles", {}).get(name)
     if controls is None:
         return None
-    if set(controls) != {
+    required_fields = {
         "schema_version",
         "max_output_tokens",
         "reasoning",
         "endpoint",
         "catalog",
         "tokenizer",
-    }:
+    }
+    optional_fields = {"max_input_tokens", "max_input_bytes", "input_amendment"}
+    if set(controls) not in (required_fields, required_fields | optional_fields):
         raise ValueError("Unknown request profile fields")
     if controls["schema_version"] != SCHEMA_VERSION:
         raise ValueError("Unknown response schema")
@@ -48,6 +48,32 @@ def request_profile(manifest, name):
         required.add("reasoning")
     if not required <= set(endpoint["supported_parameters"]) or endpoint["status"] != 0:
         raise ValueError("Pinned endpoint lacks required structured-output controls")
+    if "input_amendment" in controls:
+        from tools.repair.shared_release import bound
+
+        amendment = bound(controls["input_amendment"])
+        tokens, byte_cap = input_limits(controls)
+        if (
+            amendment.get("schema") != "exact-repair/annotation-input-amendment/v1"
+            or amendment.get("authorized") is not True
+            or amendment.get("costs_reset") is not False
+            or amendment.get("truncate_evidence") is not False
+            or amendment.get("model") != profile["model"]
+            or amendment.get("provider") != provider["only"][0]
+            or amendment.get("max_input_tokens") != tokens
+            or amendment.get("max_input_bytes") != byte_cap
+            or amendment.get("max_output_tokens") != cap
+            or manifest["phase"] not in amendment.get("phases", [])
+            or amendment.get("cost_ceiling_usd") != manifest["cost_ceiling_usd"]
+            or amendment.get("request_limits") != manifest["request_limits"]
+            or type(tokens) is not int
+            or not 1 <= tokens
+            or type(byte_cap) is not int
+            or not 1 <= byte_cap
+            or tokens + cap > endpoint.get("context_length", 0)
+            or tokens > (endpoint.get("max_prompt_tokens") or endpoint["context_length"])
+        ):
+            raise ValueError("Invalid or unsupported annotation input amendment")
     if cap > endpoint["max_completion_tokens"]:
         raise ValueError("Output cap exceeds endpoint maximum")
     models = [m for m in evidence["catalog"]["data"] if m["id"] == profile["model"]]
@@ -93,3 +119,10 @@ def request_profile(manifest, name):
     ):
         raise ValueError("Input tokenizer must bind the declared model and immutable bytes")
     return controls
+
+
+def input_limits(controls):
+    """Legacy profiles keep their original bounds; amendments bind both guards."""
+    if controls is None:
+        return 8000, 8000
+    return controls.get("max_input_tokens", 8000), controls.get("max_input_bytes", 32768)

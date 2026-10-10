@@ -87,6 +87,10 @@ def validate_row(row, manifest, original):
 
 def validate_rows(manifest):
     contract = manifest["packet_admission"]
+    if contract.get("schema") == "exact-repair/train-input-recovery/v1":
+        from tools.repair.train_input_recovery import validate_rows as validate_recovery
+
+        return validate_recovery(manifest)
     if contract["schema"] != SCHEMA or manifest["phase"] != "train":
         raise ValueError("Unknown TRAIN packet admission")
     preparation = bound(contract["encoding"])

@@ -1977,7 +1977,10 @@ class SemanticAnnotationAdapter:
             key,
             role,
             packet.case_id,
-            input_token_bound(messages, controls, getattr(self.run, "input_tokenizer", None))
+            input_token_bound(
+                messages, controls, getattr(self.run, "input_tokenizer", None),
+                self.run.max_input_bytes,
+            )
             + self.run.max_output_tokens,
         )
         try:

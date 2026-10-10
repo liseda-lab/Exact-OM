@@ -293,9 +293,13 @@ def support_targets(
         or not report.support.complete_imports
     ):
         return ()
+    # Qualified satisfied obligations need no positive conflict proof. Running
+    # the symbolic detector for them can dominate an otherwise completed native
+    # verification, especially on large coherent inputs.
+    needs_proofs = any(r.complete and r.satisfied is False for r in report.obligations)
     proofs = {
         (proof.kind, hashlib.sha256(proof.query.canonical_bytes()).hexdigest()): proof
-        for proof in detect_violations(axioms, active, problem.policy)
+        for proof in (detect_violations(axioms, active, problem.policy) if needs_proofs else ())
         if proof.query is not None and validate_proof(proof, axioms, active, problem.policy)
     }
     queries = [
@@ -309,6 +313,21 @@ def support_targets(
         (kind, hashlib.sha256(value.canonical_bytes()).hexdigest()): value
         for kind, value in queries
     }
+    # These identities describe the whole assignment and are identical for every
+    # witness. Compute them once, not once per monitored class.
+    theory_hash = canonical_hash(
+        (
+            tuple(sorted(set(axioms), key=canonical_hash)),
+            tuple(sorted(set(active), key=canonical_hash)),
+        )
+    )
+    policy_hash, backend_hash = problem.policy.content_hash, canonical_hash(report.support)
+    occurrences = tuple(
+        (obj.object_id, obj.candidates[choice].candidate_id)
+        for obj, choice in zip(problem.objects, assignment)
+    )
+    full_axioms = tuple(axiom.canonical_bytes().hex() for axiom in axioms)
+    activation = tuple(value.canonical_bytes().hex() for value in active)
     targets = []
     for result in report.obligations:
         key = result.kind, result.query_id
@@ -326,23 +345,16 @@ def support_targets(
                 lookup[key].canonical_bytes().hex(),
                 result.kind,
                 violated,
-                canonical_hash(
-                    (
-                        tuple(sorted(set(axioms), key=canonical_hash)),
-                        tuple(sorted(set(active), key=canonical_hash)),
-                    )
+                theory_hash,
+                policy_hash,
+                backend_hash,
+                occurrences,
+                (
+                    tuple(axiom.canonical_bytes().hex() for axiom in proof.asserted_support)
+                    if proof
+                    else full_axioms
                 ),
-                problem.policy.content_hash,
-                canonical_hash(report.support),
-                tuple(
-                    (obj.object_id, obj.candidates[choice].candidate_id)
-                    for obj, choice in zip(problem.objects, assignment)
-                ),
-                tuple(
-                    axiom.canonical_bytes().hex()
-                    for axiom in (proof.asserted_support if proof else axioms)
-                ),
-                tuple(value.canonical_bytes().hex() for value in active),
+                activation,
                 canonical_json(proof) if proof else None,
             )
         )

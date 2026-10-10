@@ -116,7 +116,7 @@ def _tokenizer(path, digest):
     return Tokenizer.from_str(raw.decode())
 
 
-def input_token_bound(messages, controls=None, tokenizer=None):
+def input_token_bound(messages, controls=None, tokenizer=None, max_input_bytes=32768):
     # Legacy bytes are unchanged. Controlled requests count message text with a
     # pinned model tokenizer, plus 256 framing tokens and a conservative byte
     # bound for the *entire* response schema/reasoning object. This is a local
@@ -128,7 +128,9 @@ def input_token_bound(messages, controls=None, tokenizer=None):
         if hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest:
             raise ValueError("Pinned annotation tokenizer changed")
         text = json.dumps(plain, ensure_ascii=False, separators=(",", ":"))
-        if len(text.encode()) + extra > 32768:
+        if type(max_input_bytes) is not int or max_input_bytes <= 0:
+            raise ValueError("A finite positive annotation byte cap is required")
+        if len(text.encode()) + extra > max_input_bytes:
             raise ValueError("Annotation input exceeds independent byte cap")
         return len(_tokenizer(path, digest).encode(text).ids) + 256 + extra
     return len(json.dumps(plain).encode()) + 256 + extra
