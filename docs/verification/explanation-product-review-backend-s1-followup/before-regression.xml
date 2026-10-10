@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="0.734" timestamp="2026-10-10T19:12:11.508526+01:00" hostname="Pedros-MacBook-Pro-4.local"><testcase classname="tests.explanation_literal_origin_test" name="test_saved_literal_projection_requires_an_unambiguous_original" time="0.177"><failure message="AssertionError: assert 0 == 1&#10; +  where 0 = len([])&#10; +    where [] = &lt;function test_saved_literal_projection_requires_an_unambiguous_original.&lt;locals&gt;.resolve at 0x10dfef1a0&gt;('Unique meaning')">tmp_path = PosixPath('/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/pytest-of-pedrocotovio/pytest-338/test_saved_literal_projection_0')
+
+    def test_saved_literal_projection_requires_an_unambiguous_original(tmp_path):
+        snapshot = core.load_snapshot(b'''Ontology(
+          Declaration(Class(&lt;urn:A&gt;)) Declaration(Class(&lt;urn:B&gt;))
+          Declaration(ObjectProperty(&lt;urn:A&gt;))
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:A&gt; "Unique meaning"@en)
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:A&gt; "Same"@en)
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:A&gt; "Same"@pt)
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:A&gt; "1"^^&lt;http://www.w3.org/2001/XMLSchema#integer&gt;)
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:A&gt; "1"^^&lt;http://www.w3.org/2001/XMLSchema#string&gt;)
+          AnnotationAssertion(&lt;urn:definition&gt; &lt;urn:B&gt; "Neighbour only")
+        )''', options=core.LoadOptions(backend=core.BackendPreference.NATIVE))
+        context = build_context_package(snapshot, tmp_path / "context")
+        entity = {"ontology_version_id": context.ontology_version_id, "iri": "urn:A", "kind": "class"}
+    
+        def resolve(value, **qualifiers):
+            return context.resolve_feature(
+                {"entity_iri": "urn:A", "property_iri": "urn:definition", "value": value, **qualifiers}, entity
+            )["fact_ids"]
+    
+&gt;       assert len(resolve("Unique meaning")) == 1
+E       AssertionError: assert 0 == 1
+E        +  where 0 = len([])
+E        +    where [] = &lt;function test_saved_literal_projection_requires_an_unambiguous_original.&lt;locals&gt;.resolve at 0x10dfef1a0&gt;('Unique meaning')
+
+tests/explanation_literal_origin_test.py:28: AssertionError</failure></testcase></testsuite></testsuites>

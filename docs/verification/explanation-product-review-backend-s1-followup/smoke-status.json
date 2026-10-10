@@ -1,0 +1,8 @@
+{
+  "phase": "complete",
+  "seconds": 68.58288924954832,
+  "pairs": 9,
+  "candidate_decisions_sha256": "sha256:d134b1141cf8dfcc4ffc4cd516de498d38a490252d57f7460fef45d9b047e91f",
+  "source_decisions_sha256": "sha256:f9dddde09023cf81c76b0d659b952704e615588b8f13c0eb238f60af69a370e5",
+  "limitation": "New diagnostic DOID-to-DOID run; not retained NCIT/DOID study history, final experiment or effectiveness evaluation"
+}

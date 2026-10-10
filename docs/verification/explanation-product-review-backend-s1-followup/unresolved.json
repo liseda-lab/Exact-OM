@@ -1,0 +1,32 @@
+{
+  "schema": "exact-review-unresolved-diagnosis/1",
+  "counts": {
+    "retained_origin_not_admitted_for_focal_subject": 355,
+    "no_matching_admitted_focal_relation_origin": 574,
+    "no_unique_matching_admitted_literal": 1302,
+    "relation_recorded_for_different_subject": 133
+  },
+  "examples": {
+    "retained_origin_not_admitted_for_focal_subject": {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-1",
+      "evidence_id": "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719"
+    },
+    "no_matching_admitted_focal_relation_origin": {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-1",
+      "evidence_id": "sha256:dd8addc5a4ca0c9611a37a3642548c6f4eae0baa6d9cb9a051295649ba588df6"
+    },
+    "no_unique_matching_admitted_literal": {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-1",
+      "evidence_id": "sha256:494b52f20077701e0d1be0324fb09cd217ca2f7b37479ff70cb6a8eb2b72fa52"
+    },
+    "relation_recorded_for_different_subject": {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-4",
+      "evidence_id": "sha256:8b97f4f04fcab39f695c6da06183a296dcb700647e2b678faec91e7a95f53abb"
+    }
+  },
+  "limitation": "Retained terms determine subject mismatch; no_unique_matching_admitted_literal includes absent, filtered or ambiguous literals and is not a claim that the source ontology lacks the statement."
+}

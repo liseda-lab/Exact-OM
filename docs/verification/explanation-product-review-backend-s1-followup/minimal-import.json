@@ -1,0 +1,22 @@
+{
+  "schema": "exact-review-import-mapping-reproduction/1",
+  "version": "0.2.1",
+  "backend": "native",
+  "root_sha256": "sha256:69d8cca5bc59aac0c705ff5ae96522179d5b75a883029acbc97b8fdf2b776ea4",
+  "import_sha256": "sha256:fd4c1297e7055b992ddacbd174942c1ffe85f64657cf30d6eda46686b3e1250a",
+  "results": [
+    {
+      "case": "declaration_in_import",
+      "status": "rejected",
+      "type": "UnsupportedSyntaxError",
+      "code": "RDF_MAPPING_INCOMPLETE",
+      "message": "RDF graph is not completely mappable to OWL 2 structure"
+    },
+    {
+      "case": "declaration_also_in_root",
+      "status": "parsed",
+      "complete": true,
+      "axioms": 3
+    }
+  ]
+}

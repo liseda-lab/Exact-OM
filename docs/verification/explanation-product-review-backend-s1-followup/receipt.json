@@ -1,0 +1,270 @@
+{
+  "schema": "exact-review-backend-s1-followup/1",
+  "recorded_at": "2026-10-10T18:33:35.199477+00:00",
+  "reviewed_commit": "7a6028c032962d0afae0e7de5a479090f330f3e1",
+  "implementation_commit": "4f9dad94ecf288164e3d5f5ee922387e8822c4b2",
+  "status": "qualified_handoff_with_open_gates",
+  "findings": {
+    "S1-01": {
+      "priority": "P1",
+      "owner": "backend/data and frontend S2",
+      "disposition": "literal_origin_defect_fixed; graph_data_improved; unresolved_origins_and_unsupported_projection_explicit"
+    },
+    "S1-02": {
+      "priority": "P1",
+      "owner": "offline inference",
+      "disposition": "optional_exception_authorized_by_user; ELK_failed; no_taxonomy"
+    },
+    "S1-03": {
+      "priority": "P1",
+      "owner": "provider credential then backend preparation",
+      "disposition": "blocked_HTTP_401_on_first_preflight_request; no_remaining_batch_dispatched"
+    },
+    "S1-04": {
+      "priority": "P2",
+      "owner": "pyOWLCore native RDF mapper",
+      "disposition": "all_15_imports_available; strict_native_original_admission_blocked; minimal_reproduction_delivered"
+    },
+    "S1-05": {
+      "priority": "P2",
+      "owner": "backend/data",
+      "disposition": "separate_nine_pair_smoke_completed_and_ASGI_verified; sparse_and_some_restriction_and_final_decision_strata_open"
+    },
+    "S1-06": {
+      "priority": "P2",
+      "owner": "backend/runtime",
+      "disposition": "integrity_preserving_optimizations_tested; new_HTTPS_startup_and_journey_pending_at_snapshot"
+    }
+  },
+  "bundle": {
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/refreshed-input-v2",
+    "publication_sha256": "sha256:de980187339840d0f623eb8d38162bca0c08f50d32707ae691fd5a4201286dc0",
+    "package_manifest_sha256": "sha256:587a06159a5ce3be559a407bf741ac01cc34aff587f958e6bc2f41777ed54aac",
+    "policy_sha256": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+    "source_contexts": {
+      "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": {
+        "database_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+        "manifest_sha256": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652"
+      },
+      "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": {
+        "database_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+        "manifest_sha256": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82"
+      }
+    },
+    "cases": 24,
+    "presented_pairs": 120,
+    "full_pool_pairs": 30374,
+    "provider_prose_approvals": 0,
+    "typed_claims": 514
+  },
+  "evidence": {
+    "selected": 3443,
+    "resolved_before": 301,
+    "resolved_after": 1079,
+    "unresolved_after": 2364,
+    "producer_projection_not_recorded": 3443,
+    "pure_frontend_projection": {
+      "drawn_original_occurrences": 1049,
+      "no_graph_form": 31,
+      "unavailable": 2364,
+      "source_only_pairs": 5,
+      "multiple_both_sides_channel_pairs": 92,
+      "rendered_browser": false
+    }
+  },
+  "verification": {
+    "native_regression_before": "expected_failure_reproduced",
+    "focused_boundaries": {
+      "passed": 17
+    },
+    "verifier_tools": {
+      "passed": 34
+    },
+    "broader_regressions": {
+      "passed": 116,
+      "infrastructure_failures": 2,
+      "skipped": 1,
+      "failures": "sandbox disallowed loopback bind and process identity inspection"
+    },
+    "permitted_lifecycle_rerun": {
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0,
+      "postgresql": "dedicated temporary PostgreSQL 16.2 cluster"
+    },
+    "frontend_unit": {
+      "passed": 15,
+      "failed": 0
+    },
+    "schema_check": "passed_unchanged",
+    "publication_audit": "passed_514_claims_zero_failures",
+    "full_pool_preservation": "passed_no_score_or_decision_changes",
+    "auxiliary_smoke_ASGI": "nine_pair_responses_passed",
+    "fresh_HTTPS_journey": "running_tutorial_real_elapsed_dwell; not_yet_passed",
+    "new_environment_startup": "ready_in_106.066_s_after_initial_failure; not_clean_cold_publication_start",
+    "new_environment_restart_resume": "background_pipeline_pending",
+    "relocation": "new independent root audit passed; hidden-original serving check remains open",
+    "R16": "unresolved_not_reproduced_or_fixed_here",
+    "fresh_API_tutorial_rejections": {
+      "tutorial_rejection:omitted_entity_kind": 422,
+      "tutorial_rejection:unadmitted_fact": 422
+    }
+  },
+  "environment": {
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/environment",
+    "ports": {
+      "postgres": 19203,
+      "study": 19204,
+      "exploration": 19205
+    },
+    "python": "3.12.3",
+    "postgresql": "16.2",
+    "pyowl_core": "0.2.1",
+    "pyelk_reasoner": "0.2.1 isolated target",
+    "compiled_frontend": "accepted S0; study-review/1 negotiation still requires S2",
+    "normal_CSP": true,
+    "certificate_trust_bypassed": false,
+    "existing_environment_preserved": true,
+    "ready_observed": true
+  },
+  "receipts": {
+    "publication-audit.json": {
+      "sha256": "f9da86ab1d542aa9dd588d4fc50a946997bc6537d0d77bdb1834e79204395c24",
+      "bytes": 706902
+    },
+    "catalogue.json": {
+      "sha256": "9455ebf801f1e64d3010692cf3f53280fca8c273dd556594fce8e43bf541ea3f",
+      "bytes": 287809
+    },
+    "catalogue.md": {
+      "sha256": "427ba70e9afe6d1c9f073f516ceffd4cd1e18fb78eaa80e4e5d4a8237211d2d2",
+      "bytes": 61897
+    },
+    "projection.json": {
+      "sha256": "e5f1a71bd378bd06539d717b140bd1161b8c26ff6290d1eb374f3f79fc46085d",
+      "bytes": 70687
+    },
+    "pool-parity.json": {
+      "sha256": "ef2f0c4f17c7dd04071a47d973d143b20828712cef29bd18238a70c2a1f70b2c",
+      "bytes": 208
+    },
+    "unresolved.json": {
+      "sha256": "4b922504258f4c77fd20caf7d905afd40fafa9792dd944f342c8d6ee1b0eea83",
+      "bytes": 1435
+    },
+    "provider-preflight.json": {
+      "sha256": "83eb44128860d140a2b90fe947c1335756489e45ff559a88dfd2e7c3f231f415",
+      "bytes": 732
+    },
+    "ontology-admission.json": {
+      "sha256": "aa2a62ebbdd2d65b402fe496cd9adc666b8913767f3a2c761bcc1c06bb54cdb5",
+      "bytes": 4517
+    },
+    "minimal-import.json": {
+      "sha256": "f5ee39d95cbbd205215197a0fd3efc8e6f965284cbca44fe7191a0068ad58658",
+      "bytes": 669
+    },
+    "doid-elk.json": {
+      "sha256": "36c8d40867297e37a24ac154760a00ee72464b75e4856d2227cae2ce51e1fabf",
+      "bytes": 1250
+    },
+    "ncit-elk.json": {
+      "sha256": "f94befb35e2129cb121d571d390569fc5e7773ec8b33e995e6ec124f2af417c0",
+      "bytes": 972
+    },
+    "trace-smoke.json": {
+      "sha256": "2aba39dcc07735cddc72b665211045be78b3e8d0f9b5979de71ae0d26353cedf",
+      "bytes": 2239
+    },
+    "regressions.xml": {
+      "sha256": "7bea405d56919eb25dc5f6bbc15b268ac6f7b915fba7a0ec6bc0fff32297da26",
+      "bytes": 21097
+    },
+    "lifecycle.xml": {
+      "sha256": "eee2b63c439e7c2ba023ab6428a9a0dcc7da32e802ec6864f3750956459e5e77",
+      "bytes": 5719
+    },
+    "tools.xml": {
+      "sha256": "50a15646c0a308b55faf5184be9c7c8b157bb6d3abe657778a5d0e762f9f270b",
+      "bytes": 6208
+    },
+    "boundaries.xml": {
+      "sha256": "dd3f85478039e20f062e0aaeb95f16ab7c4dbadc110df11fc4fa0c748d9a17db",
+      "bytes": 3095
+    },
+    "before-regression.xml": {
+      "sha256": "b9fd568b4b9643e51592ba4cfbe2952c93c92e89bf54ff3b2a7ff5b12671b8c0",
+      "bytes": 2474
+    },
+    "first-study-readiness.json": {
+      "sha256": "b0b1e5b06b69e6f34b99f2a90defd6c0c543f9efc222e06dce88371c176d4df6",
+      "bytes": 709
+    },
+    "smoke-config.json": {
+      "sha256": "8252820b2635cb1ac6f831de6f5a49aaf481d66f681859f9c7dea5014a7d0e91",
+      "bytes": 1005
+    },
+    "smoke-status.json": {
+      "sha256": "4b0c9b8813c6397caa768d8d5dc51852fefdaa85ba0ba5c22acf96e4edf79f7a",
+      "bytes": 417
+    },
+    "smoke-harness.executed.py": {
+      "sha256": "64b0301adeefa3589b4a667b9b628988816add94518f00eea4baef5d5e14cd80",
+      "bytes": 5602
+    }
+  },
+  "conclusions": {
+    "implementation": "corrected boundaries verified within stated checks; remaining data/performance criteria open",
+    "joint_acceptance": "open_frontend_S2_and_rendered_journey",
+    "launch_readiness": "not_established"
+  },
+  "release_gates": [
+    "working provider credential, bounded successful preflight and independent semantic prose audit",
+    "original pinned DOID/import closure native admission",
+    "missing sparse/restriction/final-decision coverage",
+    "verified cold/warm/first-use timing",
+    "frontend S2 and complete rendered journey",
+    "manual accessibility",
+    "usability and pilot",
+    "study owner approval",
+    "deployment validation",
+    "final ontology admission",
+    "historical R16 causal investigation"
+  ],
+  "public_push_or_deploy": false,
+  "background_verification": {
+    "pid": 26518,
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/environment-verification",
+    "log": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/environment-verification.log",
+    "command": "python -m tools.complete_review_environment_checks <environment> <new-output>",
+    "status": "running",
+    "completion_not_claimed": true,
+    "last_observed_phase": "fresh_https_journey",
+    "startup_seconds": 106.06601747288369,
+    "journey_status": "running",
+    "checkpoint_HTTP_checks": 34
+  },
+  "first_startup_limitation": "Study completed admission in 51.972 s and workspace readiness in .409 s (total 53.612 s); exploration did not become ready within its existing timeout, so the start command stopped all its newly owned processes. No fresh complete HTTP journey resulted from that attempt.",
+  "schema_contract_hashes": {
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "752d8c9b711313df1119b8367a61c58ff4953c6d850ba4275ec97585c534f3ff",
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "0b2fda6005b4092b2f8e4cce30b60002904c90e82710fea9a0ca6942799658c8",
+    "specs/explanation-framework/protocol/description-review.runtime-schema.json": "77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "614f7414c71022472819359dd3ebb7c779f61dc3f74e677ccf73fa3ed53fe3ec",
+    "specs/explanation-framework/protocol/exploration.runtime-openapi.json": "676fec06883c072896cb2cd98423b5a5b50cd8fcd4069668cac82fab1c3fdc72",
+    "specs/explanation-framework/protocol/review-about.runtime-schema.json": "75425ce843b5e157676a2d741ee2c185d2468a83bcbfd244c4e095cb30a6584c",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619"
+  },
+  "implementation_backend": {
+    "schema": "exact-review-backend-source/1",
+    "git_commit": "4f9dad94ecf288164e3d5f5ee922387e8822c4b2",
+    "source_sha256": "a947750cb6070d81ec5521e96357713cb208dccb0abeb4a6de37e0528039e2f8",
+    "file_count": 53
+  },
+  "auxiliary_package": {
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/trace-review-v2/package",
+    "archive": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-followup-20261010/trace-review-v2/trace-smoke.zip",
+    "archive_sha256": "712b600cf70c4ff1d8e9832654929e4d2267c2f5fe43a1200e459d324e738e77",
+    "exact_basis": "producer normalization/label basis not recorded; actual completed prefilter route events are recorded"
+  }
+}

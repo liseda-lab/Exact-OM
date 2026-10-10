@@ -1,5 +1,13 @@
 # Backend S1 contracts for frontend S2
 
+**Follow-up, 2026-10-10:** The [corrective handoff](explanation-product-review-backend-s1-followup.md)
+delivers a separate publication with recovered original-fact links and new discovered workspace
+scope IDs. Wire contracts and schema snapshots are unchanged. Producer `graph_projection`
+statuses remain distinct from the supplied pure-frontend projection observations. Inference
+is unavailable under the user's explicit optional exception; provider prose is still blocked
+by authentication. Use the follow-up receipt for current local service readiness, never assume
+that a background check passed.
+
 This is the integration contract for specs 20–22. The accepted frontend base is
 `ffd390f35c108abe47f5603b91d28bd1a54e590d`. The runtime schema files under
 `specs/explanation-framework/protocol/` are generated from the implemented models.

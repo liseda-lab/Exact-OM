@@ -1,0 +1,26 @@
+{
+  "backend": {
+    "file_count": 53,
+    "git_commit": "7a6028c032962d0afae0e7de5a479090f330f3e1",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "a947750cb6070d81ec5521e96357713cb208dccb0abeb4a6de37e0528039e2f8"
+  },
+  "phases": [
+    {
+      "phase": "backend_identity",
+      "seconds": 0.07233219593763351
+    },
+    {
+      "phase": "publication_admission",
+      "seconds": 51.9724218219053
+    },
+    {
+      "phase": "workspace_readiness",
+      "seconds": 0.4090902260504663
+    }
+  ],
+  "publication_sha256": "e5d2ee62de2093b3492da4cbeb3b2e19b832becf302fb11a5d2f7203cfec70fe",
+  "role": "study",
+  "schema": "exact-review-worker-readiness/1",
+  "seconds": 53.61165893403813
+}

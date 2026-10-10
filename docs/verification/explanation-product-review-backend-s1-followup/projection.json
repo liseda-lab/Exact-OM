@@ -1,0 +1,3116 @@
+{
+  "schema": "exact-review-frontend-projection-check/1",
+  "module_sha256": "c384a48116e3a60148a17457236791e13d2916791683312d67a57ad65cecfb88",
+  "publication_sha256": "sha256:de980187339840d0f623eb8d38162bca0c08f50d32707ae691fd5a4201286dc0",
+  "pairs": [
+    {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-1",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 7,
+        "no_graph_form": 2,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 68,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-2",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 8,
+        "no_graph_form": 2,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 68,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-3",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 7,
+        "no_graph_form": 2,
+        "unavailable": 15
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 118,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-4",
+      "selected_features": 33,
+      "original_records": 33,
+      "projection_records": {
+        "drawn": 8,
+        "no_graph_form": 2,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 68,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-01",
+      "candidate_id": "review-01-candidate-5",
+      "selected_features": 25,
+      "original_records": 25,
+      "projection_records": {
+        "drawn": 7,
+        "no_graph_form": 2,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 88,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-02",
+      "candidate_id": "review-02-candidate-1",
+      "selected_features": 45,
+      "original_records": 45,
+      "projection_records": {
+        "drawn": 12,
+        "no_graph_form": 2,
+        "unavailable": 31
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 237,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-02",
+      "candidate_id": "review-02-candidate-2",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 10,
+        "no_graph_form": 2,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 237,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-02",
+      "candidate_id": "review-02-candidate-3",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 10,
+        "no_graph_form": 2,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 237,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-02",
+      "candidate_id": "review-02-candidate-4",
+      "selected_features": 50,
+      "original_records": 50,
+      "projection_records": {
+        "drawn": 14,
+        "no_graph_form": 2,
+        "unavailable": 34
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 237,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-02",
+      "candidate_id": "review-02-candidate-5",
+      "selected_features": 49,
+      "original_records": 49,
+      "projection_records": {
+        "drawn": 13,
+        "no_graph_form": 2,
+        "unavailable": 34
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 237,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-03",
+      "candidate_id": "review-03-candidate-1",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 419,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-03",
+      "candidate_id": "review-03-candidate-2",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 388,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-03",
+      "candidate_id": "review-03-candidate-3",
+      "selected_features": 20,
+      "original_records": 20,
+      "projection_records": {
+        "drawn": 6,
+        "unavailable": 14
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 86,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-03",
+      "candidate_id": "review-03-candidate-4",
+      "selected_features": 27,
+      "original_records": 27,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 20
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 317,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-03",
+      "candidate_id": "review-03-candidate-5",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 15
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 168,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-04",
+      "candidate_id": "review-04-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-04",
+      "candidate_id": "review-04-candidate-2",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 5,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source"
+        ]
+      },
+      "source_only_channels": [
+        "attributes"
+      ],
+      "both_sides_channels": [
+        "hierarchy"
+      ],
+      "max_literal_length": 246,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-04",
+      "candidate_id": "review-04-candidate-3",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 5,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source"
+        ]
+      },
+      "source_only_channels": [
+        "attributes"
+      ],
+      "both_sides_channels": [
+        "hierarchy"
+      ],
+      "max_literal_length": 246,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-04",
+      "candidate_id": "review-04-candidate-4",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 5,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [
+        "attributes"
+      ],
+      "both_sides_channels": [
+        "hierarchy"
+      ],
+      "max_literal_length": 246,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-04",
+      "candidate_id": "review-04-candidate-5",
+      "selected_features": 26,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 5,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source"
+        ]
+      },
+      "source_only_channels": [
+        "attributes"
+      ],
+      "both_sides_channels": [
+        "hierarchy"
+      ],
+      "max_literal_length": 246,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-05",
+      "candidate_id": "review-05-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-05",
+      "candidate_id": "review-05-candidate-2",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 22
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 235,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-05",
+      "candidate_id": "review-05-candidate-3",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 216,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-05",
+      "candidate_id": "review-05-candidate-4",
+      "selected_features": 26,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 216,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-05",
+      "candidate_id": "review-05-candidate-5",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 14,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 409,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-06",
+      "candidate_id": "review-06-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-06",
+      "candidate_id": "review-06-candidate-2",
+      "selected_features": 33,
+      "original_records": 33,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-06",
+      "candidate_id": "review-06-candidate-3",
+      "selected_features": 34,
+      "original_records": 34,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 253,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-06",
+      "candidate_id": "review-06-candidate-4",
+      "selected_features": 38,
+      "original_records": 38,
+      "projection_records": {
+        "drawn": 12,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 217,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-06",
+      "candidate_id": "review-06-candidate-5",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-07",
+      "candidate_id": "review-07-candidate-1",
+      "selected_features": 37,
+      "original_records": 37,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 149,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-07",
+      "candidate_id": "review-07-candidate-2",
+      "selected_features": 34,
+      "original_records": 34,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 149,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-07",
+      "candidate_id": "review-07-candidate-3",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 31
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 149,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-07",
+      "candidate_id": "review-07-candidate-4",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 15
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 185,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-07",
+      "candidate_id": "review-07-candidate-5",
+      "selected_features": 42,
+      "original_records": 42,
+      "projection_records": {
+        "drawn": 13,
+        "unavailable": 29
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 204,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-08",
+      "candidate_id": "review-08-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-08",
+      "candidate_id": "review-08-candidate-2",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 214,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-08",
+      "candidate_id": "review-08-candidate-3",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 214,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-08",
+      "candidate_id": "review-08-candidate-4",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 214,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-08",
+      "candidate_id": "review-08-candidate-5",
+      "selected_features": 43,
+      "original_records": 43,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 33
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 214,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-09",
+      "candidate_id": "review-09-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-09",
+      "candidate_id": "review-09-candidate-2",
+      "selected_features": 26,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 198,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-09",
+      "candidate_id": "review-09-candidate-3",
+      "selected_features": 28,
+      "original_records": 28,
+      "projection_records": {
+        "drawn": 15,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 209,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-09",
+      "candidate_id": "review-09-candidate-4",
+      "selected_features": 27,
+      "original_records": 27,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 121,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-09",
+      "candidate_id": "review-09-candidate-5",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 224,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-10",
+      "candidate_id": "review-10-candidate-1",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 12,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 272,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-10",
+      "candidate_id": "review-10-candidate-2",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 20
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 124,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-10",
+      "candidate_id": "review-10-candidate-3",
+      "selected_features": 28,
+      "original_records": 28,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 252,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-10",
+      "candidate_id": "review-10-candidate-4",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 135,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-10",
+      "candidate_id": "review-10-candidate-5",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 129,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-11",
+      "candidate_id": "review-11-candidate-1",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 15
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 316,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-11",
+      "candidate_id": "review-11-candidate-2",
+      "selected_features": 35,
+      "original_records": 35,
+      "projection_records": {
+        "drawn": 12,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 316,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-11",
+      "candidate_id": "review-11-candidate-3",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 386,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-11",
+      "candidate_id": "review-11-candidate-4",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 362,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-11",
+      "candidate_id": "review-11-candidate-5",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 20
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 316,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-12",
+      "candidate_id": "review-12-candidate-1",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 6,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 153,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-12",
+      "candidate_id": "review-12-candidate-2",
+      "selected_features": 25,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 7,
+        "no_graph_form": 1,
+        "unavailable": 18
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 144,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-12",
+      "candidate_id": "review-12-candidate-3",
+      "selected_features": 36,
+      "original_records": 36,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 137,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-12",
+      "candidate_id": "review-12-candidate-4",
+      "selected_features": 40,
+      "original_records": 40,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 32
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 132,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-12",
+      "candidate_id": "review-12-candidate-5",
+      "selected_features": 36,
+      "original_records": 36,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 137,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-13",
+      "candidate_id": "review-13-candidate-1",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 486,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-13",
+      "candidate_id": "review-13-candidate-2",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 486,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-13",
+      "candidate_id": "review-13-candidate-3",
+      "selected_features": 35,
+      "original_records": 35,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 486,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-13",
+      "candidate_id": "review-13-candidate-4",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 486,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-13",
+      "candidate_id": "review-13-candidate-5",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 486,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-14",
+      "candidate_id": "review-14-candidate-1",
+      "selected_features": 18,
+      "original_records": 18,
+      "projection_records": {
+        "drawn": 5,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source"
+        ]
+      },
+      "source_only_channels": [
+        "attributes"
+      ],
+      "both_sides_channels": [
+        "hierarchy"
+      ],
+      "max_literal_length": 41,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-14",
+      "candidate_id": "review-14-candidate-2",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 14
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 41,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-14",
+      "candidate_id": "review-14-candidate-3",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 246,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-14",
+      "candidate_id": "review-14-candidate-4",
+      "selected_features": 27,
+      "original_records": 27,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 346,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-14",
+      "candidate_id": "review-14-candidate-5",
+      "selected_features": 20,
+      "original_records": 20,
+      "projection_records": {
+        "drawn": 6,
+        "unavailable": 14
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 90,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-15",
+      "candidate_id": "review-15-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-15",
+      "candidate_id": "review-15-candidate-2",
+      "selected_features": 35,
+      "original_records": 35,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 396,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-15",
+      "candidate_id": "review-15-candidate-3",
+      "selected_features": 23,
+      "original_records": 23,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 201,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-15",
+      "candidate_id": "review-15-candidate-4",
+      "selected_features": 20,
+      "original_records": 20,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 201,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-15",
+      "candidate_id": "review-15-candidate-5",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 12,
+        "unavailable": 27
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 219,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-16",
+      "candidate_id": "review-16-candidate-1",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-16",
+      "candidate_id": "review-16-candidate-2",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-16",
+      "candidate_id": "review-16-candidate-3",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-16",
+      "candidate_id": "review-16-candidate-4",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-16",
+      "candidate_id": "review-16-candidate-5",
+      "selected_features": 22,
+      "original_records": 22,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 13
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-17",
+      "candidate_id": "review-17-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-17",
+      "candidate_id": "review-17-candidate-2",
+      "selected_features": 40,
+      "original_records": 40,
+      "projection_records": {
+        "drawn": 17,
+        "unavailable": 23
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 209,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-17",
+      "candidate_id": "review-17-candidate-3",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 20
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 274,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-17",
+      "candidate_id": "review-17-candidate-4",
+      "selected_features": 42,
+      "original_records": 42,
+      "projection_records": {
+        "drawn": 13,
+        "unavailable": 29
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 269,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-17",
+      "candidate_id": "review-17-candidate-5",
+      "selected_features": 40,
+      "original_records": 40,
+      "projection_records": {
+        "drawn": 13,
+        "unavailable": 27
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 252,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-18",
+      "candidate_id": "review-18-candidate-1",
+      "selected_features": 26,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 9,
+        "no_graph_form": 2,
+        "unavailable": 15
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 159,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-18",
+      "candidate_id": "review-18-candidate-2",
+      "selected_features": 29,
+      "original_records": 29,
+      "projection_records": {
+        "drawn": 6,
+        "no_graph_form": 2,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 159,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-18",
+      "candidate_id": "review-18-candidate-3",
+      "selected_features": 24,
+      "original_records": 24,
+      "projection_records": {
+        "drawn": 6,
+        "no_graph_form": 2,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 159,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-18",
+      "candidate_id": "review-18-candidate-4",
+      "selected_features": 33,
+      "original_records": 33,
+      "projection_records": {
+        "drawn": 6,
+        "no_graph_form": 2,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 159,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-18",
+      "candidate_id": "review-18-candidate-5",
+      "selected_features": 41,
+      "original_records": 41,
+      "projection_records": {
+        "drawn": 10,
+        "no_graph_form": 2,
+        "unavailable": 29
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes"
+      ],
+      "max_literal_length": 159,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-19",
+      "candidate_id": "review-19-candidate-1",
+      "selected_features": 34,
+      "original_records": 34,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 232,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-19",
+      "candidate_id": "review-19-candidate-2",
+      "selected_features": 33,
+      "original_records": 33,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 24
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 232,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-19",
+      "candidate_id": "review-19-candidate-3",
+      "selected_features": 36,
+      "original_records": 36,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 27
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 232,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-19",
+      "candidate_id": "review-19-candidate-4",
+      "selected_features": 36,
+      "original_records": 36,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 27
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 232,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-19",
+      "candidate_id": "review-19-candidate-5",
+      "selected_features": 36,
+      "original_records": 36,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 27
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 232,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-20",
+      "candidate_id": "review-20-candidate-1",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 223,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-20",
+      "candidate_id": "review-20-candidate-2",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 223,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-20",
+      "candidate_id": "review-20-candidate-3",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 14,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 272,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-20",
+      "candidate_id": "review-20-candidate-4",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 223,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-20",
+      "candidate_id": "review-20-candidate-5",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 223,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-21",
+      "candidate_id": "review-21-candidate-1",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 288,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-21",
+      "candidate_id": "review-21-candidate-2",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-21",
+      "candidate_id": "review-21-candidate-3",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 14,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 272,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-21",
+      "candidate_id": "review-21-candidate-4",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-21",
+      "candidate_id": "review-21-candidate-5",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 199,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-22",
+      "candidate_id": "review-22-candidate-1",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 221,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-22",
+      "candidate_id": "review-22-candidate-2",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 14,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 272,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-22",
+      "candidate_id": "review-22-candidate-3",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 221,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-22",
+      "candidate_id": "review-22-candidate-4",
+      "selected_features": 39,
+      "original_records": 39,
+      "projection_records": {
+        "drawn": 14,
+        "unavailable": 25
+      },
+      "projected_channel_sides": {
+        "hierarchy": [
+          "source",
+          "target"
+        ],
+        "attributes": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "hierarchy",
+        "attributes"
+      ],
+      "max_literal_length": 301,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-22",
+      "candidate_id": "review-22-candidate-5",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 10,
+        "unavailable": 21
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 221,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-23",
+      "candidate_id": "review-23-candidate-1",
+      "selected_features": 0,
+      "original_records": 0,
+      "projection_records": {},
+      "projected_channel_sides": {},
+      "source_only_channels": [],
+      "both_sides_channels": [],
+      "max_literal_length": 0,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-23",
+      "candidate_id": "review-23-candidate-2",
+      "selected_features": 26,
+      "original_records": 26,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 19
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 219,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-23",
+      "candidate_id": "review-23-candidate-3",
+      "selected_features": 33,
+      "original_records": 33,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 24
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 442,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-23",
+      "candidate_id": "review-23-candidate-4",
+      "selected_features": 32,
+      "original_records": 32,
+      "projection_records": {
+        "drawn": 15,
+        "unavailable": 17
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 219,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-23",
+      "candidate_id": "review-23-candidate-5",
+      "selected_features": 23,
+      "original_records": 23,
+      "projection_records": {
+        "drawn": 7,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 306,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-24",
+      "candidate_id": "review-24-candidate-1",
+      "selected_features": 31,
+      "original_records": 31,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 20
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 323,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-24",
+      "candidate_id": "review-24-candidate-2",
+      "selected_features": 25,
+      "original_records": 25,
+      "projection_records": {
+        "drawn": 9,
+        "unavailable": 16
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 280,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-24",
+      "candidate_id": "review-24-candidate-3",
+      "selected_features": 30,
+      "original_records": 30,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 22
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 228,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-24",
+      "candidate_id": "review-24-candidate-4",
+      "selected_features": 34,
+      "original_records": 34,
+      "projection_records": {
+        "drawn": 8,
+        "unavailable": 26
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 356,
+      "expression_edges": []
+    },
+    {
+      "case_id": "review-24",
+      "candidate_id": "review-24-candidate-5",
+      "selected_features": 35,
+      "original_records": 35,
+      "projection_records": {
+        "drawn": 11,
+        "unavailable": 24
+      },
+      "projected_channel_sides": {
+        "attributes": [
+          "source",
+          "target"
+        ],
+        "hierarchy": [
+          "source",
+          "target"
+        ]
+      },
+      "source_only_channels": [],
+      "both_sides_channels": [
+        "attributes",
+        "hierarchy"
+      ],
+      "max_literal_length": 557,
+      "expression_edges": []
+    }
+  ],
+  "source_only_pairs": 5,
+  "multiple_both_sides_channel_pairs": 92,
+  "limitation": "Pure S0 feature projection only; automatic channel bridges excluded from acceptance. No DOM, visual layout or S2 verification."
+}

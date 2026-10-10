@@ -1,0 +1,23 @@
+{
+  "schema": "exact-review-provider-preflight/1",
+  "attempt": 3,
+  "requests": [
+    {
+      "number": 1,
+      "state": "rejected",
+      "http_status": 401,
+      "started": "2026-10-10 18:00:43",
+      "elapsed_seconds": 0.31821833713911474,
+      "response_sha256": "974194a4844daee103f1eb9c501cd130978252ca65ea74742abd314142b8563a",
+      "usage": null
+    }
+  ],
+  "preflight_passed": false,
+  "remaining_batch_dispatched": false,
+  "approved_scope": {
+    "profiles": 74,
+    "comparisons": 12
+  },
+  "available_prose_approvals": 0,
+  "limitation": "First request returned HTTP 401. No response saved for claim audit. Existing credential was read only into memory; no retry or batch followed. Account charges unverified."
+}

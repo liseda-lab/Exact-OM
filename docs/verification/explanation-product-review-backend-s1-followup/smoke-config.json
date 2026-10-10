@@ -1,0 +1,24 @@
+{
+  "purpose": "development_review_trace_smoke",
+  "max_pairs": 9,
+  "source_hash": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+  "target_hash": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+  "pairs_hash": "sha256:ea4f3ac3174005c72eea1ce0ea8ea8c6f7542104171fb31b3da78548adc14efa",
+  "source_scope": "declared_DOID_derivative_root_only",
+  "threshold": 0.9,
+  "cardinality": 1,
+  "filter_exact_matches": true,
+  "drop_exact_match_sources": false,
+  "training": "not_run",
+  "llm": "not_run",
+  "device": "cpu",
+  "threads": 2,
+  "reference_labels_used": false,
+  "encoder": "/home/pgcotovio/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2/snapshots/1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+  "harness_sha256": "sha256:64b0301adeefa3589b4a667b9b628988816add94518f00eea4baef5d5e14cd80",
+  "git_commit": "706dbb36ef92c85083548c8474cf60f6fc8fee12",
+  "versions": {
+    "torch": "2.7.0+cu128",
+    "pyowl-core": "0.2.1"
+  }
+}

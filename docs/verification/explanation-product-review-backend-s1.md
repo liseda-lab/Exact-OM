@@ -1,5 +1,10 @@
 # Backend S1 implementation and interim development-data review
 
+**Follow-up, 2026-10-10:** The [S1 corrective follow-up](explanation-product-review-backend-s1-followup.md)
+records the literal-origin correction, separately frozen richer evidence, real diagnostic
+trace examples, ELK exception and remaining provider/import/performance gates. This document
+retains the original milestone's evidence; its counts are not the newer bundle's counts.
+
 ## Scope and acceptance boundary
 
 This delivery supplies the backend B01–B07 runtime corrections and an interim development
