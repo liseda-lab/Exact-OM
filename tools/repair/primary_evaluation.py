@@ -477,7 +477,26 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             raise ValueError("Execution case declaration changed")
         from tools.repair.primary_runtime import owned_device
 
-        owned_device(manifest["gpu_uuid"])
+        if "ownership_lane" in manifest:
+            from tools.repair.evaluation_ownership import validate_lane
+
+            validate_lane(manifest)
+            admission = bound(manifest["capacity_admission"])
+            if (
+                admission.get("concurrent_load_profile") != manifest["concurrent_load_profile"]
+                or admission.get("source_commit") != manifest["source_commit"]
+                or not all(
+                    admission.get(k) is True
+                    for k in (
+                        "cpu_native_qualified",
+                        "matched_inference_load_qualified",
+                        "remaining_stage_projection_passed",
+                    )
+                )
+            ):
+                raise ValueError("Evaluation capacity qualification remains unresolved")
+        else:
+            owned_device(manifest["gpu_uuid"])
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     with (output / "owner.lock").open("a+") as lock:
@@ -491,18 +510,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             stage = read(reference["path"])
         else:
             stage = read(manifest["ledger_path"])
-            step_id = os.environ["SLURM_JOB_ID"] + "." + os.environ["SLURM_STEP_ID"]
-            owners = [
-                entry
-                for key, entry in stage.get("attempts", {}).items()
-                if entry["status"] != "settled"
-                and (Path(key) / "step.json").exists()
-                and read(Path(key) / "step.json").get("step_id") == step_id
-            ]
-            if len(owners) != 1 or not {"evaluation", "secondary_evaluation"} <= set(
-                owners[0]["budget_stages"]
-            ):
-                raise ValueError("Evaluation requires one charged stage/GPU reservation owner")
+            from tools.repair.evaluation_ownership import validate_owner
+
+            validate_owner(manifest, stage)
         first = stage.get("stages", {}).get("evaluation", {}).get("started_epoch")
         if first is None:
             raise ValueError("Evaluation first admission must be durably reserved")
@@ -511,6 +521,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             first + 40 * 3600,
             float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")),
         )
+        from tools.repair.evaluation_ownership import external_pools
+
+        dependencies = external_pools(manifest)
         rows, saved_rows = manifest["rows"], {}
         error = None
         for row in rows:
@@ -548,7 +561,11 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             if now() + CLEANUP_SECONDS >= limit:
                 break
             dependency = row["adapter"]["pool_dependency"]
-            pool_result = (saved_rows.get(dependency, {}).get("result") or {}) if dependency else {}
+            pool_result = (
+                (saved_rows.get(dependency, dependencies.get(dependency, {})).get("result") or {})
+                if dependency
+                else {}
+            )
             public = manifest["public_inputs"].get(row["case_id"])
             model_name = row["adapter"]["model"]
             model = manifest["models"].get(model_name) if model_name else None
@@ -651,6 +668,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             ],
             charged_seconds=sum(r["charged_seconds"] for r in saved_rows.values()),
             cost_rule="Each run/pool charged once; comparisons only reference run identities",
+            external_pool_cost_references=sorted(dependencies),
+            ownership_lane=manifest.get("ownership_lane", "legacy_full_gpu_shard"),
+            concurrent_load_profile=manifest.get("concurrent_load_profile"),
             hosted_calls=0,
         )
         write_artifact(output / "report.json", report)
