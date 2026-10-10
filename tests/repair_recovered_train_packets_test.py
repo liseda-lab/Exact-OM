@@ -7,7 +7,7 @@ import pytest
 from exact.repair.learning import RepairLabel, TeacherCache
 from exact.repair.semantic_fidelity import validate_comparison
 from tests.repair_semantic_fidelity_test import packet, judgment
-from tools.repair.recovered_train_packets import clarify, select_pairs
+from tools.repair.recovered_train_packets import clarify, select_pairs, reuse_native
 
 
 def test_task_clarification_preserves_full_evidence_plans_and_rubric():
@@ -53,3 +53,17 @@ def test_pair_preselection_preserves_existing_pair_and_required_swap_without_fee
     assert select_pairs(case, changed_scores, rows) == selected
     assert rows[1]["pair"] is None
     assert select_pairs(case, None, rows) == []
+
+
+@pytest.mark.parametrize("status,retry", [("complete", False), ("timeout", True),
+                                         ("unsupported", False), ("memory_limit", False)])
+def test_recovery_never_replays_a_completed_or_scientifically_unsupported_plan(tmp_path, status, retry):
+    from tools.repair.shared_release import immutable
+    from tools.repair.historical_regression import binding
+
+    path = tmp_path / "native.json"
+    plan = packet().plan_a if status == "complete" else None
+    immutable(path, dict(status=status, cleanup_complete=True, plan=plan.to_dict() if plan else None))
+    reuse, actual = reuse_native(binding(path))
+    assert reuse is not retry
+    assert actual == plan
