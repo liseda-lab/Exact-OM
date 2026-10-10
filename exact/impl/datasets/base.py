@@ -1011,8 +1011,9 @@ class BaseAlignmentDataset(IDataset):
                         "Cross-encoder reranking requires sentence_transformers.CrossEncoder"
                     )
                 counts = self._candidates.groupby("Src", sort=False).size()
-                if not counts.empty and counts.max() > int(cross_encoder_config.get("top_k", 20)):
-                    raise ValueError("Frozen cross-encoder pool exceeds its declared top_k bound")
+                # top_k bounds generated retrieval, not supplied local queries.
+                # Rerank every provided pair; overlapping queries can also have
+                # a per-source union larger than any individual query's pool.
                 before = set(self._candidates[["Src", "Tgt"]].itertuples(index=False, name=None))
                 if "cand_sim" not in self._candidates:
                     self._candidates["cand_sim"] = 0.0

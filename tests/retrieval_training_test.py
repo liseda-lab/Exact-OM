@@ -138,7 +138,8 @@ def test_real_optimizer_checkpoint_resume_matches_uninterrupted(tmp_path, kind, 
     }
 
 
-def test_fixed_pool_cross_encoder_preserves_candidates(tmp_path, monkeypatch):
+@pytest.mark.parametrize("top_k", [1, 2])
+def test_fixed_pool_cross_encoder_preserves_candidates(tmp_path, monkeypatch, top_k):
     from tests.retrieval_experiments_test import SRC, _artifact, _dataset
 
     dataset = _dataset(tmp_path, monkeypatch, name="fixed-cross")
@@ -155,7 +156,7 @@ def test_fixed_pool_cross_encoder_preserves_candidates(tmp_path, monkeypatch):
     artifact = _artifact(tmp_path / "cross", kind="cross_encoder")
     dataset.load_candidates(
         path,
-        cross_encoder={"mode": "on", "artifact": artifact, "top_k": 2},
+        cross_encoder={"mode": "on", "artifact": artifact, "top_k": top_k},
         device=torch.device("cpu"),
     )
     assert set(dataset.candidates[["Src", "Tgt"]].itertuples(index=False, name=None)) == set(
@@ -163,3 +164,62 @@ def test_fixed_pool_cross_encoder_preserves_candidates(tmp_path, monkeypatch):
     )
     assert "cand_sim_cross_encoder" in dataset.candidates
     assert dataset.candidate_pool_manifest["origin"] == "provided"
+
+
+def test_supplied_cross_encoder_keeps_large_overlapping_query_membership(tmp_path, monkeypatch):
+    from exact.core.entities.kinds import EntityKind
+    from exact.utils.mappings import candidate_table_views
+    from tests.retrieval_experiments_test import SRC, _artifact, _dataset
+
+    dataset = _dataset(tmp_path, monkeypatch, name="large-fixed-cross")
+    targets = sorted(dataset.target.entities(EntityKind.CLASS))
+    assert len(targets) >= 23
+    # Query 1 itself exceeds the generated retrieval cap; queries 2 and 3
+    # repeat a source with distinct membership, overlap, and a repeated query.
+    queries = pd.DataFrame(
+        [(SRC + "Person", "urn:query:1", repr(targets[:21])),
+         (SRC + "Person", "urn:query:2", repr(targets[19:23])),
+         (SRC + "Person", "urn:query:2", repr(targets[19:23])),
+         (SRC + "Patient", "urn:query:3", repr(targets[:2]))],
+        columns=["Src", "Tgt", "Candidates"],
+    )
+    path = tmp_path / "local-queries.tsv"
+    queries.to_csv(path, sep="\t", index=False)
+    original_bytes = path.read_bytes()
+    expected_pairs, expected_queries = candidate_table_views(queries)
+    artifact = _artifact(tmp_path / "cross", kind="cross_encoder")
+
+    dataset.load_candidates(
+        path, cross_encoder={"mode": "on", "artifact": artifact, "top_k": 20},
+        encode_batch_size=3, device=torch.device("cpu"),
+    )
+
+    actual_pairs = dataset.candidates[["Src", "Tgt"]]
+    assert set(actual_pairs.itertuples(index=False, name=None)) == set(
+        expected_pairs[["Src", "Tgt"]].itertuples(index=False, name=None)
+    )
+    assert len(actual_pairs) == len(expected_pairs) == 25
+    assert dataset.candidates.cand_sim_cross_encoder.notna().all()
+    assert path.read_bytes() == original_bytes
+    _, writer_queries = candidate_table_views(pd.read_csv(path, sep="\t"))
+    pd.testing.assert_frame_equal(writer_queries, expected_queries)
+
+
+def test_generated_cross_encoder_keeps_retrieval_cap(tmp_path, monkeypatch):
+    from tests.retrieval_experiments_test import _artifact, _dataset
+
+    dataset = _dataset(tmp_path, monkeypatch, name="bounded-global-cross")
+    artifact = _artifact(tmp_path / "cross", kind="cross_encoder")
+    with pytest.raises(ValueError, match="cross_encoder.top_k must be at least"):
+        dataset.generate_candidates(
+            top_k=2, cross_encoder={"mode": "on", "artifact": artifact, "top_k": 1},
+            device=torch.device("cpu"), use_amp=False,
+        )
+
+    dataset.generate_candidates(
+        top_k=1, cross_encoder={"mode": "on", "artifact": artifact, "top_k": 2},
+        device=torch.device("cpu"), use_amp=False,
+    )
+    assert not dataset.candidates.empty
+    assert dataset.candidates.groupby("Src").size().max() == 1
+    assert dataset.candidate_pool_manifest["origin"] == "generated"
