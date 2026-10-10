@@ -356,7 +356,8 @@ def test_approved_panel_window_preserves_costs_and_original_clock(tmp_path, monk
     started = now - 50000
     old = json.loads(json.dumps(proposal))
     old["stage"].update(
-        started_epoch=started, deadline_epoch=started + 21600,
+        started_epoch=started,
+        deadline_epoch=started + 21600,
         latest_admission_epoch=started + 21600 - 900 / 0.7,
     )
     timing = dict(
@@ -370,7 +371,8 @@ def test_approved_panel_window_preserves_costs_and_original_clock(tmp_path, monk
     deadline = timing["approved_epoch"] + timing["window_seconds"]
     proposal["stage"].update(
         started_epoch=started + (1 if defect == "clock_reset" else 0),
-        deadline_epoch=deadline, proposed_elapsed_seconds=deadline - started,
+        deadline_epoch=deadline,
+        proposed_elapsed_seconds=deadline - started,
         latest_admission_epoch=deadline - 900 / 0.7,
     )
     proposal["timing_authorization"] = save(tmp_path, "timing.json", timing)
@@ -398,14 +400,19 @@ def test_approved_panel_window_preserves_costs_and_original_clock(tmp_path, monk
             )
         assert (tmp_path / "ledger/phase-reservations.json").read_bytes() == before
         return
-    runner._reserve_phase(settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0")
+    runner._reserve_phase(
+        settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0"
+    )
     after = runner.read(tmp_path / "ledger/phase-reservations.json")
     assert len(after["reservations"]) == 60
     assert all(after["reservations"][k] == v for k, v in prior["reservations"].items())
     assert runner.read(tmp_path / "stage.json") == stage
-    assert runner._reserve_phase(
-        settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0"
-    ) is False
+    assert (
+        runner._reserve_phase(
+            settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0"
+        )
+        is False
+    )
     assert runner.read(tmp_path / "ledger/phase-reservations.json") == after
 
 
@@ -651,3 +658,49 @@ def test_nonreasoning_profile_entrypoint_serializes_schema_only(tmp_path, monkey
         == result
     )
     assert len(calls) == 1
+
+
+@pytest.mark.parametrize("context_bytes", [10000, 34000])
+def test_controlled_entrypoint_distinguishes_input_tokens_from_full_packet_bytes(
+    tmp_path, monkeypatch, context_bytes
+):
+    import exact.llm.routing
+    from tests.repair_semantic_fidelity_test import response
+
+    p = dataclasses.replace(
+        packet(),
+        local_context=("x" * context_bytes,),
+        coverage={**packet().coverage, "byte_budget": 40000},
+    )
+    client, calls = adapter(
+        tmp_path / "ledger", monkeypatch, handler=lambda **kwargs: response(judgment(p))
+    )
+    for profile in client.router.profiles.values():
+        profile.provider.update(allow_fallbacks=False, require_parameters=True)
+    monkeypatch.setattr(fidelity.SemanticAnnotationAdapter, "_dispatch", REAL_DISPATCH)
+    monkeypatch.setattr(fidelity, "OpenRouterClient", lambda: client.router.hosted)
+    monkeypatch.setattr(client.router.hosted, "close", lambda: None)
+    monkeypatch.setattr(
+        fidelity,
+        "bounded_call",
+        lambda fn, *args, **kw: SimpleNamespace(status="complete", value=fn(*args)),
+    )
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    settings = profile_fixture(tmp_path)
+    settings["teacher_panel"] = {"test_only": True}
+    monkeypatch.setattr(runner, "_request_budget", lambda m: (runner.PHASE_LIMITS, None))
+    if context_bytes > 32768:
+        with pytest.raises(ValueError, match="independent byte cap"):
+            runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=300)
+        assert calls == []
+        assert not (tmp_path / "ledger/phase-reservations.json").exists()
+    else:
+        result = runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=300)
+        assert result is not None and len(calls) == 1
+        payload = json.loads(calls[0]["content"])
+        assert len(payload["messages"][1]["content"].encode()) > 8000
+        assert runner.read(tmp_path / "out/run.json")["record"]["max_input_bytes"] == 32768
+        assert (
+            runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=1) == result
+        )
+        assert len(calls) == 1

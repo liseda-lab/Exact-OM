@@ -963,7 +963,7 @@ def annotate_packet(
         role_profiles={TEACHER: selected_teacher, EVALUATOR: evaluator},
         role_budgets=budgets,
         aggregate_budget=AnnotationBudget(704, 704 * 10000, manifest["cost_ceiling_usd"], 704 * 90),
-        max_input_bytes=8000,
+        max_input_bytes=32768 if controls else 8000,
         max_output_tokens=output_cap,
         max_cost_per_request_usd=cost,
         max_seconds_per_request=90,
@@ -1386,6 +1386,10 @@ def run(manifest_path, output):
         from tools.repair.train_packet_admission import validate_rows
 
         admitted = validate_rows(manifest)
+        if manifest.get("pretransmission_recovery"):
+            from tools.repair.train_packet_admission import validate_pretransmission_recovery
+
+            validate_pretransmission_recovery(manifest)
     elif any(
         row.get("status") or ("packet" in row and row["packet"] is None)
         for row in manifest["slots"]
@@ -1464,7 +1468,11 @@ def run(manifest_path, output):
                     packet,
                     {**manifest, "profile": profile},
                     Path(output) / row["id"],
-                    slot_id=row["id"],
+                    slot_id=(
+                        row["id"] + ":byte-guard-recovery-001"
+                        if manifest.get("pretransmission_recovery")
+                        else row["id"]
+                    ),
                     swapped=row.get("swapped", False),
                     seconds=left,
                     comparison_id=row.get("comparison_id", row["id"]),

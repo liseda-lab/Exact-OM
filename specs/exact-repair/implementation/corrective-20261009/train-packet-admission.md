@@ -25,3 +25,13 @@ aggregation, measured combined-loss/checkpoint/concurrent throughput, matched DE
 reserves and a common endpoint remain prerequisites for enabling the six fits.
 The authored construction remains generator-dependent and generated-only; this
 transport change supplies no independent expert or Conference evidence.
+
+The controlled wrapper uses `max_input_bytes=32768` alongside the independent
+8,000-token calculation; legacy profiles retain their 8,000-byte guard. A known
+local rejection at the old byte guard may receive one explicit successor only
+when terminal receipts, the exact exception, an unresolved phase reservation,
+and absence of both an adapter reservation and a matching wire identity prove
+that execution stopped before transmission. Recovery preserves the complete
+original manifest, comparison/order IDs, old reservations and cumulative logical
+worker budget. Its attempt slots have a distinct fixed suffix. It cannot recover
+an unknown delivery or recursively authorize another attempt at the same cause.
