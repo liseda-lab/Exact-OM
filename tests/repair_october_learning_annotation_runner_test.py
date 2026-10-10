@@ -582,3 +582,105 @@ def test_source_bound_policy_deferral_preserves_earlier_cost_and_never_repeats_f
         )
         assert len(after["reservations"]) == 3
         assert not (output / "slot-0").exists()
+
+
+@pytest.mark.parametrize(
+    "mutation", [None, "rule", "schedule", "omit_attempt", "unknown", "wire", "phase"]
+)
+def test_truncated_calibration_profile_retains_errors_without_retrying(
+    tmp_path, monkeypatch, mutation
+):
+    import httpx
+    import exact.llm.routing
+
+    teacher_calls = 0
+
+    def transport(**kwargs):
+        nonlocal teacher_calls
+        if kwargs["method"] == "GET":
+            return httpx.Response(
+                200, json={"data": {}}, request=httpx.Request("GET", kwargs["url"])
+            )
+        model = json.loads(kwargs["content"])["model"]
+        if model == "vendor/teacher":
+            teacher_calls += 1
+            if teacher_calls == 1:
+                return response(
+                    {}, choices=[dict(finish_reason="length", message=dict(content=""))]
+                )
+            return httpx.Response(
+                429, json={"error": {"code": 429}}, request=httpx.Request("POST", kwargs["url"])
+            )
+        return response(judgment(packet()), model=model)
+
+    client, calls = adapter(tmp_path / "ledger", monkeypatch, handler=transport)
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    packet_path = tmp_path / "packet.json"
+    runner.write_artifact(packet_path, packet().to_dict())
+    reference = lambda path: dict(path=str(path), sha256=runner.sha(path))
+    settings = {
+        **manifest(tmp_path),
+        "seconds": 300,
+        "selection_rule": "Require8/8valid grounded judgments,8/8declared semantic decisions,4/4order consistency;lowest frozen maximum cost among eligible cheap models;Sonnet fallback onlyifqualified",
+        "prices_per_million": {name: dict(input=1, output=2) for name in ("teacher", "evaluator")},
+        "slots": [
+            dict(id=f"slot-{i}", profile=profile, packet=reference(packet_path), swapped=i == 1)
+            for i, profile in enumerate(["teacher"] * 8 + ["evaluator"])
+        ],
+    }
+    path = tmp_path / "initial/manifest.json"
+    runner.write_artifact(path, settings)
+    output = tmp_path / "old"
+    with pytest.raises(runner.ConfirmedAnnotationFailure, match="429"):
+        runner.run(path, output)
+    prior = runner.read(tmp_path / "ledger/phase-reservations.json")
+    assert teacher_calls == 2
+    settings["calibration_exclusions"] = {
+        "teacher": dict(
+            previous_manifest=reference(path),
+            previous_report=reference(output / "report.json"),
+            failed_gate_slot="slot-0",
+            receipts={f"slot-{i}": reference(output / f"slot-{i}/receipt.json") for i in range(2)},
+        )
+    }
+    exclusion = settings["calibration_exclusions"]["teacher"]
+    if mutation == "rule":
+        settings["selection_rule"] = "Require7/8"
+    elif mutation == "schedule":
+        settings["slots"] = settings["slots"][:-1]
+    elif mutation == "omit_attempt":
+        del exclusion["receipts"]["slot-1"]
+    elif mutation == "unknown":
+        receipt = runner.read(output / "slot-0/receipt.json")
+        receipt["status"] = "unknown_delivery"
+        runner.write_artifact(output / "slot-0/receipt.json", receipt)
+        exclusion["receipts"]["slot-0"] = reference(output / "slot-0/receipt.json")
+    elif mutation == "wire":
+        with runner.sqlite3.connect(tmp_path / "ledger/requests.sqlite3") as db:
+            db.execute("UPDATE attempts SET raw=? WHERE status=200", (b"{}",))
+    elif mutation == "phase":
+        settings["phase"] = "train"
+    next_path = tmp_path / "next/manifest.json"
+    runner.write_artifact(next_path, settings)
+    if mutation:
+        with pytest.raises((ValueError, KeyError)):
+            runner.run(next_path, tmp_path / "continued")
+        assert teacher_calls == 2
+        assert sum(c["method"] == "POST" for c in calls) == 2
+    else:
+        for _ in range(2):
+            rows = runner.run(next_path, tmp_path / "continued")
+            assert [row["status"] for row in rows] == [
+                "unavailable",
+                "provider_error",
+                *["not_attempted_profile_ineligible"] * 6,
+                "complete",
+            ]
+            assert sum(c["method"] == "POST" for c in calls) == 3
+            assert teacher_calls == 2
+        after = runner.read(tmp_path / "ledger/phase-reservations.json")
+        assert all(
+            after["reservations"][key] == value for key, value in prior["reservations"].items()
+        )
+        assert not (tmp_path / "continued/slot-0").exists()
+        assert runner.sha(output / "report.json") == exclusion["previous_report"]["sha256"]

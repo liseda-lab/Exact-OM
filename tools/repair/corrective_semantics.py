@@ -128,6 +128,7 @@ def validate_manifest(value):
     if not value.get("authorized"):
         raise PermissionError("Frozen annotation execution is not authorized")
     _provider_deferrals(value)
+    _calibration_exclusions(value)
     return value
 
 
@@ -174,7 +175,9 @@ def _provider_deferrals(manifest):
     for profile, binding in manifest.get("provider_deferrals", {}).items():
         previous = _read_bound(binding["previous_manifest"])
         unchanged = lambda value: {
-            key: item for key, item in value.items() if key not in {"provider_deferrals", "profile"}
+            key: item
+            for key, item in value.items()
+            if key not in {"provider_deferrals", "calibration_exclusions", "profile"}
         }
         if (
             manifest["phase"] != "calibration"
@@ -217,6 +220,143 @@ def _provider_deferrals(manifest):
         ):
             raise ValueError("Provider deferral requires a qualified account-policy rejection")
         result[profile] = dict(failed_slot=row["id"], confirmed_failure=evidence, binding=binding)
+    return result
+
+
+def _calibration_exclusions(manifest):
+    """Retain a terminal truncated profile and continue only untouched profiles.
+
+    This is an explicit, receipt-bound successor, never a provider-error retry
+    or a change to the original 8/8 qualification rule or comparison denominator.
+    """
+    from exact.llm.ledger import RequestLedger
+
+    result = {}
+    for profile, binding in manifest.get("calibration_exclusions", {}).items():
+        previous = _read_bound(binding["previous_manifest"])
+        unchanged = lambda value: {
+            key: item
+            for key, item in value.items()
+            if key not in {"calibration_exclusions", "profile"}
+        }
+        if (
+            manifest["phase"] != "calibration"
+            or unchanged(manifest) != unchanged(previous)
+            or previous.get("selection_rule")
+            != (
+                "Require8/8valid grounded judgments,8/8declared semantic decisions,"
+                "4/4order consistency;lowest frozen maximum cost among eligible cheap models;"
+                "Sonnet fallback onlyifqualified"
+            )
+            or profile in manifest.get("provider_deferrals", {})
+        ):
+            raise ValueError("Calibration exclusion changed the frozen qualification design")
+        report = _read_bound(binding["previous_report"])
+        slots = {row["id"]: row for row in previous["slots"]}
+        reported = {row["id"]: row for row in report["rows"]}
+        profile_slots = {
+            key: row
+            for key, row in slots.items()
+            if row.get("profile", previous["profile"]) == profile
+        }
+        if (
+            len(profile_slots) != 8
+            or len(reported) != len(report["rows"])
+            or set(reported) != set(slots)
+            or report.get("scheduled") != len(slots)
+        ):
+            raise ValueError("Calibration exclusion lost scheduled rows")
+        if any(
+            reported[key]["status"] != "not_attempted_provider_failure"
+            for key, row in slots.items()
+            if row.get("profile", previous["profile"]) != profile
+            and row.get("profile", previous["profile"])
+            not in manifest.get("provider_deferrals", {})
+        ):
+            raise ValueError("Calibration continuation may only admit untouched other profiles")
+        attempted = {
+            key
+            for key in profile_slots
+            if reported[key]["status"] in {"unavailable", "provider_error"}
+        }
+        if (
+            set(binding["receipts"]) != attempted
+            or binding["failed_gate_slot"] not in attempted
+            or any(
+                reported[key]["status"]
+                not in {"unavailable", "provider_error", "not_attempted_provider_failure"}
+                for key in profile_slots
+            )
+        ):
+            raise ValueError("Calibration exclusion must retain every attempted slot")
+        retained = {}
+        ledger = RequestLedger(Path(manifest["ledger_directory"]))
+        for key in sorted(attempted):
+            row = profile_slots[key]
+            reference = binding["receipts"][key]
+            receipt = _read_bound(reference)
+            directory = Path(reference["path"]).parent
+            packet = read_record(read(directory / "packet.json"))
+            schedule = read_record(read(directory / "schedule.json"))
+            expected = canonical_hash(
+                (
+                    packet,
+                    {**previous, "profile": profile},
+                    key,
+                    row.get("swapped", False),
+                    row.get("comparison_id", key),
+                )
+            )
+            if (
+                receipt.get("identity") != expected
+                or sha(row["packet"]["path"]) != row["packet"]["sha256"]
+                or packet != read_record(read(row["packet"]["path"]))
+                or schedule.packet != packet
+                or reported[key].get("artifact") is not None
+            ):
+                raise ValueError("Calibration exclusion changed attempted-slot provenance")
+            parameters = schedule.slots[0]["parameters"]
+            if receipt.get("status") == "provider_error":
+                failure = _confirmed_provider_failure(ledger, parameters)
+                if (
+                    failure is None
+                    or failure != reported[key].get("confirmed_failure")
+                    or failure != receipt.get("confirmed_failure")
+                ):
+                    raise ValueError("Calibration exclusion requires a definitive provider receipt")
+            elif (
+                receipt.get("status") != "annotation_unavailable"
+                or reported[key]["status"] != "unavailable"
+            ):
+                raise ValueError(
+                    "Calibration exclusion cannot mask unknown delivery or usable labels"
+                )
+            if key == binding["failed_gate_slot"]:
+                with ledger._transaction() as db:
+                    attempts = db.execute(
+                        "SELECT a.*,r.identity FROM attempts a JOIN requests r USING(request_id) "
+                        "WHERE a.status=200"
+                    ).fetchall()
+                truncated = False
+                for attempt in attempts:
+                    identity = json.loads(attempt["identity"])
+                    payload = identity.get("payload", {})
+                    if identity.get("role") != parameters["role"] or any(
+                        canonical_hash(payload.get(field)) != canonical_hash(parameters[field])
+                        for field in ("model", "messages")
+                    ):
+                        continue
+                    raw = bytes(attempt["raw"] or b"")
+                    if hashlib.sha256(raw).hexdigest() != attempt["sha256"]:
+                        raise ValueError("Calibration exclusion changed wire response digest")
+                    choices = json.loads(raw).get("choices", [])
+                    truncated = len(choices) == 1 and choices[0].get("finish_reason") == "length"
+                if receipt.get("status") != "annotation_unavailable" or not truncated:
+                    raise ValueError(
+                        "Calibration exclusion requires a definitive truncated response"
+                    )
+            retained[key] = {**reported[key], "retained_receipt": reference}
+        result[profile] = dict(binding=binding, retained_rows=retained)
     return result
 
 
@@ -360,7 +500,9 @@ def _authentication_preflight(manifest, output):
         for name in dict.fromkeys(
             row.get("profile", manifest["profile"]) for row in manifest["slots"]
         ):
-            if name in manifest.get("provider_deferrals", {}):
+            if name in manifest.get("provider_deferrals", {}) or name in manifest.get(
+                "calibration_exclusions", {}
+            ):
                 continue
             profile = router.profiles[name]
             key = router.hosted.resolve_api_key(profile)
@@ -975,6 +1117,7 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
 def run(manifest_path, output):
     manifest = validate_manifest(read(manifest_path))
     deferrals = _provider_deferrals(manifest)
+    exclusions = _calibration_exclusions(manifest)
     if manifest["phase"] == "calibration":
         path = Path(manifest_path).resolve()
         immutable(
@@ -1007,6 +1150,7 @@ def run(manifest_path, output):
     for index, row in enumerate(manifest["slots"]):
         profile = row.get("profile", manifest["profile"])
         deferred = deferrals.get(profile)
+        excluded = exclusions.get(profile)
         packet_path = row["packet"]
         if sha(packet_path["path"]) != packet_path["sha256"]:
             raise ValueError("Frozen annotation packet changed")
@@ -1024,7 +1168,7 @@ def run(manifest_path, output):
                     seconds=left,
                     comparison_id=row.get("comparison_id", row["id"]),
                 )
-                if left > 3 and deferred is None
+                if left > 3 and deferred is None and excluded is None
                 else None
             )
         except ConfirmedAnnotationFailure as error:
@@ -1039,7 +1183,14 @@ def run(manifest_path, output):
                 failure = None
         policy_failure = deferred and deferred["failed_slot"] == row["id"]
         rows.append(
-            dict(
+            (
+                excluded["retained_rows"].get(
+                    row["id"],
+                    dict(id=row["id"], status="not_attempted_profile_ineligible", artifact=None),
+                )
+            )
+            if excluded
+            else dict(
                 id=row["id"],
                 status=(
                     "provider_error"
@@ -1075,6 +1226,7 @@ def run(manifest_path, output):
                 recorded=len(rows),
                 rows=rows,
                 provider_policy_deferrals=deferrals,
+                calibration_exclusions=exclusions,
                 **(
                     _failure_report_fields(failure.evidence)
                     if failure
