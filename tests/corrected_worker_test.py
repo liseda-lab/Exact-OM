@@ -199,7 +199,9 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
     descriptor = next(row["worker"] for row in result["logical_to_physical"] if row["id"] == cell_id)
     environment = saved(tmp_path / "env.json", {"EXACT_OPENROUTER_RETRY_UNKNOWN": "1",
         "HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
-        "TMPDIR": str(tmp_path / "scratch"), "XDG_CACHE_HOME": str(tmp_path / "cache")})
+        "TMPDIR": str(tmp_path / "scratch"), "XDG_CACHE_HOME": str(tmp_path / "cache"),
+        "MPLCONFIGDIR": str(tmp_path / "mpl"), "JAVA_TOOL_OPTIONS": ""})
+    (tmp_path / "scratch").mkdir()
     spending = saved(tmp_path / "spending.json", {"schema_version": 2, "kind": "exact_om_hosted_spending_policy",
         "mode": "hard_pause", "authorization": "fixture", "notification_tokens": 100,
         "campaign_id": "campaign", "campaign_tokens_cap": 500, "experiment_tokens_cap": 200,
@@ -295,8 +297,13 @@ def test_registered_worker_copies_history_and_accounts_reference_free_commands(t
         changed_admission = mixed.read_binding(admission)
         changed_admission["descriptor"] = changed_descriptor
         changed_admission = saved(tmp_path / (field + "-admission.json"), changed_admission)
-        with pytest.raises(ValueError, match="reconstructed corrected scientific descriptor"):
+        # Java requires /tmp before scientific reconstruction; this fixture only
+        # admits its isolated Python scratch directory. Both gates precede execution.
+        expected = (r"Uncovered corrected worker write roots:.*'/tmp'"
+                    if field == "executor" else "reconstructed corrected scientific descriptor")
+        with pytest.raises(ValueError, match=expected):
             worker.run(Path(changed_descriptor["path"]), Path(changed_admission["path"]))
+        assert len(calls) == 2
     for changed_path in (Path(mixed.read_binding(descriptor)["runs"][0]["config"]["path"]),
                          Path(inputs["path"]), supervisor / "policy.json"):
         original = changed_path.read_bytes()
@@ -319,3 +326,113 @@ def test_early_worker_failure_has_reconcilable_terminal_receipt(tmp_path, monkey
               "run": {"completion_path": str(tmp_path / "completion.json"), "exit_path": str(tmp_path / "exit-code")}}
     assert _step(launch, "14372", set()) == "14372.999"
     assert json.loads((tmp_path / "completion.json").read_text())["status"] == "failed"
+
+
+def test_java_temporary_root_uses_last_explicit_override(tmp_path, monkeypatch):
+    import os
+    from exact.experiments.corrected_worker import checked_write_roots
+    monkeypatch.setattr(os, "environ", {})
+    descriptor = {"executor": "pinned_published_matcher", "runs": []}
+    admission = {"root": str(tmp_path / "run"), "code_root": str(tmp_path / "code")}
+    policy = {"storage_guard": {"usage_root": str(tmp_path)}}
+    environment = {"HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+                   "TMPDIR": str(tmp_path / "python-tmp"), "MPLCONFIGDIR": str(tmp_path / "mpl")}
+    (tmp_path / "python-tmp").mkdir()
+    with pytest.raises(ValueError, match=r"Uncovered corrected worker write roots:.*'/tmp'"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    java_tmp = tmp_path / "java tmp"
+    environment["JAVA_TOOL_OPTIONS"] = f'-Djava.io.tmpdir=/uncovered/earlier -Djava.io.tmpdir="{java_tmp}"'
+    roots = checked_write_roots(descriptor, admission, policy, environment)
+    assert str(java_tmp) in roots and "/tmp" not in roots and "/uncovered/earlier" not in roots
+    environment["JAVA_TOOL_OPTIONS"] = "-Djava.io.tmpdir=/uncovered/last"
+    with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    for value in ("", "relative"):
+        environment["JAVA_TOOL_OPTIONS"] = "-Djava.io.tmpdir=" + value
+        with pytest.raises(ValueError, match="absolute covered write root"):
+            checked_write_roots(descriptor, admission, policy, environment)
+
+
+@pytest.mark.parametrize("field", ["EXACT_EXTRACTION_SQLITE_DIR", "TORCH_EXTENSIONS_DIR", "HF_DATASETS_CACHE", "MPLCONFIGDIR",
+    "SENTENCE_TRANSFORMERS_HOME", "PYTORCH_PRETRAINED_BERT_CACHE", "PYTORCH_TRANSFORMERS_CACHE"])
+def test_additional_cache_and_extraction_roots_require_storage_coverage(tmp_path, monkeypatch, field):
+    import os
+    from exact.experiments.corrected_worker import checked_write_roots
+    monkeypatch.setattr(os, "environ", {})
+    descriptor = {"executor": "exact_frozen_inference", "runs": []}
+    admission = {"root": str(tmp_path / "run"), "code_root": str(tmp_path / "code")}
+    policy = {"storage_guard": {"usage_root": str(tmp_path)}}
+    environment = {"HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+                   "TMPDIR": str(tmp_path / "tmp"), "MPLCONFIGDIR": str(tmp_path / "mpl"),
+                   field: str(tmp_path.parent / "uncovered")}
+    (tmp_path / "tmp").mkdir()
+    with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    environment[field] = str(tmp_path / field)
+    assert environment[field] in checked_write_roots(descriptor, admission, policy, environment)
+
+
+def test_tilde_cache_path_is_checked_after_real_home_expansion(tmp_path, monkeypatch):
+    import os
+    from types import SimpleNamespace
+    from exact.experiments.corrected_worker import checked_write_roots
+    monkeypatch.setattr(os, "environ", {"HOME": str(tmp_path.parent)})
+    config = saved(tmp_path / "config.json", {})
+    monkeypatch.setattr(ConfigModel, "load_config", lambda _: SimpleNamespace(
+        model_dump=lambda **kwargs: {"pipeline": [{"params": {"cache_dir": "~/uncovered"}}]}))
+    descriptor = {"executor": "exact_frozen_inference", "runs": [{"config": config, "run_dir": str(tmp_path / "output")}]}
+    admission = {"root": str(tmp_path / "run"), "code_root": str(tmp_path / "code")}
+    policy = {"storage_guard": {"usage_root": str(tmp_path)}}
+    environment = {"HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+                   "TMPDIR": str(tmp_path / "tmp"), "MPLCONFIGDIR": str(tmp_path / "mpl")}
+    (tmp_path / "tmp").mkdir()
+    with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    descriptor["runs"] = []
+    environment["HF_HOME"] = "~/uncovered"
+    with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+        checked_write_roots(descriptor, admission, policy, environment)
+
+
+def test_missing_temporary_directory_cannot_fall_back_outside_guard(tmp_path, monkeypatch):
+    import os
+    from exact.experiments.corrected_worker import checked_write_roots
+    monkeypatch.setattr(os, "environ", {})
+    descriptor = {"executor": "exact_frozen_inference", "runs": []}
+    admission = {"root": str(tmp_path / "run"), "code_root": str(tmp_path / "code")}
+    policy = {"storage_guard": {"usage_root": str(tmp_path)}}
+    environment = {"HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+                   "TMPDIR": str(tmp_path / "tmp"), "MPLCONFIGDIR": str(tmp_path / "mpl")}
+    with pytest.raises(ValueError, match="TMPDIR must already exist"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    (tmp_path / "tmp").mkdir()
+    assert environment["TMPDIR"] in checked_write_roots(descriptor, admission, policy, environment)
+    environment["TMPDIR"] = ""
+    with pytest.raises(ValueError, match=r"Uncovered corrected worker write roots:.*'/tmp'"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    monkeypatch.chdir(tmp_path)
+    environment["TMPDIR"] = "tmp"
+    with pytest.raises(ValueError, match="TMPDIR must already exist"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    environment["TMPDIR"] = str(tmp_path / "tmp")
+    monkeypatch.setattr(os, "access", lambda *args: False)
+    with pytest.raises(ValueError, match="TMPDIR must already exist"):
+        checked_write_roots(descriptor, admission, policy, environment)
+
+
+def test_matplotlib_default_config_and_cache_roots_are_both_guarded(tmp_path, monkeypatch):
+    import os
+    from exact.experiments.corrected_worker import checked_write_roots
+    monkeypatch.setattr(os, "environ", {})
+    descriptor = {"executor": "exact_frozen_inference", "runs": []}
+    admission = {"root": str(tmp_path / "run"), "code_root": str(tmp_path / "code")}
+    policy = {"storage_guard": {"usage_root": str(tmp_path)}}
+    environment = {"HF_HOME": str(tmp_path / "hf"), "TORCH_HOME": str(tmp_path / "torch"),
+                   "TMPDIR": str(tmp_path / "tmp"), "XDG_CACHE_HOME": str(tmp_path / "cache"),
+                   "XDG_CONFIG_HOME": str(tmp_path.parent / "uncovered-config")}
+    (tmp_path / "tmp").mkdir()
+    with pytest.raises(ValueError, match="Uncovered corrected worker write roots"):
+        checked_write_roots(descriptor, admission, policy, environment)
+    environment["XDG_CONFIG_HOME"] = str(tmp_path / "config")
+    roots = checked_write_roots(descriptor, admission, policy, environment)
+    assert str(tmp_path / "cache/matplotlib") in roots and str(tmp_path / "config/matplotlib") in roots
