@@ -14,10 +14,10 @@ validator unchanged. Schema compliance alone is not scientific qualification.
 The concrete successor compares GLM5.3Flash (low reasoning, 6,000 output tokens),
 MiniMaxM3 and MiMoV2.6Pro (reasoning disabled, 2,000 output tokens each),
 and the requested matcher model GPT-4o mini2024-07-18 (2,000 output tokens,
-reasoning omitted) on the same
-four authored TRAIN packets and both orders. Public endpoint metadata must list
-reasoning, structured_outputs and response_format, and public model metadata must
-support the exact reasoning mode. Every profile pins one provider, requires the
+reasoning omitted) on the same four authored TRAIN packets and both orders.
+Public endpoint metadata must list structured_outputs and response_format.
+Profiles that send reasoning additionally require endpoint capability and
+model metadata supporting the exact reasoning mode. Every profile pins one provider, requires the
 requested parameters and forbids fallback. Z.AI and native Minimax did not list
 structured_outputs in the captured catalog; the proposed explicit alternatives
 are Together for those two models, with Xiaomi retained for MiMo and OpenAI
