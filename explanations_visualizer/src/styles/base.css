@@ -424,6 +424,21 @@ code,
   font: inherit;
 }
 
+.disclosure {
+  display: inline;
+}
+
+.disclosure-toggle {
+  font-size: 0.875rem;
+}
+
+.disclosure-body {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
 .note-warn {
   background: var(--warn-tint);
   color: var(--warn);

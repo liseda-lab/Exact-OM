@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ScoreMeaning } from "@/components/common/Disclosure";
 import { IconArrowDown, IconArrowUp, IconCheck, IconUndo } from "@/components/common/Icons";
 import type { EventType, ResponseType } from "@/study/types";
 
@@ -179,7 +180,11 @@ export function CandidateRows({
             );
           })}
       </ol>
-      {candidates[0] && <p className="meta">{candidates[0].scoreMeaning}</p>}
+      {candidates[0] && (
+        <p className="meta">
+          <ScoreMeaning meaning={candidates[0].scoreMeaning} label="What is a matching score?" />
+        </p>
+      )}
     </section>
   );
 }

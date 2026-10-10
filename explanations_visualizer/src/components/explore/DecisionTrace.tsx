@@ -7,6 +7,7 @@
 
 import { useState } from "react";
 
+import { Disclosure, ScoreMeaning } from "@/components/common/Disclosure";
 import { formatScore } from "@/components/explore/candidates";
 import { GROUP_TEXT, eventMeaning, groupTrace, routeSummary, stageName } from "@/lib/trace";
 import type { Candidate, PairTrace } from "@/lib/types";
@@ -48,9 +49,9 @@ function EventRow({ event, index }: { event: TraceEvent; index: number }) {
             {event.scores.map((score) => (
               <li key={`${score.name}-${score.stage}`}>
                 <span className="score-chip">
-                  <strong>{score.name}</strong> {formatScore(score.value)}
+                  <strong>{scoreName(score.name)}</strong> {formatScore(score.value)}
                 </span>
-                <span className="muted">{score.meaning}</span>
+                <ScoreMeaning meaning={score.meaning} />
               </li>
             ))}
           </ul>
@@ -154,21 +155,27 @@ export function DecisionTrace({ trace }: { trace: PairTrace }) {
   );
 }
 
+/** The concise default label: the final decision score is "Matching score"; others keep their recorded names. */
+function scoreName(name: string): string {
+  return name === "S_final" ? "Matching score" : name;
+}
+
 export function ScoresPanel({ candidate }: { candidate: Candidate }) {
   const ranks = candidate.ordinal_ranks;
   const nil = Object.entries(candidate.nil);
   return (
     <div className="scores-panel">
-      <p className="muted">Each value names the stage that produced it. Scores rank candidates; they are not probabilities of being correct unless marked calibrated.</p>
+      <Disclosure label="About these scores" className="scores-about">
+        Each value names the stage that produced it. Scores rank candidates; they are not probabilities of being correct unless marked calibrated.
+      </Disclosure>
       <ul className="score-rows">
         {candidate.scores.map((score) => (
           <li key={`${score.name}-${score.stage}`}>
             <span className="score-chip">
-              <strong>{score.name}</strong> {formatScore(score.value)}
+              <strong>{scoreName(score.name)}</strong> {formatScore(score.value)}
             </span>
-            <span>
-              {score.meaning} <span className="meta">· stage: {score.stage} · calibration: {score.calibration_status.replace(/_/g, " ")}</span>
-            </span>
+            {score.name === "S_final" && <span className="meta">{score.name}</span>}
+            <ScoreMeaning meaning={score.meaning} stage={score.stage} calibration={score.calibration_status} />
           </li>
         ))}
         {candidate.scores.length === 0 && <li className="meta">No score was recorded for this pair.</li>}
