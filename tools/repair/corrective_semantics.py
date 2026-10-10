@@ -919,7 +919,11 @@ def annotate_packet(
                 input_tokenizer=controls["tokenizer"],
                 role_request_controls={
                     role: dict(
-                        reasoning=controls["reasoning"],
+                        **(
+                            {"reasoning": controls["reasoning"]}
+                            if controls["reasoning"] is not None
+                            else {}
+                        ),
                         response_format=response_format(packet, swapped),
                     )
                 },
@@ -969,7 +973,11 @@ def annotate_packet(
         input_token_bound(
             messages,
             (
-                {k: schedule.slots[0]["parameters"][k] for k in ("reasoning", "response_format")}
+                {
+                    k: schedule.slots[0]["parameters"][k]
+                    for k in ("reasoning", "response_format")
+                    if k in schedule.slots[0]["parameters"]
+                }
                 if controls
                 else None
             ),

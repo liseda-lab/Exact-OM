@@ -966,13 +966,19 @@ def _parameter_context(parameters: Mapping[str, Any]) -> dict[str, Any]:
             "max_tokens",
             "temperature",
         }
-        | ({"reasoning", "response_format"} if "response_format" in parameters else set()),
+        | (
+            {"response_format"} | ({"reasoning"} if "reasoning" in parameters else set())
+            if "response_format" in parameters
+            else set()
+        ),
         "annotation parameters",
     )
     if "response_format" in parameters:
         from exact.repair.annotation_controls import validate_wire_controls
 
-        validate_wire_controls({k: parameters[k] for k in ("reasoning", "response_format")})
+        validate_wire_controls(
+            {k: parameters[k] for k in ("reasoning", "response_format") if k in parameters}
+        )
     messages = parameters["messages"]
     if (
         parameters["role"] not in ROLES

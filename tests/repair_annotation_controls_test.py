@@ -38,7 +38,10 @@ def wire_client(tmp_path, monkeypatch, effort):
     args.update(
         max_output_tokens=6000,
         role_request_controls={
-            fidelity.TEACHER: dict(reasoning=effort, response_format=response_format(packet()))
+            fidelity.TEACHER: dict(
+                **({"reasoning": effort} if effort is not None else {}),
+                response_format=response_format(packet()),
+            )
         },
     )
     args.update(
@@ -50,7 +53,7 @@ def wire_client(tmp_path, monkeypatch, effort):
     return fidelity.SemanticAnnotationAdapter(client.router, settings, tmp_path), calls
 
 
-@pytest.mark.parametrize("effort", [{"effort": "low"}, {"enabled": False}])
+@pytest.mark.parametrize("effort", [{"effort": "low"}, {"enabled": False}, None])
 def test_actual_worker_serializes_controls_and_replays_without_payment(
     tmp_path, monkeypatch, effort
 ):
@@ -58,13 +61,15 @@ def test_actual_worker_serializes_controls_and_replays_without_payment(
     label = client.annotate(packet(), role=fidelity.TEACHER)
     assert len(calls) == 1
     payload = json.loads(calls[0]["content"])
-    assert payload["reasoning"] == effort
+    assert payload.get("reasoning") == effort
+    if effort is None:
+        assert "reasoning" not in payload
     assert payload["response_format"] == response_format(packet())
     assert payload["max_tokens"] == 6000
     assert payload["provider"]["require_parameters"] is True
     wire = label.annotator["wire_receipt"]
     assert json.loads(canonical_json(wire["identity"]["payload"])) == payload
-    assert label.annotator["request_parameters"]["reasoning"] == effort
+    assert label.annotator["request_parameters"].get("reasoning") == effort
     assert client.annotate(packet(), role=fidelity.TEACHER) == label
     assert len(calls) == 1
     with client.ledger._transaction() as db:
@@ -72,7 +77,8 @@ def test_actual_worker_serializes_controls_and_replays_without_payment(
     assert (
         row["tokens"]
         == input_token_bound(
-            payload["messages"], {k: payload[k] for k in ("reasoning", "response_format")}
+            payload["messages"],
+            {k: payload[k] for k in ("reasoning", "response_format") if k in payload},
         )
         + 6000
     )
@@ -472,3 +478,111 @@ def test_glm_requires_source_bound_first_truncation(tmp_path, monkeypatch, defec
             panel.panel_contract(settings)
     else:
         assert panel.panel_contract(settings)[0]["glm_recovery"] == lineage
+
+
+def test_schema_only_identity_is_distinct_from_disabled_reasoning(tmp_path, monkeypatch):
+    client, calls = wire_client(tmp_path, monkeypatch, None)
+    first = client.annotate(packet(), role=fidelity.TEACHER)
+    changed = dataclasses.replace(
+        client.run,
+        role_request_controls={
+            fidelity.TEACHER: dict(
+                reasoning={"enabled": False}, response_format=response_format(packet())
+            )
+        },
+    )
+    second = fidelity.SemanticAnnotationAdapter(client.router, changed, tmp_path).annotate(
+        packet(), role=fidelity.TEACHER
+    )
+    assert (
+        len(calls) == 2
+        and first.annotator["parameters_hash"] != second.annotator["parameters_hash"]
+    )
+    assert "reasoning" not in json.loads(calls[0]["content"])
+    assert json.loads(calls[1]["content"])["reasoning"] == {"enabled": False}
+
+
+def test_nonreasoning_endpoint_rejects_reasoning_controls(tmp_path):
+    settings = profile_fixture(tmp_path)
+    controls = settings["request_profiles"]["teacher"]
+    endpoint = runner.read(controls["endpoint"]["path"])
+    endpoint["data"]["endpoints"][0]["supported_parameters"].remove("reasoning")
+    controls["endpoint"] = save(tmp_path, "endpoint.json", endpoint)
+    with pytest.raises(ValueError, match="lacks required"):
+        request_profile(settings, "teacher")
+
+
+def test_four_model_amendment_retains_total_and_prior_attempts(tmp_path, monkeypatch):
+    from tools.repair import teacher_panel as panel
+
+    settings, prior = panel_fixture(tmp_path, monkeypatch)
+    settings["request_limits"] = dict(panel.FOUR_MODEL_LIMITS)
+    proposal = runner.read(settings["teacher_panel"]["proposal"]["path"])
+    proposal.update(
+        request_limits=dict(panel.FOUR_MODEL_LIMITS),
+        max_requests=32,
+        max_reserved_usd=0.13296,
+        calibration_comparison_identity_limit=56,
+    )
+    proposal["contracts"] = {"teacher": canonical_hash(panel.contract(settings))}
+    settings["teacher_panel"]["proposal"] = save(tmp_path, "four-proposal.json", proposal)
+    approval = runner.read(settings["teacher_panel"]["authorization"]["path"])
+    approval["proposal"] = settings["teacher_panel"]["proposal"]
+    settings["teacher_panel"]["authorization"] = save(tmp_path, "four-approval.json", approval)
+    assert (
+        runner._reserve_phase(
+            settings, "new-0-0", packet().content_hash, 0.0024, comparison_id="panel-0"
+        )
+        is None
+    )
+    after = runner.read(tmp_path / "ledger/phase-reservations.json")
+    assert after["request_limits"] == dict(calibration=91, train=325, development=96, test=192)
+    assert sum(after["request_limits"].values()) == 704 and all(
+        after["reservations"][k] == v for k, v in prior["reservations"].items()
+    )
+
+
+def test_nonreasoning_profile_entrypoint_serializes_schema_only(tmp_path, monkeypatch):
+    import exact.llm.routing
+    from tests.repair_semantic_fidelity_test import response
+
+    client, calls = wire_client(tmp_path / "ledger", monkeypatch, None)
+    model = "openai/gpt-4o-mini-2024-07-18"
+    client.router.profiles["teacher"].model = model
+
+    def transport(**kwargs):
+        calls.append(kwargs)
+        return response(judgment(packet()), model=model)
+
+    monkeypatch.setattr(client.router.hosted._client, "request", transport)
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    settings = profile_fixture(tmp_path)
+    settings["profiles"]["teacher"]["model"] = model
+    controls = settings["request_profiles"]["teacher"]
+    controls.update(reasoning=None, max_output_tokens=2000)
+    endpoint = runner.read(controls["endpoint"]["path"])
+    endpoint["data"]["id"] = model
+    endpoint["data"]["endpoints"][0]["supported_parameters"].remove("reasoning")
+    controls["endpoint"] = save(tmp_path, "endpoint.json", endpoint)
+    controls["catalog"] = save(tmp_path, "catalog.json", dict(data=[dict(id=model)]))
+    controls["tokenizer"].update(
+        kind="openai_o200k_base",
+        repository="openai/tiktoken",
+        encoding="o200k_base",
+        source=controls["endpoint"],
+        ordinary_token_ids_equal=True,
+    )
+    settings["teacher_panel"] = {"test_only": True}
+    monkeypatch.setattr(runner, "_request_budget", lambda manifest: (runner.PHASE_LIMITS, None))
+    result = runner.annotate_packet(packet(), settings, tmp_path / "out", slot_id="s", seconds=300)
+    assert result is not None
+    payload = json.loads(calls[0]["content"])
+    assert (
+        payload["model"] == model and payload["max_tokens"] == 2000 and "reasoning" not in payload
+    )
+    assert payload["response_format"]["json_schema"]["strict"] is True
+    assert (
+        runner.annotate_packet(packet(), settings, tmp_path / "out", slot_id="s", seconds=1)
+        == result
+    )
+    assert len(calls) == 1

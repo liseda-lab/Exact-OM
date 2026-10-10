@@ -349,12 +349,16 @@ def summarize(manifest_path, output):
                 for observation in aggregate.observations:
                     parameters = observation.annotator["request_parameters"]
                     expected_controls = dict(
-                        reasoning=controls["reasoning"],
+                        **(
+                            {"reasoning": controls["reasoning"]}
+                            if controls["reasoning"] is not None
+                            else {}
+                        ),
                         response_format=response_format(packet, slot["swapped"]),
                         max_tokens=controls["max_output_tokens"],
                         provider=manifest["profiles"][profile]["provider"],
                     )
-                    if any(
+                    if (controls["reasoning"] is None and "reasoning" in parameters) or any(
                         canonical_hash(parameters.get(k)) != canonical_hash(v)
                         for k, v in expected_controls.items()
                     ):

@@ -43,7 +43,9 @@ def request_profile(manifest, name):
     if endpoints["id"] != profile["model"] or len(matches) != 1:
         raise ValueError("Ambiguous or wrong pinned endpoint")
     endpoint = matches[0]
-    required = {"reasoning", "response_format", "structured_outputs", "max_tokens", "temperature"}
+    required = {"response_format", "structured_outputs", "max_tokens", "temperature"}
+    if controls["reasoning"] is not None:
+        required.add("reasoning")
     if not required <= set(endpoint["supported_parameters"]) or endpoint["status"] != 0:
         raise ValueError("Pinned endpoint lacks required structured-output controls")
     if cap > endpoint["max_completion_tokens"]:
@@ -52,8 +54,14 @@ def request_profile(manifest, name):
     if len(models) != 1:
         raise ValueError("Missing exact model capability")
     reasoning = controls["reasoning"]
-    support = models[0].get("reasoning", {})
-    if reasoning == {"enabled": False}:
+    support = models[0].get("reasoning") or {}
+    if reasoning is None:
+        if (
+            "reasoning" in endpoint["supported_parameters"]
+            or profile["model"] != "openai/gpt-4o-mini-2024-07-18"
+        ):
+            raise ValueError("Reasoning omission requires the qualified non-reasoning model")
+    elif reasoning == {"enabled": False}:
         if support.get("mandatory") is not False:
             raise ValueError("Model does not explicitly support reasoning disable")
     elif reasoning == {"effort": "low"}:
@@ -68,9 +76,19 @@ def request_profile(manifest, name):
         if provider.get("max_price", {}).get(param) != prices[price]:
             raise ValueError("Provider max_price and reservation differ")
     tokenizer = controls["tokenizer"]
-    if (
-        sha(tokenizer["path"]) != tokenizer["sha256"]
-        or tokenizer["repository"] != models[0].get("hugging_face_id")
+    if sha(tokenizer["path"]) != tokenizer["sha256"]:
+        raise ValueError("Input tokenizer immutable bytes changed")
+    if tokenizer.get("kind") == "openai_o200k_base":
+        if (
+            profile["model"] != "openai/gpt-4o-mini-2024-07-18"
+            or tokenizer.get("encoding") != "o200k_base"
+            or tokenizer.get("repository") != "openai/tiktoken"
+            or sha(tokenizer["source"]["path"]) != tokenizer["source"]["sha256"]
+            or tokenizer.get("ordinary_token_ids_equal") is not True
+        ):
+            raise ValueError("GPT-4o requires bound o200k_base conversion evidence")
+    elif (
+        tokenizer["repository"] != models[0].get("hugging_face_id")
         or len(tokenizer["revision"]) != 40
     ):
         raise ValueError("Input tokenizer must bind the declared model and immutable bytes")
