@@ -1,5 +1,10 @@
 # Backend S1 follow-up
 
+**Subsequent B04 recovery:** The [prose recovery handoff](explanation-product-review-backend-s1-prose-recovery.md)
+records the working replacement credential, completed real batch, separate claim approvals and
+new publication preparation. It supersedes this report's provider-authentication blocker only;
+the historical publication and the other open gates below retain their original status.
+
 **2026-10-10.** Starting checkout: `7a6028c032962d0afae0e7de5a479090f330f3e1`.
 Implementation commit: `4f9dad94ecf288164e3d5f5ee922387e8822c4b2`.
 This follows the [independent S1 review](explanation-product-review-backend-s1-review.md),

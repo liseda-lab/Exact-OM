@@ -1,0 +1,708 @@
+{
+  "conclusions": {
+    "implementation_correctness": "Authentication, strict provider shape, immutable request identity and fail-fast behavior verified. Only separately approved claims may be published. Full new-publication/runtime status is bounded by the recorded background receipts.",
+    "joint_acceptance": "open: S2/rendered journey, missing-definition prose, 4 rejected and 2 one-sided comparisons, prior data/performance gates",
+    "launch_readiness": "not established; no public deployment, original/full-closure ontology admission, manual accessibility, pilot and owner approval still open; failed real inference remains the user-authorized optional exception"
+  },
+  "generation_contract": {
+    "implementation": "grounding-prose-review/4",
+    "max_http_retries": 0,
+    "max_semantic_repairs": 0,
+    "output_schema_hash": "sha256:d70eaad3f6b37c11356dbee7f97f237bc1130f25c38f6c43320074b5c7aad8d0",
+    "profile": {
+      "max_tokens": 2000,
+      "model": "openai/gpt-4o-mini-2024-07-18",
+      "name": "review-description-v2",
+      "provider": "openrouter",
+      "revision": "2024-07-18",
+      "routing": {
+        "allow_fallbacks": false,
+        "only": [
+          "OpenAI"
+        ],
+        "require_parameters": true
+      },
+      "temperature": 0,
+      "timeout_seconds": 60
+    },
+    "prompt_hashes": {
+      "entity_profile": "sha256:d161e24751cad44865fc6f1f0af2d2d3b5f8b40411385658c46a5ba00fedb9a0",
+      "pair_comparison": "sha256:8fcfc6d35a8e2b2f1d951db57dfcca16cc9251f715563ff837761f340cf5f248"
+    },
+    "provider_response_format_sha256": "sha256:54c6a7c623fb4ca82a0aabc06f69b6edd8c043b5db00425eb9b0d9a527433df4",
+    "retry_unknown_delivery": false,
+    "schema": "exact-review-generation-contract/1"
+  },
+  "implementation_commit": "3174f4bb1a67f3731f94271ff8ff88eb0b3b4d37",
+  "ontology_contexts": {
+    "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": {
+      "capabilities": {
+        "categories": [
+          "axioms",
+          "characteristics",
+          "comments",
+          "definitions",
+          "hierarchy",
+          "labels",
+          "restrictions",
+          "synonyms"
+        ],
+        "kinds": [
+          "class",
+          "data_property",
+          "individual",
+          "object_property"
+        ],
+        "navigation": {
+          "contract_version": "exact-hierarchy/1",
+          "entry_points": "available"
+        },
+        "provider": "owl",
+        "reasoner_inferred": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "ReasonerInterruptedError",
+          "input_sha256": "sha256:77507055c3e4b5db42691a473eb4a16dfc0f6cbceb74d9119798a5c69217e8c4",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 900.0
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": false,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "source_spans": false,
+        "typed_expressions": true
+      },
+      "completeness": {
+        "axiom_count": 91530,
+        "category_counts": {
+          "axioms": 14790,
+          "characteristics": 20,
+          "comments": 1122,
+          "definitions": 10568,
+          "hierarchy": 17222,
+          "labels": 14768,
+          "restrictions": 10349,
+          "synonyms": 22691
+        },
+        "domain_completeness": "not_established",
+        "entity_count": 16395,
+        "extraction": "complete_for_policy",
+        "imports_complete": false,
+        "scope": "root"
+      },
+      "context_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+      "identity": {
+        "documents": [
+          "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+        ],
+        "import_policy": "ignore",
+        "imports": [
+          {
+            "import_iri": "http://purl.obolibrary.org/obo/doid/obo/ext.owl",
+            "source_sha256": null,
+            "status": "ignored"
+          }
+        ],
+        "logical_fingerprint": "2d9125c6ee91e909f756a8bc12fcba1872a705aeb0ec150af94f634bc3b21983",
+        "parser": {
+          "backend": "native",
+          "options": {
+            "allow_partial_rdf_mapping": false,
+            "backend": "native",
+            "collect_provenance": true,
+            "deterministic": true,
+            "format": null,
+            "imports": "ignore",
+            "limits": {
+              "cancellation_check_interval": 4096,
+              "deadline_seconds": null,
+              "max_annotations": 100000000,
+              "max_axioms": 100000000,
+              "max_canonical_work": 1000000000,
+              "max_catalog_rewrites": 128,
+              "max_composite_members": 1024,
+              "max_concurrent_fetches": 8,
+              "max_decompressed_bytes": 8589934592,
+              "max_delta_entries": 10000000,
+              "max_diagnostics": 10000,
+              "max_disk_cache_bytes": 68719476736,
+              "max_documents": 1000,
+              "max_import_depth": 128,
+              "max_index_bytes": 17179869184,
+              "max_index_rows": 500000000,
+              "max_iri_bytes": 1048576,
+              "max_literal_bytes": 67108864,
+              "max_memory_bytes": null,
+              "max_nesting_depth": 512,
+              "max_origin_entries": 100000000,
+              "max_overlay_depth": 32,
+              "max_prefixes": 1000000,
+              "max_rdf_list_length": 10000000,
+              "max_redirects": 5,
+              "max_resolver_attempts": 10000,
+              "max_rule_atoms": 10000000,
+              "max_sequence_arity": 10000000,
+              "max_source_bytes": 2147483648,
+              "max_source_map_entries": 100000000,
+              "max_strings": 500000000,
+              "max_temporary_bytes": 17179869184,
+              "max_terms": 500000000,
+              "max_total_source_bytes": 8589934592,
+              "max_triples": 100000000,
+              "max_wire_bytes": 17179869184,
+              "max_wire_rows": 500000000,
+              "type": "ParseLimits"
+            },
+            "offline": true,
+            "preserve_source_map": true,
+            "type": "LoadOptions",
+            "validate_owl2_dl": false
+          },
+          "package": "pyowl-core",
+          "version": "0.2.1"
+        },
+        "root_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+        "schema": "exact-context/2",
+        "scope": "root",
+        "structural_fingerprint": "5322162533d2f0b71e89d10e0ad61c0180fb5e08a5b3e2607b3959e3da88f8b2"
+      },
+      "manifest_sha256": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652",
+      "name": "DOID",
+      "scope": "root"
+    },
+    "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": {
+      "capabilities": {
+        "categories": [
+          "axioms",
+          "characteristics",
+          "comments",
+          "definition_citations",
+          "definitions",
+          "domains",
+          "hierarchy",
+          "labels",
+          "ranges",
+          "restrictions",
+          "synonyms"
+        ],
+        "kinds": [
+          "class",
+          "data_property",
+          "individual",
+          "object_property"
+        ],
+        "navigation": {
+          "contract_version": "exact-hierarchy/1",
+          "entry_points": "available"
+        },
+        "provider": "owl",
+        "reasoner_inferred": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "source_spans": false,
+        "typed_expressions": true
+      },
+      "completeness": {
+        "axiom_count": 1798045,
+        "category_counts": {
+          "axioms": 212418,
+          "characteristics": 13,
+          "comments": 3,
+          "definition_citations": 2,
+          "definitions": 174618,
+          "domains": 86,
+          "hierarchy": 209562,
+          "labels": 424405,
+          "ranges": 232,
+          "restrictions": 82924,
+          "synonyms": 693782
+        },
+        "domain_completeness": "not_established",
+        "entity_count": 212055,
+        "extraction": "complete_for_policy",
+        "imports_complete": true,
+        "scope": "root"
+      },
+      "context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+      "identity": {
+        "documents": [
+          "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+        ],
+        "import_policy": "ignore",
+        "imports": [],
+        "logical_fingerprint": "f93ba368ffbf82224ae29dbfe308eff4c1483f3f113acb78579fb16b548029f2",
+        "parser": {
+          "backend": "native",
+          "options": {
+            "allow_partial_rdf_mapping": false,
+            "backend": "native",
+            "collect_provenance": true,
+            "deterministic": true,
+            "format": null,
+            "imports": "ignore",
+            "limits": {
+              "cancellation_check_interval": 4096,
+              "deadline_seconds": null,
+              "max_annotations": 100000000,
+              "max_axioms": 100000000,
+              "max_canonical_work": 1000000000,
+              "max_catalog_rewrites": 128,
+              "max_composite_members": 1024,
+              "max_concurrent_fetches": 8,
+              "max_decompressed_bytes": 8589934592,
+              "max_delta_entries": 10000000,
+              "max_diagnostics": 10000,
+              "max_disk_cache_bytes": 68719476736,
+              "max_documents": 1000,
+              "max_import_depth": 128,
+              "max_index_bytes": 17179869184,
+              "max_index_rows": 500000000,
+              "max_iri_bytes": 1048576,
+              "max_literal_bytes": 67108864,
+              "max_memory_bytes": null,
+              "max_nesting_depth": 512,
+              "max_origin_entries": 100000000,
+              "max_overlay_depth": 32,
+              "max_prefixes": 1000000,
+              "max_rdf_list_length": 10000000,
+              "max_redirects": 5,
+              "max_resolver_attempts": 10000,
+              "max_rule_atoms": 10000000,
+              "max_sequence_arity": 10000000,
+              "max_source_bytes": 2147483648,
+              "max_source_map_entries": 100000000,
+              "max_strings": 500000000,
+              "max_temporary_bytes": 17179869184,
+              "max_terms": 500000000,
+              "max_total_source_bytes": 8589934592,
+              "max_triples": 100000000,
+              "max_wire_bytes": 17179869184,
+              "max_wire_rows": 500000000,
+              "type": "ParseLimits"
+            },
+            "offline": true,
+            "preserve_source_map": true,
+            "type": "LoadOptions",
+            "validate_owl2_dl": false
+          },
+          "package": "pyowl-core",
+          "version": "0.2.1"
+        },
+        "root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+        "schema": "exact-context/2",
+        "scope": "root",
+        "structural_fingerprint": "1c47a3ea3a28726aa0473702eff789ad5d768cf8cd85e1579eef26701cac7c0c"
+      },
+      "manifest_sha256": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82",
+      "name": "NCIT",
+      "scope": "root"
+    }
+  },
+  "paths": {
+    "assembled_input": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input",
+    "assembly_status": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/assembly-status.json",
+    "independent_reviews": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/independent-reviews-attempt-7",
+    "new_root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010",
+    "private_generation_root": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010",
+    "verification_status": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/verification-status.json"
+  },
+  "policy": {
+    "allow_mapping_xrefs": false,
+    "categories": [
+      "labels",
+      "definitions",
+      "definition_citations",
+      "term_metadata",
+      "synonyms",
+      "comments",
+      "hierarchy",
+      "parents",
+      "children",
+      "restrictions",
+      "usage",
+      "axioms",
+      "types",
+      "assertions",
+      "domains",
+      "ranges",
+      "characteristics",
+      "equivalences"
+    ],
+    "ontology_ids": [],
+    "policy_id": "exploration-v1"
+  },
+  "preparation_inputs": {
+    "cases": 24,
+    "contexts": {
+      "ontologies/0/manifest.json": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652",
+      "ontologies/1/manifest.json": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82"
+    },
+    "description_preparation": "independent-prose/1",
+    "generate_pairs": 12,
+    "revision": "development-review-s1-20261010",
+    "run_manifest": "sha256:85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2",
+    "schema": "exact-review-preparation/1",
+    "source_decisions": "sha256:bb70a75555131af2eada72a792016b67ba56f66653a68389c83689f61dcdf251"
+  },
+  "private_worker_hashes": {
+    "assemble.py": "sha256:9f38c71e7665efa7326d67a55ac94baf2b9337cca197d541147cefa352e5bdaf",
+    "verify-after-assembly.py": "sha256:249cf55659396df10fc3085885377858b51b89398224f111adf952cb5f8e0595"
+  },
+  "provider": {
+    "allow_fallbacks": false,
+    "attempts": [
+      {
+        "attempt": 3,
+        "reported_usage": {},
+        "requests": 1,
+        "response_states": {
+          "rejected:401": 1
+        }
+      },
+      {
+        "attempt": 4,
+        "reported_usage": {
+          "completion_tokens": 710,
+          "cost": 0.0029630999999999998,
+          "prompt_tokens": 16914,
+          "total_tokens": 17624
+        },
+        "requests": 3,
+        "response_states": {
+          "completed:200": 3
+        }
+      },
+      {
+        "attempt": 5,
+        "reported_usage": {
+          "completion_tokens": 132,
+          "cost": 0.00075015,
+          "prompt_tokens": 4473,
+          "total_tokens": 4605
+        },
+        "requests": 1,
+        "response_states": {
+          "completed:200": 1
+        }
+      },
+      {
+        "attempt": 6,
+        "reported_usage": {
+          "completion_tokens": 904,
+          "cost": 0.0031795499999999997,
+          "prompt_tokens": 17581,
+          "total_tokens": 18485
+        },
+        "requests": 3,
+        "response_states": {
+          "completed:200": 3
+        }
+      },
+      {
+        "attempt": 7,
+        "reported_usage": {
+          "completion_tokens": 18920,
+          "cost": 0.045334799999999995,
+          "prompt_tokens": 226552,
+          "total_tokens": 245472
+        },
+        "requests": 86,
+        "response_states": {
+          "completed:200": 86
+        }
+      }
+    ],
+    "final_batch_seconds": 232.10027606482618,
+    "max_http_retries": 0,
+    "max_semantic_repairs": 0,
+    "max_tokens": 2000,
+    "model": "openai/gpt-4o-mini-2024-07-18",
+    "only": [
+      "OpenAI"
+    ],
+    "require_parameters": true,
+    "temperature": 0
+  },
+  "provider_plan_sha256": "sha256:99858ad647b9e8b06cc4e4020823704d23d72ae57d44eb381810af1fc94f780c",
+  "recorded_at": "2026-10-10T19:55:01.412638+00:00",
+  "review": {
+    "approved_single_entity_only_comparison_cases": [
+      "review-07",
+      "review-12"
+    ],
+    "claims_approved": 68,
+    "claims_rejected": 104,
+    "entity_profile_reviewed": 74,
+    "entity_profile_with_approved_claims": 56,
+    "method": "Separate Codex agent review of every saved claim against its exact cited original facts, full packet missingness and typed focal identity. No model self-approval.",
+    "missing_definition_entities_attempted": [
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    ],
+    "missing_definition_entities_with_approved_prose": [],
+    "pair_comparison_reviewed": 12,
+    "pair_comparison_with_approved_claims": 8,
+    "receipt_sha256": {
+      "0016683175cb6324a029aa4d1021ec79f0c2f092e0e956a9f1ed8e730932039a.json": "sha256:13964cb58411ba9938ea9a303cf770fa2378bd0ca76ae32d56086fd08c2da1ea",
+      "02b63003c124b06e8f293873d468b498534399a17a21b3dfe4e59605432b83e8.json": "sha256:ae690c8f342629e4c4b329f68640c4972e0117b8d0c76af58dae74596aa0aac6",
+      "06db533835c3de24b4aaa2a4a860c36f977c3dbee6606e6f135b68715ad8d8b4.json": "sha256:1a15e7728ed4b88617349d7b97b2700ec4dcdbab8f73c9138359d677007029bd",
+      "07b6306ec36bb1bc4a8e8e0bcf346ea93cb6124122103cc18227e46328682489.json": "sha256:9e53c84cbc87906b82ba1b8b998c2edb5ed1734c10d610237017ab914b3eeae5",
+      "0d44e6527f168df652d5b73c68118c6399086ab43d30afd482ac59d66318bd14.json": "sha256:36f9ee544c5ac44094fd79104d511308029619ebf61151d44005a7268f821e90",
+      "0f6e4f29bea30185dd25d457b4655e4afc0df30f6492e158e9ab4311045aaa1b.json": "sha256:05bb37a7895e2889a12dcdcefa4b07cb85bf40a6f49d1face46ec88a7ac1b098",
+      "11676dbf84dfdc7cc2c682bbb3571fbb1e9f843499b29c65e5950e22298ce386.json": "sha256:141fd19bfdbf90ba7f8eb663d8a63957ea2099a561e7290a08c05dcdf3a2d33c",
+      "13c9cd63c5216456e800a4401fe7152e8a579078c18f1fdd7bfc00c6ada5ae33.json": "sha256:28acaf25e88143e2384e2971210954ce64ff53a1e22642ab426a747fdcd10d4b",
+      "198347cc56e106f3e1f9b34f3417421a9cfbdce35bbd15af2bb42b06030280cd.json": "sha256:86e84dfa6e94f102e62b86a8256c1ebc1e93fa54def01a6f43a2687e66a1da07",
+      "227bf82f4d3f5444d630a5b0adbec6c486fff6fbae1f2e09154d3404134e8588.json": "sha256:1bf61c5e302172a32daded4b26be845c05ed002b7b0e6bfc697a4118973b16c7",
+      "237ee9e9557efa3b184001903ee414423a491def13b30f40495fe702f8e746f4.json": "sha256:db3eee2d462d2d5d61f982f2932ba112a4e48f604cf7bb6d829141ee5a703dd4",
+      "284bd00fb1b1511ca5ff41e4dadb4e0cbfd179ca2e181d6184d6988a9a3f5c2e.json": "sha256:e9e5c08e8308c9b55a73f27c70b7244e2aaba48ebc5acedc121e1cf16b9d1cc3",
+      "299c942429fc7a19dd4fcdd31666f8a3b2ee4c118148f96dbfdbeed779f2aee7.json": "sha256:8e8f9387296bdc8320e1f39eb6d4c36162fbceacd4b8b7c012c9e4481193ea2f",
+      "30f07bd8f013a0325f526324c33a4ae3842c7ed36fa84bcb57e4a010cf257fb2.json": "sha256:b99826bf5023240f1215e8686123ab9b0de337a9b0e8eb161bb7069999f2f6b3",
+      "31a1802e74b8e7f8656fbeffc5e10130ab7da69ac8a4ac15af4d47fb8e9493d9.json": "sha256:53b3ac51cb74a10c69ee2191ed8e4ebc9d35dfbb6f0f0fbe1dd2b00997eb0d7e",
+      "323e8e500968fce4b6e3c56bbe9d803909d0e3292ad5f5c5319349184793be3f.json": "sha256:0dfad8ab2fd0a55cf977350f50ec0b217b00d09458bcb5d447566f77d3702d2b",
+      "335391530701d7fce7a87f3b9b36a690a98fdd916cc5c2546b74603fea8ff435.json": "sha256:e081c4d0f6d80edef2abc95d62065294bda58144016e28fbc4962b86a2b2c835",
+      "3683f682d02bb0d13fced7d90f1ae7e217ece48a3fc3d35a3943b3d5ef94a72d.json": "sha256:e36ee57a399a74400acca0d23af2b03f0cf7b873ffd0e631d0560472a1824b31",
+      "37361ee0d18183d7f8dfdf2ad775383117ad5391f0a37ca9bcdc5536445f98ce.json": "sha256:712e150b9266da8609600b59971a18e32364a0fa8f2b2866e19612051db7812b",
+      "3bc9b1c961c60fa3ac4b06ba55ff2d8f024d53761803df5a20e3154724fa970b.json": "sha256:89b3d06f1fdd8828472236eab50582b740c6cf2eadcb65351c4c490b68047509",
+      "433c25a7462a44c88a8b82c989ec0312873164b812c11ef86f21cbe83dc89afd.json": "sha256:2fe6ed820435455d38a9c403e0092c4c422de0d8e34aa142d9fb0019759fbb13",
+      "447350774dc2941a313db2abb51c27431ccd4df474e8a96634c0aeaa34b03484.json": "sha256:87dc0acf782dc256f077e2f10672af57fe73a17892b2cafc3917d45c5bff1595",
+      "46a3aa9b85a282f1ff74dac980604d12c3ab25bce01b12efbe0b532fb292a484.json": "sha256:6fe74dcac0a7f77e2108d11cf6d87701dc5934d84ff13373a5aebb969d4485f5",
+      "4d5d39839d2029eaa4fe9dd40af26e4d68ad590ca137ce5a7100833400dbc565.json": "sha256:0522c118fdbfe46b27e9dc5b70507565ce71507ec35ca9f528e41942253b6d43",
+      "52ca70263718a2613a102b1386b5834a392c758be3b63780a6a8bfb3ee9d8527.json": "sha256:8c1c75ac108bdfc06ccea8106cf0f076394505969765a8daa8d2b4c8c76cd56d",
+      "53aee6acc7d1aa91f22385f19719fe94a821ba4215b1a8823fc31ad3e6fceace.json": "sha256:4b9038fda6169b4c4bef364c1223e05f3966014499de95829b345dc75833fefe",
+      "57f914378f9eae13eb17bc8db1d5076e5cc9074c36c2357328bd2a135b9f71ef.json": "sha256:2e373ad173463c2cf35ca004321345ec9e607d3e1bb05fdcae0e7f00b4344af7",
+      "58b9ffe2c541a9e39c5da89ab8412dbafaf27fa083ade4e7ac33690e7bbf8a58.json": "sha256:ebf7d1377c67d5aa7083230086232bc53a5df2547ac259a7321ee2006dbdcb85",
+      "5a5714ec17de03e4ede32db59788e8cea334d5dfa723c28589b1c8905b02ad5d.json": "sha256:91fdcc06ddf421d34a396e22eb6df21f342f56e76454c5789ab0971a731fb6b3",
+      "5c52f843961fbd1234f26dac99f09d5d9a9782ea08ef8bd0b941f746a8b04ae3.json": "sha256:506cc31dab9c8ded396fb75b63b28241666df344ef3f396558bc81dfa36a9b04",
+      "5c9983d68ff4d9028d266530156fd5cbc7d62bc098d5eba941aae956d92afd1f.json": "sha256:69d039a142b500a444a6baad679628c37a9ecf8a670af38cf60a3f163b189c63",
+      "5d89dd45f9232ccd4a0cc2562772a812365262c779e748599cb5c35003f9b86b.json": "sha256:6208a94245b97f550f0466a53a3bac6cfd8993c1149550c30af70823830708a4",
+      "5f5759bc53a457ef44ef21cfbcb8720e7fdca6a04f9707aec67a0649c5cd40ff.json": "sha256:1c2a09ce7876e7541ed4ed4be8efcc13b256a13c688f09ffc29dc5073506e041",
+      "61a0ac4ce4fe9e4c96ddbee6e29be5f8dd03d89d48bec5e8a42274db6a714bf2.json": "sha256:4db3719bc589c49de2c03342463039539fbbab930afcfabf06e783ca2bc28c03",
+      "635301a20c52391d60493548a95893df9172c17b9e2fffc8952ef8349851c1d0.json": "sha256:eaa758caecfb5cd12b4654799a285769ea680fcedf0a39cbe68602bd222e859c",
+      "6395eef61788c513f963e540b892c64db0299b6dc9a59c9ee40d63bb5f821187.json": "sha256:835c45a014168fc8757d08cc5074ded3fee2de5e2180df7d016524cea73f5d08",
+      "695935b57535c948fb65834f8aaa7fcc66443c8c9212db3ada50a4edafaa5401.json": "sha256:afe1160169230619dda48bebe43da93b25a7624c607966a574f9df1126f366ea",
+      "69dda8d1ea6b181c06bba9806d6778e02a5d7de00cc5e8d6ff425b4e0cb77ca4.json": "sha256:36d9474f8d17b2791932ff05fe3b2d94ad83c7247083038ef323452fac44224b",
+      "6bf6df9d75cb6fdd2daad4a61695e3cb48d26a9d08cd0d1e7461ce47f9391588.json": "sha256:0e33a008c132c6c0a80377f044705c4b0031192b20f099a009193657a71d6888",
+      "6d0ca85bfcac753640bf3b651640fe610311c4505c15414fc3ba7ef33fb8f569.json": "sha256:95d2d61bd54fe1822cf649d1da7a13275fba044f029370faa4088d7571ea98ab",
+      "7279383dcb8404ece48d4a3b51e49569ac75a44a2b1ed8233c5ccac460134828.json": "sha256:dc856615c4fefcb6ce857555a6e840a2dac025639e016c1d0d6da4d4fedc6695",
+      "72b795f44daa777537c07958357ab98c2bd9cda5119e1b99064785fe1dcf52ed.json": "sha256:03409427ebdace6cc988b3234f54a3367e8745a597d9a1580815c9dc1139db29",
+      "76471c6848d9d03bfe46feb2ab20e7f08428a2fc8802c4838a5f1eddb4252db7.json": "sha256:6d24a42a16c679482d84709749304b02527af8dc9c08c7893097258a409f132a",
+      "777336d0c670e5e1a14d91411ca1f1365ba62d2c857c506a38eee2ad8e73899a.json": "sha256:339161e17bb444d8358695aabd4747d38f3b411e23a83690df6fcf6b962757fa",
+      "79a8851c01f1f3bf9935b0f985daade6268f6e66fad1ccaf8dd6c1b050fb13e7.json": "sha256:92777aec285638743529054eb7559c68c37f373a79bd3593d3db3e3207619330",
+      "7badbc12208b6ae0ad3fe87377a30756e2840865996bb971d18e9dd42165b027.json": "sha256:7625352f73ba35492ce074147a134258332321a7b158d63ee17900d28c6b0ea0",
+      "7fd548050807394e443e657823f2b5c62fd42574ee68c055b642c3ff8ae06049.json": "sha256:f65b9a3e3f519843e2aab55d2a3db7dbb5be201bdcefab6ec7db545fe043b364",
+      "8461244a3e7b2c6b2fc74dfc12189955ee29bbe1816cac134cb0223f5d41a23c.json": "sha256:e6b4c61c79c3841b1665db474c4ad402f191677c110df19a8d5ff94c83b77338",
+      "86a9cdcdedbe8ae61b1837ea0487efe369f543b2541a688ef355a08b9c86a4c1.json": "sha256:497b779a5ed6fd8062548a19c14e17fd1ece1f81e67239f18baa83d69eb5a94b",
+      "880256e72c483c089e567ce28c723bedd4705f8b1f6babfa5eac5406d2de06cb.json": "sha256:ae4ec01f3b543a3d4c4bf4f02011904d51a92ac5162f2cb49d3e5b5ea954c1eb",
+      "89f3a3c560b5c156d56174cfbba6efb18feb8494e16e88d0322ccc1299f9933c.json": "sha256:a629545fdb1a8f75d92f264004759ec78c927e147d753ac9131437ff19a2ba31",
+      "8ac7dbfa500927d0e09f83507b285dd659e8db731502bd64d2dfc50f69e57a0b.json": "sha256:a447e2275afbc6f225d0539ef64a69058f751b173f091e1348ada38e42be3eed",
+      "8ccc7b5d544f21b7cfb468edb27e852372e7557c478ecf19ddff323e5d028688.json": "sha256:83187136e755653ff50a052ae9fd68455a16095e530813b1f8837db866c70b88",
+      "8dfd09283da2f33f669dd379b01deba460cdc105d380749e21efdf3f3691b3ec.json": "sha256:1af83bef208d158c87db1261d9bfedbe755fa50b4571100777f36202f10a22c0",
+      "8fa8c9e6e8ed114986910ca0872c6b573667bdf5aa0f7a3a0d33e73fa2bc1a7a.json": "sha256:d9ab3e84e6dab70d06610145427ce41d3fb7485994e8ba22603d46737f38addb",
+      "92529f664e67e7c283cd96bdb17e959c17294c37f4a0a04dc241c7607618cac3.json": "sha256:2833d732c9ec3fe9d79752e1b9159bf93ebea2585f58ffbb5438a3e25234e797",
+      "953807885645dad3e24d80d70e08e62ff5a02771273ab869bda25c0463fddbbf.json": "sha256:237e72e15667b63728ee243a374b5c07b5e3e6ed77aaa33df78b2d9fe095f5d3",
+      "9dd915ceeeaa535d36c9d5287d16f8e6c1c5f2ba7ea83d9dad88914307a97c44.json": "sha256:b3d2b501a7fc4fe317f2e5045bbf86f09d4b06db3c1c14c40e08cad9e7450225",
+      "a21d5533db3734c8e343ca97569e7b921a6c30cfea99f8ac5334f71056645129.json": "sha256:09e02be3aa96e51f7ebb01dab976855eb5e7b915070587748650de7770d4d133",
+      "a2dcc62150538470962c1097d26219943e5d0ede13839069b9c987a3364e8a2f.json": "sha256:073408559cc8afc9ac5db134a23e400b2815098c75a457dcd6b2ffb8467c28c3",
+      "a75c3d5e511e9079e4b75eca2fa80e31f7c7f643f718ec5c636ce0dcb3b448db.json": "sha256:f338e4041880daa68e9c90006cf818e1a4f7b46c5459c946d5bf79d016d351dc",
+      "aa911b70d9b8ac662060ddb25262ba951e1d3478f391381ea5099ae1e2b05878.json": "sha256:47d96b298053ea1f6634b4b988fab0a964b92fb3b87061379d79a81593c00732",
+      "ab83a04024167ae880855231c0a9ea5c1bf6653f573450f1710abc6c4e5270a3.json": "sha256:f2df48411a82c0d64e452394bd0566ac3ed71c947c0fa99115a3e559eab30569",
+      "adcd381f58fd71b3949de9c693292a9ac1f5e25346cdfe6e7ca2324c72d3b9e1.json": "sha256:5db73f7a868f2c866092155bcdd85a7bdc008a00386b4cffec1e0d3a92dfc11b",
+      "b1952bc6bd5268bdf65db23f25657bd1a68e4ea4814b785eb709ef0ea83ec6d2.json": "sha256:db617cb54e7afd554aea51756b06e7c1a315081596686e26a273313edb378a56",
+      "b2c5516202ccc1c379b6b4962262b25ad79189645affc36337da8cd5a76edd20.json": "sha256:5f952cd36bf30b1677239c652e67677382f996ae60cb8280dd514b83887bae54",
+      "b5c4d8c945cd2357743882cc7902b42bba4652b88fc1f26dd97137890b33ebba.json": "sha256:b7c16e3656122ded77e76426a11e2710f92cba28f9d17b092a77f47f88960fc6",
+      "b9b0a2c418d8cbe1834eac7d329ffe95d375a8cfb4d6ae5d7faf2374ec91e47e.json": "sha256:6c2b978fa4ed3b76d7b3d4ed1ae24d37827816bc4b10320d7d8d8590ff676ea9",
+      "bc16418c7e3b41bf2c2150e00fd05bfa223ce74cc6c17dac0a528601364a7b39.json": "sha256:34091745ec0830c3a756c6e4f6bdb444ab04dd230afafe19f0a0f2462b3076d1",
+      "bc186a71a3c3de0ebfc0a7d3f83127a8359f388acbb4a30251f98e46538bc4a7.json": "sha256:7593287f770c30f3842b915a201409a49877eef7b221b7a7d63e3c7a1119d716",
+      "bee192ae09d1c92de7655cdfd1264046dc413c0f4060ddd7cfed0c9211137136.json": "sha256:3d0dd66d6e340d0e567d849932049293441426ec560192bb597759ef3fa15867",
+      "c09be6d5e61281189197f18299078044c57a9b47e10fbd2b93dd177dda137342.json": "sha256:e4b1e0c98bfb14448d4ce2fcb0b2803cda51fd0d121ff7006a48d0e68a576107",
+      "c5287766a26f47d7e2c1cd10b6238976810423d23c6c19066df09172f4c82396.json": "sha256:2a02bc1130d9bd9e068464c8b75ce18b631805ba406ead84fe9c06750b1fe956",
+      "c5410879df21783308fd3e5d779e1c0a781de9cbf153653993cd87588407bb82.json": "sha256:1352b971f035e6891354c5d725387bd567c0ad99d5dab45b8355c405a3498b9e",
+      "c5e008d066eea4e6cec68df3334cb41498e34a2b8136df98d30a01443c84339b.json": "sha256:dc23198098f53b70274353d3df3601377885ad31cee2c00aba2b75377e8cdd82",
+      "c5f3b474b8fb584499a01287f39d374b8b1a3f7716b51520ddaaa8b9a2d766fb.json": "sha256:d9cda959df1b2f8dac046683c907dbd0775b12ccdcb0321b8792ca62b88d5f35",
+      "cd7057154656ec3eeb739a40f18f244e58e5c4243dd4c271e7160a5aeea0220e.json": "sha256:e6ac6d17699d676b63f0d633c898d33c38ce50aa310f8a933000fe3a2a8bd2cd",
+      "ce5405e2cf141d7ada61a819a450cff2e765c986990753c162f8a599d07a15a6.json": "sha256:a65b3021eec6cfa64e4cd01cf22f9d14820a634b621b0b4750e61b038cdc758b",
+      "d6f35a7025a57f88b5b0a8e2cb8e282411d56ad7b570d69c40b61f08e86764a2.json": "sha256:0d4a0e775df6b89f1a28a1f91dccb30793e0d1a6575fcb2f5efabe278a3f22aa",
+      "d9c25896d5f3f23dcb5dd4b217b5b2d9f8c7783d9cf77372565a0983b4b07af7.json": "sha256:56d5f429eeac89dfce563a4a770183ffd793e485e4c5627e4e8088fa2fa8576a",
+      "df626ac461c61ff20a019abe493081ed3dbaa42a32e4195807b6e14010e1de7f.json": "sha256:8f9401849ceb2cbf6405176019a529c0e4f5bda1f47dc3cfe33d5e43d2b63952",
+      "e341233f28e82dcc7749b1cab4f5f3134620b804186fe36e0579f39d016036ab.json": "sha256:418c3a38100b0421c3046de27085e8e905f8719ff87b2e108ba168e822de5916",
+      "ebb2ef5ad93f1867a785f007675279105329cec9956f6abd733739b6745060c1.json": "sha256:a7242411d177c544e7a116377af179fec38bb95bd93d8f5628e88f9bbac87229",
+      "f33e52dde10064c3d550156b7c042d02ae04ee69fe2f64f97ac6f06248193015.json": "sha256:15573a633a946801bb11444c1ada9aea4b26d2b8304a351aee0554831a79ef6f",
+      "fd6d203a7e6f5a9bb76c541001d4d6ced9db576c2bfd14fa7cd65e2d7e953e70.json": "sha256:71fafdb1986a42b9c5cb3c471bd08e4770dee23c8acf3696ea099e01e53b4ecd",
+      "fdbd3e0ece01113f9cf70bb9607ed9ec9a519e175f35fbf1d93cbcf458cf7c1b.json": "sha256:9714e2e22ae3768964662c47e808b237b6870b0f82188cf6458bb739783065ee"
+    },
+    "useful_two_sided_comparison_cases": [
+      "review-01",
+      "review-02",
+      "review-03",
+      "review-05",
+      "review-09",
+      "review-10"
+    ],
+    "wholly_rejected_comparison_cases": [
+      "review-04",
+      "review-06",
+      "review-08",
+      "review-11"
+    ]
+  },
+  "runtime": {
+    "compiled_frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-delivered-final-20261010/frontend",
+    "compiled_frontend_sha256": "47bdca016cdb745c725f8173e0f5458e5a39cc2f4b7cf526318b66b30b72b3a2",
+    "new_environment": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment",
+    "normal_csp_and_tls_required": true,
+    "planned_ports": {
+      "exploration": 19305,
+      "postgres": 19303,
+      "study": 19304
+    },
+    "postgres_version": "postgres (PostgreSQL) 16.2",
+    "python": "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "versions": {
+      "fastapi": "0.116.2",
+      "psycopg": "3.3.6",
+      "pydantic": "2.13.4",
+      "pyowl-core": "0.2.1",
+      "python": "3.12.3",
+      "uvicorn": "0.35.0"
+    }
+  },
+  "runtime_contract_hashes": {
+    "specs/explanation-framework/protocol/description-review.runtime-schema.json": "sha256:77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "specs/explanation-framework/protocol/exploration.runtime-openapi.json": "sha256:676fec06883c072896cb2cd98423b5a5b50cd8fcd4069668cac82fab1c3fdc72",
+    "specs/explanation-framework/protocol/review-about.runtime-schema.json": "sha256:75425ce843b5e157676a2d741ee2c185d2468a83bcbfd244c4e095cb30a6584c",
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "sha256:0b2fda6005b4092b2f8e4cce30b60002904c90e82710fea9a0ca6942799658c8",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "sha256:614f7414c71022472819359dd3ebb7c779f61dc3f74e677ccf73fa3ed53fe3ec",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "sha256:f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "sha256:752d8c9b711313df1119b8367a61c58ff4953c6d850ba4275ec97585c534f3ff"
+  },
+  "schema": "exact-backend-s1-prose-recovery/1",
+  "scope": "Backend B04 provider recovery within existing S1 development-review inputs; no final experiments, push or public deployment",
+  "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+  "starting_commit": "66b588ce979eab1b9b0b446d7eba9d61712b549d",
+  "verification": {
+    "backend_regressions": {
+      "errors": 0,
+      "failures": 0,
+      "receipt": "regressions.xml",
+      "seconds": 23.121,
+      "skipped": 0,
+      "tests": 90,
+      "warning": "Existing routing-alias DeprecationWarning"
+    },
+    "background_snapshots": {
+      "assembly-status.json": {
+        "phase": "preparing_cache_only_publication",
+        "pid": 40837,
+        "schema": "exact-prose-assembly/1",
+        "seconds": 63.88866224489175
+      },
+      "verification-status.json": {
+        "phase": "waiting_for_assembly",
+        "pid": 42536,
+        "schema": "exact-prose-post-assembly/1",
+        "seconds": 1.6518868505954742e-05,
+        "status": "running"
+      }
+    },
+    "full_new_publication_checks": "See live background status; pending is not a pass",
+    "new_rendered_browser_journey": "not performed; frontend S2 remains necessary",
+    "real_preflight_asgi": "passed; two reviewed explanation GETs 200 with exact claim parity, rejected draft GET 404",
+    "runtime_schema_check": "passed; unchanged API schema snapshots"
+  }
+}

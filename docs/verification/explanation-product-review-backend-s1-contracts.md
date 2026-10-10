@@ -1,11 +1,18 @@
 # Backend S1 contracts for frontend S2
 
-**Follow-up, 2026-10-10:** The [corrective handoff](explanation-product-review-backend-s1-followup.md)
+**Prose recovery, 2026-10-10:** The [generation recovery handoff](explanation-product-review-backend-s1-prose-recovery.md)
+supersedes the authentication blocker below: 74 real profiles and 12 comparisons completed;
+separate claim review admitted 56 profile artifacts and eight comparison artifacts. Unsupported
+drafts retain labelled fallbacks. The new publication and isolated environment have their own
+assembly/verification receipts; pending work is not acceptance. Participant wire contracts
+remain unchanged. Missing-definition prose and complete comparison coverage are still open.
+
+**Earlier follow-up, 2026-10-10:** The [corrective handoff](explanation-product-review-backend-s1-followup.md)
 delivers a separate publication with recovered original-fact links and new discovered workspace
 scope IDs. Wire contracts and schema snapshots are unchanged. Producer `graph_projection`
 statuses remain distinct from the supplied pure-frontend projection observations. Inference
-is unavailable under the user's explicit optional exception; provider prose is still blocked
-by authentication. Use the follow-up receipt for current local service readiness, never assume
+is unavailable under the user's explicit optional exception; that earlier publication had no
+approved provider prose. Use the applicable receipt for local service readiness, never assume
 that a background check passed.
 
 This is the integration contract for specs 20–22. The accepted frontend base is
