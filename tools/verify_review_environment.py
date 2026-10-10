@@ -837,8 +837,46 @@ class Journey:
             "/api/v1/study/resources/" + quote(tutorial["case"]["explanation_refs"][0], safe=""),
             label="frozen_tutorial_resource",
         ).json()
+        prepared_actions = list(actions_for(tutorial, resource))
+        # Rejection must be transactional and the next valid action must work.
+        # These are real API requests against the frozen tutorial, not helper tests.
+        probes = []
+        for lesson, actions in prepared_actions:
+            for action in actions:
+                if "fact_id" in action and not any(p[0] == "unadmitted_fact" for p in probes):
+                    probes.append(
+                        ("unadmitted_fact", lesson, {**action, "fact_id": "sha256:" + "0" * 64})
+                    )
+                if "entity" in action and not any(p[0] == "omitted_entity_kind" for p in probes):
+                    entity = {k: v for k, v in action["entity"].items() if k != "kind"}
+                    probes.append(("omitted_entity_kind", lesson, {**action, "entity": entity}))
+        require(len(probes) == 2, "tutorial_boundary_probe_resources")
+        for label, lesson, action in probes:
+            before = copy.deepcopy(self.state)
+            self.request(
+                "PUT",
+                "/api/v1/study/tutorial/progress",
+                label="tutorial_rejection:" + label,
+                expected=422,
+                json={
+                    "idempotency_key": uuid4().hex,
+                    "expected_revision": before["revision"],
+                    "tutorial_version": tutorial["version"],
+                    "lesson_id": lesson,
+                    "actions": [action],
+                    "completed_requirements": [action["requirement_id"]],
+                },
+            )
+            after = self.request(
+                "GET", "/api/v1/study/state", label="state_after_tutorial_rejection"
+            ).json()
+            require(
+                after["revision"] == before["revision"]
+                and after["tutorial_progress"] == before["tutorial_progress"],
+                "tutorial_rejection_atomic",
+            )
         action_count = 0
-        for lesson, actions in actions_for(tutorial, resource):
+        for lesson, actions in prepared_actions:
             self.mutate(
                 "PUT",
                 "tutorial/progress",

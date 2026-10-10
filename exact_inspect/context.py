@@ -748,18 +748,37 @@ class OntologyContext:
                 ).fetchall()
                 matches = [row[0] for row in rows]
             elif (item.get("prop_iri") or item.get("property_iri")) and "value" in item:
+                # Older matcher exports retained lexical values but omitted some
+                # literal qualifiers. Recover the original only if the retained
+                # terms identify one literal. Never guess xsd:string/@en, and do
+                # not silently rebind a neighbouring entity to the focal subject.
+                if item.get("entity_iri", ref["iri"]) != ref["iri"]:
+                    return {
+                        "status": "not_exported",
+                        "fact_ids": [],
+                        "reason": "Recorded annotation subject differs from the typed focal entity",
+                    }
+                conditions, arguments = [], [
+                    ref["iri"],
+                    ref["kind"],
+                    item.get("prop_iri", item.get("property_iri")),
+                    item["value"],
+                ]
+                if "language" in item:
+                    conditions.append("COALESCE(a.language,'')=?")
+                    arguments.append(item["language"] or "")
+                if "datatype" in item:
+                    conditions.append("a.datatype IS ?")
+                    arguments.append(item["datatype"])
                 rows = connection.execute(
-                    "SELECT a.id FROM refs r JOIN axioms a ON a.id=r.axiom_id WHERE r.iri=? AND r.kind=? AND a.predicate=? AND a.lexical=? AND COALESCE(a.language,'')=? AND a.datatype=?",
-                    (
-                        ref["iri"],
-                        ref["kind"],
-                        item.get("prop_iri", item.get("property_iri")),
-                        item["value"],
-                        item.get("language") or "",
-                        item.get("datatype"),
-                    ),
+                    "SELECT a.id,a.language,a.datatype FROM refs r JOIN axioms a ON a.id=r.axiom_id "
+                    "WHERE r.iri=? AND r.kind=? AND a.predicate=? AND a.lexical=?"
+                    + (" AND " + " AND ".join(conditions) if conditions else ""),
+                    arguments,
                 ).fetchall()
-                matches = [row[0] for row in rows]
+                literal_identities = {(row[1] or "", row[2]) for row in rows}
+                if len(literal_identities) == 1:
+                    matches = [row[0] for row in rows]
             elif (
                 item.get("subject_iri")
                 and item.get("object_iri")

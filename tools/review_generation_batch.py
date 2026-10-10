@@ -147,7 +147,7 @@ def batch_plan(root, attempt, source_attempt=1):
     }
 
 
-def execute_plan(plan, approved_sha256):
+def execute_plan(plan, approved_sha256, *, preflight=False):
     if canonical_hash(plan) != approved_sha256:
         raise ValueError("Explicit approved plan hash does not match")
     current = batch_plan(plan["root"], plan["generation_attempt"], plan["source_attempt"])
@@ -163,6 +163,28 @@ def execute_plan(plan, approved_sha256):
         root, plan["source_attempt"]
     )
     results, packets, counts, exact_jobs = {}, {}, Counter(), []
+    selected_profiles, selected_comparisons = plan["profiles"], plan["comparisons"]
+    if preflight:
+        # One real comparison, its independent profiles, and one missing-definition
+        # profile exercise both request shapes before the rest of this SAME plan.
+        selected_comparisons = selected_comparisons[:1]
+        identities = {canonical_hash(e) for pair in selected_comparisons for e in pair["entities"]}
+        missing = next(
+            (
+                p
+                for p in selected_profiles
+                if not any(
+                    f.get("category") == "definitions"
+                    for f in originals[p["source_request"]][1].facts
+                )
+            ),
+            None,
+        )
+        if missing:
+            identities.add(canonical_hash(missing["entity"]))
+        selected_profiles = [
+            p for p in selected_profiles if canonical_hash(p["entity"]) in identities
+        ]
 
     def generate(packet, expected=None):
         result = jobs.generate(packet, profile, max_repairs=0)
@@ -187,8 +209,16 @@ def execute_plan(plan, approved_sha256):
                     paths["requests"] / (key + ".unreviewable.json"),
                     {"explanation_id": result["explanation_id"], "reason": str(error)},
                 )
+                if preflight:
+                    raise ValueError(
+                        "Real preflight response is unreviewable; no remaining jobs dispatched"
+                    ) from error
             else:
                 atomic_json(paths["requests"] / (key + ".json"), request)
+        elif preflight:
+            raise ValueError(
+                "Real preflight has no saved provider response; no remaining jobs dispatched"
+            )
         atomic_json(
             root / f"generation-progress-attempt-{attempt}.json",
             {
@@ -199,22 +229,26 @@ def execute_plan(plan, approved_sha256):
         )
         return result
 
-    for item in plan["profiles"]:
+    for item in selected_profiles:
         packet = originals[item["source_request"]][1]
         identity = canonical_hash(item["entity"])
         packets[identity] = packet
         results[identity] = generate(packet, item["job_id"])
-    for item in plan["comparisons"]:
+    for item in selected_comparisons:
         a, b = [canonical_hash(e) for e in item["entities"]]
         packet = comparison_packet(packets[a], packets[b], [results[a], results[b]])
         generate(packet)
-    marker = root / f"generation-dispatch-complete-attempt-{attempt}.json"
+    marker = (
+        root
+        / f"generation-{'preflight' if preflight else 'dispatch-complete'}-attempt-{attempt}.json"
+    )
     atomic_json(
         marker,
         {
             "counts": dict(counts),
             "approved_plan_sha256": approved_sha256,
             "exact_jobs": exact_jobs,
+            "preflight": preflight,
             "semantic_review": "Separate independent review required; no publication performed.",
         },
     )
@@ -232,6 +266,7 @@ def main():
     execute = commands.add_parser("execute")
     execute.add_argument("--plan", type=Path, required=True)
     execute.add_argument("--approved-plan-sha256", required=True)
+    execute.add_argument("--preflight", action="store_true")
     args = parser.parse_args()
     if args.command == "preview":
         if args.output.exists():
@@ -250,7 +285,13 @@ def main():
             )
         )
     else:
-        print(execute_plan(json.loads(args.plan.read_bytes()), args.approved_plan_sha256))
+        print(
+            execute_plan(
+                json.loads(args.plan.read_bytes()),
+                args.approved_plan_sha256,
+                preflight=args.preflight,
+            )
+        )
 
 
 if __name__ == "__main__":

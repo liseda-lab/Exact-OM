@@ -14,7 +14,7 @@ def prepared_private_run(root, run, *, contexts, source_version, target_version,
     root, run = Path(root), Path(run).resolve()
     selected = sorted({canonical_hash(entity) for entity in selected_entities})
     resolver = {
-        "implementation": "review-selected-original-facts/2",
+        "implementation": "review-selected-original-facts/3",
         "contexts": {
             version: file_hash(context.database) for version, context in sorted(contexts.items())
         },

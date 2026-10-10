@@ -819,7 +819,7 @@ def import_run(
 class DecisionStore:
     """Read-only SQLite keyset pages; a request never scans raw run files."""
 
-    def __init__(self, directory: Path):
+    def __init__(self, directory: Path, *, verified_database=None):
         self.directory = Path(directory)
         self._manifest = read_metadata(self.directory / "decisions.manifest.json")
         if (
@@ -835,7 +835,17 @@ class DecisionStore:
             raise DomainError("invalid_manifest", "Unsupported decision database locator", 422)
         self.database = relative_path(self.directory, self._manifest["database"])
         self._verified_stat = self._database_stat()
-        if file_hash(self.database) != self._manifest["database_hash"]:
+        # A containing service may have checked this exact inode and byte version
+        # during readiness. Never reuse a bare digest across a file replacement.
+        digest = (
+            verified_database[0]
+            if verified_database is not None and verified_database[1] == self._verified_stat
+            else file_hash(self.database)
+        )
+        if (
+            digest != self._manifest["database_hash"]
+            or self._database_stat() != self._verified_stat
+        ):
             raise DomainError("artifact_conflict", "Decision package hash changed.", 409)
         with self._connect():
             pass

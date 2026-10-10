@@ -214,8 +214,13 @@ class PreparedService:
             if run_id not in self._runs:
                 from .decisions import DecisionStore
 
-                self._verify_resource_files(self.manifest.runs[run_id])
-                store = DecisionStore(relative_path(self.path.parent, self.manifest.runs[run_id]))
+                locator = self.manifest.runs[run_id]
+                hashes = self._verify_resource_files(locator)
+                database = locator.rstrip("/") + "/decisions.sqlite"
+                store = DecisionStore(
+                    relative_path(self.path.parent, locator),
+                    verified_database=(hashes["decisions.sqlite"], self._verified_files[database]),
+                )
                 if any(
                     not self.policy.allows_ontology(store.manifest()[side + "_ontology_version_id"])
                     for side in ("source", "target")

@@ -62,6 +62,26 @@ def file_hash(path):
     return result.hexdigest()
 
 
+class AdmissionHashes:
+    """Deduplicate bytes within one preflight, bound to exact file stat identities."""
+
+    def __init__(self):
+        self.checked = {}
+        self.bytes_read = 0
+
+    def __call__(self, path):
+        path = Path(path).resolve(strict=True)
+        stat = path.stat()
+        key = (path, stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+        if key not in self.checked:
+            value = file_hash(path)
+            if path.stat() != stat:
+                raise ReviewError("Immutable input changed during admission")
+            self.checked[key] = value
+            self.bytes_read += stat.st_size
+        return self.checked[key]
+
+
 def tree_hash(path):
     digest = hashlib.sha256()
     for item in sorted(Path(path).rglob("*")):
@@ -128,8 +148,13 @@ def backend_identity(repo):
     try:
         commit = command(["git", "-C", str(root), "rev-parse", "--verify", "HEAD"], timeout=5)
     except ReviewError as exc:
+        reason = (
+            "timed out after 5 seconds"
+            if isinstance(exc.__cause__, subprocess.TimeoutExpired)
+            else "failed"
+        )
         raise ReviewError(
-            "Backend Git identity is unavailable; use a durable committed checkout"
+            f"Backend Git identity lookup {reason}; use a durable committed checkout"
         ) from exc
     if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
         raise ReviewError("Backend Git identity is invalid")
@@ -212,9 +237,10 @@ def validate_publication(raw, *, allow_expired=False):
     return definition
 
 
-def verify_assets(raw, assets):
+def verify_assets(raw, assets, *, hasher=None):
     """Verify supplied immutable assets and admission receipts without regenerating them."""
     root = Path(assets).resolve()
+    hasher = hasher or file_hash
     for asset in raw["definition"]["assets"]:
         for key, hash_key in (
             ("path", "sha256"),
@@ -225,15 +251,16 @@ def verify_assets(raw, assets):
             target = (root / asset[key]).resolve()
             if root not in target.parents or not target.is_file():
                 raise ReviewError("A publication asset is absent or outside its admitted root")
-            if file_hash(target) != asset[hash_key].removeprefix("sha256:"):
+            if hasher(target) != asset[hash_key].removeprefix("sha256:"):
                 raise ReviewError("A publication asset or admission receipt has changed")
             if key == "path" and target.stat().st_size != asset["size_bytes"]:
                 raise ReviewError("A publication asset has a different byte length")
 
 
-def verify_workspaces(raw, assets):
+def verify_workspaces(raw, assets, *, hasher=None):
     """Verify all study workspace bindings even when exploration uses another bundle."""
     root = Path(assets).resolve()
+    hasher = hasher or file_hash
     checked = {}
     for scope in raw["definition"].get("workspace_scopes", []):
         files = [(scope["index_path"], scope["index_sha256"])]
@@ -251,7 +278,7 @@ def verify_workspaces(raw, assets):
                     "A study workspace resource is missing or outside its admitted root"
                 )
             if target not in checked:
-                checked[target] = file_hash(target)
+                checked[target] = hasher(target)
             if checked[target] != expected.removeprefix("sha256:"):
                 raise ReviewError("A bound study workspace index, manifest or database changed")
 
@@ -522,14 +549,21 @@ def preflight(config, *, allow_expired=False, allow_closed=False, check_ports=Tr
         validate_tls(config["certificate"], config["private_key"])
     raw = read_json(config["publication"])
     validate_publication(raw, allow_expired=allow_expired)
-    verify_assets(raw, config["assets"])
-    verify_workspaces(raw, config["assets"])
+    hashes = AdmissionHashes()
+    verify_assets(raw, config["assets"], hasher=hashes)
+    verify_workspaces(raw, config["assets"], hasher=hashes)
     from exact_inspect.study.models import Publish
 
     Publish.model_validate(raw)
-    from exact_inspect.artifacts import validate_bundle
+    from exact_inspect.artifacts import relative_path, validate_bundle
 
-    validate_bundle(Path(config["package"]), verify_hashes=True)
+    package_path = Path(config["package"])
+    bundle = validate_bundle(package_path, verify_hashes=False)
+    for artifact in bundle.artifacts:
+        if hashes(
+            relative_path(package_path.parent, artifact.path)
+        ) != artifact.sha256.removeprefix("sha256:"):
+            raise ReviewError("A package artifact failed checksum verification")
     require_open_publication(config, raw, allow_expired=allow_expired, allow_closed=allow_closed)
     if check_ports:
         records = processes(config)
@@ -977,7 +1011,16 @@ def fresh_session(config, *, renew=False, days=30):
 def serve(config, role, nonce):
     if role not in {"study", "exploration"} or not nonce or len(nonce) != 32:
         raise ReviewError("Invalid managed review worker")
-    verify_backend(config)
+    started = time.monotonic()
+    phases = []
+
+    def phase(name, operation):
+        before = time.monotonic()
+        value = operation()
+        phases.append({"phase": name, "seconds": time.monotonic() - before})
+        return value
+
+    phase("backend_identity", lambda: verify_backend(config))
     if role == "study":
         from urllib.parse import quote
 
@@ -995,13 +1038,34 @@ def serve(config, role, nonce):
             Path(config["assets"]),
             frontend_dir=Path(config["frontend"]),
         )
-        app.state.study_store.publish(Publish.model_validate(raw))
+        phase(
+            "publication_admission",
+            lambda: app.state.study_store.publish(Publish.model_validate(raw)),
+        )
+        # Verify every frozen workspace before readiness, including after a
+        # publication retry. The process-local stat-bound caches then cover the
+        # first participant request without weakening authorization or admission.
+        phase("workspace_readiness", lambda: warm_workspaces(app.state.study_store, raw))
     else:
         from exact_inspect.service import create_prepared_app
 
-        app = create_prepared_app(
-            Path(config["package"]), profile="local_app", frontend_dir=Path(config["frontend"])
+        app = phase(
+            "package_admission",
+            lambda: create_prepared_app(
+                Path(config["package"]), profile="local_app", frontend_dir=Path(config["frontend"])
+            ),
         )
+    private_json(
+        Path(config["root"]) / "logs" / (role + "-readiness.json"),
+        {
+            "schema": "exact-review-worker-readiness/1",
+            "role": role,
+            "backend": config["backend"],
+            "publication_sha256": config["hashes"]["publication"],
+            "phases": phases,
+            "seconds": time.monotonic() - started,
+        },
+    )
     import uvicorn
 
     uvicorn.run(
@@ -1013,6 +1077,15 @@ def serve(config, role, nonce):
         log_level="warning",
         access_log=False,
     )
+
+
+def warm_workspaces(store, raw):
+    from exact_inspect.contracts import VisibilityPolicy
+    from exact_inspect.study.workspace import WorkspaceScope, _open_resources
+
+    policy = VisibilityPolicy.model_validate(raw["definition"]["visibility_policy"])
+    for scope in raw["definition"]["workspace_scopes"]:
+        _open_resources(store, WorkspaceScope.model_validate(scope), policy)
 
 
 @contextlib.contextmanager
