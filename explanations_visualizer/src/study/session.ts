@@ -182,6 +182,6 @@ export function useStudySession() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [recovery]);
-  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current?.size ?? 0, hasRecovery: recovery !== null, downloadRecovery };
+  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current?.size ?? 0, queued: () => queue.current?.queued() ?? [], hasRecovery: recovery !== null, downloadRecovery };
 }
 export type StudySession = ReturnType<typeof useStudySession>;

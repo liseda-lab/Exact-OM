@@ -77,6 +77,11 @@ export class MutationQueue {
 
   get size() { return this.entries.length; }
 
+  /** Copies of the unsent writes, oldest first (a reloaded page shows what it still holds). */
+  queued(): { path: string; body: Record<string, unknown> }[] {
+    return this.entries.map((entry) => ({ path: entry.path, body: structuredClone(entry.body) }));
+  }
+
   observe(state: QueueState) {
     if (state.session_id === this.options.state.session_id) this.revision = Math.max(this.revision, state.revision);
   }

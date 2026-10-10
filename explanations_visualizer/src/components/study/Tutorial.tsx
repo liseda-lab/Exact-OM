@@ -34,6 +34,7 @@ import type { Telemetry } from "@/study/telemetry";
 import { workspaceEvent } from "@/study/workspaceEvents";
 import { uuid, type StudySession } from "@/study/session";
 import { assessmentPosition, followAcknowledged, lessonPosition, restoredPosition } from "@/study/tutorialPosition";
+import { AssessmentDrafts, canonical } from "@/study/assessmentDrafts";
 import { DiscardedMutation } from "@/study/mutationQueue";
 import { LessonEvidence, evidenceFor, type LessonSignal } from "@/study/tutorialProgress";
 import type { AssessmentItem, AssessmentResponse, ExplanationResource, LessonRequirement, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
@@ -82,6 +83,68 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
   const acknowledged = useMemo(() => new Set(progress?.completed_requirements ?? []), [progress?.completed_requirements]);
   const acknowledgedRef = useRef(acknowledged);
   acknowledgedRef.current = acknowledged;
+
+  // Visible assessment drafts above the keyed question cards (S0-R2): queued work restored after
+  // a reload is shown, a newer local edit is never replaced by an older or competing server
+  // draft, and pending drafts are saved again after a conflict refresh or a discarded write.
+  const drafts = useRef<AssessmentDrafts | null>(null);
+  if (!drafts.current) {
+    drafts.current = new AssessmentDrafts();
+    const latest = new Map<string, AssessmentResponse>();
+    for (const entry of session.queued()) {
+      const draft = entry.path === "/api/v1/study/tutorial/progress" ? (entry.body.assessment_draft as { question_id?: string; response?: AssessmentResponse } | undefined) : undefined;
+      if (draft?.question_id && draft.response) latest.set(draft.question_id, draft.response);
+    }
+    drafts.current.seed(Array.from(latest, ([questionId, response]) => ({ questionId, response })));
+  }
+  const [, setDraftVersion] = useState(0);
+  const serverDrafts = progress?.assessment_drafts;
+  const serverDraftsRef = useRef(serverDrafts);
+  serverDraftsRef.current = serverDrafts;
+  useEffect(() => {
+    drafts.current!.reconcile(serverDrafts);
+    setDraftVersion((value) => value + 1);
+  }, [serverDrafts]);
+  const conflicts = useRef(new Map<string, number>());
+  const sendDraft = useCallback(
+    (questionId: string, response: AssessmentResponse) => {
+      const store = drafts.current!;
+      store.sent(questionId);
+      session
+        .mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, assessment_draft: { question_id: questionId, response } }, coalesce: `tutorial:item:${questionId}`, debounceMs: 500 })
+        .then((next) => {
+          conflicts.current.delete(questionId);
+          store.settled(questionId, next.tutorial_progress?.assessment_drafts);
+          setDraftVersion((value) => value + 1);
+        })
+        .catch((error) => {
+          store.settled(questionId, serverDraftsRef.current);
+          setDraftVersion((value) => value + 1);
+          // A conflict refresh or a write discarded behind another failure: save the visible
+          // draft again on top of the refreshed state (bounded, so two tabs cannot loop).
+          const retry = error instanceof DiscardedMutation || (error instanceof ApiError && error.status === 409);
+          if (!retry) return;
+          const count = (conflicts.current.get(questionId) ?? 0) + 1;
+          conflicts.current.set(questionId, count);
+          if (count <= 3)
+            window.setTimeout(() => {
+              const pending = drafts.current!.pending().find((item) => item.questionId === questionId);
+              if (pending) sendDraftRef.current(questionId, pending.response);
+            }, 0);
+        });
+    },
+    [session, tutorial.version],
+  );
+  const sendDraftRef = useRef(sendDraft);
+  sendDraftRef.current = sendDraft;
+  const editDraft = useCallback(
+    (questionId: string, response: AssessmentResponse) => {
+      drafts.current!.edit(questionId, response);
+      setDraftVersion((value) => value + 1);
+      sendDraft(questionId, response);
+    },
+    [sendDraft],
+  );
 
   // Valid lesson evidence that the server has not acknowledged yet (21 F01.4–5). "Saving…" is
   // shown for it; a tick only for acknowledged requirements.
@@ -328,7 +391,17 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
           </div>
         </>
       ) : (
-        <Assessment tutorial={tutorial} state={state} session={session} onRevisit={go} onQuestion={(questionId) => navigate(assessmentPosition(questionId))} focusedQuestion={position.question_id} outstandingLessons={outstandingLessons} />
+        <Assessment
+          tutorial={tutorial}
+          state={state}
+          session={session}
+          onRevisit={go}
+          onQuestion={(questionId) => navigate(assessmentPosition(questionId))}
+          focusedQuestion={position.question_id}
+          outstandingLessons={outstandingLessons}
+          draftOf={(item) => drafts.current!.value(item.question_id, serverDrafts?.[item.question_id], emptyResponse(item))}
+          onDraft={editDraft}
+        />
       )}
       {helpOpen && lesson && (
         <Dialog title={`Help · ${lesson.title}`} onClose={() => setHelpOpen(false)} wide>
@@ -612,6 +685,8 @@ function Assessment({
   onQuestion,
   focusedQuestion,
   outstandingLessons,
+  draftOf,
+  onDraft,
 }: {
   tutorial: TutorialPublic;
   state: StudyState;
@@ -620,6 +695,9 @@ function Assessment({
   onQuestion: (questionId: string) => void;
   focusedQuestion: string | null;
   outstandingLessons: TutorialLesson[];
+  /** The visible answer for a question (a pending local edit, else the server's draft). */
+  draftOf: (item: AssessmentItem) => AssessmentResponse;
+  onDraft: (questionId: string, response: AssessmentResponse) => void;
 }) {
   const progress = state.tutorial_progress ?? null;
   const passed = new Set(progress?.passed_items ?? []);
@@ -659,7 +737,7 @@ function Assessment({
           </ol>
         </nav>
       </section>
-      <AssessmentCard key={current.question_id} item={current} number={currentIndex + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(current.question_id)} onRevisit={onRevisit} />
+      <AssessmentCard key={current.question_id} item={current} number={currentIndex + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(current.question_id)} onRevisit={onRevisit} response={draftOf(current)} onChange={(next) => onDraft(current.question_id, next)} />
       <div className="study-actions question-steps">
         <button type="button" className="btn" disabled={currentIndex === 0} onClick={() => onQuestion(tutorial.assessment[currentIndex - 1].question_id)}>
           Previous question
@@ -726,6 +804,8 @@ function AssessmentCard({
   tutorial,
   passed,
   onRevisit,
+  response,
+  onChange,
 }: {
   item: AssessmentItem;
   number: number;
@@ -734,21 +814,19 @@ function AssessmentCard({
   tutorial: TutorialPublic;
   passed: boolean;
   onRevisit: (lessonId: string) => void;
+  /** The visible answer, held above this keyed card so navigation never loses it (S0-R2). */
+  response: AssessmentResponse;
+  onChange: (next: AssessmentResponse) => void;
 }) {
-  const draft = state.tutorial_progress?.assessment_drafts?.[item.question_id];
-  const [response, setResponse] = useState<AssessmentResponse>(() => draft ?? emptyResponse(item));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const attempts = (state.tutorial_progress?.attempts ?? []).filter((attempt) => attempt.question_id === item.question_id);
   const latest = attempts.at(-1) ?? null;
-  const [stale, setStale] = useState(false);
+  // Changed since the last check: compared with what was checked, so it survives remounts.
+  const stale = latest ? canonical(latest.response) !== canonical(response) : false;
   const update = (next: AssessmentResponse) => {
-    setResponse(next);
-    setStale(true);
     setError(null);
-    void session
-      .mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, assessment_draft: { question_id: item.question_id, response: next } }, coalesce: `tutorial:item:${item.question_id}`, debounceMs: 500 })
-      .catch(() => undefined);
+    onChange(next);
   };
   const errorRef = useRef<HTMLSpanElement>(null);
   const submit = async () => {
@@ -761,7 +839,6 @@ function AssessmentCard({
     try {
       // Each check is its own attempt: never coalesced, retried with the same identity.
       await session.mutate({ method: "POST", path: "/api/v1/study/tutorial/assessment", body: { tutorial_version: tutorial.version, question_id: item.question_id, attempt_id: uuid(), response } });
-      setStale(false);
     } catch (failure) {
       setError(describeError(failure));
     } finally {
