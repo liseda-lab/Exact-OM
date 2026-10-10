@@ -325,6 +325,7 @@ def _assignment_label(
     false_positive_weight: float = 1.0,
     semantic_target: SemanticTargetSpec | None = None,
     evidence_directory: Path | None = None,
+    support_enabled: bool = True,
 ) -> RepairLabel:
     from exact.repair.kernel import materialize
     from exact.repair.owl import OwlVerifier, snapshot_from_axioms
@@ -352,7 +353,9 @@ def _assignment_label(
         candidate_cost(obj, obj.candidates[choice], profile)
         for obj, choice in zip(case.problem.objects, assignment)
     )
-    auxiliary = support_targets(case.problem, assignment, report, axioms, active)
+    auxiliary = (
+        support_targets(case.problem, assignment, report, axioms, active) if support_enabled else ()
+    )
     if report.logical_status != "VERIFIED_FEASIBLE":
         feasible = False if report.logical_status == "VERIFIED_INFEASIBLE" else None
         return RepairLabel(assignment, feasible, None, cost, support_targets=auxiliary)
@@ -401,6 +404,7 @@ def label_case(
     desired_family_weight: float = 1.0,
     false_positive_weight: float = 1.0,
     evidence_directory: Path | None = None,
+    support_enabled: bool = True,
 ) -> TeacherCache:
     """Verify the intended clean parent, then enumerate whole-case labels under deadlines."""
     from importlib.metadata import version
@@ -446,6 +450,7 @@ def label_case(
             desired_family_weight,
             false_positive_weight,
             semantic_target,
+            support_enabled=support_enabled,
             timeout=call_limit,
             **options,
         )
@@ -804,6 +809,7 @@ def generated_development(
                     options.get("profile", DEFAULT_PROFILE),
                     semantic_target=semantic_target
                     or SemanticTargetSpec(canonical_hash(case.probes)),
+                    support_enabled=getattr(model, "support_enabled", False),
                     timeout=(
                         min(30.0, max(0.001, remaining - annotation_call_reserve))
                         if annotation_reserve
@@ -1225,7 +1231,9 @@ def train_cases(
                     ),
                     rating_aggregation=plan_rating_aggregation,
                     aggregate_receipts=fidelity_plan_aggregates,
-                    rating_context_packets=fidelity_rating_contexts if case.split == "train" else None,
+                    rating_context_packets=(
+                        fidelity_rating_contexts if case.split == "train" else None
+                    ),
                 )
         identity_options["fidelity_plan_aggregate_hash"] = canonical_hash(fidelity_plan_aggregates)
         if checkpoint_path is not None:
@@ -2343,6 +2351,7 @@ def train_cases(
                         assignment,
                         profile,
                         semantic_target=semantic_targets[case.case_id],
+                        support_enabled=support_enabled,
                         timeout=min(left, decode_seconds),
                     )
                     return (
@@ -3651,6 +3660,7 @@ def main() -> int:
                             profile=profile,
                             desired_family_weight=protocol["teacher"]["desired_family_weight"],
                             false_positive_weight=protocol["teacher"]["false_positive_weight"],
+                            support_enabled=config["support_enabled"],
                         )
                         if labeled.status != "complete":
                             raise ValueError(f"Label worker {labeled.status}: {labeled.detail}")

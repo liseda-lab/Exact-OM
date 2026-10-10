@@ -57,6 +57,7 @@ def run(plan_path, output):
             assignment,
             profile,
             semantic_target=semantic_target,
+            support_enabled=protocol["model"].get("support_enabled", False),
             output_directory=str(target / "cache"),
             evidence_directory=target / "native",
             timeout=plan["call_seconds"],

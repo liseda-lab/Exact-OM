@@ -66,6 +66,7 @@ def fixture(tmp_path, monkeypatch):
     def label(case, assignment, *args, **kwargs):
         calls.append(assignment)
         assert case.problem.content_hash == generated.content_hash
+        assert kwargs["support_enabled"] is protocol["model"]["support_enabled"]
         return RepairLabel(assignment, True, 1.0, 0.0)
 
     monkeypatch.setattr(train, "_assignment_label", label)
@@ -121,7 +122,9 @@ def fixture(tmp_path, monkeypatch):
         round_id="0",
     )
     protocol = dict(
-        objective=dict(edit_weights={}), teacher=dict(family_weights=dict(desired=1, unwanted=1))
+        objective=dict(edit_weights={}),
+        teacher=dict(family_weights=dict(desired=1, unwanted=1)),
+        model=dict(support_enabled=False),
     )
     return case, generated, plan, protocol, calls, clock, limits
 
@@ -410,3 +413,11 @@ def test_assignment_support_crosses_real_worker_as_lossless_artifact(tmp_path):
         stream.write(b"x")
     with pytest.raises(ValueError, match="integrity mismatch"):
         ga._read_assignment_payload(result.value, tmp_path, case, expected.assignment)
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_generated_acquisition_passes_protocol_support_setting(tmp_path, monkeypatch, enabled):
+    case, _, plan, protocol, calls, _, _ = fixture(tmp_path, monkeypatch)
+    protocol["model"]["support_enabled"] = enabled
+    ga.case_worker(case_to_dict(case), plan, protocol, tmp_path, "optional-support", 1300)
+    assert calls
