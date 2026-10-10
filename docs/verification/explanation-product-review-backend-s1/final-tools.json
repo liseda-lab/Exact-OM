@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "final-tools",
+  "source_junit_sha256": "sha256:3795fed3bb4da780f45d5ea66c3fea4b8c945fc794494c4cdcc649a3633b06d8",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "23",
+      "time": "61.832",
+      "timestamp": "2026-10-10T15:25:50.652373+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

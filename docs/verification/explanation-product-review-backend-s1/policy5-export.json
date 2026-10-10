@@ -1,0 +1,10 @@
+{
+  "stage": "policy_export",
+  "database_sha256": "sha256:c60384bb0eb0bdaeeb77c68868fec9892d7bb906c70b05193c78a82c84b4c912",
+  "elapsed_seconds": 217.4246050918009,
+  "cpu_user_seconds_total": 247.642662,
+  "cpu_system_seconds_total": 50.127677,
+  "peak_rss_bytes": 386211840,
+  "free_disk_bytes": 3762745344,
+  "source_receipt_sha256": "sha256:640d00fc5acfc151ea070618eb52f623a5f266bce9735f3c16edc80d5ced6c1a"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "workspace-metadata",
+  "source_junit_sha256": "sha256:1c0d6154080d638aa2c3ae3a21947a99b1d6230a5c19482220e94899ff3a5a56",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "22",
+      "time": "7.915",
+      "timestamp": "2026-10-10T15:13:08.491591+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

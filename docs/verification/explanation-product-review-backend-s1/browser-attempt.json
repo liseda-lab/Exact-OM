@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-browser-attempt/1",
+  "recorded_at": "2026-10-10T15:51:57.326823+00:00",
+  "backend_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+  "frontend_source_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+  "browser": "Codex In-app Browser",
+  "tool": "mcp__cua_repl",
+  "url": "https://127.0.0.1:19185/",
+  "status": "blocked_by_untrusted_local_certificate",
+  "browser_error": "net::ERR_CERT_AUTHORITY_INVALID",
+  "certificate_file_sha256": "sha256:e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+  "rendered_page_inspected": false,
+  "screenshots": [],
+  "certificate_warning_bypassed": false,
+  "trust_settings_changed": false,
+  "global_tls_validation_disabled": false,
+  "boundary": "No rendered main/study browser acceptance. Exact-certificate HTTPS API checks are separately recorded. S0 cannot negotiate forms3 until S2."
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "exact-corrected-evidence-inputs/1",
+  "mode": "inputs_only",
+  "status": "complete",
+  "elapsed_seconds": 351.5420014108531,
+  "cpu_user_seconds": 256.455985,
+  "cpu_system_seconds": 51.009604,
+  "peak_rss_bytes": 387387392,
+  "free_disk_bytes": 3775836160,
+  "old_bytes_preserved": true,
+  "provider_dispatch_allowed": false,
+  "source_hashes": {
+    "exact_inspect/decisions.py": "sha256:5e112d1e0bfa25ace733faac561467deb2bf448a17a82b8db1eca13a8b5e297f",
+    "exact_inspect/decisions_export.py": "sha256:83fbd4050d3ebc8f3fbfdf94d6575d36500b3419c89e211aefd28b5cd6117ab2",
+    "exact_inspect/evidence_metadata.py": "sha256:9f14d04b381f96f4976f6c98fe7eec26ff29357e2fa41d6e8872404aa0694c56",
+    "exact_inspect/models.py": "sha256:d20289b68d1861484022fd6fe62ebd435f76a39fdc9139db86972c13c11a31a5",
+    "tools/prepare_review_bundle.py": "sha256:3a8135fc4f4eb0f077183a8f6e9e2670c692df4ce021ff2bc0dfbed722d31760",
+    "tools/review_pair_inputs.py": "sha256:e10f16e8e2acd1daf0f99516a75a8fc023f0e37efece25a52d1b6c040609239e",
+    "tools/review_private_run_cache.py": "sha256:05877c56749c5263e9e72a5b46dfa824f9c25b33c2746179d642b1e847462cd5",
+    "tools/review_run_cache.py": "sha256:343625847c0b024496054f160a098841e39aeaa5ab313327da6bcb482289c982"
+  },
+  "stages": [
+    {
+      "cpu_system_seconds_total": 12.73409,
+      "cpu_user_seconds_total": 101.856804,
+      "database_sha256": "sha256:b405a4834c5d0b5753f3cc97df8e32079e51b3e92154c4a612b906151282dac4",
+      "elapsed_seconds": 34.55529507389292,
+      "free_disk_bytes": 6461714432,
+      "full_candidate_pool_audit": {
+        "additional_indexed_pairs": 0,
+        "indexed_typed_pairs": 30374,
+        "missing_typed_pairs": 0,
+        "saved_array_entries": 30374,
+        "saved_unique_typed_pairs": 30374,
+        "source_count": 300
+      },
+      "peak_rss_bytes": 380321792,
+      "stage": "private_import"
+    },
+    {
+      "cpu_system_seconds_total": 50.127677,
+      "cpu_user_seconds_total": 247.642662,
+      "database_sha256": "sha256:c60384bb0eb0bdaeeb77c68868fec9892d7bb906c70b05193c78a82c84b4c912",
+      "elapsed_seconds": 217.4246050918009,
+      "free_disk_bytes": 3762745344,
+      "peak_rss_bytes": 386211840,
+      "stage": "policy_export"
+    }
+  ],
+  "source_receipt_sha256": "sha256:204bdfadfa5e126a1e6014e39b7f877a8c688aaf4dabb9843257bdbd9c378222"
+}

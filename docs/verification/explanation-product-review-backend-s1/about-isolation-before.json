@@ -1,0 +1,30 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "about-isolation-before",
+  "source_junit_sha256": "sha256:043cbee8af3b8b472c40385580776e671dbbe82bbe59cb6dd455b7a9236dd0d7",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "0",
+      "tests": "1",
+      "time": "8.185",
+      "timestamp": "2026-10-10T15:55:13.045711+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": [
+    {
+      "test": {
+        "classname": "tests.explanation_review_publication_test",
+        "name": "test_review_purpose_is_explicit_and_test_only_at_actual_api",
+        "time": "7.199"
+      },
+      "kind": "failure",
+      "detail": {
+        "message": "AssertionError: assert {'schema_vers...:00:00Z', ...} == {'schema_vers...:00:00Z', ...}\n  \n  Omitting 14 identical items, use -vv to show\n  Differing items:\n  {'cases': [{'case_id': 'case-0', 'source': {'ontology_version_id': 'sha256:4973118ed4d3f36071130834120dfa1821872dc9a06... 'sha256:9713b783a0b01fd9cdc7ef44ba629f512c8494b7de97c06ebf0d488854534292', 'iri': 'urn:target:5', 'kind': 'class'}]}]} != {'cases': []}\n  Use -v to get more diff"
+      }
+    }
+  ]
+}

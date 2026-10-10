@@ -1,0 +1,22 @@
+{
+  "schema": "exact-focused-test-receipt/1",
+  "scope": "Bounded actual nonempty class probe selection in verifier; application runtime unchanged",
+  "command": "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python -m pytest -q tests/explanation_review_inventory_verifier_test.py tests/explanation_review_http_verifier_test.py tests/explanation_review_pair_verifier_test.py tests/explanation_review_verifier_test.py",
+  "passed": 52,
+  "seconds": 1.27,
+  "baseline": {
+    "test": "test_read_surfaces_try_another_real_class_when_first_focal_class_has_no_edges",
+    "source_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+    "failed": true,
+    "observed": "VerificationError: nonempty_class_hierarchy_exercised"
+  },
+  "files": {
+    "tools/verify_review_environment.py": "667327de56c1358db33f990a5ea4584ce47578c95bfb5f9d066a838f5a859ec6",
+    "tests/explanation_review_inventory_verifier_test.py": "4fd57697ae8e3062be1161b5b0720333df2cf528196c7366da6df8b735a54b55"
+  },
+  "format_checks": [
+    "black line-length100",
+    "flake8 select F,E9"
+  ],
+  "junit": null
+}

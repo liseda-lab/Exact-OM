@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "cache-lineage",
+  "source_junit_sha256": "sha256:23155e088304000041306c45dd0393da3a040f904eaa8d6f237213922941046b",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "16",
+      "time": "12.747",
+      "timestamp": "2026-10-10T15:32:09.737848+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

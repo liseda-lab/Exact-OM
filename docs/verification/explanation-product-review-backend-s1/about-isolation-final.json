@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "about-isolation-final",
+  "source_junit_sha256": "sha256:ebe487d45fbe221994527bee3cca756e0a6bb9292983c5772a90166e1dcf99b9",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "1",
+      "time": "9.120",
+      "timestamp": "2026-10-10T15:56:58.835711+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

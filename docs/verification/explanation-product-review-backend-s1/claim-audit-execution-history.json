@@ -1,0 +1,92 @@
+{
+  "schema": "exact-independent-claim-audit-execution-history/1",
+  "initial_harness_stop": {
+    "phase": "exact main-versus-workspace result equality",
+    "cause": "The current workspace response model materializes independent_review:null while deterministic main artifacts omit the optional field.",
+    "followup_check": "All264 workspace result occurrences differ only by that optional null field; claims, manifests and every other field match exactly.",
+    "correction": "Permit absent independent_review to match only explicit null; all remaining exact equality and independent semantic rules retained.",
+    "classification": "audit harness correction; no publication or runtime change"
+  },
+  "first_successful_audit": {
+    "receipt": "exact-final-published-claim-audit.json",
+    "receipt_sha256": "sha256:6506d2869f4299c2bc2d66f10de2b2be326de976bc3d768051e7b5eb5707a8d8",
+    "script": "exact-audit-published-review-initial.py",
+    "script_sha256": "sha256:9823a85f8b58db7fd620693944d570be03f4717e38c779b0ceead3d571af4705"
+  },
+  "reproducible_rerun": {
+    "receipt": "exact-reproducible-published-claim-audit.json",
+    "receipt_sha256": "sha256:279d98ab45df29aa8cfdaecfc419fe6651611d606f240bfb973492b0670e96d3",
+    "script": "tools/audit_review_publication.py",
+    "change": "Explicit maintained runtime root and imported module byte identities; no independent semantic-rule changes.",
+    "equivalence_check": "All claims, cases, coverage, source hashes and conclusions exactly match first receipt; only execution provenance, timestamp, script hash and timings differ.",
+    "script_sha256": "sha256:7355cb3ce86d9c27f32494f5f753216e10791bfaf13fa33517038113926202f1",
+    "preserved_executable": "exact-audit-review-publication-before-isort.py"
+  },
+  "publication_modified": false,
+  "prior_history_sha256": "sha256:090d67548892a4ce953cf1c464d437ac017dbd7e9e821dea824c080ff90fbdf7",
+  "style_only_delivered_probe": {
+    "script": "exact-audit-review-publication-imports-only.py",
+    "script_sha256": "sha256:97af3aea496878ffea5f829f449aa95ca49604c6609e18fcc55df16cc6438a5e",
+    "change": "isort standard-library import order only; non-import AST identical",
+    "result": "FileNotFoundError before context bytes were read; no output receipt",
+    "missing_path": "input/selection.json",
+    "cause": "Portable runtime whitelist did not include separate public selection metadata",
+    "runtime_input_modified": false
+  },
+  "public_metadata_sidecar": {
+    "installation_receipt": "publication-audit-inputs/installation-receipt.json",
+    "installation_receipt_sha256": "sha256:a7b978594bec9388c6fe9a4257928cfbb4530516b669c68aa604a9042427c2b9",
+    "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+    "bytes": 157066,
+    "change": "Optional --selection-file; existing frozen publication selection hash remains mandatory; existing default input path preserved",
+    "independent_semantic_rules": "named/expression/assess_claim/verify_label ASTs unchanged",
+    "regression_receipt": "exact-publication-audit-sidecar-tests.json",
+    "regression_receipt_sha256": "sha256:d8189eba5f8a31c62c1b706561353b6fc7869ace46a8f8bb5db3805455623d51",
+    "publication_or_runtime_input_modified": false
+  },
+  "final_delivered_rerun": {
+    "receipt": "exact-final-delivered-published-claim-audit.json",
+    "receipt_sha256": "sha256:81d5e8fb75394c957d90631707570cfa5553a20ccf0cb25cbd08de08091495a1",
+    "script": "tools/audit_review_publication.py",
+    "script_sha256": "sha256:b95d6b074548b32a3f020ea70d506ddc5801343f7b45498f725cbcc65cc0ae0e",
+    "runtime": {
+      "checkout_commit": "629bec57d5d7be3b67f4a2d940f6d5f868ca2dc2",
+      "imported_module_sha256": {
+        "exact_inspect/__init__.py": "sha256:b90249f8049e876b3700ab1478c227faabe42d70db109fb0386c75f576768bf5",
+        "exact_inspect/artifacts.py": "sha256:ba0887f341f1c31b725f4d12d71c583812f10d9b4f6fbe898f1195e9f3d11a3e",
+        "exact_inspect/context.py": "sha256:7630922ee347ea98a1505b1ef7cf764bce0be8f14456bf76cff0bb5adb1392ac",
+        "exact_inspect/context_prepare.py": "sha256:c2710a92b8db357f50af1d4931514a38b0ab256c05726d3f9af1497d05355f6b",
+        "exact_inspect/context_semantics.py": "sha256:5d378f3df65441dbd62095101996bf139f4473483d662f55b1eebb0b172e2300",
+        "exact_inspect/contracts.py": "sha256:14be5138499d5fb8e63372be987fa07570f37dfcf09bb6d76826c18ed9699fef",
+        "exact_inspect/description_review.py": "sha256:aa9f948f7a258f77b51d25275d37c4881c09a59a50ce78a0fd3008b04b65d1bd",
+        "exact_inspect/descriptions.py": "sha256:8cc76f39a1c52aeefac36cef948f26e6a5a54cc7c56c6d15c9a568a58dd28a33",
+        "exact_inspect/evidence_metadata.py": "sha256:9f14d04b381f96f4976f6c98fe7eec26ff29357e2fa41d6e8872404aa0694c56",
+        "exact_inspect/generation.py": "sha256:eefb4de1881b5fc53981f6fd416921c7c0bb8522ed42f86001c80568b1020212",
+        "exact_inspect/models.py": "sha256:d20289b68d1861484022fd6fe62ebd435f76a39fdc9139db86972c13c11a31a5",
+        "exact_inspect/navigation.py": "sha256:cece04b9726de6cc03dcbdbccdd6f47b0fe07630805ec282880ffdb9a73b118c",
+        "exact_inspect/review_metadata.py": "sha256:6fb2cf5d56f95f838a143ff7445a26989d745ccf4c1fa79d81c9182903eb441a",
+        "exact_inspect/sqlite_safety.py": "sha256:61d120621a051368d2dfe211601231bdef0e4f357fe525cd1c566c7bb796d995",
+        "exact_inspect/study/__init__.py": "sha256:00630050238e2c889f3e9ed9c953efd3a95859f714481f5c80d9e091c561c8d0",
+        "exact_inspect/study/administration.py": "sha256:560bb63ba95dc0f241d0da81ecb73d646dd7f900e140e9889a07c2d4ee2b48e8",
+        "exact_inspect/study/api.py": "sha256:5672dcf7bf27e2d64a8dc53fd6d2a19e401c4298039b0f7e01c2608d188661f4",
+        "exact_inspect/study/exports.py": "sha256:f0ff189f154a949e88c13b859e9a350561f3bd6dc0ed70d85b07838c780bfc27",
+        "exact_inspect/study/forms.py": "sha256:f16d8a9e92ded9bce21f29a5407c5dbf9dcf9377163c496780fd4b5bddb3dbe2",
+        "exact_inspect/study/models.py": "sha256:3eaa389e97b9d7d469106b6393533a00d0805455cb773eee01636a8991cfab03",
+        "exact_inspect/study/owl_ast.py": "sha256:1674d2c9793755ce51e665958bb739d31b8d97975d58bf6b0d28ad122f8e33f9",
+        "exact_inspect/study/resources.py": "sha256:8379457567eaff7dc3512ac63b3bf043fb88208f8406638949443834b88f7569",
+        "exact_inspect/study/review_models.py": "sha256:9605e2612f55685bb94873cee441e2f0cabbea74cf0a3ca3ca316301876383c3",
+        "exact_inspect/study/scoring.py": "sha256:3484f993e306af7adf3d9da44fabd1b5f593edd75ee5f730349728a5f99abd46",
+        "exact_inspect/study/store.py": "sha256:4cf27ca143d194cb05ce9fcda9fe8ee413a03bd60612c24afd8ab65c3a1fa561",
+        "exact_inspect/study/telemetry.py": "sha256:b23fa261f76e68df2594fe536455f6239098c2a156bc0cdde4dcac5acb21b4ba",
+        "exact_inspect/study/v2_models.py": "sha256:967c84c53b593d37ae505c824bea639126f10877d9cd3a4928791b7f00b0db77",
+        "exact_inspect/study/workspace.py": "sha256:915336410be7ee730aee64b107a5ba2e2f21b85675766fa6dc20efcc135b7488"
+      }
+    },
+    "elapsed_seconds": 41.65925904898904,
+    "selection_input": "explicit_sidecar",
+    "equivalence_check": "All claims, cases, coverage, source/input hashes and conclusions exactly match the prior successful audit; imported runtime module bytes also match. Only execution provenance, timestamp, script hash, sidecar source mode and timing differ.",
+    "result": "passed; zero failures",
+    "source": "delivered immutable input with separately installed hash-bound public selection metadata",
+    "measurement_window": "After complete API journey and final696-file hash verification; no concurrent performance probe"
+  }
+}

@@ -43,6 +43,13 @@ publications continue accepting the historical secret-only request. S2 must expl
 recognize all new form/method versions before making this declaration. Do not merely add
 the string to a client that still renders old form semantics.
 
+Concrete delivered examples are in
+[the S2 response excerpts](explanation-product-review-backend-s1/s2-response-examples.json).
+They retain the actual public HTTP fields, full-response hash, status and extraction pointers;
+they are bounded subsets, not complete payloads for schema validation. The actual public forms
+and protocol dictionaries are captured from a successful negotiated session response with all
+participant state and capabilities omitted. Use the generated schemas for complete envelopes.
+
 ## Tutorial actions and safe rejection
 
 Keep the existing mutation envelope, revision check, idempotency key and acknowledged-state
@@ -311,3 +318,15 @@ valid/neighbour citations are conservatively unresolved as a whole record. Origi
 by policy remain `withheld`, a separate state. Serving historical indexes applies the same
 projection without rewriting their bytes. Keep the unresolved record visible in the list;
 do not treat it as zero selected evidence or create an original-fact graph edge from it.
+
+
+### Delivered-data boundaries for S2
+
+The interim bundle contains 140 unique typed entity profiles and 120 comparisons, all
+`grounded_description` with `typed_template_support`. It contains no approved provider prose
+and no `factual_fallback` result; those are supported runtime branches with separate tests.
+Both real inference preparations report failure. All 3,443 selected evidence records have
+graph projection `not_recorded`, including the 301 records with admitted focal original links.
+All 120 selected pair traces report the `prefilter` event and `exact_basis` as `not_recorded`.
+Do not derive route-event copy from saved protected flags or score 1, or graph support from
+original-fact resolution. The owner catalogue and final handoff record these coverage gaps.

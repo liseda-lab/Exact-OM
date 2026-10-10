@@ -1,0 +1,31 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "latest-runtime",
+  "source_junit_sha256": "sha256:a18f9df24fcf45c693dc79646ec92be842d60f73ecf198c0ac2369b4d1a0f2f9",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "1",
+      "tests": "41",
+      "time": "87.940",
+      "timestamp": "2026-10-10T15:25:11.906029+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": [
+    {
+      "test": {
+        "classname": "tests.explanation_study_v2_test",
+        "name": "test_v2_postgresql_backup_restore_preserves_training_and_draft",
+        "time": "6.341"
+      },
+      "kind": "skipped",
+      "detail": {
+        "type": "pytest.skip",
+        "message": "Dedicated PostgreSQL URL, PGBIN and PGDATA required for v2 backup/restore"
+      }
+    }
+  ]
+}

@@ -441,10 +441,17 @@
     "frontend_verification": "docs/verification/explanation-frontend-e2e.md",
     "frontend_corrective_handoff": "docs/verification/explanation-frontend-corrections.md",
     "frontend_v2_contract_examples": "docs/verification/explanation-frontend-v2-contract-examples.json",
-    "current_corrective_assignment": "specs/explanation-framework/17-integration-corrective-programme.md",
+    "current_corrective_assignment": "specs/explanation-framework/20-review-corrective-programme.md",
     "backend_integration_assignment": "specs/explanation-framework/18-backend-integration-corrections.md",
     "frontend_integration_assignment": "specs/explanation-framework/19-frontend-integration-corrections.md",
-    "integration_review": "specs/explanation-framework/evidence/integration-review-20261003.md"
+    "integration_review": "specs/explanation-framework/evidence/integration-review-20261003.md",
+    "backend_review_assignment": "specs/explanation-framework/22-review-backend-and-data.md",
+    "frontend_review_assignment": "specs/explanation-framework/21-review-frontend-corrections.md",
+    "backend_s1_handoff": "docs/verification/explanation-product-review-backend-s1.md",
+    "backend_s1_receipt": "docs/verification/explanation-product-review-backend-s1-receipt.json",
+    "backend_s1_contracts": "docs/verification/explanation-product-review-backend-s1-contracts.md",
+    "backend_s1_catalogue": "docs/verification/explanation-product-review-backend-s1/case-catalogue.md",
+    "backend_s1_local_runbook": "docs/explanation-review-environment.md"
   },
   "deferred": [
     "48-pair baseline/challenger model-selection exercise",
@@ -484,7 +491,7 @@
     "deployment": false,
     "followup_note": "Historical implementation receipt. Independent review at 2d9715b reopened R01-R04; see integration_followup_20261003. Earlier verified claims are not current joint closure."
   },
-  "current_acceptance_authority": "specs/explanation-framework/17-integration-corrective-programme.md",
+  "current_acceptance_authority": "specs/explanation-framework/20-review-corrective-programme.md",
   "integration_followup_20261003": {
     "status": "R14_R15_verified_R16_unresolved_R03_blocked_on_J10_manual_audit",
     "reviewed_commit": "2d9715b",
@@ -754,5 +761,199 @@
     },
     "frontend_implementation_followup_required": false,
     "release_gates_waived": false
+  },
+  "product_review_s1_20261010": {
+    "authority": "specs/explanation-framework/20-review-corrective-programme.md",
+    "base_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+    "runtime_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+    "status": "backend_contracts_verified_interim_real_bundle_S2_S3_pending",
+    "purpose": "development_review",
+    "synthetic": false,
+    "correctness_metrics": "disabled",
+    "requirements": {
+      "B01": {
+        "u_ids": [
+          "U01",
+          "U02",
+          "U03",
+          "U04"
+        ],
+        "status": "implemented_backend_verified",
+        "commits": [
+          "758082a",
+          "016976d",
+          "394af1a"
+        ],
+        "next_owner": "frontend_S2"
+      },
+      "B02": {
+        "u_ids": [
+          "U09",
+          "U12",
+          "U18"
+        ],
+        "status": "interim_real_bundle_coverage_and_admission_gaps",
+        "commits": [
+          "178b8f2",
+          "00b7a59",
+          "66f42ce",
+          "43e8fc2",
+          "4c9a8c9",
+          "394af1a"
+        ],
+        "next_owner": "backend_data_and_frontend_S2"
+      },
+      "B03": {
+        "u_ids": [
+          "U10",
+          "U11",
+          "U12"
+        ],
+        "status": "runtime_verified_real_inference_incomplete",
+        "commits": [
+          "365558c",
+          "00b7a59"
+        ],
+        "next_owner": "backend_data_and_frontend_S2"
+      },
+      "B04": {
+        "u_ids": [
+          "U06",
+          "U08"
+        ],
+        "status": "typed_path_verified_real_prose_unapproved",
+        "commits": [
+          "178b8f2",
+          "66f42ce"
+        ],
+        "next_owner": "backend_preparation_and_frontend_S2"
+      },
+      "B05": {
+        "u_ids": [
+          "U07",
+          "U15"
+        ],
+        "status": "implemented_backend_verified_recorded_coverage_limits",
+        "commits": [
+          "758082a",
+          "7c37436",
+          "43e8fc2",
+          "394af1a"
+        ],
+        "next_owner": "frontend_S2"
+      },
+      "B06": {
+        "u_ids": [
+          "U13",
+          "U14"
+        ],
+        "status": "implemented_backend_verified",
+        "commits": [
+          "016976d",
+          "a964a24",
+          "4c9a8c9"
+        ],
+        "next_owner": "frontend_S2"
+      },
+      "B07": {
+        "u_ids": [
+          "U17"
+        ],
+        "status": "portable_API_verified_rendered_browser_pending",
+        "commits": [
+          "7c36bf4",
+          "2682b33",
+          "66f42ce",
+          "b70f340",
+          "a06af6e",
+          "3a1ecb7"
+        ],
+        "next_owner": "frontend_S2_S3_and_local_browser_setup"
+      }
+    },
+    "conclusions": {
+      "runtime_implementation": "verified_with_recorded_limits",
+      "real_data_bundle": "interim_not_full_acceptance",
+      "joint_acceptance": "S2_and_S3_pending",
+      "research_launch": "not_ready"
+    },
+    "unresolved_findings": [
+      {
+        "id": "B07-performance",
+        "severity": "P2_acceptance",
+        "owner": "backend_local_performance",
+        "status": "measured_outliers_not_closed",
+        "remaining": "Cold start130.798s and first explanation-condition current-case (case13)25.413s/main pair metadata7.861s; record isolated profiling and satisfy agreed cold/first-use acceptance without bypassing integrity checks."
+      },
+      {
+        "id": "B07-rendered-browser",
+        "severity": "verification_limit",
+        "owner": "local_browser_setup_then_frontend_S2_S3",
+        "status": "blocked_by_untrusted_local_certificate",
+        "remaining": "Trust the exact local certificate using the documented owner workflow, then run rendered main and integrated S2 journeys. No browser pass or screenshot is claimed."
+      },
+      {
+        "id": "B07-intermittent-worker-git",
+        "severity": "P2_environment",
+        "owner": "backend_local_environment",
+        "status": "unresolved_not_reproduced_in_instrumented_probes",
+        "remaining": "Two worker startup identity failures observed; six exact-entrypoint Git probes passed in0.010-0.013s. Preserve identity checks and diagnose recurrence; no cause established."
+      },
+      {
+        "id": "B02-full-context",
+        "severity": "P1_acceptance",
+        "owner": "backend_data",
+        "status": "interim_derivative_root_only",
+        "remaining": "Original DOID parsing/import admission including ext.owl; full admitted closure."
+      },
+      {
+        "id": "B02-coverage",
+        "severity": "P2_acceptance",
+        "owner": "backend_data",
+        "status": "missing_in_selected_pool",
+        "remaining": "Sparse selected-feature and rejected/differing-final-decision examples; recorded exact-stage events/basis, admitted-original multi-channel/source-only graph coverage and recorded graph projection support; do not fabricate."
+      },
+      {
+        "id": "B03-real-inference",
+        "severity": "P1_acceptance",
+        "owner": "backend_data",
+        "status": "bounded_native_preparation_failed",
+        "remaining": "Complete native taxonomy on admitted real scope and three real contrasting inferred examples."
+      },
+      {
+        "id": "B04-real-prose",
+        "severity": "P1_acceptance",
+        "owner": "backend_preparation",
+        "status": "malformed_outputs_preserved_unapproved",
+        "remaining": "Authorized corrected batch, structurally valid output, independent semantic audit and a new immutable publication."
+      },
+      {
+        "id": "R16",
+        "severity": "unresolved_historical",
+        "owner": "joint_backend_frontend",
+        "status": "no_cause_or_fix_established",
+        "remaining": "Reproduce browser reload stall and distinguish protocol exception from cause; API disconnect success is not closure."
+      }
+    ],
+    "frontend_followup": [
+      "F05 description preparation/support states",
+      "F06 indexed entry points and hierarchy bases/failure states",
+      "F07 forms3/setup3/consultation3/methods3 negotiation",
+      "F02 guided stable position/action identity",
+      "F08 recorded comparison metadata and typed list/graph identity",
+      "F09 real-case light/dark readability",
+      "Aggregate-only participant About; never fetch owner catalogue in study",
+      "S0 P3 archived recovery presentation",
+      "S3 full compiled frontend HTTPS/PostgreSQL browser Q01-Q12"
+    ],
+    "historical_evidence_preserved": true,
+    "release_gates_waived": false,
+    "live_publication": false,
+    "recruitment": false,
+    "public_deployment": false,
+    "handoff": "docs/verification/explanation-product-review-backend-s1.md",
+    "receipt": "docs/verification/explanation-product-review-backend-s1-receipt.json",
+    "receipt_sha256": "sha256:58df009d602037613ebcc22fe2f6796366ebf9a534c9e674a0de0f3966238da2",
+    "deferred_scope_clarification": "Historical optional whole-ontology inference is now required by B03/Q06; real completion remains an open technical requirement."
   }
 }

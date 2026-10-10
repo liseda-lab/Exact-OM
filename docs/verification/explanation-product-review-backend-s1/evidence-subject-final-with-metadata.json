@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "evidence-subject-final-with-metadata",
+  "source_junit_sha256": "sha256:ba482fc3290f7c62bbc729916ebf478af244a5c2120645c5d7514f70e0e23b27",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "34",
+      "time": "48.154",
+      "timestamp": "2026-10-10T16:14:37.751781+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

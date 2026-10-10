@@ -1,0 +1,299 @@
+{
+  "schema": "exact-s1-evidence-index/1",
+  "scope": "Bounded verification receipts and historical orchestration; original private state and provider records are excluded.",
+  "evidence": [
+    {
+      "path": "about-isolation-after.json",
+      "bytes": 1185,
+      "sha256": "sha256:65c951ce44283d4c74b4295a71cd7b4b80e47b823166f80a132f2deec031d5f2"
+    },
+    {
+      "path": "about-isolation-before.json",
+      "bytes": 1194,
+      "sha256": "sha256:9c5951f6d2c6e1df8f182c791eb2fe84e116fb19cbf4012d9e154ac1dd05b22e"
+    },
+    {
+      "path": "about-isolation-final.json",
+      "bytes": 464,
+      "sha256": "sha256:3ec4b714fb9ad0ea5eb4582d24271826aa226581e5da0fd6b10b9131b510b83f"
+    },
+    {
+      "path": "about-isolation-postgresql-12ee9d864366-receipt.json",
+      "bytes": 6466,
+      "sha256": "sha256:ad036562963ec26dc2266d4fc88b2c471c6e54e9e89ef105b96282dcb89f380f",
+      "origin": "verification/about-isolation-postgresql-12ee9d864366/receipt.json"
+    },
+    {
+      "path": "api-journey-attempt-1.json",
+      "bytes": 1163588,
+      "sha256": "sha256:739819815b0c1ea2defbacb7f4042727d1405eed9cff06f15157bbbbf9b82bb6"
+    },
+    {
+      "path": "api-journey.json",
+      "bytes": 161425,
+      "sha256": "sha256:72a38b0695b777a6cced8b17322dd5d16cdafe97c15992b452ea56f676dd0989"
+    },
+    {
+      "path": "b07-closure-identity-final-receipt.json",
+      "bytes": 2445,
+      "sha256": "sha256:a57fd7d8022121f297102925b340dd61d867b7121f8b6ac5f7030c3e32cede51",
+      "origin": "verification/b07-closure-identity-final/receipt.json"
+    },
+    {
+      "path": "broad-regression-fixes-receipt.json",
+      "bytes": 2299,
+      "sha256": "sha256:e28b316f6c8361e0f01c6dc0544e392a73b48a47d73e7cc40acca8e938341f58",
+      "origin": "verification/broad-regression-fixes/receipt.json"
+    },
+    {
+      "path": "broad-sqlite-fde183d156b9-receipt.json",
+      "bytes": 43417,
+      "sha256": "sha256:3a5cbc648e93bcf653706f6bd0da81ea2b922a2ad625f27d1a2738d581e30524",
+      "origin": "verification/broad-sqlite-fde183d156b9/receipt.json"
+    },
+    {
+      "path": "browser-attempt.json",
+      "bytes": 880,
+      "sha256": "sha256:a08724bd5c8f879544ee3db75e5da645bd2a29293392f7892987d4327044086e"
+    },
+    {
+      "path": "cache-lineage.json",
+      "bytes": 458,
+      "sha256": "sha256:8aabf9b2b84063df87f5105c526037ea99535fb9c3db16e7cb8fe3c4588c1053"
+    },
+    {
+      "path": "case-catalogue.json",
+      "bytes": 277775,
+      "sha256": "sha256:acd0bb1c0b6d3841eade51dda5c5c9318f987123f257ea7df6a5e3304edf6a5e"
+    },
+    {
+      "path": "case-catalogue.md",
+      "bytes": 61767,
+      "sha256": "sha256:f56057d70de61249a9ff75256b3c77cbac1796fda62c11a5436fe80eaa4c1e4b"
+    },
+    {
+      "path": "claim-audit-execution-history.json",
+      "bytes": 7639,
+      "sha256": "sha256:bd5f2f546349dd612c67064257fada6ce895eaf75d4240e8e3c8729b4c32c4cc"
+    },
+    {
+      "path": "clone-inventory.json",
+      "bytes": 158727,
+      "sha256": "sha256:477b42b5ee578d85d60cdbc593634f6a8d8b5ba099d548320c7209d22a521e2f"
+    },
+    {
+      "path": "delivered-boundary-summary.json",
+      "bytes": 25220,
+      "sha256": "sha256:9304505fe462f072c8712fffeeb1098222e9cc4250e485b6011645343c382d9c"
+    },
+    {
+      "path": "doid-hierarchy-diagnostic.json",
+      "bytes": 29779,
+      "sha256": "sha256:e73ceaf6ad52ad14c50788b997371f1781fbc945dae04e7eb5cf837828a16fa7",
+      "origin": "diagnostics/doid-hierarchy-diagnostic.json"
+    },
+    {
+      "path": "evidence-subject-final-with-metadata.json",
+      "bytes": 481,
+      "sha256": "sha256:8db15f8e5a84df5e417d063b1469b06c96f257ef2e0b702ee0be967315102ab5"
+    },
+    {
+      "path": "evidence-subject-final.json",
+      "bytes": 467,
+      "sha256": "sha256:26e4f450b54db4ab6190f81f92fe0d46e671126a208d33055537577ee8915b05"
+    },
+    {
+      "path": "fail-fast-tests.json",
+      "bytes": 1373,
+      "sha256": "sha256:a0c2e7aab556902e70fac5a1833493f59a6afcfe9a2f2f53b64cfd377cc84064"
+    },
+    {
+      "path": "final-postgresql-c46972ac4aee-receipt.json",
+      "bytes": 10069,
+      "sha256": "sha256:9538dce34dd6a7f449e6d98dd5da864013ee1ad4eaf8924eae29dcf240a14a8d",
+      "origin": "verification/final-postgresql-c46972ac4aee/receipt.json"
+    },
+    {
+      "path": "final-public-input-audit.json",
+      "bytes": 1915,
+      "sha256": "sha256:f6293d1cc446484bff5b2dab4c7dcf92a7b1c023b9d46e0ea1f1019dd441592d"
+    },
+    {
+      "path": "final-service-status.json",
+      "bytes": 1442,
+      "sha256": "sha256:e006eee4e4953593b79a02b261bf95950ae89b2e66a50f6ddb025c05d2e24faa"
+    },
+    {
+      "path": "final-tools.json",
+      "bytes": 456,
+      "sha256": "sha256:3c9ee0bceb30847ab8981e47bc00ea0285c84db2cdbdff8723fcab8377dc83ee"
+    },
+    {
+      "path": "frontend-build-receipt.json",
+      "bytes": 41869,
+      "sha256": "sha256:65f0095453d2967def5e70c5a4d5a590ddfd35d480b48d6e2491aae6972a8e70",
+      "origin": "frontend-build-receipt.json"
+    },
+    {
+      "path": "hierarchy-probe-tests.json",
+      "bytes": 1088,
+      "sha256": "sha256:654a694eb2dabd8e1b95899120b60fb81a4af4e08f01999edadb0a3ca296cfd9"
+    },
+    {
+      "path": "initial-startup-observations.json",
+      "bytes": 2682,
+      "sha256": "sha256:ca66ec81e067b794489888a9d81813c6eb094853ec8403816141b166f6771acb"
+    },
+    {
+      "path": "latest-runtime.json",
+      "bytes": 838,
+      "sha256": "sha256:430cfe57feb632e2b4d134972d82f58ebcec9a99a75d666fbee02a94f0f3c87b"
+    },
+    {
+      "path": "navigation-install-receipt.json",
+      "bytes": 2132,
+      "sha256": "sha256:2e3deda65c5c6be663225a5baf2132d95e2661fad4af76c13fcc028d63969be5",
+      "origin": "diagnostics/navigation-install-receipt.json"
+    },
+    {
+      "path": "ncit-hierarchy-diagnostic.json",
+      "bytes": 6893,
+      "sha256": "sha256:f2181e9b36a8785f9bbec543325bbe33c56f05eedf5144dce0e9229dae21d955",
+      "origin": "diagnostics/ncit-hierarchy-diagnostic.json"
+    },
+    {
+      "path": "pair-metadata-postgresql-57ff233c8140-receipt.json",
+      "bytes": 6591,
+      "sha256": "sha256:d927044ece7550b1852120ddf461fb4b7b810742ddd3dfb1e4311550ab509e64",
+      "origin": "verification/pair-metadata-postgresql-57ff233c8140/receipt.json"
+    },
+    {
+      "path": "policy5-export.json",
+      "bytes": 414,
+      "sha256": "sha256:27629ece78024e3fd5500922a93f2b86382438983f76f38d7f8c19b46c9d167a"
+    },
+    {
+      "path": "policy5-input-preparation.json",
+      "bytes": 2347,
+      "sha256": "sha256:ea5b71cdb13f59bc0011dae5f6c3800f6d9b91b3c28977036224e945700b396c"
+    },
+    {
+      "path": "policy5-unpublished-cleanup.json",
+      "bytes": 2399,
+      "sha256": "sha256:743aa82c9b94c69d93b92844f7c47b085a61df462704c4919430d9811289caef"
+    },
+    {
+      "path": "pool-and-verifier.initial.json",
+      "bytes": 893,
+      "sha256": "sha256:657386238f05db23860d54150dd6b24f48479d855c778efab71f4a13e2d29f5c"
+    },
+    {
+      "path": "pool-and-verifier.json",
+      "bytes": 462,
+      "sha256": "sha256:1eeee0c0840f975fd51047bb536589bdb8d2cf2a34c420b240bbc9967a2671dd"
+    },
+    {
+      "path": "preparation-tests.json",
+      "bytes": 462,
+      "sha256": "sha256:ec3acd6acadf72b1cac501177c5857d20f756fd4cd25da8a7b64097cb2ad7bea"
+    },
+    {
+      "path": "provider-attempt-2-stopped.json",
+      "bytes": 886,
+      "sha256": "sha256:5f79edd78f90f092900b193338da18edc56c794e00b7dec7ee5faabeb2246974",
+      "origin": "diagnostics/provider-attempt-2-stopped.json"
+    },
+    {
+      "path": "publication-audit-sidecar-installation.json",
+      "bytes": 677,
+      "sha256": "sha256:a7b978594bec9388c6fe9a4257928cfbb4530516b669c68aa604a9042427c2b9"
+    },
+    {
+      "path": "publication-audit-sidecar-tests.json",
+      "bytes": 1456,
+      "sha256": "sha256:d8189eba5f8a31c62c1b706561353b6fc7869ace46a8f8bb5db3805455623d51"
+    },
+    {
+      "path": "published-claim-audit.json",
+      "bytes": 696868,
+      "sha256": "sha256:81d5e8fb75394c957d90631707570cfa5553a20ccf0cb25cbd08de08091495a1"
+    },
+    {
+      "path": "raw-selected-stage-audit.json",
+      "bytes": 11658,
+      "sha256": "sha256:872a29431a4e422c62fe32c3b076510d5a59bc2fedc218ad271d3ab77e2fe138"
+    },
+    {
+      "path": "relocate_verify.py",
+      "bytes": 19053,
+      "sha256": "sha256:e3d30256d0e827073ae710f8222faaeeaa4248eeefe54bc5370f0a94d3122357"
+    },
+    {
+      "path": "relocation-attempt-1.json",
+      "bytes": 170880,
+      "sha256": "sha256:55986036f7cdf6fd19dba4c631f724ac1606de9f9267fbe66b68ddbf201cbe20"
+    },
+    {
+      "path": "relocation.json",
+      "bytes": 174385,
+      "sha256": "sha256:d7a85abc0891f232d8667145cc8d8905ccf7b97b70c79a91ef2a26f1472c47ca"
+    },
+    {
+      "path": "resume_workflow.py",
+      "bytes": 8809,
+      "sha256": "sha256:b52f7f74083e1eba0db68c5e960e8f55305ab167fe5bd450b3e24e879d779458"
+    },
+    {
+      "path": "root-final-runtime.json",
+      "bytes": 463,
+      "sha256": "sha256:72bf52902935746af7f00c0a254889b27d71b9ea67c12059af8743d8c37e370e"
+    },
+    {
+      "path": "s2-response-examples.json",
+      "bytes": 58060,
+      "sha256": "sha256:97f0f29e0c27ba294c1d1bd9b3635f0c2a26a1f4c61a3058cefc2ee77081ee5d"
+    },
+    {
+      "path": "selected-subject-preflight.json",
+      "bytes": 145283,
+      "sha256": "sha256:84e459282a82daf66d2013cd9418733068a3ed32e559e93f585ac8134e52f155"
+    },
+    {
+      "path": "selected-trace-audit.json",
+      "bytes": 272,
+      "sha256": "sha256:ef370b45581f2a9c1dbaf79e63b6a99d215189c18bbf378ea50a01f1cf30b60e"
+    },
+    {
+      "path": "source-review.ofn.verified-reuse.json",
+      "bytes": 1352,
+      "sha256": "sha256:0022c468954505da3093a0b27e5038e85a5dc09b5457507c64b9c28b37c401ca",
+      "origin": "diagnostics/source-review.ofn.verified-reuse.json"
+    },
+    {
+      "path": "specification-verification.json",
+      "bytes": 765,
+      "sha256": "sha256:f0f3e50a4eee6bf4bcf36eda7f9ce2f40bb44411d1d0080a7aa02aaeaae2c9e8"
+    },
+    {
+      "path": "target-review.ofn.verified-reuse.json",
+      "bytes": 1230,
+      "sha256": "sha256:e9b323a423d9f5939a353251893605ac4edaa47b8b5406d2515acfcdb9a6992c",
+      "origin": "diagnostics/target-review.ofn.verified-reuse.json"
+    },
+    {
+      "path": "typed-publication-final.json",
+      "bytes": 7237,
+      "sha256": "sha256:2ea950d83a073ba0cbd32c29f8a95b4e898d811e00bdd7e49580e446bfb56ad8"
+    },
+    {
+      "path": "typed-publication-initial-failure.json",
+      "bytes": 1827,
+      "sha256": "sha256:41fdb49eb0c30dd90d87d383e5a8ce88e7e98a7c2dea703a292e1cf27c4f888e"
+    },
+    {
+      "path": "workspace-metadata.json",
+      "bytes": 462,
+      "sha256": "sha256:f0329f7f036c2bd654239bea4547e4789f89f4a4bd926dbcf41711ec8c7d57f4"
+    }
+  ]
+}

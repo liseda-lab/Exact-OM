@@ -1,0 +1,18 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "root-final-runtime",
+  "source_junit_sha256": "sha256:ab185b12d630217e4005d174be3f9cd0b170c18cdf265ac237cea6352a509fdb",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "0",
+      "skipped": "0",
+      "tests": "44",
+      "time": "79.453",
+      "timestamp": "2026-10-10T15:00:22.950741+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": []
+}

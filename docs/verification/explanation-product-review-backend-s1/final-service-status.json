@@ -1,0 +1,42 @@
+{
+  "backend": {
+    "file_count": 53,
+    "git_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "9cbc51e516e0c6911d0f5da1b6baae86bdc88746f9e76ee9d15c47f30c195518"
+  },
+  "certificate_not_after": "2026-11-09T15:47:10Z",
+  "certificate_pem_sha256": "e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+  "certificate_x509_fingerprint": "SHA256 Fingerprint=A4:42:89:EC:F4:98:B7:1D:AD:7B:43:AE:E1:B2:24:2D:9D:E4:8E:02:3E:77:74:48:AE:7B:12:85:95:40:6D:86",
+  "closes_at": "2026-11-09T15:47:10.522210+00:00",
+  "postgres_version": "postgres (PostgreSQL) 16.2",
+  "purpose": "development_review",
+  "runtime_versions": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "python": "3.12.3",
+    "uvicorn": "0.35.0"
+  },
+  "schema": "exact-final-review-service-status/1",
+  "services": {
+    "exploration": {
+      "ready": true,
+      "state": "owned"
+    },
+    "postgres": {
+      "ready": true,
+      "state": "owned"
+    },
+    "study": {
+      "ready": true,
+      "state": "owned"
+    }
+  },
+  "serving_publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+  "source_publication_sha256": "edf000e8498b000493f0f7d9812188e03b6b0241fd84e1ca7508d7afb41a040a",
+  "source_restored": true,
+  "state": "running",
+  "study_revision": "review-20261010T154710-f1025c8952"
+}

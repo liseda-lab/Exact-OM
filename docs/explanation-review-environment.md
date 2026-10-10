@@ -12,6 +12,16 @@ frontend in durable directories too. Temporary directories are rejected as their
 Nothing below reinstalls dependencies, rebuilds ontology assets, contacts an LLM, or deletes a
 previous PostgreSQL cluster.
 
+The delivered macOS environment uses an already installed Python 3.12.3 runtime at
+`~/Library/Caches/exact-om-dev/pyenv/bin/python`, with FastAPI 0.116.2, Starlette 0.48.0,
+Uvicorn 0.35.0, h11 0.16.0, Pydantic 2.13.4, pydantic-settings 2.14.2,
+HTTPX 0.28.1, psycopg 3.3.6 and pgserver 0.1.4. The pgserver package supplies the
+PostgreSQL executables at the path below. OpenSSL must be available for local certificate
+operations. The final delivery receipt records the actual executable and dependency identities.
+This runbook operates that installed environment; it is not a clean-machine installation
+recipe. Copying the data alone does not install the Python/PostgreSQL/native preparation stack.
+Serving the prepared data does not require Torch, a provider credential or a running reasoner.
+
 Prepare once from the checkout containing the corrected backend and the compiled frontend:
 
 ```sh

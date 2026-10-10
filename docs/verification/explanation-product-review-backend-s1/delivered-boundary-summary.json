@@ -1,0 +1,823 @@
+{
+  "additional_owner_audit_sidecar_scope": "Separate selection provenance under verification/publication-audit-inputs, outside the unchanged696 runtime files; independently audited.",
+  "api": {
+    "check_counts": {
+      "actual_elapsed_timing": 27,
+      "baseline_pair_metadata_denied": 60,
+      "baseline_workspace_denied": 12,
+      "case_usable_observation": 24,
+      "current_case": 24,
+      "current_explanation_resource": 12,
+      "default_export": 1,
+      "entity_context_full": 12,
+      "entity_facts_page": 12,
+      "entry_points_page1": 24,
+      "entry_points_page2": 24,
+      "foreign_candidate_metadata_denied": 12,
+      "frozen_tutorial_resource": 1,
+      "immutable_csv_export": 2,
+      "immutable_json_export": 2,
+      "legacy_client_refused": 1,
+      "main_bounded_ancestor_graph": 2,
+      "main_exact_iri_search": 2,
+      "main_hierarchy_page": 8,
+      "main_pair_metadata": 60,
+      "mutation:cases": 72,
+      "mutation:complete": 1,
+      "mutation:consent": 1,
+      "mutation:questionnaires": 2,
+      "mutation:setup": 1,
+      "mutation:tutorial": 17,
+      "negotiated_session": 1,
+      "original_axiom": 12,
+      "original_fact": 12,
+      "post_interrupt_full_body": 3,
+      "post_interrupt_state": 3,
+      "prepared_explanation_full": 24,
+      "prepared_explanations_page": 12,
+      "public_exploration_catalogue": 1,
+      "repeat_csv_export": 2,
+      "restricted_export": 1,
+      "served_participation_page": 1,
+      "study_exact_iri_search": 2,
+      "study_hierarchy_page": 8,
+      "study_pair_metadata": 60,
+      "study_ready": 1,
+      "study_selected_evidence": 60,
+      "test_invitation": 1,
+      "workspace_capabilities": 12
+    },
+    "client_contract": "study-review/1",
+    "complete_read_surfaces": {
+      "ontologies": [
+        {
+          "ancestor_graph_edges": 12,
+          "ancestor_graph_nodes": 11,
+          "hierarchy": {
+            "children": {
+              "continuation_edges": 0,
+              "continuation_exercised": false,
+              "first_page_edges": 2
+            },
+            "parents": {
+              "continuation_edges": 0,
+              "continuation_exercised": false,
+              "first_page_edges": 1
+            }
+          },
+          "hierarchy_empty_probes": 0,
+          "hierarchy_probes_attempted": 1,
+          "ontology_sha256": "d5c93facf2061cfdaeeeb0564b1fad762bfe8634f1d2b77b224a48d66a861687"
+        },
+        {
+          "ancestor_graph_edges": 11,
+          "ancestor_graph_nodes": 11,
+          "hierarchy": {
+            "children": {
+              "continuation_edges": 0,
+              "continuation_exercised": false,
+              "first_page_edges": 0
+            },
+            "parents": {
+              "continuation_edges": 0,
+              "continuation_exercised": false,
+              "first_page_edges": 1
+            }
+          },
+          "hierarchy_empty_probes": 2,
+          "hierarchy_probes_attempted": 3,
+          "ontology_sha256": "fa7f4b3d1cf82db1f1ed963db0b6616ee2b960ae1ca47b119d1bcf22e325f12c"
+        }
+      ],
+      "prior_inventory_elapsed_seconds": 681.78,
+      "prior_inventory_pages": {
+        "exploration": 2285,
+        "study": 2285
+      },
+      "prior_inventory_receipt_sha256": "739819815b0c1ea2defbacb7f4042727d1405eed9cff06f15157bbbbf9b82bb6",
+      "prior_inventory_verifier_sha256": "d5e923b82b68dfc0feec9a03519854ecba6ce7cc43096e4fedb2ada24d4c11f9",
+      "same_publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+      "scope": "This run repeats real search, nonempty hierarchy/continuation parity and bounded ancestor graph. Full ordered inventories passed in the separately preserved prior attempt; they were not repeated."
+    },
+    "completed_cases": 24,
+    "conditions": {
+      "explanation": 12,
+      "ontology_baseline": 12
+    },
+    "elapsed_seconds": 178.173,
+    "exports": [
+      {
+        "csv_sha256": "3f16e4974393fffaa0cab2c035647ba71f3347d34f0442a4cefb592f1471db10",
+        "json_sha256": "4a3e6ae76d487f6f4a7356f951c4152ef447d8849f76a68d039770d0a30f3568",
+        "named_methods": false,
+        "tables": [
+          "cases.csv",
+          "consultation_drafts.csv",
+          "data-dictionary.json",
+          "events.csv",
+          "manifest.json",
+          "method_responses.csv",
+          "questionnaires.csv",
+          "sessions.csv",
+          "summary.csv",
+          "timing_segments.csv",
+          "tutorial_attempts.csv",
+          "tutorial_outcomes.csv"
+        ]
+      },
+      {
+        "csv_sha256": "d3e8b9659bc5b2eed82aa13228d5588bfc127390e973d7440a0cb49e512502d4",
+        "json_sha256": "b106758623141da2dd6f2b56bd6c9bb9688bda06596982f9c0105697fab85944",
+        "named_methods": true,
+        "tables": [
+          "cases.csv",
+          "consultation_drafts.csv",
+          "data-dictionary.json",
+          "events.csv",
+          "manifest.json",
+          "method_responses.csv",
+          "questionnaires.csv",
+          "sessions.csv",
+          "summary.csv",
+          "timing_segments.csv",
+          "tutorial_attempts.csv",
+          "tutorial_outcomes.csv"
+        ]
+      }
+    ],
+    "interruptions": [
+      {
+        "declared_bytes": 38106,
+        "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+        "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+        "received_first_chunk_bytes": 128,
+        "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+        "seconds": 0.192
+      },
+      {
+        "declared_bytes": 38106,
+        "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+        "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+        "received_first_chunk_bytes": 128,
+        "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+        "seconds": 0.193
+      },
+      {
+        "declared_bytes": 38106,
+        "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+        "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+        "received_first_chunk_bytes": 128,
+        "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+        "seconds": 0.203
+      }
+    ],
+    "participant_states_with_catalogue_withheld": 98,
+    "scope": "real_bundle",
+    "service_log_observation": {
+      "counts": {
+        "asgi_exceptions": 0,
+        "content_length_protocol_errors": 0,
+        "h11_local_protocol_errors": 0,
+        "tracebacks": 0
+      },
+      "new_bytes": 0,
+      "scope": "Owned study process log during this API journey; no historical-causation claim",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "status": "passed"
+  },
+  "backend": {
+    "file_count": 53,
+    "git_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "9cbc51e516e0c6911d0f5da1b6baae86bdc88746f9e76ee9d15c47f30c195518"
+  },
+  "boundary": "Actual certificate-verified HTTPS API journey; not a browser or human-activity test",
+  "certificate_not_after": "2026-11-09T15:47:10Z",
+  "certificate_sha256": "e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+  "clone": {
+    "files": 696,
+    "mode": "Darwin clonefile(2), flags=0; no copy fallback; different inode and every source/destination hash verified"
+  },
+  "exhaustive_inventory_prior_attempt": {
+    "attempt_elapsed_seconds": 681.78,
+    "attempt_status": "failed",
+    "inventory_component_status": "passed_before_later_hierarchy_probe_failure",
+    "later_failure": "nonempty_class_hierarchy_exercised",
+    "ontology_declared_entity_counts": [
+      16395,
+      212055
+    ],
+    "provenance": "Known recorded verifier completes each full ordered inventory/count/uniqueness comparison before the two successful exact-IRI searches. The later nonempty-class probe failure is preserved.",
+    "receipt_sha256": "739819815b0c1ea2defbacb7f4042727d1405eed9cff06f15157bbbbf9b82bb6",
+    "request_latencies": {
+      "main_full_index_page": {
+        "max_seconds": 0.567,
+        "median_seconds": 0.092,
+        "p95_seconds": 0.121,
+        "requests": 2285,
+        "total_seconds": 217.337
+      },
+      "study_full_index_page": {
+        "max_seconds": 0.312,
+        "median_seconds": 0.134,
+        "p95_seconds": 0.158,
+        "requests": 2285,
+        "total_seconds": 303.764
+      }
+    },
+    "typed_entities_per_api": 228450,
+    "verifier_sha256": "d5e923b82b68dfc0feec9a03519854ecba6ce7cc43096e4fedb2ada24d4c11f9"
+  },
+  "git_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+  "limitations": [
+    "Actual HTTPS API verification, not rendered browser or human-activity acceptance.",
+    "Browser navigation was refused by local certificate trust before rendering. No bypass or global TLS-security changes were used.",
+    "Three early client body closes do not prove server-side cancellation or historical browser-stall causation.",
+    "Cold means first launch against newly initialized PG; OS file caches were not cleared.",
+    "CPU/RSS sample only owned main PIDs, not all descendants.",
+    "Bounded read-only main examples and attempted browser navigation may overlap the API phase; it is not an isolated latency benchmark.",
+    "Earlier Git-identity startup failures were not reproduced by six subsequent exact-entrypoint probes; cause remains unproven."
+  ],
+  "phases": {
+    "api_journey": {
+      "processes": {
+        "exploration": {
+          "first_cpu_seconds": 31.52,
+          "last_cpu_seconds": 39.75,
+          "observed_cpu_delta_seconds": 8.23,
+          "peak_cpu_percent": 93.7,
+          "peak_rss_kib": 84280,
+          "samples": 310
+        },
+        "postgres": {
+          "first_cpu_seconds": 0.03,
+          "last_cpu_seconds": 0.39,
+          "observed_cpu_delta_seconds": 0.36,
+          "peak_cpu_percent": 2.8,
+          "peak_rss_kib": 13700,
+          "samples": 310
+        },
+        "study": {
+          "first_cpu_seconds": 1.19,
+          "last_cpu_seconds": 43.6,
+          "observed_cpu_delta_seconds": 42.41,
+          "peak_cpu_percent": 100.0,
+          "peak_rss_kib": 124544,
+          "samples": 310
+        }
+      },
+      "seconds": 178.194
+    },
+    "clone": {
+      "seconds": 63.537
+    },
+    "cold_start": {
+      "frontend_probes": {
+        "exploration": {
+          "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+          "bytes": 10563,
+          "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0048,
+            0.002,
+            0.0018
+          ]
+        },
+        "study": {
+          "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+          "bytes": 9102,
+          "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0041,
+            0.0016,
+            0.0016
+          ]
+        }
+      },
+      "processes": {
+        "exploration": {
+          "first_cpu_seconds": 0.24,
+          "last_cpu_seconds": 30.2,
+          "observed_cpu_delta_seconds": 29.96,
+          "peak_cpu_percent": 100.0,
+          "peak_rss_kib": 75120,
+          "samples": 56
+        },
+        "postgres": {
+          "first_cpu_seconds": 0.03,
+          "last_cpu_seconds": 0.03,
+          "observed_cpu_delta_seconds": 0.0,
+          "peak_cpu_percent": 6.0,
+          "peak_rss_kib": 13572,
+          "samples": 138
+        },
+        "study": {
+          "first_cpu_seconds": 0.07,
+          "last_cpu_seconds": 43.4,
+          "observed_cpu_delta_seconds": 43.33,
+          "peak_cpu_percent": 100.0,
+          "peak_rss_kib": 135148,
+          "samples": 137
+        }
+      },
+      "seconds": 130.856,
+      "services": {
+        "exploration": {
+          "port": 19185,
+          "ready": true,
+          "state": "owned"
+        },
+        "postgres": {
+          "port": 19183,
+          "ready": true,
+          "state": "owned"
+        },
+        "study": {
+          "port": 19184,
+          "ready": true,
+          "state": "owned"
+        }
+      },
+      "start_seconds": 130.798
+    },
+    "frozen_copy_unchanged": {
+      "files": 696,
+      "seconds": 33.17,
+      "unchanged": true
+    },
+    "prepare": {
+      "seconds": 57.594
+    },
+    "resume_start": {
+      "frontend_probes": {
+        "exploration": {
+          "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+          "bytes": 10563,
+          "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0073,
+            0.0027,
+            0.0024
+          ]
+        },
+        "study": {
+          "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+          "bytes": 9102,
+          "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0055,
+            0.0025,
+            0.0026
+          ]
+        }
+      },
+      "processes": {
+        "exploration": {
+          "first_cpu_seconds": 0.2,
+          "last_cpu_seconds": 31.51,
+          "observed_cpu_delta_seconds": 31.31,
+          "peak_cpu_percent": 100.0,
+          "peak_rss_kib": 76232,
+          "samples": 59
+        },
+        "postgres": {
+          "first_cpu_seconds": 0.02,
+          "last_cpu_seconds": 0.03,
+          "observed_cpu_delta_seconds": 0.01,
+          "peak_cpu_percent": 2.8,
+          "peak_rss_kib": 13624,
+          "samples": 62
+        },
+        "study": {
+          "first_cpu_seconds": 0.06,
+          "last_cpu_seconds": 1.16,
+          "observed_cpu_delta_seconds": 1.1,
+          "peak_cpu_percent": 93.9,
+          "peak_rss_kib": 69512,
+          "samples": 62
+        }
+      },
+      "seconds": 99.059,
+      "services": {
+        "exploration": {
+          "port": 19185,
+          "ready": true,
+          "state": "owned"
+        },
+        "postgres": {
+          "port": 19183,
+          "ready": true,
+          "state": "owned"
+        },
+        "study": {
+          "port": 19184,
+          "ready": true,
+          "state": "owned"
+        }
+      },
+      "start_seconds": 98.977
+    },
+    "warm_start": {
+      "frontend_probes": {
+        "exploration": {
+          "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+          "bytes": 10563,
+          "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0053,
+            0.0024,
+            0.0025
+          ]
+        },
+        "study": {
+          "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+          "bytes": 9102,
+          "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+          "exact_configured_csp": true,
+          "seconds": [
+            0.0053,
+            0.0021,
+            0.002
+          ]
+        }
+      },
+      "processes": {
+        "exploration": {
+          "first_cpu_seconds": 0.52,
+          "last_cpu_seconds": 32.54,
+          "observed_cpu_delta_seconds": 32.02,
+          "peak_cpu_percent": 100.0,
+          "peak_rss_kib": 73652,
+          "samples": 59
+        },
+        "postgres": {
+          "first_cpu_seconds": 0.03,
+          "last_cpu_seconds": 0.03,
+          "observed_cpu_delta_seconds": 0.0,
+          "peak_cpu_percent": 2.2,
+          "peak_rss_kib": 13592,
+          "samples": 63
+        },
+        "study": {
+          "first_cpu_seconds": 0.05,
+          "last_cpu_seconds": 1.31,
+          "observed_cpu_delta_seconds": 1.26,
+          "peak_cpu_percent": 88.0,
+          "peak_rss_kib": 68924,
+          "samples": 63
+        }
+      },
+      "seconds": 93.521,
+      "services": {
+        "exploration": {
+          "port": 19185,
+          "ready": true,
+          "state": "owned"
+        },
+        "postgres": {
+          "port": 19183,
+          "ready": true,
+          "state": "owned"
+        },
+        "study": {
+          "port": 19184,
+          "ready": true,
+          "state": "owned"
+        }
+      },
+      "start_seconds": 93.498
+    }
+  },
+  "receipts_sha256": {
+    "api-journey.json": "72a38b0695b777a6cced8b17322dd5d16cdafe97c15992b452ea56f676dd0989",
+    "relocation.json": "d7a85abc0891f232d8667145cc8d8905ccf7b97b70c79a91ef2a26f1472c47ca"
+  },
+  "request_latencies": {
+    "actual_elapsed_timing": {
+      "max_seconds": 0.068,
+      "median_seconds": 0.042,
+      "p95_seconds": 0.054,
+      "requests": 27,
+      "total_seconds": 1.117
+    },
+    "baseline_pair_metadata_denied": {
+      "max_seconds": 0.034,
+      "median_seconds": 0.022,
+      "p95_seconds": 0.028,
+      "requests": 60,
+      "total_seconds": 1.381
+    },
+    "baseline_workspace_denied": {
+      "max_seconds": 0.028,
+      "median_seconds": 0.022,
+      "p95_seconds": 0.028,
+      "requests": 12,
+      "total_seconds": 0.27
+    },
+    "case_usable_observation": {
+      "max_seconds": 0.081,
+      "median_seconds": 0.0425,
+      "p95_seconds": 0.063,
+      "requests": 24,
+      "total_seconds": 1.003
+    },
+    "current_case": {
+      "max_seconds": 25.413,
+      "median_seconds": 0.0315,
+      "p95_seconds": 0.046,
+      "requests": 24,
+      "total_seconds": 26.118
+    },
+    "current_explanation_resource": {
+      "max_seconds": 0.036,
+      "median_seconds": 0.0275,
+      "p95_seconds": 0.036,
+      "requests": 12,
+      "total_seconds": 0.336
+    },
+    "default_export": {
+      "max_seconds": 0.059,
+      "median_seconds": 0.059,
+      "p95_seconds": 0.059,
+      "requests": 1,
+      "total_seconds": 0.059
+    },
+    "entity_context_full": {
+      "max_seconds": 0.092,
+      "median_seconds": 0.07,
+      "p95_seconds": 0.092,
+      "requests": 12,
+      "total_seconds": 0.895
+    },
+    "entity_facts_page": {
+      "max_seconds": 0.05,
+      "median_seconds": 0.036,
+      "p95_seconds": 0.05,
+      "requests": 12,
+      "total_seconds": 0.459
+    },
+    "entry_points_page1": {
+      "max_seconds": 0.052,
+      "median_seconds": 0.038,
+      "p95_seconds": 0.05,
+      "requests": 24,
+      "total_seconds": 0.967
+    },
+    "entry_points_page2": {
+      "max_seconds": 0.058,
+      "median_seconds": 0.0385,
+      "p95_seconds": 0.052,
+      "requests": 24,
+      "total_seconds": 0.979
+    },
+    "foreign_candidate_metadata_denied": {
+      "max_seconds": 0.044,
+      "median_seconds": 0.0345,
+      "p95_seconds": 0.044,
+      "requests": 12,
+      "total_seconds": 0.445
+    },
+    "frozen_tutorial_resource": {
+      "max_seconds": 0.036,
+      "median_seconds": 0.036,
+      "p95_seconds": 0.036,
+      "requests": 1,
+      "total_seconds": 0.036
+    },
+    "immutable_csv_export": {
+      "max_seconds": 0.031,
+      "median_seconds": 0.0305,
+      "p95_seconds": 0.031,
+      "requests": 2,
+      "total_seconds": 0.061
+    },
+    "immutable_json_export": {
+      "max_seconds": 0.037,
+      "median_seconds": 0.0355,
+      "p95_seconds": 0.037,
+      "requests": 2,
+      "total_seconds": 0.071
+    },
+    "legacy_client_refused": {
+      "max_seconds": 0.02,
+      "median_seconds": 0.02,
+      "p95_seconds": 0.02,
+      "requests": 1,
+      "total_seconds": 0.02
+    },
+    "main_bounded_ancestor_graph": {
+      "max_seconds": 0.017,
+      "median_seconds": 0.0145,
+      "p95_seconds": 0.017,
+      "requests": 2,
+      "total_seconds": 0.029
+    },
+    "main_exact_iri_search": {
+      "max_seconds": 0.101,
+      "median_seconds": 0.056,
+      "p95_seconds": 0.101,
+      "requests": 2,
+      "total_seconds": 0.112
+    },
+    "main_hierarchy_page": {
+      "max_seconds": 0.013,
+      "median_seconds": 0.0045,
+      "p95_seconds": 0.013,
+      "requests": 8,
+      "total_seconds": 0.044
+    },
+    "main_pair_metadata": {
+      "max_seconds": 7.861,
+      "median_seconds": 0.015,
+      "p95_seconds": 0.026,
+      "requests": 60,
+      "total_seconds": 8.755
+    },
+    "mutation:cases": {
+      "max_seconds": 0.062,
+      "median_seconds": 0.03,
+      "p95_seconds": 0.043,
+      "requests": 72,
+      "total_seconds": 2.162
+    },
+    "mutation:complete": {
+      "max_seconds": 0.023,
+      "median_seconds": 0.023,
+      "p95_seconds": 0.023,
+      "requests": 1,
+      "total_seconds": 0.023
+    },
+    "mutation:consent": {
+      "max_seconds": 0.04,
+      "median_seconds": 0.04,
+      "p95_seconds": 0.04,
+      "requests": 1,
+      "total_seconds": 0.04
+    },
+    "mutation:questionnaires": {
+      "max_seconds": 0.031,
+      "median_seconds": 0.0265,
+      "p95_seconds": 0.031,
+      "requests": 2,
+      "total_seconds": 0.053
+    },
+    "mutation:setup": {
+      "max_seconds": 1.796,
+      "median_seconds": 1.796,
+      "p95_seconds": 1.796,
+      "requests": 1,
+      "total_seconds": 1.796
+    },
+    "mutation:tutorial": {
+      "max_seconds": 0.106,
+      "median_seconds": 0.029,
+      "p95_seconds": 0.106,
+      "requests": 17,
+      "total_seconds": 0.681
+    },
+    "negotiated_session": {
+      "max_seconds": 0.024,
+      "median_seconds": 0.024,
+      "p95_seconds": 0.024,
+      "requests": 1,
+      "total_seconds": 0.024
+    },
+    "original_axiom": {
+      "max_seconds": 0.05,
+      "median_seconds": 0.0375,
+      "p95_seconds": 0.05,
+      "requests": 12,
+      "total_seconds": 0.469
+    },
+    "original_fact": {
+      "max_seconds": 0.054,
+      "median_seconds": 0.036,
+      "p95_seconds": 0.054,
+      "requests": 12,
+      "total_seconds": 0.463
+    },
+    "post_interrupt_full_body": {
+      "max_seconds": 0.092,
+      "median_seconds": 0.089,
+      "p95_seconds": 0.092,
+      "requests": 3,
+      "total_seconds": 0.267
+    },
+    "post_interrupt_state": {
+      "max_seconds": 0.026,
+      "median_seconds": 0.024,
+      "p95_seconds": 0.026,
+      "requests": 3,
+      "total_seconds": 0.072
+    },
+    "prepared_explanation_full": {
+      "max_seconds": 0.049,
+      "median_seconds": 0.036,
+      "p95_seconds": 0.049,
+      "requests": 24,
+      "total_seconds": 0.913
+    },
+    "prepared_explanations_page": {
+      "max_seconds": 0.053,
+      "median_seconds": 0.0355,
+      "p95_seconds": 0.053,
+      "requests": 12,
+      "total_seconds": 0.451
+    },
+    "public_exploration_catalogue": {
+      "max_seconds": 0.008,
+      "median_seconds": 0.008,
+      "p95_seconds": 0.008,
+      "requests": 1,
+      "total_seconds": 0.008
+    },
+    "repeat_csv_export": {
+      "max_seconds": 0.03,
+      "median_seconds": 0.0295,
+      "p95_seconds": 0.03,
+      "requests": 2,
+      "total_seconds": 0.059
+    },
+    "restricted_export": {
+      "max_seconds": 0.05,
+      "median_seconds": 0.05,
+      "p95_seconds": 0.05,
+      "requests": 1,
+      "total_seconds": 0.05
+    },
+    "served_participation_page": {
+      "max_seconds": 0.013,
+      "median_seconds": 0.013,
+      "p95_seconds": 0.013,
+      "requests": 1,
+      "total_seconds": 0.013
+    },
+    "study_exact_iri_search": {
+      "max_seconds": 0.118,
+      "median_seconds": 0.0855,
+      "p95_seconds": 0.118,
+      "requests": 2,
+      "total_seconds": 0.171
+    },
+    "study_hierarchy_page": {
+      "max_seconds": 0.051,
+      "median_seconds": 0.04,
+      "p95_seconds": 0.051,
+      "requests": 8,
+      "total_seconds": 0.342
+    },
+    "study_pair_metadata": {
+      "max_seconds": 0.08,
+      "median_seconds": 0.056,
+      "p95_seconds": 0.072,
+      "requests": 60,
+      "total_seconds": 3.396
+    },
+    "study_ready": {
+      "max_seconds": 0.023,
+      "median_seconds": 0.023,
+      "p95_seconds": 0.023,
+      "requests": 1,
+      "total_seconds": 0.023
+    },
+    "study_selected_evidence": {
+      "max_seconds": 0.055,
+      "median_seconds": 0.04,
+      "p95_seconds": 0.052,
+      "requests": 60,
+      "total_seconds": 2.503
+    },
+    "test_invitation": {
+      "max_seconds": 0.027,
+      "median_seconds": 0.027,
+      "p95_seconds": 0.027,
+      "requests": 1,
+      "total_seconds": 0.027
+    },
+    "workspace_capabilities": {
+      "max_seconds": 0.106,
+      "median_seconds": 0.035,
+      "p95_seconds": 0.106,
+      "requests": 12,
+      "total_seconds": 0.536
+    }
+  },
+  "schema": "exact-delivered-boundary-summary/1",
+  "served_publication": {
+    "closes_at": "2026-11-09T15:47:10.522210+00:00",
+    "publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+    "purpose": "development_review",
+    "study_revision": "review-20261010T154710-f1025c8952"
+  },
+  "source_hidden": true,
+  "source_restored": true,
+  "status": "passed",
+  "successful_journey_verifier_commit": "3a1ecb7ab2967b5955b76864aa68a2cf7456965d",
+  "successful_journey_verifier_sha256": "667327de56c1358db33f990a5ea4584ce47578c95bfb5f9d066a838f5a859ec6"
+}

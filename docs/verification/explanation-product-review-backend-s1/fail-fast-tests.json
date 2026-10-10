@@ -1,0 +1,32 @@
+{
+  "schema": "exact-focused-test-receipt/1",
+  "scope": "Mirror-only lifecycle fail-fast correction; no complete real-bundle startup claim",
+  "command": "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python -m pytest -q tests/explanation_review_environment_test.py -k 'not real_postgresql'",
+  "exact_pytest_arguments": [
+    "-q",
+    "tests/explanation_review_environment_test.py",
+    "-k",
+    "not real_postgresql"
+  ],
+  "passed": 34,
+  "deselected": 1,
+  "seconds": 3.75,
+  "baseline_regression": {
+    "test": "test_start_detects_exited_child_without_waiting_for_admission_timeout",
+    "failed": true,
+    "observed": "Generic readiness timeout despite exited worker; expected immediate role-specific failure"
+  },
+  "format_checks": [
+    "black line-length100",
+    "flake8 select F,E9"
+  ],
+  "files": {
+    "tools/review_environment.py": "e9685f137d70296a970b25b697bd816b5124acdc12088ad07a5620e10878a64c",
+    "tests/explanation_review_environment_test.py": "4b4abf55af76e294e4f956298c8533b8ffeadd9c7bc259e969b3e3aba1acdde7"
+  },
+  "limitations": [
+    "The one real PostgreSQL restart case was deliberately deselected; separate prior lifecycle receipts cover it.",
+    "Initial unprivileged test invocation had two sandbox permission failures; authorized rerun passed.",
+    "No JUnit file was requested during the witnessed passing run."
+  ]
+}

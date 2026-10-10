@@ -1,0 +1,1468 @@
+{
+  "schema": "exact-s1-delivered-response-excerpts/1",
+  "captured_at": "2026-10-10T15:51:27.311904+00:00",
+  "runtime_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+  "https_origin": "https://127.0.0.1:19185",
+  "trusted_certificate_pem_sha256": "sha256:e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+  "capture_source_sha256": "sha256:0a4cf8122b4050a8277b1fa2483549a481d8f4247d58f32673fe06ec4159094e",
+  "package": {
+    "location": "input/package/package.json",
+    "sha256": "sha256:a00b57c3c5188ecae7ab32f0a041400a440ff7d21ab6898f853a092a0abae683",
+    "package_id": "sha256:ee0c2e99330896a55ff7030615e35b1ef8bf51349689ea85e14342bf5a3440fe"
+  },
+  "meaning": "Actual public HTTPS response fields, extracted without text rewriting. Subsets are not complete response examples or validation fixtures. JSON pointers identify omitted array selections. No participant identities, answers, private session fields, credentials, case keys, private paths or provider outputs are included.",
+  "examples": [
+    {
+      "name": "DOID: literal_asserted entry points",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/ontologies/sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500/entry-points",
+        "query": {
+          "kind": "class",
+          "basis": "literal_asserted",
+          "limit": 2
+        },
+        "status": 200,
+        "response_sha256": "sha256:e5c422d89ed3421258b02ff88403985ed1966847dec9240743c21ca4448e6d09",
+        "response_bytes": 2845
+      },
+      "extracted_subset": false,
+      "selected_json_pointers": [
+        ""
+      ],
+      "payload": {
+        "items": [
+          {
+            "entity": {
+              "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+              "iri": "http://purl.obolibrary.org/obo/DOID_4",
+              "kind": "class"
+            },
+            "preferred_label": {
+              "status": "available",
+              "value": "disease",
+              "language": "en",
+              "fact_id": "sha256:9f056a3259a5cecc45f9edb10b074f96d76337870858641f241724489f80b0fd",
+              "requested_language": null,
+              "language_fallback": false
+            },
+            "entry_kind": "named_root",
+            "component_size": 1
+          },
+          {
+            "entity": {
+              "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+              "iri": "http://purl.obolibrary.org/obo/DOID_0050502",
+              "kind": "class"
+            },
+            "preferred_label": {
+              "status": "available",
+              "value": "obsolete (+)ssRNA virus infectious disease",
+              "language": "en",
+              "fact_id": "sha256:cbc829545a2cef2a3a91fb557f53277295ae6b67182ab35178e32bca4f19be28",
+              "requested_language": null,
+              "language_fallback": false
+            },
+            "entry_kind": "named_root",
+            "component_size": 1
+          }
+        ],
+        "returned_count": 2,
+        "total_count": 4189,
+        "next_cursor": "eyJsYXN0IjoxLCJzY29wZSI6InNoYTI1Njo1MmI4YWFlOGJiY2Y2YjBiMDA1YmMzZDE1N2YyYjcwNWQ1MzU2OGQ0MGU5ZTcwNjMwYmU0ZDM3YzljZTg5ODljIn0",
+        "truncated": true,
+        "scope": {
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+          "context_revision": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+          "basis": "literal_asserted",
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "filter_id": "sha256:d5ba6062007fe714cd3eef51d91dc0d33b29d338d34572561e9067b57e9e6900"
+        },
+        "status": "available",
+        "reason": null,
+        "order": null,
+        "navigation_contract": "exact-hierarchy/1",
+        "default_entity": {
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+          "iri": "http://purl.obolibrary.org/obo/DOID_4",
+          "kind": "class"
+        },
+        "basis": "literal_asserted",
+        "completeness": {
+          "axiom_count": 91530,
+          "category_counts": {
+            "axioms": 14790,
+            "characteristics": 20,
+            "comments": 1122,
+            "definitions": 10568,
+            "hierarchy": 17222,
+            "labels": 14768,
+            "restrictions": 10349,
+            "synonyms": 22691
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 16395,
+          "extraction": "complete_for_policy",
+          "imports_complete": false,
+          "scope": "root"
+        },
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "ReasonerInterruptedError",
+          "input_sha256": "sha256:77507055c3e4b5db42691a473eb4a16dfc0f6cbceb74d9119798a5c69217e8c4",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 900.0
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": false,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        }
+      }
+    },
+    {
+      "name": "DOID: reasoner_inferred entry points",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/ontologies/sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500/entry-points",
+        "query": {
+          "kind": "class",
+          "basis": "reasoner_inferred",
+          "limit": 2
+        },
+        "status": 200,
+        "response_sha256": "sha256:fa959ed2fdb8d0c0c6992eb6382c9b07c40222c3e4326fb9d26971d1b29a7c39",
+        "response_bytes": 1721
+      },
+      "extracted_subset": false,
+      "selected_json_pointers": [
+        ""
+      ],
+      "payload": {
+        "items": [],
+        "returned_count": 0,
+        "total_count": null,
+        "next_cursor": null,
+        "truncated": false,
+        "scope": {
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+          "context_revision": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+          "basis": "reasoner_inferred",
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "filter_id": "sha256:d5ba6062007fe714cd3eef51d91dc0d33b29d338d34572561e9067b57e9e6900"
+        },
+        "status": "failed",
+        "reason": "Native hierarchy preparation did not complete",
+        "order": null,
+        "navigation_contract": "exact-hierarchy/1",
+        "default_entity": null,
+        "basis": "reasoner_inferred",
+        "completeness": {
+          "axiom_count": 91530,
+          "category_counts": {
+            "axioms": 14790,
+            "characteristics": 20,
+            "comments": 1122,
+            "definitions": 10568,
+            "hierarchy": 17222,
+            "labels": 14768,
+            "restrictions": 10349,
+            "synonyms": 22691
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 16395,
+          "extraction": "complete_for_policy",
+          "imports_complete": false,
+          "scope": "root"
+        },
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "ReasonerInterruptedError",
+          "input_sha256": "sha256:77507055c3e4b5db42691a473eb4a16dfc0f6cbceb74d9119798a5c69217e8c4",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 900.0
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": false,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        }
+      }
+    },
+    {
+      "name": "NCIT: literal_asserted entry points",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/ontologies/sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9/entry-points",
+        "query": {
+          "kind": "class",
+          "basis": "literal_asserted",
+          "limit": 2
+        },
+        "status": 200,
+        "response_sha256": "sha256:191f4f546e9f124b656efe1439caaeb55bddec718a634910d64de8a75e019041",
+        "response_bytes": 2912
+      },
+      "extracted_subset": false,
+      "selected_json_pointers": [
+        ""
+      ],
+      "payload": {
+        "items": [
+          {
+            "entity": {
+              "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C12913",
+              "kind": "class"
+            },
+            "preferred_label": {
+              "status": "available",
+              "value": "Abnormal Cell",
+              "language": null,
+              "fact_id": "sha256:5c3f64db823efa0bc639ffeaffc814b398757691343cbce7b5371bfa8c9c9abe",
+              "requested_language": null,
+              "language_fallback": false
+            },
+            "entry_kind": "named_root",
+            "component_size": 1
+          },
+          {
+            "entity": {
+              "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C43431",
+              "kind": "class"
+            },
+            "preferred_label": {
+              "status": "available",
+              "value": "Activity",
+              "language": null,
+              "fact_id": "sha256:217d3fcdd10b393b1369547ea348ce41aa8215b68d13c961cb407c1fc1ebee70",
+              "requested_language": null,
+              "language_fallback": false
+            },
+            "entry_kind": "named_root",
+            "component_size": 1
+          }
+        ],
+        "returned_count": 2,
+        "total_count": 23868,
+        "next_cursor": "eyJsYXN0IjoxLCJzY29wZSI6InNoYTI1Njo2M2E0ZWU1MDA1NDZkODhhMzcyNzM4MmMwYWNhNWM3YTc3ODQyZjQ2NmQxMzczNmNhNGZjNTVkODIyZjE1MzRiIn0",
+        "truncated": true,
+        "scope": {
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+          "context_revision": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+          "basis": "literal_asserted",
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "filter_id": "sha256:bb28e2d2646ba5f05ff4588cf5ab771a6599433090c488f1e528f4da150f1e5f"
+        },
+        "status": "available",
+        "reason": null,
+        "order": null,
+        "navigation_contract": "exact-hierarchy/1",
+        "default_entity": {
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C12913",
+          "kind": "class"
+        },
+        "basis": "literal_asserted",
+        "completeness": {
+          "axiom_count": 1798045,
+          "category_counts": {
+            "axioms": 212418,
+            "characteristics": 13,
+            "comments": 3,
+            "definition_citations": 2,
+            "definitions": 174618,
+            "domains": 86,
+            "hierarchy": 209562,
+            "labels": 424405,
+            "ranges": 232,
+            "restrictions": 82924,
+            "synonyms": 693782
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 212055,
+          "extraction": "complete_for_policy",
+          "imports_complete": true,
+          "scope": "root"
+        },
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        }
+      }
+    },
+    {
+      "name": "NCIT: reasoner_inferred entry points",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/ontologies/sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9/entry-points",
+        "query": {
+          "kind": "class",
+          "basis": "reasoner_inferred",
+          "limit": 2
+        },
+        "status": 200,
+        "response_sha256": "sha256:2e5a418387f20048530eb4da7c1d5f86c80fee7d465123a75a51baec704e8c9f",
+        "response_bytes": 1761
+      },
+      "extracted_subset": false,
+      "selected_json_pointers": [
+        ""
+      ],
+      "payload": {
+        "items": [],
+        "returned_count": 0,
+        "total_count": null,
+        "next_cursor": null,
+        "truncated": false,
+        "scope": {
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+          "context_revision": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+          "basis": "reasoner_inferred",
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "filter_id": "sha256:bb28e2d2646ba5f05ff4588cf5ab771a6599433090c488f1e528f4da150f1e5f"
+        },
+        "status": "failed",
+        "reason": "Native hierarchy preparation did not complete",
+        "order": null,
+        "navigation_contract": "exact-hierarchy/1",
+        "default_entity": null,
+        "basis": "reasoner_inferred",
+        "completeness": {
+          "axiom_count": 1798045,
+          "category_counts": {
+            "axioms": 212418,
+            "characteristics": 13,
+            "comments": 3,
+            "definition_citations": 2,
+            "definitions": 174618,
+            "domains": 86,
+            "hierarchy": 209562,
+            "labels": 424405,
+            "ranges": 232,
+            "restrictions": 82924,
+            "synonyms": 693782
+          },
+          "domain_completeness": "not_established",
+          "entity_count": 212055,
+          "extraction": "complete_for_policy",
+          "imports_complete": true,
+          "scope": "root"
+        },
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        }
+      }
+    },
+    {
+      "name": "pair_comparison / grounded_description / typed_template_support",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/explanations/sha256:00d9632f727681ba0f2b2492dc76d0cb900613a9f04549974b2048df5640e8e4",
+        "query": {},
+        "status": 200,
+        "response_sha256": "sha256:3b9c7e6b235f1af17f651dee18052c07e5d17f5a7dd43f4bf258489df4b128cc",
+        "response_bytes": 22148
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/artifact_type",
+        "/contract_version",
+        "/explanation_id",
+        "/task",
+        "/entities",
+        "/grounding_status",
+        "/preparation_kind",
+        "/support_status",
+        "/support_reasons",
+        "/limitations",
+        "/fixture_provenance",
+        "/claims/0",
+        "/manifest"
+      ],
+      "payload": {
+        "artifact_type": "generated_explanation",
+        "contract_version": "exact-explain/1.0",
+        "explanation_id": "sha256:00d9632f727681ba0f2b2492dc76d0cb900613a9f04549974b2048df5640e8e4",
+        "task": "pair_comparison",
+        "entities": [
+          {
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C120192",
+            "kind": "class"
+          },
+          {
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+            "iri": "http://purl.obolibrary.org/obo/DOID_4674",
+            "kind": "class"
+          }
+        ],
+        "grounding_status": "validated",
+        "preparation_kind": "grounded_description",
+        "support_status": "typed_template_support",
+        "support_reasons": [],
+        "limitations": [],
+        "fixture_provenance": "Real ontology facts; deterministic typed rendering, no model request.",
+        "claims": [
+          {
+            "category": "difference",
+            "claim_id": "sha256:88c4f61ffbd54d566e400be91ace75d5b934082cdecd26e6c6215c51a9399e54",
+            "fact_ids": [
+              "sha256:85a6c1ccd190a48d650f4855e82e098888d6e4cbbb560cedd2d020b28bc8b58b",
+              "sha256:8f5839bbd91e1ed4ba7ccee3834ef8ed501f11258f7e6895b41fcf9569178295"
+            ],
+            "text": "Source definition excerpt: “A genetic disorder associated with a mutation in the AR gene, resulting in partial resistance to androgenic hormones.”. Target definition excerpt: “A disorder of sexual development that is characterized by the inability of the cell to respond to androgens in individuals with a karyotype of 46,XY resulting in female physical tr…”. These excerpts alone do not establish equivalence or incompatibility."
+          }
+        ],
+        "manifest": {
+          "description_contract": "exact-description/2",
+          "ontology_context_hashes": [
+            "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+            "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a"
+          ],
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "packet_hash": "sha256:fea482fa745ae7ffa61238c5b28fc023dd09e7e75c4eee6ca0ea8d14cff8484e",
+          "prompt_hash": "sha256:efbf79eabc439f79047d29898cf768e3a0e65a9d2814fe0cb799f46f3ad91aab",
+          "output_schema": "exact-explain-generation/1",
+          "requested_model": "none-typed-renderer",
+          "returned_model": null,
+          "provider": null,
+          "parameters_hash": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "language": "en",
+          "response_hash": null,
+          "status": "validated"
+        }
+      }
+    },
+    {
+      "name": "entity_profile / grounded_description / typed_template_support",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/explanations/sha256:037ecfcbb206bdd3eb387fd9a5a2ec927f917bdf6e0de665b959dc9d68348a48",
+        "query": {},
+        "status": 200,
+        "response_sha256": "sha256:1213f9171d6a74d1149a335f5c5e4e3ada98c6499cbd190f1b07e99baad71eab",
+        "response_bytes": 11665
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/artifact_type",
+        "/contract_version",
+        "/explanation_id",
+        "/task",
+        "/entities",
+        "/grounding_status",
+        "/preparation_kind",
+        "/support_status",
+        "/support_reasons",
+        "/limitations",
+        "/fixture_provenance",
+        "/claims/0",
+        "/manifest"
+      ],
+      "payload": {
+        "artifact_type": "generated_explanation",
+        "contract_version": "exact-explain/1.0",
+        "explanation_id": "sha256:037ecfcbb206bdd3eb387fd9a5a2ec927f917bdf6e0de665b959dc9d68348a48",
+        "task": "entity_profile",
+        "entities": [
+          {
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111384",
+            "kind": "class"
+          }
+        ],
+        "grounding_status": "validated",
+        "preparation_kind": "grounded_description",
+        "support_status": "typed_template_support",
+        "support_reasons": [],
+        "limitations": [],
+        "fixture_provenance": "Real ontology facts; deterministic typed rendering, no model request.",
+        "claims": [
+          {
+            "category": "meaning",
+            "claim_id": "sha256:a74a46120b270f608c185583a21b374417e3ea02622e65197b559bfe3a184d18",
+            "fact_ids": [
+              "sha256:8ab4c7d52ddbd5a44d195670e5e8780c8fba724ce5f713d452c651f5058cc1be"
+            ],
+            "text": "The ontology describes this entity as: “An inclusion body myopathy with Paget disease of bone and frontotemporal dementia that has_material_basis_in heterozygous mutation in HNRPA2B1 on 7p15.2.”."
+          }
+        ],
+        "manifest": {
+          "description_contract": "exact-description/2",
+          "ontology_context_hashes": [
+            "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a"
+          ],
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "packet_hash": "sha256:8beda1c42dce56e38d9174905156d36570a8293e0ea573cb633b65c280aae72f",
+          "prompt_hash": "sha256:efbf79eabc439f79047d29898cf768e3a0e65a9d2814fe0cb799f46f3ad91aab",
+          "output_schema": "exact-explain-generation/1",
+          "requested_model": "none-typed-renderer",
+          "returned_model": null,
+          "provider": null,
+          "parameters_hash": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "language": "en",
+          "response_hash": null,
+          "status": "validated"
+        }
+      }
+    },
+    {
+      "name": "original axiom cited by the preceding prepared profile",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/axioms/sha256:8ab4c7d52ddbd5a44d195670e5e8780c8fba724ce5f713d452c651f5058cc1be",
+        "query": {
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        },
+        "status": 200,
+        "response_sha256": "sha256:ff2553aa17b33178ada0e840989888d2033f819a07fbe93e160cd8991e1a5acb",
+        "response_bytes": 2778
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/id",
+        "/fact_id",
+        "/axiom_id",
+        "/ontology_version_id",
+        "/category",
+        "/interpretation",
+        "/availability",
+        "/ast",
+        "/original_axiom_digest",
+        "/original_syntax",
+        "/original_format",
+        "/original_availability",
+        "/rendering"
+      ],
+      "payload": {
+        "id": "sha256:8ab4c7d52ddbd5a44d195670e5e8780c8fba724ce5f713d452c651f5058cc1be",
+        "fact_id": "sha256:8ab4c7d52ddbd5a44d195670e5e8780c8fba724ce5f713d452c651f5058cc1be",
+        "axiom_id": "sha256:8ab4c7d52ddbd5a44d195670e5e8780c8fba724ce5f713d452c651f5058cc1be",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+        "category": "definitions",
+        "interpretation": {
+          "kind": "asserted",
+          "scope": "root"
+        },
+        "availability": "available",
+        "ast": {
+          "type": "AnnotationAssertion",
+          "annotations": [],
+          "property": {
+            "iri": {
+              "type": "IRI",
+              "value": "http://purl.obolibrary.org/obo/IAO_0000115"
+            },
+            "kind": "annotation_property",
+            "type": "AnnotationProperty"
+          },
+          "subject": {
+            "type": "IRI",
+            "value": "http://purl.obolibrary.org/obo/DOID_0111384"
+          },
+          "value": {
+            "datatype": {
+              "iri": {
+                "type": "IRI",
+                "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral"
+              },
+              "kind": "datatype",
+              "type": "Datatype"
+            },
+            "language": "en",
+            "lexical_form": "An inclusion body myopathy with Paget disease of bone and frontotemporal dementia that has_material_basis_in heterozygous mutation in HNRPA2B1 on 7p15.2.",
+            "type": "Literal"
+          }
+        },
+        "original_axiom_digest": "sha256:044edf80d559f5c255cd5e7b21ec864b7c8691b84f3ee2af217af4c5bde96ad3",
+        "original_syntax": null,
+        "original_format": "pyowl-core/canonical-bytes;model=2",
+        "original_availability": "not_exported",
+        "rendering": {
+          "status": "unsupported",
+          "text": "{\"annotations\":[],\"property\":{\"iri\":{\"type\":\"IRI\",\"value\":\"http://purl.obolibrary.org/obo/IAO_0000115\"},\"kind\":\"annotation_property\",\"type\":\"AnnotationProperty\"},\"subject\":{\"type\":\"IRI\",\"value\":\"http://purl.obolibrary.org/obo/DOID_0111384\"},\"type\":\"AnnotationAssertion\",\"value\":{\"datatype\":{\"iri\":{\"type\":\"IRI\",\"value\":\"http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral\"},\"kind\":\"datatype\",\"type\":\"Datatype\"},\"language\":\"en\",\"lexical_form\":\"An inclusion body myopathy with Paget disease of bone and frontotemporal dementia that has_material_basis_in heterozygous mutation in HNRPA2B1 on 7p15.2.\",\"type\":\"Literal\"}}"
+        }
+      }
+    },
+    {
+      "name": "entity_profile / grounded_description / typed_template_support / definition absent from the prepared packet",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/explanations/sha256:04f4e1c69500e5815b4516447474ac75cd1c355a05f3ae306441521dc4378a23",
+        "query": {},
+        "status": 200,
+        "response_sha256": "sha256:2233424682de46a9de38a1bbfdb461eee95b8126178e5f1791d770543ded9f41",
+        "response_bytes": 4465
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/artifact_type",
+        "/contract_version",
+        "/explanation_id",
+        "/task",
+        "/entities",
+        "/grounding_status",
+        "/preparation_kind",
+        "/support_status",
+        "/support_reasons",
+        "/limitations",
+        "/fixture_provenance",
+        "/claims/0",
+        "/manifest",
+        "/support_packet/missingness"
+      ],
+      "payload": {
+        "artifact_type": "generated_explanation",
+        "contract_version": "exact-explain/1.0",
+        "explanation_id": "sha256:04f4e1c69500e5815b4516447474ac75cd1c355a05f3ae306441521dc4378a23",
+        "task": "entity_profile",
+        "entities": [
+          {
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+            "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+            "kind": "class"
+          }
+        ],
+        "grounding_status": "validated",
+        "preparation_kind": "grounded_description",
+        "support_status": "typed_template_support",
+        "support_reasons": [],
+        "limitations": [
+          "No original definition is available in the admitted context."
+        ],
+        "fixture_provenance": "Real ontology facts; deterministic typed rendering, no model request.",
+        "claims": [
+          {
+            "category": "scope",
+            "claim_id": "sha256:20381c505166224529ba617720901459cd9b0c34842b68137625926f81e39081",
+            "fact_ids": [
+              "sha256:874ad80b6f4c2db26833beee5f9a70dcbdd2ff7738fe5086ea76bd5a35e15d60"
+            ],
+            "text": "Every instance satisfies this recorded necessary condition: <http://purl.obolibrary.org/obo/DOID_1979>."
+          }
+        ],
+        "manifest": {
+          "description_contract": "exact-description/2",
+          "ontology_context_hashes": [
+            "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a"
+          ],
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "packet_hash": "sha256:0e72cebb94b07e83101210fc701fbc9ee23b3a1aeba06467cce5c267f044cf84",
+          "prompt_hash": "sha256:efbf79eabc439f79047d29898cf768e3a0e65a9d2814fe0cb799f46f3ad91aab",
+          "output_schema": "exact-explain-generation/1",
+          "requested_model": "none-typed-renderer",
+          "returned_model": null,
+          "provider": null,
+          "parameters_hash": "sha256:44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+          "language": "en",
+          "response_hash": null,
+          "status": "validated"
+        },
+        "support_packet": {
+          "missingness": [
+            "No original definition is available in the admitted context."
+          ]
+        }
+      }
+    },
+    {
+      "name": "resolved_and_unresolved_features / review-01",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/runs/sha256:697313658cf8ee11d9c26e7e8fd6cbe913fa3c0ca0b1cc269f0b07b485edce1d/pair",
+        "query": {
+          "pair_id": "sha256:a6d7fee32c7b3d65c82803e9f9d99e83c9eee286a4dc0333a7157d1d5233cd93"
+        },
+        "status": 200,
+        "response_sha256": "sha256:86446bd4b7a36dcf1704928bd2c99613250e0c02564b825bf76162094bdb20ec",
+        "response_bytes": 47846
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/run_id",
+        "/pair_id",
+        "/source",
+        "/target",
+        "/events/1",
+        "/evidence_metadata/bridges/0",
+        "/evidence_metadata/bridges/1",
+        "/evidence_metadata/bridges/2",
+        "/evidence_metadata/bridges/27",
+        "/evidence_metadata/comparison_records/0",
+        "/evidence_metadata/version",
+        "/evidence_metadata/status",
+        "/evidence_metadata/counts",
+        "/evidence_metadata/bridge_status",
+        "/evidence_metadata/comparison_resolution",
+        "/evidence_metadata/scope"
+      ],
+      "payload": {
+        "run_id": "sha256:697313658cf8ee11d9c26e7e8fd6cbe913fa3c0ca0b1cc269f0b07b485edce1d",
+        "pair_id": "sha256:a6d7fee32c7b3d65c82803e9f9d99e83c9eee286a4dc0333a7157d1d5233cd93",
+        "source": {
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "kind": "class"
+        },
+        "target": {
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+          "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+          "kind": "class"
+        },
+        "events": [
+          {
+            "stage": "prefilter",
+            "status": "not_recorded",
+            "outcome": "unknown",
+            "reason_code": "historical_stage_record_not_exported",
+            "exact_basis": {
+              "status": "not_recorded",
+              "predicate": null,
+              "normalization_rule": null,
+              "comparison_key": null,
+              "source": null,
+              "target": null,
+              "artifact_refs": [],
+              "reason_code": "exact_rule_inputs_not_recorded"
+            },
+            "scores": [],
+            "competitor_pair_ids": [],
+            "artifact_refs": [],
+            "implementation_id": null,
+            "provenance_status": "unavailable"
+          }
+        ],
+        "evidence_metadata": {
+          "version": "exact-evidence-metadata/1",
+          "status": "selected",
+          "counts": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "bridge_status": "withheld",
+          "comparison_resolution": {
+            "recorded": 31,
+            "resolved": 31,
+            "unresolved": 0,
+            "ambiguous": 0,
+            "unsupported": 0
+          },
+          "scope": "prepared_visibility_policy",
+          "bridges": [
+            {
+              "bridge_id": "sha256:9cd2baddbb930c10f0a9a4d65b671e224b8ab3feeb7379116fa1732c15cb2773",
+              "level": "channel_comparison",
+              "status": "recorded",
+              "channel": "lexical",
+              "source_channel": null,
+              "target_channel": null,
+              "source_family": null,
+              "target_family": null,
+              "comparison_basis": "lexical_score",
+              "recorded_score": 0.9677734375,
+              "source": {
+                "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+                "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+                "kind": "class"
+              },
+              "target": {
+                "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+                "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+                "kind": "class"
+              },
+              "source_evidence_ids": [],
+              "target_evidence_ids": [],
+              "source_fact_ids": [],
+              "target_fact_ids": [],
+              "artifact_refs": [
+                "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6"
+              ],
+              "interpretation": "matcher_comparison"
+            },
+            {
+              "bridge_id": "sha256:d23aa872db4ac20d54a29609590effc5f5cf862fee6cbadc46575c9b76c2a77e",
+              "level": "feature_correspondence",
+              "status": "recorded",
+              "channel": "hierarchy",
+              "source_channel": "hierarchy",
+              "target_channel": "hierarchy",
+              "source_family": "is_a",
+              "target_family": "is_a",
+              "comparison_basis": "matrix_support",
+              "recorded_score": 0.9716796875,
+              "source": {
+                "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+                "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+                "kind": "class"
+              },
+              "target": {
+                "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+                "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+                "kind": "class"
+              },
+              "source_evidence_ids": [
+                "sha256:f3af21ae3a76ebe570ca26e55e28851565f5916f54a4b305b91184409870cab5"
+              ],
+              "target_evidence_ids": [
+                "sha256:9c297e89d02dfbd354ac94fe0a21a5c08e6d290e0d45bc0b435a9eab58122bd2"
+              ],
+              "source_fact_ids": [
+                "sha256:7c2f161149e26b729c4025f42e6588406d708abf8e8562b37afa510f85da16bd"
+              ],
+              "target_fact_ids": [
+                "sha256:2f9741d93da0e474200a29e21e6d835b9cad3571d2d5eb7fdabd34602a4f2dfc"
+              ],
+              "artifact_refs": [
+                "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6"
+              ],
+              "interpretation": "matcher_comparison"
+            },
+            {
+              "bridge_id": "sha256:36facdee64e625b3c7312d8f4685cbf6ebd601acb7a93bb438845f9b8b2785ad",
+              "level": "feature_correspondence",
+              "status": "withheld",
+              "channel": "hierarchy",
+              "source_channel": "hierarchy",
+              "target_channel": "hierarchy",
+              "source_family": "is_a",
+              "target_family": "is_a",
+              "comparison_basis": "matrix_support",
+              "recorded_score": 0.9619140625,
+              "source": {
+                "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+                "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+                "kind": "class"
+              },
+              "target": {
+                "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+                "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+                "kind": "class"
+              },
+              "source_evidence_ids": [
+                "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719"
+              ],
+              "target_evidence_ids": [
+                "sha256:974e5af63e039fcbffcec9fe17aed379372f8ee5e923c0ebb235447d99f8594b"
+              ],
+              "source_fact_ids": [],
+              "target_fact_ids": [],
+              "artifact_refs": [
+                "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6"
+              ],
+              "interpretation": "matcher_comparison"
+            },
+            {
+              "bridge_id": "sha256:dd0cb6992b7fb3b13f3c22e5b78eadf6963a909f957d6d2914b374930c0fbd03",
+              "level": "channel_comparison",
+              "status": "withheld",
+              "channel": "difference",
+              "source_channel": null,
+              "target_channel": "difference",
+              "source_family": null,
+              "target_family": null,
+              "comparison_basis": "difference_endpoint",
+              "recorded_score": 0.9152987956098224,
+              "source": {
+                "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+                "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+                "kind": "class"
+              },
+              "target": {
+                "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+                "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+                "kind": "class"
+              },
+              "source_evidence_ids": [],
+              "target_evidence_ids": [
+                "sha256:dd8addc5a4ca0c9611a37a3642548c6f4eae0baa6d9cb9a051295649ba588df6"
+              ],
+              "source_fact_ids": [],
+              "target_fact_ids": [],
+              "artifact_refs": [
+                "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6"
+              ],
+              "interpretation": "matcher_comparison"
+            }
+          ],
+          "comparison_records": [
+            {
+              "record_id": "sha256:7b86e39297fa34e5182b25a5c0c87aae56685ab40622ecef03d6965f870b5a30",
+              "channel": "lexical",
+              "status": "resolved",
+              "reason_code": "saved_comparison_identity_resolved",
+              "bridge_id": "sha256:9cd2baddbb930c10f0a9a4d65b671e224b8ab3feeb7379116fa1732c15cb2773",
+              "artifact_refs": [
+                "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "name": "selected evidence statuses / review-01",
+      "provenance": {
+        "source": "actual_https_response",
+        "method": "GET",
+        "path": "/api/v1/runs/sha256:697313658cf8ee11d9c26e7e8fd6cbe913fa3c0ca0b1cc269f0b07b485edce1d/pair-evidence",
+        "query": {
+          "pair_id": "sha256:a6d7fee32c7b3d65c82803e9f9d99e83c9eee286a4dc0333a7157d1d5233cd93",
+          "limit": 100
+        },
+        "status": 200,
+        "response_sha256": "sha256:ea492759b02d9348f24c49f524049c2eae35c0c6551105d4bf10840fc241886e",
+        "response_bytes": 26686
+      },
+      "extracted_subset": true,
+      "selected_json_pointers": [
+        "/items/0",
+        "/items/1",
+        "/items/19",
+        "/returned_count",
+        "/total_count",
+        "/next_cursor",
+        "/truncated",
+        "/scope",
+        "/status",
+        "/reason"
+      ],
+      "payload": {
+        "returned_count": 32,
+        "total_count": 32,
+        "next_cursor": null,
+        "truncated": false,
+        "scope": {
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+          "context_revision": "sha256:4e5d2d2cacdcfaa0d0cffa24d62fe92465a6ee658fcc05b62f351847c3706c58",
+          "basis": "run_selected",
+          "visibility_policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+          "filter_id": "sha256:0fe842a9684a0ecdf5c378548e959efe9bac508fe8c6316555c353358ff5d79b"
+        },
+        "status": "available",
+        "reason": null,
+        "items": [
+          {
+            "evidence_id": "sha256:00ce981c967c37939bee032a4e9e0bd83e135cc95658a216033bfae17d08b44a",
+            "channel": "attributes",
+            "family": null,
+            "side": "source",
+            "role": "attributes",
+            "entity": {
+              "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+              "kind": "class"
+            },
+            "feature_id": null,
+            "fact_ids": [],
+            "source_axiom_refs": [],
+            "axiom_origins": [],
+            "semantic_terms": {},
+            "historical_item_alias": null,
+            "display": {},
+            "values": {
+              "support": 0.939453125,
+              "importance": 0.05337787701234934,
+              "weight": 0.22767024287973997
+            },
+            "interpretation": "projected",
+            "derivation": null,
+            "provenance_status": "provenance_unavailable",
+            "status": "not_exported",
+            "origin_resolution": "unresolved",
+            "graph_projection": "not_recorded",
+            "reason": "Original fact mapping was not resolved."
+          },
+          {
+            "evidence_id": "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "channel": "hierarchy",
+            "family": "is_a",
+            "side": "source",
+            "role": "is_a",
+            "entity": {
+              "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+              "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+              "kind": "class"
+            },
+            "feature_id": null,
+            "fact_ids": [],
+            "source_axiom_refs": [],
+            "axiom_origins": [],
+            "semantic_terms": {},
+            "historical_item_alias": null,
+            "display": {},
+            "values": {
+              "support": 0.912109375,
+              "importance": 0.16443661971830986
+            },
+            "interpretation": "projected",
+            "derivation": null,
+            "provenance_status": "derived_from_saved_artifacts",
+            "status": "not_exported",
+            "origin_resolution": "unresolved",
+            "graph_projection": "not_recorded",
+            "reason": "Original facts do not bind to the selected feature's typed entity."
+          },
+          {
+            "evidence_id": "sha256:9c297e89d02dfbd354ac94fe0a21a5c08e6d290e0d45bc0b435a9eab58122bd2",
+            "channel": "hierarchy",
+            "family": "is_a",
+            "side": "target",
+            "role": "is_a",
+            "entity": {
+              "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+              "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+              "kind": "class"
+            },
+            "feature_id": "sha256:ad00c5e63ea0256ab24091e19ce4ce7c78997e831121d638294aede918304b88",
+            "fact_ids": [
+              "sha256:2f9741d93da0e474200a29e21e6d835b9cad3571d2d5eb7fdabd34602a4f2dfc"
+            ],
+            "source_axiom_refs": [],
+            "axiom_origins": [],
+            "semantic_terms": {},
+            "historical_item_alias": null,
+            "display": {},
+            "values": {
+              "support": 0.9716796875,
+              "importance": 0.17517605633802816
+            },
+            "interpretation": "projected",
+            "derivation": null,
+            "provenance_status": "derived_from_saved_artifacts",
+            "status": "available",
+            "origin_resolution": "resolved",
+            "graph_projection": "not_recorded",
+            "reason": null
+          }
+        ]
+      }
+    }
+  ],
+  "form_definitions": {
+    "provenance": {
+      "source": "actual_https_response_public_definitions_only",
+      "method": "POST",
+      "path": "/api/v1/study/session",
+      "status": 200,
+      "response_sha256": "sha256:11a26bef381514a91acbe1d5b3e07e2061ada8f8768d8f2ec609fe47da3fe3c5",
+      "definition_excerpt_sha256": "sha256:8a5fdb7a5141ce90032985d14069fbd039420e93c003431bad667db727b41dbe",
+      "note": "Captured during the already-authorized verifier journey; this capture made no additional participant exchange. Only schema definitions and protocol versions are retained."
+    },
+    "protocol_versions": {
+      "assessment": "assessment/2",
+      "consultation": "consultation/3",
+      "export": "exact-study-analysis/4",
+      "forms": "exact-study-forms/3",
+      "information": "synthetic-information-v2",
+      "methods": "study-methods/3",
+      "resource_policy": "exploration-v1",
+      "setup": "setup/3",
+      "software": "exact-explain-ui-1.2",
+      "tutorial": "tutorial/2.0-native-2-forms3"
+    },
+    "runtime_materialization_crosscheck": {
+      "selected_definitions_equal": true,
+      "source_location": "exact_inspect/study/forms.py::definitions",
+      "source_sha256": "sha256:f16d8a9e92ded9bce21f29a5407c5dbf9dcf9377163c496780fd4b5bddb3dbe2"
+    },
+    "extracted_subset": true,
+    "selected_json_pointers": [
+      "/protocol_versions",
+      "/forms/version",
+      "/forms/method_version",
+      "/forms/method_dictionary",
+      "/forms/collection_notice",
+      "/forms/experience_note",
+      "/forms/setup",
+      "/forms/consultation",
+      "/forms/background/0",
+      "/forms/background/1",
+      "/forms/background/2",
+      "/forms/background/8",
+      "/forms/background/11",
+      "/forms/background/13",
+      "/forms/background/16"
+    ],
+    "payload": {
+      "version": "exact-study-forms/3",
+      "method_version": "study-methods/3",
+      "method_dictionary": {
+        "other_method": "Other method",
+        "plain_files": "Text editor",
+        "protege": "Protégé"
+      },
+      "collection_notice": "We record your selected methods and any short method names you enter. Default de-identified analysis exports omit method names. An authorized researcher can explicitly include those names in a restricted analysis export. Do not enter personal names, institutions, file paths or URLs. Familiarity is optional and does not require you to use or install a tool.",
+      "experience_note": "Count completed years, counting overlapping study/work years once. Zero experience is None; a positive duration under one year is Less than 1 year.",
+      "setup": [
+        {
+          "id": "familiar_methods",
+          "label": "Which of these methods are familiar to you? (Optional)",
+          "matrix": null,
+          "multiple": true,
+          "option_order": [
+            "protege",
+            "plain_files",
+            "other_method",
+            "none"
+          ],
+          "options": {
+            "none": "None of these",
+            "other_method": "Other method",
+            "plain_files": "Text editor",
+            "protege": "Protégé"
+          },
+          "required": false,
+          "row_order": [],
+          "show_if": null,
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "familiar_other_method",
+          "label": "Which other methods are familiar to you?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "familiar_methods": {
+              "contains": "other_method"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        }
+      ],
+      "consultation": [
+        {
+          "id": "consulted_external_ontologies",
+          "label": "For the source and candidates you just ranked, did you inspect ontology information outside this study interface?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [
+            "true",
+            "false"
+          ],
+          "options": {
+            "false": "No",
+            "true": "Yes"
+          },
+          "required": true,
+          "row_order": [],
+          "show_if": null,
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "methods",
+          "label": "Select all methods you actually used for this case. You may combine methods and change them between cases.",
+          "matrix": null,
+          "multiple": true,
+          "option_order": [
+            "protege",
+            "plain_files",
+            "other_method"
+          ],
+          "options": {
+            "other_method": "Other method",
+            "plain_files": "Text editor",
+            "protege": "Protégé"
+          },
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "consulted_external_ontologies": true
+          },
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "other_method",
+          "label": "Which other methods did you use?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "methods": {
+              "contains": "other_method"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        },
+        {
+          "id": "resource_scope",
+          "label": "Which ontology resources did you inspect? (Optional)",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [
+            "supplied_only",
+            "different_or_additional",
+            "unsure"
+          ],
+          "options": {
+            "different_or_additional": "Different or additional resources",
+            "supplied_only": "Only the supplied ontology versions",
+            "unsure": "Unsure"
+          },
+          "required": false,
+          "row_order": [],
+          "show_if": {
+            "consulted_external_ontologies": true
+          },
+          "text_max_length": 2000,
+          "text_min_length": 0
+        }
+      ],
+      "background": [
+        {
+          "id": "cs_experience_years",
+          "label": "How much study or professional experience do you have in computer science or computing?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [
+            "none",
+            "less_than_1",
+            "1_3",
+            "4_5",
+            "6_9",
+            "10_plus"
+          ],
+          "options": {
+            "10_plus": "10+ years",
+            "1_3": "1–3 years",
+            "4_5": "4–5 years",
+            "6_9": "6–9 years",
+            "less_than_1": "Less than 1 year",
+            "none": "None"
+          },
+          "required": true,
+          "row_order": [],
+          "show_if": null,
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "health_bio_experience_years",
+          "label": "How much study or professional experience do you have in health, medicine or biosciences?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [
+            "none",
+            "less_than_1",
+            "1_3",
+            "4_5",
+            "6_9",
+            "10_plus"
+          ],
+          "options": {
+            "10_plus": "10+ years",
+            "1_3": "1–3 years",
+            "4_5": "4–5 years",
+            "6_9": "6–9 years",
+            "less_than_1": "Less than 1 year",
+            "none": "None"
+          },
+          "required": true,
+          "row_order": [],
+          "show_if": null,
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "domain_specialty",
+          "label": "What is your main health or bioscience field, if any?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": false,
+          "row_order": [],
+          "show_if": null,
+          "text_max_length": 2000,
+          "text_min_length": 0
+        },
+        {
+          "id": "doid_contexts_other",
+          "label": "In what other context have you used DOID?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "doid_contexts": {
+              "contains": "other"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        },
+        {
+          "id": "ncit_contexts_other",
+          "label": "In what other context have you used NCIT?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "ncit_contexts": {
+              "contains": "other"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        },
+        {
+          "id": "roles_other",
+          "label": "What other role describes your work or study?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "roles": {
+              "contains": "other"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        },
+        {
+          "id": "ontology_activities_other",
+          "label": "What other ontology activity have you done?",
+          "matrix": null,
+          "multiple": false,
+          "option_order": [],
+          "options": null,
+          "required": true,
+          "row_order": [],
+          "show_if": {
+            "ontology_activities": {
+              "contains": "other"
+            }
+          },
+          "text_max_length": 160,
+          "text_min_length": 1
+        }
+      ]
+    }
+  },
+  "review_identity": {
+    "source_run_id": "sha256:697313658cf8ee11d9c26e7e8fd6cbe913fa3c0ca0b1cc269f0b07b485edce1d",
+    "policy_sha256": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "source_count": 24,
+    "presented_pairs": 120
+  },
+  "delivered_description_inventory": {
+    "pair_comparison|grounded_description|typed_template_support": 120,
+    "entity_profile|grounded_description|typed_template_support": 140
+  },
+  "not_demonstrated": [
+    "No independently reviewed provider prose exists in this typed-only publication.",
+    "Actual failed inference is demonstrated; successful inferred edges require semantic fixture examples and a future completed real preparation.",
+    "Removed-competing and disabled exact-match routes are not fabricated from the selected emitted-only cases.",
+    "Only public form definitions are extracted from the existing session response; no identities, answers or private session fields are included. Separate journey evidence verifies authorized study/main correspondence."
+  ],
+  "assembly_source_sha256": "sha256:66938689c6c8801603c7912a8de4139df026be429a4f7564fff1aa747107f084"
+}

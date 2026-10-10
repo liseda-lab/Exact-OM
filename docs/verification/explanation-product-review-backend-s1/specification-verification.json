@@ -1,0 +1,15 @@
+{
+  "schema": "exact-s1-specification-verification/1",
+  "command": "PYTHONPATH=/private/tmp/exact-s1-spec-validation-deps /Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python specs/explanation-framework/protocol/validate_specs.py",
+  "cwd": "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM",
+  "scope": "specification artifacts only; not backend acceptance",
+  "status": "passed",
+  "json_files": 30,
+  "schema_fixtures": 13,
+  "local_links": 242,
+  "study_schedules": 8,
+  "scoring_oracles": 9,
+  "errors": [],
+  "dependency_setup": "jsonschema4.26.0 in isolated temporary dependency directory; service Python environment unchanged",
+  "initial_limitation": "jsonschema unavailable in service/global/bundled runtime until isolated dependency setup"
+}

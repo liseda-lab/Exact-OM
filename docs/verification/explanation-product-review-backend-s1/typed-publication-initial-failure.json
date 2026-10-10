@@ -1,0 +1,28 @@
+{
+  "schema": "exact-typed-interim-preparation/1",
+  "status": "failed",
+  "error": "Evidence citation is outside the admitted typed subject",
+  "error_type": "ValueError",
+  "generation_mode": "typed-only",
+  "provider_dispatch_allowed": false,
+  "revision": "development-review-s1-interim-20261010",
+  "scopes": [],
+  "elapsed_seconds": 154.69294167216867,
+  "cpu_user_seconds": 135.274811,
+  "cpu_system_seconds": 17.178807,
+  "peak_rss_bytes": 381984768,
+  "input_clone_receipt_sha256": "sha256:b2f4afdabb048f11e0016696f678013c97f46e2815b0122742334fe60814ba6d",
+  "source_hashes": {
+    "exact_inspect/decisions.py": "sha256:5e112d1e0bfa25ace733faac561467deb2bf448a17a82b8db1eca13a8b5e297f",
+    "exact_inspect/decisions_export.py": "sha256:b8c234b53de746e6a8eaccb20ca612f07a8a091fef329d1358cde85614ac669f",
+    "exact_inspect/descriptions.py": "sha256:8cc76f39a1c52aeefac36cef948f26e6a5a54cc7c56c6d15c9a568a58dd28a33",
+    "exact_inspect/evidence_metadata.py": "sha256:883676fdd3625c340bf39b4fb365362a73d5ae6d52b13a6796f5bc92d8f39ee1",
+    "exact_inspect/study/workspace.py": "sha256:f6ede9f4061304093eafce6e03c20937a92e9b5ed148219db25c9c66688970ad",
+    "tools/prepare_review_bundle.py": "sha256:3a8135fc4f4eb0f077183a8f6e9e2670c692df4ce021ff2bc0dfbed722d31760",
+    "tools/review_generation_attempt.py": "sha256:dd900fcc232d64b22bf68def9e09927ba44dcd9ceaf37ee870158c765d9cedcc",
+    "tools/review_pair_inputs.py": "sha256:e10f16e8e2acd1daf0f99516a75a8fc023f0e37efece25a52d1b6c040609239e",
+    "tools/review_private_run_cache.py": "sha256:05877c56749c5263e9e72a5b46dfa824f9c25b33c2746179d642b1e847462cd5",
+    "tools/review_run_cache.py": "sha256:343625847c0b024496054f160a098841e39aeaa5ab313327da6bcb482289c982"
+  },
+  "source_receipt_sha256": "sha256:d82aebf44ab71e15b3dff5229e8cddc8c7a51962091588271c5defa3783252f3"
+}

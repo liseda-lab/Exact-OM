@@ -1,0 +1,319 @@
+{
+  "all_saved_candidate_keys": [
+    "S_base",
+    "S_final",
+    "SrcKind",
+    "TgtKind",
+    "U",
+    "U_dis",
+    "U_ind",
+    "emitted",
+    "p_llm",
+    "pre_typing_selected",
+    "protected_exact",
+    "reason",
+    "reconstruction",
+    "relation",
+    "relation_confidence",
+    "relation_evidence",
+    "target",
+    "threshold_positive"
+  ],
+  "candidate_decisions_file": {
+    "declared_in_manifest": false,
+    "exists": false,
+    "relative_path": "candidate_decisions.json"
+  },
+  "checkpoint_matching_key_paths": {
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_claude_sonnet_46": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_deepseek_chat_v31": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_gpt4o_mini": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_gpt5": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_gpt_oss_120b": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_llama33_70b": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_qwen35_122b": 1,
+    "$.checkpoint_fingerprint_payload.models[].payload.llm_router.profiles.openrouter_qwen3_235b": 1
+  },
+  "checkpoint_top_level_keys": [
+    "checkpoint_fingerprint",
+    "checkpoint_fingerprint_payload",
+    "checkpoint_payload",
+    "checkpoint_schema_version",
+    "dataset_fingerprint",
+    "dataset_signature",
+    "explanation_index_path",
+    "explanation_records_count",
+    "kind",
+    "mappings_count",
+    "processed_examples",
+    "results_json_count",
+    "timing",
+    "total_examples"
+  ],
+  "elapsed_seconds": 40.325,
+  "embedded_candidate_decision_record_count": 0,
+  "file_binding_scope": "All listed bytes hashed for this audit. Original manifest hashes validated when supplied; original hashless index/shard entries checked for declared size and now assigned audit hashes.",
+  "file_bindings": [
+    {
+      "bytes": 57073,
+      "location": "run_manifest.json",
+      "manifest_declared_bytes_checked": false,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2"
+    },
+    {
+      "bytes": 157066,
+      "location": "../selection.json",
+      "manifest_declared_bytes_checked": false,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc"
+    },
+    {
+      "bytes": 33768876,
+      "location": "source_decisions.json",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": true,
+      "sha256": "bb70a75555131af2eada72a792016b67ba56f66653a68389c83689f61dcdf251"
+    },
+    {
+      "bytes": 37054,
+      "location": "explanations/index.json",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "a819694af32ff5fef40fb00082aad8671ee8ddc596727262d2f019ba145e3619"
+    },
+    {
+      "bytes": 13803,
+      "location": "checkpoints/inference_1789729285.json",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "c66411ec9b3d798e965e20be842b3d540289c65c3d57189dfbd639b2dd19cba7"
+    },
+    {
+      "bytes": 9698981,
+      "location": "explanations/shards/g4ec738442af4-00000.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "0130ad89a07879fd10f93ae0513edea24d0420edf5665c68526513de33d42be5"
+    },
+    {
+      "bytes": 9564060,
+      "location": "explanations/shards/g4ec738442af4-00001.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "ed5e8abd80a64bde8d3ecf00a8e1eac18797fafbbfe9a9664a9c051190d7ac64"
+    },
+    {
+      "bytes": 9786569,
+      "location": "explanations/shards/g4ec738442af4-00002.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "edd2a638f16600b9fbe56c8c71df0658822470aa03b01357fc8dfe7750276438"
+    },
+    {
+      "bytes": 13185734,
+      "location": "explanations/shards/g4ec738442af4-00003.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "ad8ffdba3759afe504906770ccbc029e698bb1fd056033933afbe712902c7647"
+    },
+    {
+      "bytes": 16152671,
+      "location": "explanations/shards/g4ec738442af4-00004.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "cffcbae405f6fb5b2143f24e62c9e10d783d4e76fa2a5bf5df236fbf20119cd4"
+    },
+    {
+      "bytes": 11123919,
+      "location": "explanations/shards/g4ec738442af4-00005.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "332ab8d29a26ad2dcd502c66aab0891d091fd37a9c75a12fdf1f80d134357e46"
+    },
+    {
+      "bytes": 12238059,
+      "location": "explanations/shards/g4ec738442af4-00006.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "c00cb07ed34ce58396d9bd3a3fe8d6a596ea2dc0eb22595d59a30e7aab93206f"
+    },
+    {
+      "bytes": 12674267,
+      "location": "explanations/shards/g4ec738442af4-00007.jsonl.zst",
+      "manifest_declared_bytes_checked": true,
+      "manifest_declared_sha256_checked": false,
+      "sha256": "a1ab80b2ffa08f18db9fb5a2a2d7056f480dbb42f3c1d324b06e21c9482d3dcb"
+    }
+  ],
+  "interpretation": {
+    "conclusion": "The retained producer inputs contain no explicit per-pair prefilter event or exact-match basis for these 120 typed selected pairs. The absent candidate_decisions export and absent embedded candidate_decision/events are historical artifact absence, not an inference from the API projection.",
+    "limit": "This audit establishes what the retained exports contain; it does not prove that no exact stage ran in the historical process or reconstruct missing events from scores, labels, or flags.",
+    "other_matching_keys": "identifier_normalized belongs to per-side selected attribute items; llm_router belongs to checkpoint model configuration. Neither is a per-pair exact decision record.",
+    "prefilter_event_or_exact_basis_export_found": false,
+    "saved_fields_not_route_events": "Eight saved protected_exact flags and 112 pair_pre_selector reconstruction score labels are retained facts; neither supplies an observed prefilter route event, bypass timing, or exact-match normalization basis."
+  },
+  "manifest_declared_decision_or_trace_files": [
+    "source_decisions.json"
+  ],
+  "missing_explanations_exactly_match_saved_protected_flags": true,
+  "raw_selected_explanation_records": 112,
+  "schema": "exact-raw-selected-stage-audit/1",
+  "scope": "Read-only retained producer records for all 120 selected typed pairs; no provider calls, matching, inference, reference-label reads, or artifact writes.",
+  "search_key_pattern": "exact|normaliz|prefilt|bypass|route|stage|event|basis",
+  "selected_candidates_matching_key_paths": {
+    "$[].protected_exact": 120,
+    "$[].reconstruction.score_stage": 112
+  },
+  "selected_cases": 24,
+  "selected_explanation_top_level_keys": [
+    "attributes",
+    "backend_usage",
+    "confidences",
+    "context_sentences",
+    "context_triples",
+    "contributions",
+    "cross_side_provenance",
+    "explanation_schema_version",
+    "importances",
+    "kind",
+    "llm_calibration",
+    "llm_pair_brief",
+    "llm_pair_evidence_packet",
+    "llm_summaries",
+    "models",
+    "prediction",
+    "qualities",
+    "reconstruction",
+    "run_id",
+    "selected_labels",
+    "selector_evidence_items",
+    "src_iri",
+    "src_kind",
+    "tgt_iri",
+    "tgt_kind",
+    "triple_attributions",
+    "weights"
+  ],
+  "selected_explanations_matching_key_paths": {
+    "$[].attributes.source[].identifier_normalized": 1101,
+    "$[].attributes.target[].identifier_normalized": 979,
+    "$[].reconstruction.score_stage": 112
+  },
+  "selected_pairs": 120,
+  "selected_pairs_without_raw_explanation_record": [
+    {
+      "case_id": "review-04",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-05",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_9220",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-06",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0050678",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-08",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0090001",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-09",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0080776",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-15",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_9274",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-17",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0070688",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    },
+    {
+      "case_id": "review-23",
+      "target": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_11080",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      }
+    }
+  ],
+  "selected_saved_emitted_flags": {
+    "True": 120
+  },
+  "selected_saved_protected_exact_flags": {
+    "False": 112,
+    "True": 8
+  },
+  "selected_saved_reasons": {
+    "emitted": 120
+  },
+  "selected_saved_score_stage_labels": {
+    "None": 8,
+    "pair_pre_selector": 112
+  },
+  "selected_saved_threshold_positive_flags": {
+    "True": 120
+  },
+  "selected_source_rows_matching_key_paths": {
+    "$[].candidates[].protected_exact": 2400,
+    "$[].candidates[].reconstruction.score_stage": 2392
+  },
+  "source_decision_record_keys": [
+    "Src",
+    "action",
+    "candidate_count",
+    "candidates",
+    "competing_sources_by_target",
+    "emitted_targets",
+    "empty_candidate_pool",
+    "pre_typing_targets"
+  ],
+  "source_decisions_schema_version": 2,
+  "source_decisions_stage_label": "after_cardinality_and_relation_typing",
+  "source_decisions_stage_label_scope": "Document-level final export phase; not an observed per-pair route event.",
+  "source_decisions_top_level_keys": [
+    "dataset_signature",
+    "mode",
+    "policy",
+    "records",
+    "reference_labels_used",
+    "schema_version",
+    "source_universe",
+    "source_universe_status",
+    "stage"
+  ],
+  "source_document_matching_key_paths": {
+    "$.stage": 1
+  }
+}

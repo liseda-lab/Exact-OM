@@ -1,0 +1,45 @@
+{
+  "context_sqlite_written": false,
+  "contexts": [
+    {
+      "counts": {
+        "edges": 0,
+        "entries": 8410,
+        "members": 0
+      },
+      "failure_code": "ReasonerInterruptedError",
+      "id": "0",
+      "inference_status": "failed",
+      "navigation_sha256": "sha256:7f350b0aa3f4a6dee27bdf526e9616b1156267d67f49ede3ed12b473b635a21e",
+      "new_manifest_sha256": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652",
+      "old_manifest_sha256": "sha256:f843876e2c472b25957691680d032ccd10df9c24e6976df0febea9cc5b6c154b",
+      "original_manifest_backup": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/diagnostics/context-0-manifest.before-navigation.json",
+      "prepared_source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/prepared-contexts/doid-900",
+      "unchanged_context_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a"
+    },
+    {
+      "counts": {
+        "edges": 0,
+        "entries": 24059,
+        "members": 0
+      },
+      "failure_code": "TimeoutError",
+      "id": "1",
+      "inference_status": "failed",
+      "navigation_sha256": "sha256:083fee6f2f990c42f960f6578f2ec391bb39c9b8071eaa2f4923703f1136d1d5",
+      "new_manifest_sha256": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82",
+      "old_manifest_sha256": "sha256:f24c2271cf895374a6c8dc34c727d8e270d4f86f051990f1b57fc18aeab09f9b",
+      "original_manifest_backup": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/diagnostics/context-1-manifest.before-navigation.json",
+      "prepared_source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/prepared-contexts/ncit",
+      "unchanged_context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738"
+    }
+  ],
+  "installed_at": "2026-10-10T13:31:45.234406+00:00",
+  "only_replaced": [
+    "navigation.sqlite",
+    "manifest.json"
+  ],
+  "package": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/package",
+  "package_manifest_republication_required": true,
+  "remote_modified": false
+}

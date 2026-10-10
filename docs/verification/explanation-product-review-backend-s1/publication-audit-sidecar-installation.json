@@ -1,0 +1,13 @@
+{
+  "schema": "exact-publication-audit-sidecar-installation/1",
+  "recorded_at": "2026-10-10T16:13:09.923828+00:00",
+  "source": "original_preparation_public_selection",
+  "destination": "verification/publication-audit-inputs/selection.json",
+  "bytes": 157066,
+  "sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+  "binding": "publication.definition.review_provenance.selection_manifest_sha256",
+  "byte_exact_copy": true,
+  "existing_file_overwritten": false,
+  "runtime_input_modified": false,
+  "scope": "Public audit metadata installed outside immutable runtime input; no provider, credential, invitation or raw matcher input copied."
+}

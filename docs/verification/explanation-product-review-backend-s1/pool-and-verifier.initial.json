@@ -1,0 +1,30 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "pool-and-verifier.initial",
+  "source_junit_sha256": "sha256:0c1ff93f22eb368f29aa18ba209fad8bea355294b06b3c5b5eb7f78747781aad",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "0",
+      "tests": "57",
+      "time": "12.187",
+      "timestamp": "2026-10-10T15:44:15.470148+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": [
+    {
+      "test": {
+        "classname": "tests.explanation_review_verifier_test",
+        "name": "test_failure_receipt_records_status_without_private_response_or_request",
+        "time": "0.001"
+      },
+      "kind": "failure",
+      "detail": {
+        "message": "AssertionError: Regex pattern did not match.\n  Expected regex: 'safe_label:http_status'\n  Actual message: 'safe_label:csp_present'"
+      }
+    }
+  ]
+}

@@ -1,0 +1,77 @@
+{
+  "schema": "exact-review-startup-observation/1",
+  "git_commit": "394af1ac7b80e8089f6fd06bc1277671279aca9c",
+  "observed_worker_failure": "Backend Git identity is unavailable; use a durable committed checkout",
+  "same_diagnostic_occurrences": 2,
+  "worker_log_sha256": "9a78b00b57392bb80d4a30efe0cbac62fdebc7b8ebb07e91ff8158aff9750e88",
+  "attempts": [
+    {
+      "receipt": "relocation-attempt-1.json",
+      "sha256": "72a8e43cee473b37add5be65bde8349a250abee0776ea9d21fd25a0973d4e2db",
+      "status": "failed",
+      "failed_phase": "cold_start",
+      "source_restored": true,
+      "exception_type": "KeyboardInterrupt",
+      "intentional_interrupt_reason": "Study worker had exited before app import; wrapper finally stopped owned services and restored source."
+    },
+    {
+      "receipt": "relocation.json",
+      "sha256": "aa853cbb86b3fa183ff23a29d4db1754b3f2fd390603a304f1284b210e19dcc3",
+      "status": "failed",
+      "failed_phase": "cold_start",
+      "source_restored": true,
+      "exception_type": "KeyboardInterrupt",
+      "intentional_interrupt_reason": "Study worker had exited before app import; wrapper finally stopped owned services and restored source."
+    }
+  ],
+  "preserved_data": true,
+  "source_restored": true,
+  "subsequent_git_probes": [
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0104
+    },
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0127
+    },
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0127
+    },
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0102
+    },
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0109
+    },
+    {
+      "timeout": 5,
+      "returncode": 0,
+      "stdout": "394af1ac7b80e8089f6fd06bc1277671279aca9c\n",
+      "stderr": "",
+      "seconds": 0.0106
+    }
+  ],
+  "probe_executable_version": "Homebrew Git2.40.1",
+  "probe_scenarios": "Three detached exact worker entrypoint probes with source present; three with source hidden and finally restored. All then failed at stopped PostgreSQL as expected.",
+  "causal_limit": "Earlier nested Git return code or timeout was not captured. Subsequent probes succeeded; infrastructure cause remains unproven.",
+  "owned_services_stopped": true
+}

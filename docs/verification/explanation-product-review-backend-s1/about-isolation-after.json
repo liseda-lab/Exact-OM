@@ -1,0 +1,42 @@
+{
+  "schema": "exact-s1-junit-summary/1",
+  "name": "about-isolation-after",
+  "source_junit_sha256": "sha256:ccce0039b8df601687608143e051b3ef0deb8e6d6d269109f709868a85592f7b",
+  "suites": [
+    {
+      "name": "pytest",
+      "errors": "0",
+      "failures": "1",
+      "skipped": "1",
+      "tests": "14",
+      "time": "81.766",
+      "timestamp": "2026-10-10T15:55:57.337719+01:00",
+      "hostname": "Pedros-MacBook-Pro-4.local"
+    }
+  ],
+  "exceptions": [
+    {
+      "test": {
+        "classname": "tests.explanation_review_publication_test",
+        "name": "test_review_purpose_is_explicit_and_test_only_at_actual_api",
+        "time": "7.683"
+      },
+      "kind": "failure",
+      "detail": {
+        "message": "TypeError: tuple indices must be integers or slices, not str"
+      }
+    },
+    {
+      "test": {
+        "classname": "tests.explanation_study_v2_test",
+        "name": "test_v2_postgresql_backup_restore_preserves_training_and_draft",
+        "time": "7.148"
+      },
+      "kind": "skipped",
+      "detail": {
+        "type": "pytest.skip",
+        "message": "Dedicated PostgreSQL URL, PGBIN and PGDATA required for v2 backup/restore"
+      }
+    }
+  ]
+}

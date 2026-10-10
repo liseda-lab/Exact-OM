@@ -1,0 +1,14 @@
+{
+  "pairs": 120,
+  "prefilter_event_states": [
+    {
+      "status": "not_recorded",
+      "reason_code": "historical_stage_record_not_exported",
+      "exact_basis_status": "not_recorded",
+      "count": 120
+    }
+  ],
+  "saved_prefilter_flags": {
+    "None": 120
+  }
+}

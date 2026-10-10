@@ -1,0 +1,1912 @@
+{
+  "schema": "exact-product-review-backend-s1-receipt/1",
+  "runtime_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+  "verifier_commit": "3a1ecb7ab2967b5955b76864aa68a2cf7456965d",
+  "audit_tool_commit": "629bec57d5d7be3b67f4a2d940f6d5f868ca2dc2",
+  "base_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+  "frontend_s0_handoff_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+  "implementation_commits": [
+    {
+      "commit": "629bec57d5d7be3b67f4a2d940f6d5f868ca2dc2",
+      "subject": "test(review): make the independent publication audit portable"
+    },
+    {
+      "commit": "3a1ecb7ab2967b5955b76864aa68a2cf7456965d",
+      "subject": "test(review): select a nonempty recorded hierarchy probe"
+    },
+    {
+      "commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+      "subject": "fix(review): stop waiting when an owned service exits"
+    },
+    {
+      "commit": "394af1ac7b80e8089f6fd06bc1277671279aca9c",
+      "subject": "fix(explain): enforce typed origins in selected evidence views"
+    },
+    {
+      "commit": "4c9a8c995a6ed31fa24d3eab480c25814f47748e",
+      "subject": "fix(study): keep review catalogues outside participant state"
+    },
+    {
+      "commit": "b70f34076bbccbfb4a5f9d322cb25a7a26f6f85b",
+      "subject": "test(review): verify full indexes and preserve explicit coverage limits"
+    },
+    {
+      "commit": "43e8fc23a497807f9d5000028505d12e4c7747ed",
+      "subject": "fix(explain): preserve complete recorded candidate pools and mappings"
+    },
+    {
+      "commit": "66f42ced2a454fb12f1274dafeafb9c1ce110ca0",
+      "subject": "feat(review): prepare reproducible provisional bundles with bound caches"
+    },
+    {
+      "commit": "2682b33c9c932dda7a6f0e3a1d1e65593fe78874",
+      "subject": "fix(review): verify immutable local services and scoped pair data"
+    },
+    {
+      "commit": "7c37436deb04801fbb0663c667d0825abb26983c",
+      "subject": "fix(explain): retain recorded comparisons across scoped workspaces"
+    },
+    {
+      "commit": "00b7a591fa8cf22734733703d5b85bceeb4c4319",
+      "subject": "fix(explain): verify lineage when reusing filtered ontology exports"
+    },
+    {
+      "commit": "178b8f24d28bbf40278a895ff279781da491526f",
+      "subject": "feat(study): freeze provisional review and grounded description contracts"
+    },
+    {
+      "commit": "365558c648f4f802434d97dd2ee906b907ad0760",
+      "subject": "feat(explain): prepare policy-bound native hierarchy navigation"
+    },
+    {
+      "commit": "758082a452248874f4900b21b22d675db74c9373",
+      "subject": "Validate tutorial actions and preserve exact evidence provenance"
+    },
+    {
+      "commit": "a964a2445ed740278c948e816a27bbfb010d021a",
+      "subject": "fix(study): reject malformed review method lists"
+    },
+    {
+      "commit": "7c36bf4eab8ae15f4461e8535dc9b941ef8b9b83",
+      "subject": "feat(review): manage durable owned local review services"
+    },
+    {
+      "commit": "016976dca254fcdb1a808f523aed002cc7e54f28",
+      "subject": "feat(study): version review forms and restricted method exports"
+    }
+  ],
+  "reviewed_inputs": {
+    "specs/explanation-framework/20-review-corrective-programme.md": {
+      "sha256": "sha256:8249cf73f5c4b64a333404ecbf2fa3512d758e3fb17f425192e51c5cae72774f",
+      "state": "pre_existing_uncommitted_input_preserved"
+    },
+    "specs/explanation-framework/21-review-frontend-corrections.md": {
+      "sha256": "sha256:bfce50c39c63a3a835eb0b02e6a3a249d4bf5763d0ad27a753c909608d5c4f54",
+      "state": "pre_existing_uncommitted_input_preserved"
+    },
+    "specs/explanation-framework/22-review-backend-and-data.md": {
+      "sha256": "sha256:aa36e77695fdcc923b74ce4c5c34e83f2cc63d8b270053455f6810e3ac1c8c48",
+      "state": "pre_existing_uncommitted_input_preserved"
+    },
+    "docs/verification/explanation-product-review-frontend-s0-followup-2-review.md": {
+      "sha256": "sha256:16919a0e1168097f635f77e7aa99ac70634b720c585427cda09697b275038858",
+      "state": "pre_existing_uncommitted_input_preserved"
+    }
+  },
+  "stage": "S1",
+  "intended_use": "development_review",
+  "synthetic": false,
+  "conclusions": {
+    "runtime_implementation": "verified_with_recorded_limits",
+    "real_data_bundle": "interim_not_full_acceptance",
+    "joint_acceptance": "S2_and_S3_pending",
+    "research_launch": "not_ready"
+  },
+  "source": {
+    "locator": "/home/pgcotovio/Exact-OM/data/experiments-v2/g0-validation-10/local300/run",
+    "git": {
+      "branch": "dev",
+      "commit": "c86f540a21fab81d123f9d7b2656a73b17e82632",
+      "dirty": true,
+      "source_tree": {
+        "files": 248,
+        "sha256": "9c92e5a5e330741e600a41a393b51a753acfe0d71e8e6c449a7ac6b3b64387ca"
+      },
+      "worktree_source": {
+        "files": 1,
+        "sha256": "5fdc61839c6f43b724e6f178b4f7fc1660fd21291536daa2681c437bb9d1382e"
+      }
+    },
+    "split_role": "development",
+    "reference_role": "valid",
+    "ended_at": "2026-09-18T12:13:43.099568+00:00",
+    "dataset_lock": null,
+    "candidate_pool_fingerprint": "5148597e23d8c7479842b09396996897a8876ba617acab1dc8ab86c5256bf5de",
+    "resolved_config_hash": "bcce69e056e554f5a9f20c2d79a975a3cb63b7d207046a463e5ae68095249bb0",
+    "experiment_config_hash": "e3155a37e17418b9adfc6ee4e2d82b729dcdef24297e274879019fd01209c72e",
+    "selection_uses_reference_labels": false,
+    "upstream_population": "Reference-based development/validation sampling; seed17 cap300; not an unbiased effectiveness sample.",
+    "run_manifest_sha256": "sha256:85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2",
+    "experiment_manifest_sha256": "sha256:78b2a720905e1429d02e053f1692c221be3686141bfece7e6f156337fb04327a",
+    "private_import": {
+      "implementation": "decision-adapter/7",
+      "revision": "sha256:b95522232b97e0602175f297e8e59e77871766714d414ba8ef54b64f1ee31b57",
+      "counts": {
+        "pairs": 30374,
+        "provenance_unavailable": 1019417,
+        "selected_evidence": 1027952,
+        "source_candidates_without_explanations": 155,
+        "source_decision_candidates": 30374
+      },
+      "database_hash": "sha256:b405a4834c5d0b5753f3cc97df8e32079e51b3e92154c4a612b906151282dac4",
+      "dependencies": {
+        "alignment/paper.maps_global.tsv": "sha256:df1acd3e33c52cb76823a3c0b498c3f72ade6d03e150663d6999caef36a3ba38",
+        "config.yaml": "sha256:ef022a871b9a540f74449e9e49f5cd6f807714f21b682a28adbf33c75c506262",
+        "dataset/candidate_pool_manifest.json": "sha256:12bb8e69d170bb8712a73386741ea7bc489a55185d109a4f444a187045770c52",
+        "explanations/index.json": "sha256:a819694af32ff5fef40fb00082aad8671ee8ddc596727262d2f019ba145e3619",
+        "explanations/shards/g4ec738442af4-00000.jsonl.zst": "sha256:0130ad89a07879fd10f93ae0513edea24d0420edf5665c68526513de33d42be5",
+        "explanations/shards/g4ec738442af4-00001.jsonl.zst": "sha256:ed5e8abd80a64bde8d3ecf00a8e1eac18797fafbbfe9a9664a9c051190d7ac64",
+        "explanations/shards/g4ec738442af4-00002.jsonl.zst": "sha256:edd2a638f16600b9fbe56c8c71df0658822470aa03b01357fc8dfe7750276438",
+        "explanations/shards/g4ec738442af4-00003.jsonl.zst": "sha256:ad8ffdba3759afe504906770ccbc029e698bb1fd056033933afbe712902c7647",
+        "explanations/shards/g4ec738442af4-00004.jsonl.zst": "sha256:cffcbae405f6fb5b2143f24e62c9e10d783d4e76fa2a5bf5df236fbf20119cd4",
+        "explanations/shards/g4ec738442af4-00005.jsonl.zst": "sha256:332ab8d29a26ad2dcd502c66aab0891d091fd37a9c75a12fdf1f80d134357e46",
+        "explanations/shards/g4ec738442af4-00006.jsonl.zst": "sha256:c00cb07ed34ce58396d9bd3a3fe8d6a596ea2dc0eb22595d59a30e7aab93206f",
+        "explanations/shards/g4ec738442af4-00007.jsonl.zst": "sha256:a1ab80b2ffa08f18db9fb5a2a2d7056f480dbb42f3c1d324b06e21c9482d3dcb",
+        "run_manifest.json": "sha256:85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2",
+        "source_decisions.json": "sha256:bb70a75555131af2eada72a792016b67ba56f66653a68389c83689f61dcdf251"
+      },
+      "dependency_inventory_hash": "sha256:33b74225e28c68a878eba228414c33bdab3f3ef2dc99f3ead65371235247a5d6",
+      "dependency_inventory_schema": "exact-decision-dependency-inventory/1",
+      "ontology_input_binding": {
+        "source": {
+          "context_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+          "producer_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+          "status": "verified"
+        },
+        "status": "verified",
+        "target": {
+          "context_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+          "producer_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+          "status": "verified"
+        }
+      }
+    },
+    "checkpoint_identities": [
+      {
+        "path": "checkpoints/inference_1789729285.json",
+        "bytes": 13803,
+        "sha256": "sha256:c66411ec9b3d798e965e20be842b3d540289c65c3d57189dfbd639b2dd19cba7"
+      },
+      {
+        "path": "checkpoints/inference_additional_models_872cb53e68f5.jsonl.zst",
+        "bytes": 34772946,
+        "sha256": "sha256:cd1dde4fd5fc66a61f9a819d93dfe82ec02a00b523c91e5ef7817cf58bda04f1"
+      }
+    ]
+  },
+  "requirements": {
+    "B01": {
+      "u_ids": [
+        "U01",
+        "U02",
+        "U03",
+        "U04"
+      ],
+      "status": "implemented_backend_verified",
+      "commits": [
+        "758082a",
+        "016976d",
+        "394af1a"
+      ],
+      "next_owner": "frontend_S2"
+    },
+    "B02": {
+      "u_ids": [
+        "U09",
+        "U12",
+        "U18"
+      ],
+      "status": "interim_real_bundle_coverage_and_admission_gaps",
+      "commits": [
+        "178b8f2",
+        "00b7a59",
+        "66f42ce",
+        "43e8fc2",
+        "4c9a8c9",
+        "394af1a"
+      ],
+      "next_owner": "backend_data_and_frontend_S2"
+    },
+    "B03": {
+      "u_ids": [
+        "U10",
+        "U11",
+        "U12"
+      ],
+      "status": "runtime_verified_real_inference_incomplete",
+      "commits": [
+        "365558c",
+        "00b7a59"
+      ],
+      "next_owner": "backend_data_and_frontend_S2"
+    },
+    "B04": {
+      "u_ids": [
+        "U06",
+        "U08"
+      ],
+      "status": "typed_path_verified_real_prose_unapproved",
+      "commits": [
+        "178b8f2",
+        "66f42ce"
+      ],
+      "next_owner": "backend_preparation_and_frontend_S2"
+    },
+    "B05": {
+      "u_ids": [
+        "U07",
+        "U15"
+      ],
+      "status": "implemented_backend_verified_recorded_coverage_limits",
+      "commits": [
+        "758082a",
+        "7c37436",
+        "43e8fc2",
+        "394af1a"
+      ],
+      "next_owner": "frontend_S2"
+    },
+    "B06": {
+      "u_ids": [
+        "U13",
+        "U14"
+      ],
+      "status": "implemented_backend_verified",
+      "commits": [
+        "016976d",
+        "a964a24",
+        "4c9a8c9"
+      ],
+      "next_owner": "frontend_S2"
+    },
+    "B07": {
+      "u_ids": [
+        "U17"
+      ],
+      "status": "portable_API_verified_rendered_browser_pending",
+      "commits": [
+        "7c36bf4",
+        "2682b33",
+        "66f42ce",
+        "b70f340",
+        "a06af6e",
+        "3a1ecb7"
+      ],
+      "next_owner": "frontend_S2_S3_and_local_browser_setup"
+    }
+  },
+  "ontology_contexts": [
+    {
+      "manifest_sha256": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652",
+      "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "name": "DOID",
+      "identity": {
+        "documents": [
+          "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+        ],
+        "import_policy": "ignore",
+        "imports": [
+          {
+            "import_iri": "http://purl.obolibrary.org/obo/doid/obo/ext.owl",
+            "source_sha256": null,
+            "status": "ignored"
+          }
+        ],
+        "logical_fingerprint": "2d9125c6ee91e909f756a8bc12fcba1872a705aeb0ec150af94f634bc3b21983",
+        "parser": {
+          "backend": "native",
+          "options": {
+            "allow_partial_rdf_mapping": false,
+            "backend": "native",
+            "collect_provenance": true,
+            "deterministic": true,
+            "format": null,
+            "imports": "ignore",
+            "limits": {
+              "cancellation_check_interval": 4096,
+              "deadline_seconds": null,
+              "max_annotations": 100000000,
+              "max_axioms": 100000000,
+              "max_canonical_work": 1000000000,
+              "max_catalog_rewrites": 128,
+              "max_composite_members": 1024,
+              "max_concurrent_fetches": 8,
+              "max_decompressed_bytes": 8589934592,
+              "max_delta_entries": 10000000,
+              "max_diagnostics": 10000,
+              "max_disk_cache_bytes": 68719476736,
+              "max_documents": 1000,
+              "max_import_depth": 128,
+              "max_index_bytes": 17179869184,
+              "max_index_rows": 500000000,
+              "max_iri_bytes": 1048576,
+              "max_literal_bytes": 67108864,
+              "max_memory_bytes": null,
+              "max_nesting_depth": 512,
+              "max_origin_entries": 100000000,
+              "max_overlay_depth": 32,
+              "max_prefixes": 1000000,
+              "max_rdf_list_length": 10000000,
+              "max_redirects": 5,
+              "max_resolver_attempts": 10000,
+              "max_rule_atoms": 10000000,
+              "max_sequence_arity": 10000000,
+              "max_source_bytes": 2147483648,
+              "max_source_map_entries": 100000000,
+              "max_strings": 500000000,
+              "max_temporary_bytes": 17179869184,
+              "max_terms": 500000000,
+              "max_total_source_bytes": 8589934592,
+              "max_triples": 100000000,
+              "max_wire_bytes": 17179869184,
+              "max_wire_rows": 500000000,
+              "type": "ParseLimits"
+            },
+            "offline": true,
+            "preserve_source_map": true,
+            "type": "LoadOptions",
+            "validate_owl2_dl": false
+          },
+          "package": "pyowl-core",
+          "version": "0.2.1"
+        },
+        "root_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+        "schema": "exact-context/2",
+        "scope": "root",
+        "structural_fingerprint": "5322162533d2f0b71e89d10e0ad61c0180fb5e08a5b3e2607b3959e3da88f8b2"
+      },
+      "scope": "root",
+      "completeness": {
+        "axiom_count": 91530,
+        "category_counts": {
+          "axioms": 14790,
+          "characteristics": 20,
+          "comments": 1122,
+          "definitions": 10568,
+          "hierarchy": 17222,
+          "labels": 14768,
+          "restrictions": 10349,
+          "synonyms": 22691
+        },
+        "domain_completeness": "not_established",
+        "entity_count": 16395,
+        "extraction": "complete_for_policy",
+        "imports_complete": false,
+        "scope": "root"
+      },
+      "source_derivation": {
+        "original_source_sha256": "sha256:611355c445537fcf4bae2c519f1b3598af5a8fea793274316e35525b7d05e945",
+        "receipt_hash": "sha256:6a1d35517cee385a8ce5a07f80342b33f8168455aa6370f1534742d192cb76cb",
+        "status": "declared_derivative"
+      },
+      "sources": [
+        {
+          "document_key": "d2:baf7a12f1e0e7c75a07aeae7062e78687d471a4e455c41e0e00f5e773998669f",
+          "format": "rdfxml",
+          "ontology_id": {
+            "ontology_iri": {
+              "type": "IRI",
+              "value": "http://purl.obolibrary.org/obo/doid.owl"
+            },
+            "type": "OntologyID",
+            "version_iri": {
+              "type": "IRI",
+              "value": "http://purl.obolibrary.org/obo/doid/releases/2026-05-30/doid.owl"
+            }
+          },
+          "source_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+        }
+      ],
+      "policy_filter": {
+        "policy": {
+          "allow_mapping_xrefs": false,
+          "categories": [
+            "labels",
+            "definitions",
+            "definition_citations",
+            "term_metadata",
+            "synonyms",
+            "comments",
+            "hierarchy",
+            "parents",
+            "children",
+            "restrictions",
+            "usage",
+            "axioms",
+            "types",
+            "assertions",
+            "domains",
+            "ranges",
+            "characteristics",
+            "equivalences"
+          ],
+          "ontology_ids": [],
+          "policy_id": "exploration-v1"
+        },
+        "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+        "schema": "exact-policy-context/2",
+        "source_context_sha256": "sha256:0d74b600700268df3faeaad671ef399b2edd705080929a7d6ba551a4c412cb92"
+      },
+      "capabilities": {
+        "categories": [
+          "axioms",
+          "characteristics",
+          "comments",
+          "definitions",
+          "hierarchy",
+          "labels",
+          "restrictions",
+          "synonyms"
+        ],
+        "kinds": [
+          "class",
+          "data_property",
+          "individual",
+          "object_property"
+        ],
+        "navigation": {
+          "contract_version": "exact-hierarchy/1",
+          "entry_points": "available"
+        },
+        "provider": "owl",
+        "reasoner_inferred": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "ReasonerInterruptedError",
+          "input_sha256": "sha256:77507055c3e4b5db42691a473eb4a16dfc0f6cbceb74d9119798a5c69217e8c4",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 900.0
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": false,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "source_spans": false,
+        "typed_expressions": true
+      },
+      "navigation": {
+        "context_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+        "contract_version": "exact-hierarchy/1",
+        "entry_points": "available",
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "ReasonerInterruptedError",
+          "input_sha256": "sha256:77507055c3e4b5db42691a473eb4a16dfc0f6cbceb74d9119798a5c69217e8c4",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 900.0
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": false,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+        "order": "root_priority_label_iri",
+        "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+        "preparation_key": "sha256:37a4f7f936c26be03420f050349e7d18c8ecc29c0a808809be69d0a916ada902",
+        "runtime": {
+          "peak_rss_bytes": 299384832,
+          "preparation_seconds": 905.1937766319606
+        },
+        "source_documents": [
+          "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+        ],
+        "source_root_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+      }
+    },
+    {
+      "manifest_sha256": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82",
+      "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "name": "NCIT",
+      "identity": {
+        "documents": [
+          "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+        ],
+        "import_policy": "ignore",
+        "imports": [],
+        "logical_fingerprint": "f93ba368ffbf82224ae29dbfe308eff4c1483f3f113acb78579fb16b548029f2",
+        "parser": {
+          "backend": "native",
+          "options": {
+            "allow_partial_rdf_mapping": false,
+            "backend": "native",
+            "collect_provenance": true,
+            "deterministic": true,
+            "format": null,
+            "imports": "ignore",
+            "limits": {
+              "cancellation_check_interval": 4096,
+              "deadline_seconds": null,
+              "max_annotations": 100000000,
+              "max_axioms": 100000000,
+              "max_canonical_work": 1000000000,
+              "max_catalog_rewrites": 128,
+              "max_composite_members": 1024,
+              "max_concurrent_fetches": 8,
+              "max_decompressed_bytes": 8589934592,
+              "max_delta_entries": 10000000,
+              "max_diagnostics": 10000,
+              "max_disk_cache_bytes": 68719476736,
+              "max_documents": 1000,
+              "max_import_depth": 128,
+              "max_index_bytes": 17179869184,
+              "max_index_rows": 500000000,
+              "max_iri_bytes": 1048576,
+              "max_literal_bytes": 67108864,
+              "max_memory_bytes": null,
+              "max_nesting_depth": 512,
+              "max_origin_entries": 100000000,
+              "max_overlay_depth": 32,
+              "max_prefixes": 1000000,
+              "max_rdf_list_length": 10000000,
+              "max_redirects": 5,
+              "max_resolver_attempts": 10000,
+              "max_rule_atoms": 10000000,
+              "max_sequence_arity": 10000000,
+              "max_source_bytes": 2147483648,
+              "max_source_map_entries": 100000000,
+              "max_strings": 500000000,
+              "max_temporary_bytes": 17179869184,
+              "max_terms": 500000000,
+              "max_total_source_bytes": 8589934592,
+              "max_triples": 100000000,
+              "max_wire_bytes": 17179869184,
+              "max_wire_rows": 500000000,
+              "type": "ParseLimits"
+            },
+            "offline": true,
+            "preserve_source_map": true,
+            "type": "LoadOptions",
+            "validate_owl2_dl": false
+          },
+          "package": "pyowl-core",
+          "version": "0.2.1"
+        },
+        "root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+        "schema": "exact-context/2",
+        "scope": "root",
+        "structural_fingerprint": "1c47a3ea3a28726aa0473702eff789ad5d768cf8cd85e1579eef26701cac7c0c"
+      },
+      "scope": "root",
+      "completeness": {
+        "axiom_count": 1798045,
+        "category_counts": {
+          "axioms": 212418,
+          "characteristics": 13,
+          "comments": 3,
+          "definition_citations": 2,
+          "definitions": 174618,
+          "domains": 86,
+          "hierarchy": 209562,
+          "labels": 424405,
+          "ranges": 232,
+          "restrictions": 82924,
+          "synonyms": 693782
+        },
+        "domain_completeness": "not_established",
+        "entity_count": 212055,
+        "extraction": "complete_for_policy",
+        "imports_complete": true,
+        "scope": "root"
+      },
+      "source_derivation": null,
+      "sources": [
+        {
+          "document_key": "d2:d1fe917975eb9b0d6a82e295822822784ca3c3706ef0c8884c5ead63635f1abc",
+          "format": "rdfxml",
+          "ontology_id": {
+            "ontology_iri": {
+              "type": "IRI",
+              "value": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl"
+            },
+            "type": "OntologyID",
+            "version_iri": null
+          },
+          "source_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+        }
+      ],
+      "policy_filter": {
+        "policy": {
+          "allow_mapping_xrefs": false,
+          "categories": [
+            "labels",
+            "definitions",
+            "definition_citations",
+            "term_metadata",
+            "synonyms",
+            "comments",
+            "hierarchy",
+            "parents",
+            "children",
+            "restrictions",
+            "usage",
+            "axioms",
+            "types",
+            "assertions",
+            "domains",
+            "ranges",
+            "characteristics",
+            "equivalences"
+          ],
+          "ontology_ids": [],
+          "policy_id": "exploration-v1"
+        },
+        "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+        "schema": "exact-policy-context/2",
+        "source_context_sha256": "sha256:fd1cbbc0cfc90750db24e3bde46755e0d22e8d7c149508b11e68de186bc00b5b"
+      },
+      "capabilities": {
+        "categories": [
+          "axioms",
+          "characteristics",
+          "comments",
+          "definition_citations",
+          "definitions",
+          "domains",
+          "hierarchy",
+          "labels",
+          "ranges",
+          "restrictions",
+          "synonyms"
+        ],
+        "kinds": [
+          "class",
+          "data_property",
+          "individual",
+          "object_property"
+        ],
+        "navigation": {
+          "contract_version": "exact-hierarchy/1",
+          "entry_points": "available"
+        },
+        "provider": "owl",
+        "reasoner_inferred": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "source_spans": false,
+        "typed_expressions": true
+      },
+      "navigation": {
+        "context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+        "contract_version": "exact-hierarchy/1",
+        "entry_points": "available",
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+        "order": "root_priority_label_iri",
+        "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+        "preparation_key": "sha256:21664072320e1fe88c020fa379a8323e06c941b71d859028ea1610a76b092eba",
+        "runtime": {
+          "peak_rss_bytes": 1517547520,
+          "preparation_seconds": 415.4505164269358
+        },
+        "source_documents": [
+          "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+        ],
+        "source_root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+      }
+    }
+  ],
+  "setup": {
+    "platform": "macOS-26.5.2-x86_64-i386-64bit",
+    "python": "3.12.3 (main, Apr  9 2024, 08:09:14) [Clang 15.0.0 (clang-1500.3.9.4)]",
+    "packages": {
+      "fastapi": "0.116.2",
+      "starlette": "0.48.0",
+      "uvicorn": "0.35.0",
+      "h11": "0.16.0",
+      "pydantic": "2.13.4",
+      "sqlalchemy": "not_installed_under_this_name",
+      "httpx": "0.28.1",
+      "pyowl-core": "0.2.1",
+      "pyhermit": "0.2.3",
+      "pytest": "9.1.1",
+      "psycopg": "3.3.6",
+      "pydantic-settings": "2.14.2",
+      "pgserver": "0.1.4"
+    },
+    "frontend_build": "exact-explain-ui-1.2",
+    "frontend_source_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+    "tls": "certificate_verified_local_HTTPS",
+    "csp": "normal_service_policy",
+    "database": "dedicated_local_PostgreSQL",
+    "ports": {
+      "postgresql": 19183,
+      "study": 19184,
+      "exploration": 19185
+    }
+  },
+  "runtime_contract_hashes": {
+    "specs/explanation-framework/protocol/description-review.runtime-schema.json": "sha256:77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "specs/explanation-framework/protocol/exploration.runtime-openapi.json": "sha256:676fec06883c072896cb2cd98423b5a5b50cd8fcd4069668cac82fab1c3fdc72",
+    "specs/explanation-framework/protocol/review-about.runtime-schema.json": "sha256:75425ce843b5e157676a2d741ee2c185d2468a83bcbfd244c4e095cb30a6584c",
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "sha256:0b2fda6005b4092b2f8e4cce30b60002904c90e82710fea9a0ca6942799658c8",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "sha256:614f7414c71022472819359dd3ebb7c779f61dc3f74e677ccf73fa3ed53fe3ec",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "sha256:f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "sha256:752d8c9b711313df1119b8367a61c58ff4953c6d850ba4275ec97585c534f3ff"
+  },
+  "regressions": {
+    "totals_are_overlapping": true,
+    "evidence_index": "explanation-product-review-backend-s1/index.json",
+    "initial_runtime_invocation": "incorrect test filename; no tests collected; corrected invocation recorded in latest-runtime.json",
+    "torch_dependent_modules": "explanation_decisions_test.py and explanation_replay_test.py unavailable in local runtime; not passed",
+    "command_corrections": [
+      "Final subject suite initially used nonexistent explanation_policy_export_test.py; no tests collected. Corrected to explanation_export_policy_test.py; final JUnit records actual tests."
+    ],
+    "docker": "CLI installed but daemon unavailable; image copy and cold import checked; no actual container build/run claimed"
+  },
+  "provider": {
+    "account_charge_status": "unverified",
+    "attempt_count": 77,
+    "completion_marker_present": false,
+    "generation_attempt": 2,
+    "ledger_sha256": "sha256:eec176a1a531a52cbac7df1c2cd71f2bf1815edef9b52639782d74e8116e43ab",
+    "outcomes": [
+      {
+        "count": 76,
+        "http_status": 200,
+        "state": "completed"
+      },
+      {
+        "count": 1,
+        "http_status": null,
+        "state": "unknown"
+      }
+    ],
+    "raw_reuse_for_corrected_prompt": false,
+    "recorded_usage_tokens": {
+      "completion_tokens": 26865,
+      "prompt_tokens": 325098,
+      "total_tokens": 351963
+    },
+    "reported_usage_cost_usd": "0.06488370",
+    "request_count": 77,
+    "saved_explanation_tasks": {
+      "entity_profile": 66,
+      "pair_comparison": 10
+    },
+    "saved_explanations": 76,
+    "saved_response_files": 76,
+    "schema": "exact-review-stopped-attempt/1",
+    "semantic_status": "No schema-valid prose review requests; malformed responses remain unchanged and unapproved.",
+    "successful_usage_records": 76,
+    "unknown_delivery_cost": "unknown; not included in successful usage sum"
+  },
+  "corrected_provider_batch": {
+    "status": "awaiting_additional_explicit_authorization",
+    "plan_sha256": "sha256:02264c7889aa4525e6bc517717fe39b570f01cccc7326401befa1062ba14bafe",
+    "profile_count": 74,
+    "comparison_count": 12,
+    "automatic_http_retries": 0,
+    "semantic_repairs": 0,
+    "unknown_delivery_retry": false
+  },
+  "corrected_findings": [
+    {
+      "id": "S1-CF01",
+      "finding": "Future review cases disclosed through About metadata",
+      "severity": "P1",
+      "owner": "backend isolation",
+      "cause_and_disposition": "Actual HTTP reproduction exposed the whole catalogue before assignment. Participant state now receives aggregate-only metadata (`cases: []`) on fresh responses and old mutation replay; full owner catalogue, immutable publication bytes, stored receipts and request hashes are retained."
+    },
+    {
+      "id": "S1-CF02",
+      "finding": "Implicit or cross-scope tutorial evidence",
+      "severity": "P1",
+      "owner": "backend contract",
+      "cause_and_disposition": "Strict typed/action-specific admission preserved; no default fact or class is introduced. Actual API regressions check atomic rejection and subsequent success."
+    },
+    {
+      "id": "S1-CF03",
+      "finding": "Unresolved correctness admitted outside review purpose",
+      "severity": "P1",
+      "owner": "backend",
+      "cause_and_disposition": "Shared key enums exposed a missing purpose guard. Both unresolved key kind and origin now require development review. HTTP rejection leaves no study row."
+    },
+    {
+      "id": "S1-CF04",
+      "finding": "Reviewed prose envelope could be detached from complete generation provenance",
+      "severity": "P1",
+      "owner": "backend",
+      "cause_and_disposition": "Added full manifest/review/input validation including nested model revalidation and forgery cases."
+    },
+    {
+      "id": "S1-CF05",
+      "finding": "Selected evidence promoted neighbour-origin facts to focal citations",
+      "severity": "P1",
+      "owner": "backend evidence",
+      "cause_and_disposition": "Actual first-case publication rejected 16 links whose original axioms did not reference the focal typed entity. The general resolver intentionally supports neighbouring origins; selected-evidence admission/read/export lacked the narrower subject boundary. Retain the raw records, selection counts and strict workspace check; require the focal typed binding and preserve unsupported links as explicit unresolved records. The public policy export is rebuilt under a new exporter identity."
+    },
+    {
+      "id": "S1-CF06",
+      "finding": "Legacy workspace evidence could expose unadmitted selected text",
+      "severity": "P1",
+      "owner": "backend",
+      "cause_and_disposition": "Apply the same policy filter on admission and reads, retaining missingness tombstones and original frozen bytes."
+    },
+    {
+      "id": "S1-CF07",
+      "finding": "Filtered full ontology export encountered absent original syntax",
+      "severity": "P1",
+      "owner": "preparation",
+      "cause_and_disposition": "Policy-filtered contexts deliberately omit raw syntax. Reconstruct only allowlisted native typed nodes and verify canonical/typed round-trip agreement, rather than parsing another syntax or restoring hidden content."
+    },
+    {
+      "id": "S1-CF08",
+      "finding": "Position-only tutorial save failed revalidation",
+      "severity": "P2",
+      "owner": "backend",
+      "cause_and_disposition": "Default-filled serialization introduced an omitted legacy alias. Revalidation now retains original field presence while historical request hashes remain unchanged."
+    },
+    {
+      "id": "S1-CF09",
+      "finding": "Structured 422 changed legacy detail shape and misidentified nested array indices",
+      "severity": "P2",
+      "owner": "backend",
+      "cause_and_disposition": "Retain sanitized legacy detail and derive action indices only immediately after `actions`; regression includes multiple nested indices."
+    },
+    {
+      "id": "S1-CF10",
+      "finding": "New runtime modules absent from study image",
+      "severity": "P1",
+      "owner": "packaging",
+      "cause_and_disposition": "Explicit image copy closure and cold-import checks updated; no matcher/native runtime dependency is imported by the cold study service."
+    },
+    {
+      "id": "S1-CF11",
+      "finding": "Full saved candidate pool was incomplete in the exploration index",
+      "severity": "P1",
+      "owner": "backend",
+      "cause_and_disposition": "The importer unioned explanations and mapping/decision records but omitted 155 source-decision candidates without explanations. Added the saved typed candidate universe, retaining exact source-record locations and allowlisted scores; missing stage events remain `not_recorded`, while evidence exports remain `not_exported`. Saved array position is not a rank."
+    },
+    {
+      "id": "S1-CF12",
+      "finding": "Manifest-declared global mapping filename was ignored",
+      "severity": "P1",
+      "owner": "backend provenance",
+      "cause_and_disposition": "The real manifest retained `alignment/paper.maps_global.tsv`, while the reader looked only for its canonical filename. Bind the unique declared mapping path and hash through the supported reader; do not rename or invent producer history."
+    },
+    {
+      "id": "S1-CF13",
+      "finding": "Cross-side comparison evidence was retained but not imported",
+      "severity": "P1",
+      "owner": "backend",
+      "cause_and_disposition": "The historical producer saved `cross_side_provenance`, while the adapter read only the newer `evidence_bridges` form. Resolve exact recorded aliases by side, typed entity, channel and family; preserve unresolved/ambiguous records and distinguish entity/channel comparisons from two-feature correspondences. Main and authorized study now share the same policy-filtered metadata."
+    },
+    {
+      "id": "S1-CF14",
+      "finding": "Cached preparation result belonged to another request",
+      "severity": "P1",
+      "owner": "preparation",
+      "cause_and_disposition": "Independent review reproduced a copied-result cache substitution. Bind cached request, receipt and result to the exact job identity before reuse; the regression uses local stubs and makes no provider requests."
+    },
+    {
+      "id": "S1-CF15",
+      "finding": "Startup kept waiting after an owned worker exited",
+      "severity": "P2",
+      "owner": "local review lifecycle",
+      "cause_and_disposition": "The readiness loop retried connection errors after the child had already terminated, consuming the full admission timeout. Check the recorded process ownership before and after readiness probes, fail with a safe role-specific diagnostic, and retain rollback of only newly started owned roles. This does not identify or suppress the separate Git-identity failure."
+    },
+    {
+      "id": "S1-CF16",
+      "finding": "Real hierarchy verification assumed the first focal class had asserted edges",
+      "severity": "P2",
+      "owner": "verification",
+      "cause_and_disposition": "Both services correctly returned empty asserted pages for the first NCIT focal class. Probe up to 200 unique frozen typed classes, preserving status/count/edge/continuation parity even on empty probes; unavailable responses still fail. Regressions cover a valid later class, cross-service disagreement and unavailable status. Preserve the earlier partial journey and bind reused full-inventory evidence by hash."
+    },
+    {
+      "id": "S1-CF17",
+      "finding": "Portable offline audit omitted selection metadata",
+      "severity": "P2",
+      "owner": "review packaging",
+      "cause_and_disposition": "The runtime input whitelist correctly omitted an owner-only file, but the documented audit expected `selection.json` beside that input. Deliver the exact selection as a separate owner-audit sidecar and pass it explicitly; retain mandatory equality to the frozen publication’s selection hash. Preserve the 696 runtime input files and original inventory, and rerun the audit against the delivered copy."
+    },
+    {
+      "id": "S1-CF18",
+      "finding": "Provider prose omitted required claim structure",
+      "severity": "P1",
+      "owner": "preparation",
+      "cause_and_disposition": "The first prose prompt did not state the full JSON shape. Preserve malformed saved outputs; add a new prompt identity with exact field/category rules and transport-boundary regressions. No permissive normalization or semantic self-approval."
+    }
+  ],
+  "browser_verification": {
+    "schema": "exact-s1-browser-attempt/1",
+    "recorded_at": "2026-10-10T15:51:57.326823+00:00",
+    "backend_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+    "frontend_source_commit": "ffd390f35c108abe47f5603b91d28bd1a54e590d",
+    "browser": "Codex In-app Browser",
+    "tool": "mcp__cua_repl",
+    "url": "https://127.0.0.1:19185/",
+    "status": "blocked_by_untrusted_local_certificate",
+    "browser_error": "net::ERR_CERT_AUTHORITY_INVALID",
+    "certificate_file_sha256": "sha256:e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+    "rendered_page_inspected": false,
+    "screenshots": [],
+    "certificate_warning_bypassed": false,
+    "trust_settings_changed": false,
+    "global_tls_validation_disabled": false,
+    "boundary": "No rendered main/study browser acceptance. Exact-certificate HTTPS API checks are separately recorded. S0 cannot negotiate forms3 until S2."
+  },
+  "unresolved_findings": [
+    {
+      "id": "B07-performance",
+      "severity": "P2_acceptance",
+      "owner": "backend_local_performance",
+      "status": "measured_outliers_not_closed",
+      "remaining": "Cold start130.798s and first explanation-condition current-case (case13)25.413s/main pair metadata7.861s; record isolated profiling and satisfy agreed cold/first-use acceptance without bypassing integrity checks."
+    },
+    {
+      "id": "B07-rendered-browser",
+      "severity": "verification_limit",
+      "owner": "local_browser_setup_then_frontend_S2_S3",
+      "status": "blocked_by_untrusted_local_certificate",
+      "remaining": "Trust the exact local certificate using the documented owner workflow, then run rendered main and integrated S2 journeys. No browser pass or screenshot is claimed."
+    },
+    {
+      "id": "B07-intermittent-worker-git",
+      "severity": "P2_environment",
+      "owner": "backend_local_environment",
+      "status": "unresolved_not_reproduced_in_instrumented_probes",
+      "remaining": "Two worker startup identity failures observed; six exact-entrypoint Git probes passed in0.010-0.013s. Preserve identity checks and diagnose recurrence; no cause established."
+    },
+    {
+      "id": "B02-full-context",
+      "severity": "P1_acceptance",
+      "owner": "backend_data",
+      "status": "interim_derivative_root_only",
+      "remaining": "Original DOID parsing/import admission including ext.owl; full admitted closure."
+    },
+    {
+      "id": "B02-coverage",
+      "severity": "P2_acceptance",
+      "owner": "backend_data",
+      "status": "missing_in_selected_pool",
+      "remaining": "Sparse selected-feature and rejected/differing-final-decision examples; recorded exact-stage events/basis, admitted-original multi-channel/source-only graph coverage and recorded graph projection support; do not fabricate."
+    },
+    {
+      "id": "B03-real-inference",
+      "severity": "P1_acceptance",
+      "owner": "backend_data",
+      "status": "bounded_native_preparation_failed",
+      "remaining": "Complete native taxonomy on admitted real scope and three real contrasting inferred examples."
+    },
+    {
+      "id": "B04-real-prose",
+      "severity": "P1_acceptance",
+      "owner": "backend_preparation",
+      "status": "malformed_outputs_preserved_unapproved",
+      "remaining": "Authorized corrected batch, structurally valid output, independent semantic audit and a new immutable publication."
+    },
+    {
+      "id": "R16",
+      "severity": "unresolved_historical",
+      "owner": "joint_backend_frontend",
+      "status": "no_cause_or_fix_established",
+      "remaining": "Reproduce browser reload stall and distinguish protocol exception from cause; API disconnect success is not closure."
+    }
+  ],
+  "frontend_followup": [
+    "F05 description preparation/support states",
+    "F06 indexed entry points and hierarchy bases/failure states",
+    "F07 forms3/setup3/consultation3/methods3 negotiation",
+    "F02 guided stable position/action identity",
+    "F08 recorded comparison metadata and typed list/graph identity",
+    "F09 real-case light/dark readability",
+    "Aggregate-only participant About; never fetch owner catalogue in study",
+    "S0 P3 archived recovery presentation",
+    "S3 full compiled frontend HTTPS/PostgreSQL browser Q01-Q12"
+  ],
+  "later_gates": [
+    "final matcher and adjudicated keys/new publication",
+    "manual accessibility/screen reader",
+    "usability/pilot",
+    "study-owner release approval",
+    "deployment and restore verification",
+    "ontology admission and license review"
+  ],
+  "experiments_altered": false,
+  "public_push": false,
+  "public_deployment": false,
+  "independent_review": {
+    "runtime": "Separate agent read-only reviews and targeted reruns; exact boundaries are in the handoff.",
+    "real_bundle": {
+      "status": "passed_with_recorded_coverage_limits",
+      "receipt": "explanation-product-review-backend-s1/published-claim-audit.json",
+      "receipt_sha256": "sha256:81d5e8fb75394c957d90631707570cfa5553a20ccf0cb25cbd08de08091495a1",
+      "audit_script_sha256": "sha256:b95d6b074548b32a3f020ea70d506ddc5801343f7b45498f725cbcc65cc0ae0e",
+      "runtime": {
+        "checkout_commit": "629bec57d5d7be3b67f4a2d940f6d5f868ca2dc2",
+        "imported_module_sha256": {
+          "exact_inspect/__init__.py": "sha256:b90249f8049e876b3700ab1478c227faabe42d70db109fb0386c75f576768bf5",
+          "exact_inspect/artifacts.py": "sha256:ba0887f341f1c31b725f4d12d71c583812f10d9b4f6fbe898f1195e9f3d11a3e",
+          "exact_inspect/context.py": "sha256:7630922ee347ea98a1505b1ef7cf764bce0be8f14456bf76cff0bb5adb1392ac",
+          "exact_inspect/context_prepare.py": "sha256:c2710a92b8db357f50af1d4931514a38b0ab256c05726d3f9af1497d05355f6b",
+          "exact_inspect/context_semantics.py": "sha256:5d378f3df65441dbd62095101996bf139f4473483d662f55b1eebb0b172e2300",
+          "exact_inspect/contracts.py": "sha256:14be5138499d5fb8e63372be987fa07570f37dfcf09bb6d76826c18ed9699fef",
+          "exact_inspect/description_review.py": "sha256:aa9f948f7a258f77b51d25275d37c4881c09a59a50ce78a0fd3008b04b65d1bd",
+          "exact_inspect/descriptions.py": "sha256:8cc76f39a1c52aeefac36cef948f26e6a5a54cc7c56c6d15c9a568a58dd28a33",
+          "exact_inspect/evidence_metadata.py": "sha256:9f14d04b381f96f4976f6c98fe7eec26ff29357e2fa41d6e8872404aa0694c56",
+          "exact_inspect/generation.py": "sha256:eefb4de1881b5fc53981f6fd416921c7c0bb8522ed42f86001c80568b1020212",
+          "exact_inspect/models.py": "sha256:d20289b68d1861484022fd6fe62ebd435f76a39fdc9139db86972c13c11a31a5",
+          "exact_inspect/navigation.py": "sha256:cece04b9726de6cc03dcbdbccdd6f47b0fe07630805ec282880ffdb9a73b118c",
+          "exact_inspect/review_metadata.py": "sha256:6fb2cf5d56f95f838a143ff7445a26989d745ccf4c1fa79d81c9182903eb441a",
+          "exact_inspect/sqlite_safety.py": "sha256:61d120621a051368d2dfe211601231bdef0e4f357fe525cd1c566c7bb796d995",
+          "exact_inspect/study/__init__.py": "sha256:00630050238e2c889f3e9ed9c953efd3a95859f714481f5c80d9e091c561c8d0",
+          "exact_inspect/study/administration.py": "sha256:560bb63ba95dc0f241d0da81ecb73d646dd7f900e140e9889a07c2d4ee2b48e8",
+          "exact_inspect/study/api.py": "sha256:5672dcf7bf27e2d64a8dc53fd6d2a19e401c4298039b0f7e01c2608d188661f4",
+          "exact_inspect/study/exports.py": "sha256:f0ff189f154a949e88c13b859e9a350561f3bd6dc0ed70d85b07838c780bfc27",
+          "exact_inspect/study/forms.py": "sha256:f16d8a9e92ded9bce21f29a5407c5dbf9dcf9377163c496780fd4b5bddb3dbe2",
+          "exact_inspect/study/models.py": "sha256:3eaa389e97b9d7d469106b6393533a00d0805455cb773eee01636a8991cfab03",
+          "exact_inspect/study/owl_ast.py": "sha256:1674d2c9793755ce51e665958bb739d31b8d97975d58bf6b0d28ad122f8e33f9",
+          "exact_inspect/study/resources.py": "sha256:8379457567eaff7dc3512ac63b3bf043fb88208f8406638949443834b88f7569",
+          "exact_inspect/study/review_models.py": "sha256:9605e2612f55685bb94873cee441e2f0cabbea74cf0a3ca3ca316301876383c3",
+          "exact_inspect/study/scoring.py": "sha256:3484f993e306af7adf3d9da44fabd1b5f593edd75ee5f730349728a5f99abd46",
+          "exact_inspect/study/store.py": "sha256:4cf27ca143d194cb05ce9fcda9fe8ee413a03bd60612c24afd8ab65c3a1fa561",
+          "exact_inspect/study/telemetry.py": "sha256:b23fa261f76e68df2594fe536455f6239098c2a156bc0cdde4dcac5acb21b4ba",
+          "exact_inspect/study/v2_models.py": "sha256:967c84c53b593d37ae505c824bea639126f10877d9cd3a4928791b7f00b0db77",
+          "exact_inspect/study/workspace.py": "sha256:915336410be7ee730aee64b107a5ba2e2f21b85675766fa6dc20efcc135b7488"
+        }
+      },
+      "elapsed_seconds": 41.65925904898904,
+      "failures": [],
+      "final_runtime_imported_module_parity": true
+    }
+  },
+  "publication": {
+    "publication_sha256": "sha256:edf000e8498b000493f0f7d9812188e03b6b0241fd84e1ca7508d7afb41a040a",
+    "package_manifest_sha256": "sha256:a00b57c3c5188ecae7ab32f0a041400a440ff7d21ab6898f853a092a0abae683",
+    "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+    "policy_sha256": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "case_count": 24,
+    "pair_count": 120,
+    "unique_results": 260,
+    "unique_claims": 514,
+    "displayed_claim_occurrences": 529,
+    "distinct_typed_original_facts_verified": 1038,
+    "source_contexts": {
+      "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": {
+        "database_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+        "manifest_sha256": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652"
+      },
+      "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": {
+        "database_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+        "manifest_sha256": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82"
+      }
+    }
+  },
+  "published_coverage": {
+    "coverage": {
+      "absent_or_asymmetric_definitions": 5,
+      "close_alternatives": 16,
+      "multiple_parents": 20,
+      "restrictions_or_equivalences": 8,
+      "rich_definitions": 23
+    },
+    "missing_coverage": {
+      "absent_or_asymmetric_definitions": 0,
+      "close_alternatives": 0,
+      "multiple_parents": 0,
+      "restrictions_or_equivalences": 0,
+      "rich_definitions": 0,
+      "sparse_evidence": 3
+    },
+    "evidence_coverage": {
+      "graph_projection": {
+        "not_recorded": 3443,
+        "supported": 0,
+        "unsupported": 0
+      },
+      "origin_resolution": {
+        "not_exported": 0,
+        "resolved": 301,
+        "unresolved": 3142,
+        "withheld": 0
+      },
+      "packet_labels_over_80_character_occurrences": 11,
+      "pair_channels": {
+        "graph_supported_both_sides_multiple_channel_pairs": 0,
+        "graph_supported_source_only_pairs": 0,
+        "resolved_both_sides_multiple_channel_pairs": 0,
+        "resolved_source_only_pairs": 0,
+        "selected_both_sides_multiple_channel_pairs": 112,
+        "selected_source_only_pairs": 11
+      },
+      "pairs_with_available_expression_originals": 16,
+      "preferred_labels_over_80_character_occurrences": 7
+    },
+    "claim_methods": {
+      "asserted_subclass_necessary_condition": 258,
+      "asserted_within_ontology_class_equivalence": 8,
+      "attributed_original_definition": 128,
+      "ordered_definition_excerpts": 108,
+      "scoped_packet_missingness": 12
+    },
+    "semantic_obligations_checked": {
+      "ObjectIntersectionOf": 11,
+      "ObjectUnionOf": 3,
+      "exact_named_IRI": 266,
+      "exact_quotation": 128,
+      "existential_witness": 96,
+      "explicit_excerpt_truncation": 108,
+      "necessary_not_sufficient": 258,
+      "no_equivalence_or_incompatibility_inference": 108,
+      "no_incompatibility_inference": 12,
+      "ontology_attribution": 128,
+      "ordered_source_target_roles": 108,
+      "packet_absence_not_global_absence": 12,
+      "recorded_equivalence_not_cross_ontology_mapping": 8,
+      "recorded_not_inferred": 258
+    },
+    "inference_status": {
+      "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": "failed",
+      "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": "failed"
+    },
+    "limitations": [
+      "No provider prose or provider semantic-review receipt is approved by this deterministic audit.",
+      "Ontology source correctness, completeness, biomedical usefulness and mapping equivalence are not established.",
+      "Full native inferred coverage remains failed; asserted facts and navigation retain their declared scope.",
+      "Sparse selected evidence coverage remains absent; missing exports are not zero-evidence observations.",
+      "Selected channel inventory is not linked-original or graph-visible coverage; unresolved neighbour citations and unrecorded projection remain explicit gaps.",
+      "This validates immutable served artifacts; the independent HTTPS/browser check determines actual rendering and interaction."
+    ]
+  },
+  "service_verification": {
+    "status": "passed_actual_API_not_browser",
+    "api_receipt": "explanation-product-review-backend-s1/api-journey.json",
+    "api_receipt_sha256": "sha256:72a38b0695b777a6cced8b17322dd5d16cdafe97c15992b452ea56f676dd0989",
+    "relocation_receipt": "explanation-product-review-backend-s1/relocation.json",
+    "relocation_receipt_sha256": "sha256:d7a85abc0891f232d8667145cc8d8905ccf7b97b70c79a91ef2a26f1472c47ca",
+    "backend": {
+      "file_count": 53,
+      "git_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+      "schema": "exact-review-backend-source/1",
+      "source_sha256": "9cbc51e516e0c6911d0f5da1b6baae86bdc88746f9e76ee9d15c47f30c195518"
+    },
+    "serving_publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+    "api_summary": {
+      "boundary": "Actual certificate-verified HTTPS API journey; not a browser or human-activity test",
+      "elapsed_seconds": 178.173,
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "tutorial": {
+        "actual_elapsed_seconds": 120.009,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      },
+      "participant_states_with_catalogue_withheld": 98,
+      "exports": [
+        {
+          "csv_sha256": "3f16e4974393fffaa0cab2c035647ba71f3347d34f0442a4cefb592f1471db10",
+          "json_sha256": "4a3e6ae76d487f6f4a7356f951c4152ef447d8849f76a68d039770d0a30f3568",
+          "named_methods": false,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        },
+        {
+          "csv_sha256": "d3e8b9659bc5b2eed82aa13228d5588bfc127390e973d7440a0cb49e512502d4",
+          "json_sha256": "b106758623141da2dd6f2b56bd6c9bb9688bda06596982f9c0105697fab85944",
+          "named_methods": true,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        }
+      ],
+      "interruptions": [
+        {
+          "declared_bytes": 38106,
+          "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.192
+        },
+        {
+          "declared_bytes": 38106,
+          "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.193
+        },
+        {
+          "declared_bytes": 38106,
+          "full_body_sha256": "3c8a7c5b818327e8540ea3edc0dbeab9b61e2c11dda89fc1e50d0c86bb2e296f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.203
+        }
+      ],
+      "complete_read_surfaces": {
+        "ontologies": [
+          {
+            "ancestor_graph_edges": 12,
+            "ancestor_graph_nodes": 11,
+            "hierarchy": {
+              "children": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 2
+              },
+              "parents": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 1
+              }
+            },
+            "hierarchy_empty_probes": 0,
+            "hierarchy_probes_attempted": 1,
+            "ontology_sha256": "d5c93facf2061cfdaeeeb0564b1fad762bfe8634f1d2b77b224a48d66a861687"
+          },
+          {
+            "ancestor_graph_edges": 11,
+            "ancestor_graph_nodes": 11,
+            "hierarchy": {
+              "children": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 0
+              },
+              "parents": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 1
+              }
+            },
+            "hierarchy_empty_probes": 2,
+            "hierarchy_probes_attempted": 3,
+            "ontology_sha256": "fa7f4b3d1cf82db1f1ed963db0b6616ee2b960ae1ca47b119d1bcf22e325f12c"
+          }
+        ],
+        "prior_inventory_elapsed_seconds": 681.78,
+        "prior_inventory_pages": {
+          "exploration": 2285,
+          "study": 2285
+        },
+        "prior_inventory_receipt_sha256": "739819815b0c1ea2defbacb7f4042727d1405eed9cff06f15157bbbbf9b82bb6",
+        "prior_inventory_verifier_sha256": "d5e923b82b68dfc0feec9a03519854ecba6ce7cc43096e4fedb2ada24d4c11f9",
+        "same_publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+        "scope": "This run repeats real search, nonempty hierarchy/continuation parity and bounded ancestor graph. Full ordered inventories passed in the separately preserved prior attempt; they were not repeated."
+      },
+      "service_log_observation": {
+        "counts": {
+          "asgi_exceptions": 0,
+          "content_length_protocol_errors": 0,
+          "h11_local_protocol_errors": 0,
+          "tracebacks": 0
+        },
+        "new_bytes": 0,
+        "scope": "Owned study process log during this API journey; no historical-causation claim",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "timing_phases": {
+      "api_journey": {
+        "processes": {
+          "exploration": {
+            "first_cpu_seconds": 31.52,
+            "last_cpu_seconds": 39.75,
+            "observed_cpu_delta_seconds": 8.23,
+            "peak_cpu_percent": 93.7,
+            "peak_rss_kib": 84280,
+            "samples": 310
+          },
+          "postgres": {
+            "first_cpu_seconds": 0.03,
+            "last_cpu_seconds": 0.39,
+            "observed_cpu_delta_seconds": 0.36,
+            "peak_cpu_percent": 2.8,
+            "peak_rss_kib": 13700,
+            "samples": 310
+          },
+          "study": {
+            "first_cpu_seconds": 1.19,
+            "last_cpu_seconds": 43.6,
+            "observed_cpu_delta_seconds": 42.41,
+            "peak_cpu_percent": 100.0,
+            "peak_rss_kib": 124544,
+            "samples": 310
+          }
+        },
+        "seconds": 178.194
+      },
+      "clone": {
+        "seconds": 63.537
+      },
+      "cold_start": {
+        "frontend_probes": {
+          "exploration": {
+            "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+            "bytes": 10563,
+            "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0048,
+              0.002,
+              0.0018
+            ]
+          },
+          "study": {
+            "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+            "bytes": 9102,
+            "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0041,
+              0.0016,
+              0.0016
+            ]
+          }
+        },
+        "processes": {
+          "exploration": {
+            "first_cpu_seconds": 0.24,
+            "last_cpu_seconds": 30.2,
+            "observed_cpu_delta_seconds": 29.96,
+            "peak_cpu_percent": 100.0,
+            "peak_rss_kib": 75120,
+            "samples": 56
+          },
+          "postgres": {
+            "first_cpu_seconds": 0.03,
+            "last_cpu_seconds": 0.03,
+            "observed_cpu_delta_seconds": 0.0,
+            "peak_cpu_percent": 6.0,
+            "peak_rss_kib": 13572,
+            "samples": 138
+          },
+          "study": {
+            "first_cpu_seconds": 0.07,
+            "last_cpu_seconds": 43.4,
+            "observed_cpu_delta_seconds": 43.33,
+            "peak_cpu_percent": 100.0,
+            "peak_rss_kib": 135148,
+            "samples": 137
+          }
+        },
+        "seconds": 130.856,
+        "services": {
+          "exploration": {
+            "port": 19185,
+            "ready": true,
+            "state": "owned"
+          },
+          "postgres": {
+            "port": 19183,
+            "ready": true,
+            "state": "owned"
+          },
+          "study": {
+            "port": 19184,
+            "ready": true,
+            "state": "owned"
+          }
+        },
+        "start_seconds": 130.798
+      },
+      "frozen_copy_unchanged": {
+        "files": 696,
+        "seconds": 33.17,
+        "unchanged": true
+      },
+      "prepare": {
+        "seconds": 57.594
+      },
+      "resume_start": {
+        "frontend_probes": {
+          "exploration": {
+            "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+            "bytes": 10563,
+            "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0073,
+              0.0027,
+              0.0024
+            ]
+          },
+          "study": {
+            "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+            "bytes": 9102,
+            "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0055,
+              0.0025,
+              0.0026
+            ]
+          }
+        },
+        "processes": {
+          "exploration": {
+            "first_cpu_seconds": 0.2,
+            "last_cpu_seconds": 31.51,
+            "observed_cpu_delta_seconds": 31.31,
+            "peak_cpu_percent": 100.0,
+            "peak_rss_kib": 76232,
+            "samples": 59
+          },
+          "postgres": {
+            "first_cpu_seconds": 0.02,
+            "last_cpu_seconds": 0.03,
+            "observed_cpu_delta_seconds": 0.01,
+            "peak_cpu_percent": 2.8,
+            "peak_rss_kib": 13624,
+            "samples": 62
+          },
+          "study": {
+            "first_cpu_seconds": 0.06,
+            "last_cpu_seconds": 1.16,
+            "observed_cpu_delta_seconds": 1.1,
+            "peak_cpu_percent": 93.9,
+            "peak_rss_kib": 69512,
+            "samples": 62
+          }
+        },
+        "seconds": 99.059,
+        "services": {
+          "exploration": {
+            "port": 19185,
+            "ready": true,
+            "state": "owned"
+          },
+          "postgres": {
+            "port": 19183,
+            "ready": true,
+            "state": "owned"
+          },
+          "study": {
+            "port": 19184,
+            "ready": true,
+            "state": "owned"
+          }
+        },
+        "start_seconds": 98.977
+      },
+      "warm_start": {
+        "frontend_probes": {
+          "exploration": {
+            "body_sha256": "6f19d9566216f0ee9f741c404e66b0dafadffc0764a91a18b39d56e6c743e6ef",
+            "bytes": 10563,
+            "csp_sha256": "f8080955ec6b87b258ce8e2a97e48d7817e16ae58a5045403d3416a4762f62a6",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0053,
+              0.0024,
+              0.0025
+            ]
+          },
+          "study": {
+            "body_sha256": "3656110cf1f785a8243e3f0c3deee808ca924875e1000dc4af25d06a6e8a6b8b",
+            "bytes": 9102,
+            "csp_sha256": "3570e23d8dc2b6c16bba173414f2b7710f696fca2513546badac5d0a82301e89",
+            "exact_configured_csp": true,
+            "seconds": [
+              0.0053,
+              0.0021,
+              0.002
+            ]
+          }
+        },
+        "processes": {
+          "exploration": {
+            "first_cpu_seconds": 0.52,
+            "last_cpu_seconds": 32.54,
+            "observed_cpu_delta_seconds": 32.02,
+            "peak_cpu_percent": 100.0,
+            "peak_rss_kib": 73652,
+            "samples": 59
+          },
+          "postgres": {
+            "first_cpu_seconds": 0.03,
+            "last_cpu_seconds": 0.03,
+            "observed_cpu_delta_seconds": 0.0,
+            "peak_cpu_percent": 2.2,
+            "peak_rss_kib": 13592,
+            "samples": 63
+          },
+          "study": {
+            "first_cpu_seconds": 0.05,
+            "last_cpu_seconds": 1.31,
+            "observed_cpu_delta_seconds": 1.26,
+            "peak_cpu_percent": 88.0,
+            "peak_rss_kib": 68924,
+            "samples": 63
+          }
+        },
+        "seconds": 93.521,
+        "services": {
+          "exploration": {
+            "port": 19185,
+            "ready": true,
+            "state": "owned"
+          },
+          "postgres": {
+            "port": 19183,
+            "ready": true,
+            "state": "owned"
+          },
+          "study": {
+            "port": 19184,
+            "ready": true,
+            "state": "owned"
+          }
+        },
+        "start_seconds": 93.498
+      }
+    },
+    "runtime_copy": {
+      "files": 696,
+      "logical_bytes": 13707483995,
+      "inventory_sha256": "445ce0ea00fe848d8a8b15f6bb19d9d79c22c1a95811cf6e6972f198ad7c935a",
+      "copy_mode": "Darwin clonefile(2), flags=0; no copy fallback; different inode and every source/destination hash verified"
+    },
+    "source_restored": true,
+    "fresh_API_request_count": 632,
+    "prior_inventory_attempt_receipt": "explanation-product-review-backend-s1/api-journey-attempt-1.json",
+    "prior_inventory_attempt_sha256": "sha256:739819815b0c1ea2defbacb7f4042727d1405eed9cff06f15157bbbbf9b82bb6"
+  },
+  "final_service_status": {
+    "receipt": "explanation-product-review-backend-s1/final-service-status.json",
+    "sha256": "sha256:e006eee4e4953593b79a02b261bf95950ae89b2e66a50f6ddb025c05d2e24faa",
+    "value": {
+      "backend": {
+        "file_count": 53,
+        "git_commit": "a06af6ec1e6e4064e610cb3f2751bdb7e52d9a8b",
+        "schema": "exact-review-backend-source/1",
+        "source_sha256": "9cbc51e516e0c6911d0f5da1b6baae86bdc88746f9e76ee9d15c47f30c195518"
+      },
+      "certificate_not_after": "2026-11-09T15:47:10Z",
+      "certificate_pem_sha256": "e6dfcf786178a1e0ffe039086b8b6193e76d83852dc0009b40fb30ed0a1926a3",
+      "certificate_x509_fingerprint": "SHA256 Fingerprint=A4:42:89:EC:F4:98:B7:1D:AD:7B:43:AE:E1:B2:24:2D:9D:E4:8E:02:3E:77:74:48:AE:7B:12:85:95:40:6D:86",
+      "closes_at": "2026-11-09T15:47:10.522210+00:00",
+      "postgres_version": "postgres (PostgreSQL) 16.2",
+      "purpose": "development_review",
+      "runtime_versions": {
+        "fastapi": "0.116.2",
+        "psycopg": "3.3.6",
+        "pydantic": "2.13.4",
+        "pyowl-core": "0.2.1",
+        "python": "3.12.3",
+        "uvicorn": "0.35.0"
+      },
+      "schema": "exact-final-review-service-status/1",
+      "services": {
+        "exploration": {
+          "ready": true,
+          "state": "owned"
+        },
+        "postgres": {
+          "ready": true,
+          "state": "owned"
+        },
+        "study": {
+          "ready": true,
+          "state": "owned"
+        }
+      },
+      "serving_publication_sha256": "8cbcbcd0246809c9f5cf3593e6e7412098c63d6ed7f36eb82165af7f59369033",
+      "source_publication_sha256": "edf000e8498b000493f0f7d9812188e03b6b0241fd84e1ca7508d7afb41a040a",
+      "source_restored": true,
+      "state": "running",
+      "study_revision": "review-20261010T154710-f1025c8952"
+    }
+  },
+  "latency_summary": {
+    "receipt": "explanation-product-review-backend-s1/delivered-boundary-summary.json",
+    "sha256": "sha256:9304505fe462f072c8712fffeeb1098222e9cc4250e485b6011645343c382d9c"
+  },
+  "portable_owner_audit_sidecar": {
+    "installation_receipt": "explanation-product-review-backend-s1/publication-audit-sidecar-installation.json",
+    "installation_sha256": "sha256:a7b978594bec9388c6fe9a4257928cfbb4530516b669c68aa604a9042427c2b9",
+    "tests": "explanation-product-review-backend-s1/publication-audit-sidecar-tests.json",
+    "test_receipt_sha256": "sha256:d8189eba5f8a31c62c1b706561353b6fc7869ace46a8f8bb5db3805455623d51"
+  },
+  "historical_trace_audit": {
+    "receipt": "explanation-product-review-backend-s1/raw-selected-stage-audit.json",
+    "receipt_sha256": "sha256:872a29431a4e422c62fe32c3b076510d5a59bc2fedc218ad271d3ab77e2fe138",
+    "summary": {
+      "conclusion": "The retained producer inputs contain no explicit per-pair prefilter event or exact-match basis for these 120 typed selected pairs. The absent candidate_decisions export and absent embedded candidate_decision/events are historical artifact absence, not an inference from the API projection.",
+      "limit": "This audit establishes what the retained exports contain; it does not prove that no exact stage ran in the historical process or reconstruct missing events from scores, labels, or flags.",
+      "other_matching_keys": "identifier_normalized belongs to per-side selected attribute items; llm_router belongs to checkpoint model configuration. Neither is a per-pair exact decision record.",
+      "prefilter_event_or_exact_basis_export_found": false,
+      "saved_fields_not_route_events": "Eight saved protected_exact flags and 112 pair_pre_selector reconstruction score labels are retained facts; neither supplies an observed prefilter route event, bypass timing, or exact-match normalization basis."
+    }
+  },
+  "s2_actual_response_examples": {
+    "receipt": "explanation-product-review-backend-s1/s2-response-examples.json",
+    "sha256": "sha256:97f0f29e0c27ba294c1d1bd9b3635f0c2a26a1f4c61a3058cefc2ee77081ee5d"
+  },
+  "typed_preparation": {
+    "receipt": "explanation-product-review-backend-s1/typed-publication-final.json",
+    "sha256": "sha256:2ea950d83a073ba0cbd32c29f8a95b4e898d811e00bdd7e49580e446bfb56ad8",
+    "summary": {
+      "catalogue_sha256": "sha256:56bb23d772acf62430092ee5da5466a8d88bd890fdb25308f12dac6295e278f3",
+      "cpu_system_seconds": 30.032394,
+      "cpu_user_seconds": 209.567014,
+      "elapsed_seconds": 244.6997710398864,
+      "free_disk_bytes": 3728179200,
+      "generation_mode": "typed-only",
+      "input_clone_receipt_sha256": "sha256:b2f4afdabb048f11e0016696f678013c97f46e2815b0122742334fe60814ba6d",
+      "peak_rss_bytes": 383586304,
+      "policy5_refresh_receipt_sha256": "sha256:e47ec91d503401dd3322deb8d2a711d19931b225b32e2301234af5e7ca7e1269",
+      "provider_dispatch_allowed": false,
+      "publication_sha256": "sha256:edf000e8498b000493f0f7d9812188e03b6b0241fd84e1ca7508d7afb41a040a",
+      "revision": "development-review-s1-interim-20261010",
+      "schema": "exact-typed-interim-preparation/1",
+      "scopes": [
+        {
+          "elapsed_seconds": 0.5966972650494426,
+          "free_disk_bytes": 3754422272,
+          "index_sha256": "80009c709273191eb6d33f107fca0ca86de2ff79480921b7dfdce5b42f4a748e",
+          "scope_id": "review-01"
+        },
+        {
+          "elapsed_seconds": 0.5681056620087475,
+          "free_disk_bytes": 3750002688,
+          "index_sha256": "2fc87cc1d1c9466bfd60816ac8a149639db44923ef4ad59096d59c5ccd29a8e2",
+          "scope_id": "review-02"
+        },
+        {
+          "elapsed_seconds": 0.4679064021911472,
+          "free_disk_bytes": 3745595392,
+          "index_sha256": "2af3262f1abbbc6a49c02da5e2d2f8559fc11bf051ff37bb8fad0480897d4f8f",
+          "scope_id": "review-03"
+        },
+        {
+          "elapsed_seconds": 0.25605693901889026,
+          "free_disk_bytes": 3743510528,
+          "index_sha256": "2082934d42c261026aa5f3ee749cb40182dabff12b0eaab586cc6bcdc458b54f",
+          "scope_id": "review-04"
+        },
+        {
+          "elapsed_seconds": 0.38358149002306163,
+          "free_disk_bytes": 3740057600,
+          "index_sha256": "d76cc122418dde1ed8e79c0edf2ad212679415c64da8e5aaecb3240c783955e6",
+          "scope_id": "review-05"
+        },
+        {
+          "elapsed_seconds": 0.42110236594453454,
+          "free_disk_bytes": 3734327296,
+          "index_sha256": "d2d0c38493dbfec9641733ff68ec98ad9322e97dae643ab41f2070d6c59e1bda",
+          "scope_id": "review-06"
+        },
+        {
+          "elapsed_seconds": 0.5330807310529053,
+          "free_disk_bytes": 3729629184,
+          "index_sha256": "9bfed758a5281e8a83404474d461c59f395df00d678122cfa31b8f70e953e314",
+          "scope_id": "review-07"
+        },
+        {
+          "elapsed_seconds": 0.43335163802839816,
+          "free_disk_bytes": 3726696448,
+          "index_sha256": "6d38620b001bc13770ff37a135872af4b3561218371a1f21e4f8ca8ca09cfcc8",
+          "scope_id": "review-08"
+        },
+        {
+          "elapsed_seconds": 0.4440223118290305,
+          "free_disk_bytes": 3742584832,
+          "index_sha256": "d51e003e2f1af2f632baf0b5172e907932b28d81f2b8b2e60bbe2818ff513473",
+          "scope_id": "review-09"
+        },
+        {
+          "elapsed_seconds": 0.5747559198644012,
+          "free_disk_bytes": 3738427392,
+          "index_sha256": "973e4cbda2b65a6466355375ca9503d635abe39a58c08ed1a4db8ea67b8dd4cc",
+          "scope_id": "review-10"
+        },
+        {
+          "elapsed_seconds": 0.4872016808949411,
+          "free_disk_bytes": 3734061056,
+          "index_sha256": "fe0d0f2dd8eb7b52c48bd37a496245ea70efb88ebe674414c4d32416cea52a9b",
+          "scope_id": "review-11"
+        },
+        {
+          "elapsed_seconds": 0.6163963708095253,
+          "free_disk_bytes": 3729190912,
+          "index_sha256": "33279cbb6a10c7a05c03c3fff705e3ce99d036190b414b714b667507513fbe9b",
+          "scope_id": "review-12"
+        },
+        {
+          "elapsed_seconds": 0.5114300679415464,
+          "free_disk_bytes": 3726004224,
+          "index_sha256": "aa87af66c649ba7385d33756022fe5e24f892947c13b942e725c6039de008002",
+          "scope_id": "review-13"
+        },
+        {
+          "elapsed_seconds": 0.4283385758753866,
+          "free_disk_bytes": 3722301440,
+          "index_sha256": "f073755c5a32e57bda1b4996ab518e3d38abcb80c2975e2f2eca16f139b752ac",
+          "scope_id": "review-14"
+        },
+        {
+          "elapsed_seconds": 0.44858414586633444,
+          "free_disk_bytes": 3718721536,
+          "index_sha256": "a88c15d5cafd597b812658012e83c138f17d4e7d35e718575183346aec56fd3f",
+          "scope_id": "review-15"
+        },
+        {
+          "elapsed_seconds": 0.4528939218726009,
+          "free_disk_bytes": 3714609152,
+          "index_sha256": "1695ad03f6900a0c6bbd48f82f8dd7ad7025e6691be3f90d3062b2130338a1b9",
+          "scope_id": "review-16"
+        },
+        {
+          "elapsed_seconds": 0.5077976880129427,
+          "free_disk_bytes": 3710099456,
+          "index_sha256": "06d65a22a9640d6d7b0db95f609a1ef603d0c0dcc6e60f1f4808d7eb0adc303c",
+          "scope_id": "review-17"
+        },
+        {
+          "elapsed_seconds": 0.43893819907680154,
+          "free_disk_bytes": 3739144192,
+          "index_sha256": "d3d0c0a8b057cfdd96f738f9520477e1760c4872b24c7a51b9996c4e78c500f4",
+          "scope_id": "review-18"
+        },
+        {
+          "elapsed_seconds": 0.524823386920616,
+          "free_disk_bytes": 3738193920,
+          "index_sha256": "e3f4e53aeeddb502bffe11a5577e44346e28fc03622969e0efc88a826658f02d",
+          "scope_id": "review-19"
+        },
+        {
+          "elapsed_seconds": 0.4595222941134125,
+          "free_disk_bytes": 3733528576,
+          "index_sha256": "665acb8a27d4d9eb45bd35a0652d77313fb7f9c2a69d22758c5bcb8d7948ff6d",
+          "scope_id": "review-20"
+        },
+        {
+          "elapsed_seconds": 0.48749460908584297,
+          "free_disk_bytes": 3729600512,
+          "index_sha256": "7f11771334c147aaf353c1b263ee73d2a2488dedf18bcf3d2096bdfc17958ff2",
+          "scope_id": "review-21"
+        },
+        {
+          "elapsed_seconds": 0.4892871880438179,
+          "free_disk_bytes": 3726372864,
+          "index_sha256": "5321d9296dc7962e3d60122f52161159b11c87e9ee26ff4b22a76dc98b92674d",
+          "scope_id": "review-22"
+        },
+        {
+          "elapsed_seconds": 0.45794863486662507,
+          "free_disk_bytes": 3722866688,
+          "index_sha256": "448207f44578fe06410add0a562c5adfcda0d710b231416be5acdf78407993d5",
+          "scope_id": "review-23"
+        },
+        {
+          "elapsed_seconds": 0.5301140369847417,
+          "free_disk_bytes": 3720474624,
+          "index_sha256": "d53647dd69d8ced11af97888d40229842a5338e20af82762b5fbaf58f1cb167a",
+          "scope_id": "review-24"
+        }
+      ],
+      "source_hashes": {
+        "exact_inspect/decisions.py": "sha256:5e112d1e0bfa25ace733faac561467deb2bf448a17a82b8db1eca13a8b5e297f",
+        "exact_inspect/decisions_export.py": "sha256:83fbd4050d3ebc8f3fbfdf94d6575d36500b3419c89e211aefd28b5cd6117ab2",
+        "exact_inspect/descriptions.py": "sha256:8cc76f39a1c52aeefac36cef948f26e6a5a54cc7c56c6d15c9a568a58dd28a33",
+        "exact_inspect/evidence_metadata.py": "sha256:9f14d04b381f96f4976f6c98fe7eec26ff29357e2fa41d6e8872404aa0694c56",
+        "exact_inspect/study/workspace.py": "sha256:915336410be7ee730aee64b107a5ba2e2f21b85675766fa6dc20efcc135b7488",
+        "tools/prepare_review_bundle.py": "sha256:3a8135fc4f4eb0f077183a8f6e9e2670c692df4ce021ff2bc0dfbed722d31760",
+        "tools/review_generation_attempt.py": "sha256:dd900fcc232d64b22bf68def9e09927ba44dcd9ceaf37ee870158c765d9cedcc",
+        "tools/review_pair_inputs.py": "sha256:e10f16e8e2acd1daf0f99516a75a8fc023f0e37efece25a52d1b6c040609239e",
+        "tools/review_private_run_cache.py": "sha256:05877c56749c5263e9e72a5b46dfa824f9c25b33c2746179d642b1e847462cd5",
+        "tools/review_run_cache.py": "sha256:343625847c0b024496054f160a098841e39aeaa5ab313327da6bcb482289c982"
+      },
+      "status": "complete",
+      "source_receipt_sha256": "sha256:e3e91ef9f7fd7091664bada5ca0e2a10b122c63ea064268f0de27b0ce97676c5"
+    }
+  }
+}

@@ -1,0 +1,4102 @@
+{
+  "source": "actual retained adapter7 exporter4 public index before correction",
+  "contexts_verified": {
+    "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+    "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738"
+  },
+  "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+  "cases": [
+    {
+      "case_id": "review-01",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 6,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+            "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "sha256:974e5af63e039fcbffcec9fe17aed379372f8ee5e923c0ebb235447d99f8594b"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 6,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 3,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+            "sha256:48f47cf10c23973c67024cd86990819dfc90a7d2a64723e6018a1290913c95da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050926",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 8,
+            "unresolved": 16,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 4,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+            "sha256:9c297e89d02dfbd354ac94fe0a21a5c08e6d290e0d45bc0b435a9eab58122bd2",
+            "sha256:a338acc89366e267b7fee7955cba05030f2ba7c5fcf7fed73cc3815e8ddecad9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_10153",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 33,
+            "resolved": 6,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "after": {
+            "selected": 33,
+            "resolved": 3,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+            "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "sha256:974e5af63e039fcbffcec9fe17aed379372f8ee5e923c0ebb235447d99f8594b"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5272",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 25,
+            "resolved": 6,
+            "unresolved": 19,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "after": {
+            "selected": 25,
+            "resolved": 3,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+            "sha256:1a7c05d1648d8aba17a16b3c95c6b79c02c5a7974d5be5b0a9fe0d563b80974b",
+            "sha256:974e5af63e039fcbffcec9fe17aed379372f8ee5e923c0ebb235447d99f8594b"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-02",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C3332",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5158",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 45,
+            "resolved": 7,
+            "unresolved": 38,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 45
+          },
+          "after": {
+            "selected": 45,
+            "resolved": 3,
+            "unresolved": 42,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 45
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3f5169f5d41cfd4c864005bbd8375fe2034f3d885c40c111378c3b808cfd2f15",
+            "sha256:6cf91ac932dcb2cc52ec541bd607835aee4fb74c80a00d1d5439ea879263eefa",
+            "sha256:5ae03d26cf5185edc23e8c95c0c7a6b9be4f57fc43989b68e9c437164825fe22",
+            "sha256:70d2c59f17384755536d08746b1ec58225ed443270912baf406120aa1c15246c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 6,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 3,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3f5169f5d41cfd4c864005bbd8375fe2034f3d885c40c111378c3b808cfd2f15",
+            "sha256:6cf91ac932dcb2cc52ec541bd607835aee4fb74c80a00d1d5439ea879263eefa",
+            "sha256:d1d343c4a852fc8cb617dea21ba15dd6f83cefbcd75c9e1f8d13111f42a4f5fc"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 6,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 3,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3f5169f5d41cfd4c864005bbd8375fe2034f3d885c40c111378c3b808cfd2f15",
+            "sha256:6cf91ac932dcb2cc52ec541bd607835aee4fb74c80a00d1d5439ea879263eefa",
+            "sha256:d1d343c4a852fc8cb617dea21ba15dd6f83cefbcd75c9e1f8d13111f42a4f5fc"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_7474",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 50,
+            "resolved": 10,
+            "unresolved": 40,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 50
+          },
+          "after": {
+            "selected": 50,
+            "resolved": 6,
+            "unresolved": 44,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 50
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3f5169f5d41cfd4c864005bbd8375fe2034f3d885c40c111378c3b808cfd2f15",
+            "sha256:6cf91ac932dcb2cc52ec541bd607835aee4fb74c80a00d1d5439ea879263eefa",
+            "sha256:802db29709aee761a92fbc44a9c20068d360f6b283054cd4c1774fd37e9c5018",
+            "sha256:861110855e124bf7c198b02603453671adf5e5299b08860be43b8229cecf2750"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_10195",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 49,
+            "resolved": 10,
+            "unresolved": 39,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 49
+          },
+          "after": {
+            "selected": 49,
+            "resolved": 5,
+            "unresolved": 44,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 49
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:6cf91ac932dcb2cc52ec541bd607835aee4fb74c80a00d1d5439ea879263eefa",
+            "sha256:3f5169f5d41cfd4c864005bbd8375fe2034f3d885c40c111378c3b808cfd2f15",
+            "sha256:6747621a5ca235576001b547993d17519ac096ba99a5cdc269f902edaa923d27",
+            "sha256:80c498b5444a063b0184ffba3cfe14fc880e28b758269478d867f942440d677a",
+            "sha256:d152afa0a3085e2325e5940abf508fdc4f925ded70c6253db537f99df99ba1fb"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-03",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C34536",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050096",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 6,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 3,
+            "unresolved": 21,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc4bb074eab713c9188d84f66fc62f8aa23ce63f2750e9dde4a56269bbf5b7b7",
+            "sha256:7b29f413d7a77f22720a205fcb27cd1152e24eac82ed1f0092669cb36cabe9d4",
+            "sha256:0bb3db792ee139352d143605fa3ea8ddd40c62e7710a0ea13026cac8ed2fee9d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_4337",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 4,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 2,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc4bb074eab713c9188d84f66fc62f8aa23ce63f2750e9dde4a56269bbf5b7b7",
+            "sha256:7b29f413d7a77f22720a205fcb27cd1152e24eac82ed1f0092669cb36cabe9d4"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 20,
+            "resolved": 4,
+            "unresolved": 16,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "after": {
+            "selected": 20,
+            "resolved": 2,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc4bb074eab713c9188d84f66fc62f8aa23ce63f2750e9dde4a56269bbf5b7b7",
+            "sha256:0bb3db792ee139352d143605fa3ea8ddd40c62e7710a0ea13026cac8ed2fee9d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8913",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 27,
+            "resolved": 4,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "after": {
+            "selected": 27,
+            "resolved": 2,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc4bb074eab713c9188d84f66fc62f8aa23ce63f2750e9dde4a56269bbf5b7b7",
+            "sha256:2e1630f25947d7803efc3ff045194749768e5c015f545bd9e44f720f459207ef"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_13368",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 5,
+            "unresolved": 19,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc4bb074eab713c9188d84f66fc62f8aa23ce63f2750e9dde4a56269bbf5b7b7",
+            "sha256:8cb3e726686f7f2a2d4df5c14be92de376c3b3e3a69bbc88540184ce498b2d5a",
+            "sha256:7bbd39d0faa15b260eb18d3deecebbc60df90af2f1a41754c5f0d7a9187bd8ec"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-04",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C110923",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 4,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3d2750ba31ad5e7abfad69d4458649ab941fab5a60dc4f1d09b153d94a4dfedf",
+            "sha256:f1000576c5740e3322615ae3a88cd9e41dbd316e52c2d8097423043b8f66f98d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 4,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3d2750ba31ad5e7abfad69d4458649ab941fab5a60dc4f1d09b153d94a4dfedf",
+            "sha256:f1000576c5740e3322615ae3a88cd9e41dbd316e52c2d8097423043b8f66f98d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 4,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3d2750ba31ad5e7abfad69d4458649ab941fab5a60dc4f1d09b153d94a4dfedf",
+            "sha256:8e857acd26e5f71edbaea45d6ccffabd82571716215c2b0b372c6824803fc2bd"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 26,
+            "resolved": 4,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "after": {
+            "selected": 26,
+            "resolved": 2,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:3d2750ba31ad5e7abfad69d4458649ab941fab5a60dc4f1d09b153d94a4dfedf",
+            "sha256:1ff8e1ddab3a09c8950a9526d0755d08e16c25067ba5a4c77e5fbca43bb689a8"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-05",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116046",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_9220",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050848",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 4,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:9df073a4f67465b315d1e51ad0a15b72a7715e15bc8135e314c7105157de24f4",
+            "sha256:e88770f4b7a1a7906a5a2c9ef9bc779330b616fd886b781554a55243a603e7f4"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050847",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 4,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 2,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:9df073a4f67465b315d1e51ad0a15b72a7715e15bc8135e314c7105157de24f4",
+            "sha256:b005c48dbf213adf589cc344eee11ceebc33c54bb34cdc5d4989afe3e85fdbd6"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080302",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 26,
+            "resolved": 4,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "after": {
+            "selected": 26,
+            "resolved": 2,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:9df073a4f67465b315d1e51ad0a15b72a7715e15bc8135e314c7105157de24f4",
+            "sha256:e88770f4b7a1a7906a5a2c9ef9bc779330b616fd886b781554a55243a603e7f4"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0060731",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 8,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 4,
+            "unresolved": 35,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:9df073a4f67465b315d1e51ad0a15b72a7715e15bc8135e314c7105157de24f4",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c",
+            "sha256:098767605eb034d7b58610c498c22da6cb5b24e18cf80adedbfba7121cae47a5",
+            "sha256:64d0f8a58293ceb7206e70cf8d56d6f9d9f60b0a515989b1d65449d32d73d5b7"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-06",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116794",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050678",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080725",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 33,
+            "resolved": 6,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "after": {
+            "selected": 33,
+            "resolved": 3,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:5da8322628ec7dc71be6f609cfd1c9dd07a3f23457653592822944401805a460",
+            "sha256:83088b9b4cabbd8a3e449c2fb5005c60bbc8d7baa18e4504873d511c7aa5f439"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111713",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 34,
+            "resolved": 6,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "after": {
+            "selected": 34,
+            "resolved": 3,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:5da8322628ec7dc71be6f609cfd1c9dd07a3f23457653592822944401805a460",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050600",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 38,
+            "resolved": 8,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 38
+          },
+          "after": {
+            "selected": 38,
+            "resolved": 4,
+            "unresolved": 34,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 38
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:5da8322628ec7dc71be6f609cfd1c9dd07a3f23457653592822944401805a460",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0061196",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 6,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 3,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:5da8322628ec7dc71be6f609cfd1c9dd07a3f23457653592822944401805a460",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-07",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C118423",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_6652",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 37,
+            "resolved": 4,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 37
+          },
+          "after": {
+            "selected": 37,
+            "resolved": 2,
+            "unresolved": 35,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 37
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c1329a0c22a271e3da157dd1ffb37b37e7739564ac875067148ac9794461ee77",
+            "sha256:e63a1419cc5e6eac0a11f50699e517d909c17e825df9186cc9a16c48c5a47a85"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_205",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 34,
+            "resolved": 4,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "after": {
+            "selected": 34,
+            "resolved": 2,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c1329a0c22a271e3da157dd1ffb37b37e7739564ac875067148ac9794461ee77",
+            "sha256:cec8af169ee95b4b914110ef1c71ce8912b74144e628e7ad64f8a17ac62d09b0"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_4253",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 4,
+            "unresolved": 35,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 2,
+            "unresolved": 37,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c1329a0c22a271e3da157dd1ffb37b37e7739564ac875067148ac9794461ee77",
+            "sha256:3fac106829aa7b10aac229c29125d553f1fc918cc09aa095a5d19b65d2ce704d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0060379",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 4,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c1329a0c22a271e3da157dd1ffb37b37e7739564ac875067148ac9794461ee77",
+            "sha256:15f9b6a326c0ff6fd34d6ce6f90926769df28766ed2520fbe85559feed38c868"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050568",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 42,
+            "resolved": 6,
+            "unresolved": 36,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 42
+          },
+          "after": {
+            "selected": 42,
+            "resolved": 3,
+            "unresolved": 39,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 42
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c1329a0c22a271e3da157dd1ffb37b37e7739564ac875067148ac9794461ee77",
+            "sha256:b7fa1d04b944408d72876ef46485f71c4f61e25580bd4fa826651241e27ec981",
+            "sha256:15f9b6a326c0ff6fd34d6ce6f90926769df28766ed2520fbe85559feed38c868"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-08",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C118436",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0090001",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111405",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 8,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 3,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:81b69f315b7f44d83c93306557ffedf77eaf8a63bd1dc755668a2a70dc143e47",
+            "sha256:e629e3d471bfbc11d42d2dcb78181ecacbae518ba9524d6b2d0af1b80f7f33c6"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111407",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 8,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 3,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:81b69f315b7f44d83c93306557ffedf77eaf8a63bd1dc755668a2a70dc143e47",
+            "sha256:e629e3d471bfbc11d42d2dcb78181ecacbae518ba9524d6b2d0af1b80f7f33c6"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111406",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 8,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 3,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:81b69f315b7f44d83c93306557ffedf77eaf8a63bd1dc755668a2a70dc143e47",
+            "sha256:e629e3d471bfbc11d42d2dcb78181ecacbae518ba9524d6b2d0af1b80f7f33c6"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050438",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 43,
+            "resolved": 9,
+            "unresolved": 34,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 43
+          },
+          "after": {
+            "selected": 43,
+            "resolved": 4,
+            "unresolved": 39,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 43
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:efd598ccabcc6f2b2722955b5cceaaeb2978e304ec5c3f84620e54642c308ee3",
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-09",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C120192",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080776",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080775",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 26,
+            "resolved": 4,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "after": {
+            "selected": 26,
+            "resolved": 2,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:37e21b3f76963f618cca743beb5d38a97db8435dc90dd656e3bb523c720347da",
+            "sha256:ab85f9fab519e30ccc151e2dc04a8fd7e86cd6cba0ff2ef4f57e8f158cf952f2"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_4674",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 28,
+            "resolved": 4,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 28
+          },
+          "after": {
+            "selected": 28,
+            "resolved": 2,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 28
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:37e21b3f76963f618cca743beb5d38a97db8435dc90dd656e3bb523c720347da",
+            "sha256:8d65cedee31e1a8c66071c83bca854c2da2d3e8d5f01565b143d414286687c1b"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050801",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 27,
+            "resolved": 4,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "after": {
+            "selected": 27,
+            "resolved": 2,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:37e21b3f76963f618cca743beb5d38a97db8435dc90dd656e3bb523c720347da",
+            "sha256:b447bc3abd7c085f1b666ada26e391c2853ae3b1bb817a407f60fce21b873398"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111526",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:37e21b3f76963f618cca743beb5d38a97db8435dc90dd656e3bb523c720347da",
+            "sha256:8d65cedee31e1a8c66071c83bca854c2da2d3e8d5f01565b143d414286687c1b",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-10",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C120198",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14448",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 4,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 2,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:03bb3c1daa7b6df1c91de08913aa8571dc95e9be001db7cb6877d420044c37e8",
+            "sha256:fdb556d5b98f78ff5a59e424c1ce1b95cf6efa844448f1c7c771111417adcaf8"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14450",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 4,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 2,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:03bb3c1daa7b6df1c91de08913aa8571dc95e9be001db7cb6877d420044c37e8",
+            "sha256:fdb556d5b98f78ff5a59e424c1ce1b95cf6efa844448f1c7c771111417adcaf8"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111778",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 28,
+            "resolved": 6,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 28
+          },
+          "after": {
+            "selected": 28,
+            "resolved": 3,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 28
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:03bb3c1daa7b6df1c91de08913aa8571dc95e9be001db7cb6877d420044c37e8",
+            "sha256:cd8b38036ec8c1d3cc0b246d0511965d230f903f549b84c2ddfc1267ad0b77af",
+            "sha256:562f290d11a5a886f1cd0fcc160faf7f33ef538633bc46caf801dce31295d417"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080656",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 4,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:03bb3c1daa7b6df1c91de08913aa8571dc95e9be001db7cb6877d420044c37e8",
+            "sha256:3f8bfac4401697801b6349542b24707bc36ea8c5198974e53652798fd5c12d87"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14447",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 4,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 2,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:03bb3c1daa7b6df1c91de08913aa8571dc95e9be001db7cb6877d420044c37e8",
+            "sha256:8d65cedee31e1a8c66071c83bca854c2da2d3e8d5f01565b143d414286687c1b"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-11",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121565",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0081332",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 5,
+            "unresolved": 19,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3911",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 35,
+            "resolved": 7,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "after": {
+            "selected": 35,
+            "resolved": 3,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:83d245a195920b13a0a9548946fcb0f3bbd89efed3b7e229c0c915d53dfea2ea",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0081334",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 7,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 3,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:83d245a195920b13a0a9548946fcb0f3bbd89efed3b7e229c0c915d53dfea2ea",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0051067",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 7,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:83d245a195920b13a0a9548946fcb0f3bbd89efed3b7e229c0c915d53dfea2ea",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0060590",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 7,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 3,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:83d245a195920b13a0a9548946fcb0f3bbd89efed3b7e229c0c915d53dfea2ea",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-12",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121750",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112183",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 6,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:08c47805ccbe19d0d27b44c5cf15df751939595726fddadf57b0d01afc372632",
+            "sha256:dc1aed62b36307601ac3afab27d98c1ae2981f08944c957c93ccfbd1111203d1",
+            "sha256:3cdea608797d6aa0e6e880c587f57a4f7d6ceb91d8ad463f1e3de518a895e4d4",
+            "sha256:be25a3f1fe80450c669ed42d06ad61c470aa842e2c596ea05a3226f19b7f1368"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080015",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 25,
+            "resolved": 4,
+            "unresolved": 21,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "after": {
+            "selected": 25,
+            "resolved": 2,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:dc1aed62b36307601ac3afab27d98c1ae2981f08944c957c93ccfbd1111203d1",
+            "sha256:08c47805ccbe19d0d27b44c5cf15df751939595726fddadf57b0d01afc372632"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112186",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 36,
+            "resolved": 7,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "after": {
+            "selected": 36,
+            "resolved": 3,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:08c47805ccbe19d0d27b44c5cf15df751939595726fddadf57b0d01afc372632",
+            "sha256:dc1aed62b36307601ac3afab27d98c1ae2981f08944c957c93ccfbd1111203d1",
+            "sha256:e3b8592dfc5e80932cd32682cd10c6d286b8c092b01a5a1230cd8e2b874433a2",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050328",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 40,
+            "resolved": 7,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "after": {
+            "selected": 40,
+            "resolved": 3,
+            "unresolved": 37,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:08c47805ccbe19d0d27b44c5cf15df751939595726fddadf57b0d01afc372632",
+            "sha256:dc1aed62b36307601ac3afab27d98c1ae2981f08944c957c93ccfbd1111203d1",
+            "sha256:e928002026452848e4db0447154999111e8b142cbe63e691a27b37d083640170",
+            "sha256:098767605eb034d7b58610c498c22da6cb5b24e18cf80adedbfba7121cae47a5"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112188",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 36,
+            "resolved": 7,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "after": {
+            "selected": 36,
+            "resolved": 3,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:08c47805ccbe19d0d27b44c5cf15df751939595726fddadf57b0d01afc372632",
+            "sha256:dc1aed62b36307601ac3afab27d98c1ae2981f08944c957c93ccfbd1111203d1",
+            "sha256:e3b8592dfc5e80932cd32682cd10c6d286b8c092b01a5a1230cd8e2b874433a2",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-13",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C122663",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111385",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 7,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:621e8c31afd1f6f3a9c7f4a87b7ddf59afdb77cd9484d3f708ebda0e801ccadb",
+            "sha256:b0b95b429b6f61f99634c272c0127fdc8a54af056ef9a350b39be5d55d6768e0",
+            "sha256:6618e977d252c27de1466820b79a1c5315a9b9b4d58b57b7998805c3383c2e74",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111386",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 7,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:621e8c31afd1f6f3a9c7f4a87b7ddf59afdb77cd9484d3f708ebda0e801ccadb",
+            "sha256:b0b95b429b6f61f99634c272c0127fdc8a54af056ef9a350b39be5d55d6768e0",
+            "sha256:6618e977d252c27de1466820b79a1c5315a9b9b4d58b57b7998805c3383c2e74",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050881",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 35,
+            "resolved": 5,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "after": {
+            "selected": 35,
+            "resolved": 2,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:621e8c31afd1f6f3a9c7f4a87b7ddf59afdb77cd9484d3f708ebda0e801ccadb",
+            "sha256:b0b95b429b6f61f99634c272c0127fdc8a54af056ef9a350b39be5d55d6768e0",
+            "sha256:4cf3ec9cfd173f9a8f9e1d5980d29471c39be290d7da02b2a9dc5b817d3539b9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111384",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 7,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:621e8c31afd1f6f3a9c7f4a87b7ddf59afdb77cd9484d3f708ebda0e801ccadb",
+            "sha256:b0b95b429b6f61f99634c272c0127fdc8a54af056ef9a350b39be5d55d6768e0",
+            "sha256:6618e977d252c27de1466820b79a1c5315a9b9b4d58b57b7998805c3383c2e74",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0081121",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 7,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:621e8c31afd1f6f3a9c7f4a87b7ddf59afdb77cd9484d3f708ebda0e801ccadb",
+            "sha256:b0b95b429b6f61f99634c272c0127fdc8a54af056ef9a350b39be5d55d6768e0",
+            "sha256:6618e977d252c27de1466820b79a1c5315a9b9b4d58b57b7998805c3383c2e74",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-14",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C122812",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 18,
+            "resolved": 4,
+            "unresolved": 14,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 18
+          },
+          "after": {
+            "selected": 18,
+            "resolved": 2,
+            "unresolved": 16,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 18
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:115c093ef888c818f167c2fffbb4e4c771b7979edda6d130089ce8cd58d3c4b2",
+            "sha256:3371badbe131b29a49316ac7c332a2c61fbdfc6fb77e41e051e4066a6df9938e"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 4,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:115c093ef888c818f167c2fffbb4e4c771b7979edda6d130089ce8cd58d3c4b2",
+            "sha256:3371badbe131b29a49316ac7c332a2c61fbdfc6fb77e41e051e4066a6df9938e"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_2234",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 4,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 2,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:115c093ef888c818f167c2fffbb4e4c771b7979edda6d130089ce8cd58d3c4b2",
+            "sha256:c8f56d7c8486ec2cf6d32aba82541a5ab9687ff17ebeb3651ae40c8e6a66be90"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1826",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 27,
+            "resolved": 4,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "after": {
+            "selected": 27,
+            "resolved": 2,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 27
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:115c093ef888c818f167c2fffbb4e4c771b7979edda6d130089ce8cd58d3c4b2",
+            "sha256:0d5c93ec530829764deaf722b7993b694101b34f09c13bfa9288b104ab2eba05"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_2544",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 20,
+            "resolved": 4,
+            "unresolved": 16,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "after": {
+            "selected": 20,
+            "resolved": 2,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:115c093ef888c818f167c2fffbb4e4c771b7979edda6d130089ce8cd58d3c4b2",
+            "sha256:c8f56d7c8486ec2cf6d32aba82541a5ab9687ff17ebeb3651ae40c8e6a66be90"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-15",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C123433",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_9274",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0060439",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 35,
+            "resolved": 6,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "after": {
+            "selected": 35,
+            "resolved": 3,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:0e5105dfcc2694a4ad3090a976d2de4b0cbd249e8f2b7307dac3bc81a1dff443",
+            "sha256:63f39af96d1c505c679ecff299d177f7a95385debc23035b5d1c97e91dfc2fa9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080541",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 23,
+            "resolved": 6,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 23
+          },
+          "after": {
+            "selected": 23,
+            "resolved": 3,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 23
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:0e5105dfcc2694a4ad3090a976d2de4b0cbd249e8f2b7307dac3bc81a1dff443",
+            "sha256:63f39af96d1c505c679ecff299d177f7a95385debc23035b5d1c97e91dfc2fa9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050721",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 20,
+            "resolved": 6,
+            "unresolved": 14,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "after": {
+            "selected": 20,
+            "resolved": 3,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 20
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:0e5105dfcc2694a4ad3090a976d2de4b0cbd249e8f2b7307dac3bc81a1dff443",
+            "sha256:63f39af96d1c505c679ecff299d177f7a95385debc23035b5d1c97e91dfc2fa9"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112307",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 8,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 4,
+            "unresolved": 35,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:0e5105dfcc2694a4ad3090a976d2de4b0cbd249e8f2b7307dac3bc81a1dff443",
+            "sha256:63f39af96d1c505c679ecff299d177f7a95385debc23035b5d1c97e91dfc2fa9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-16",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C123729",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080709",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 5,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:79a6150a2a4e9b48dcc4f33c9ca232aa7b88c069d150a6a566f6815c40997d76",
+            "sha256:f56258084d5180a76486f74d2271f06a2b500020e6d11728dc8d1be2b297d85e",
+            "sha256:90ac943431b9f8817ae845e8363a9b0112af22a77a6eaa53a8b21112a7cd637f"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111966",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 5,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:79a6150a2a4e9b48dcc4f33c9ca232aa7b88c069d150a6a566f6815c40997d76",
+            "sha256:f56258084d5180a76486f74d2271f06a2b500020e6d11728dc8d1be2b297d85e",
+            "sha256:23c8b84cbffb524d7330b8d05c82ff7704cedad1bf29d50db48172a4df225c6a"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080710",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 5,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:79a6150a2a4e9b48dcc4f33c9ca232aa7b88c069d150a6a566f6815c40997d76",
+            "sha256:f56258084d5180a76486f74d2271f06a2b500020e6d11728dc8d1be2b297d85e",
+            "sha256:90ac943431b9f8817ae845e8363a9b0112af22a77a6eaa53a8b21112a7cd637f"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111965",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 5,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:79a6150a2a4e9b48dcc4f33c9ca232aa7b88c069d150a6a566f6815c40997d76",
+            "sha256:f56258084d5180a76486f74d2271f06a2b500020e6d11728dc8d1be2b297d85e",
+            "sha256:23c8b84cbffb524d7330b8d05c82ff7704cedad1bf29d50db48172a4df225c6a"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111963",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 22,
+            "resolved": 5,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "after": {
+            "selected": 22,
+            "resolved": 2,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 22
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:79a6150a2a4e9b48dcc4f33c9ca232aa7b88c069d150a6a566f6815c40997d76",
+            "sha256:f56258084d5180a76486f74d2271f06a2b500020e6d11728dc8d1be2b297d85e",
+            "sha256:90ac943431b9f8817ae845e8363a9b0112af22a77a6eaa53a8b21112a7cd637f"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-17",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C125386",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0070688",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0070146",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 40,
+            "resolved": 7,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "after": {
+            "selected": 40,
+            "resolved": 3,
+            "unresolved": 37,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62",
+            "sha256:69d8662ab4da39ddbc36e6276c762aa084a60e8e5833a48b316add633f7f6b11"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111728",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 5,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 2,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:b7449503b565248c3471dbb68b93c2780d27fe26e04147ecdd6ad51b19e3bc2d"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0070149",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 42,
+            "resolved": 7,
+            "unresolved": 35,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 42
+          },
+          "after": {
+            "selected": 42,
+            "resolved": 3,
+            "unresolved": 39,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 42
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c",
+            "sha256:69d8662ab4da39ddbc36e6276c762aa084a60e8e5833a48b316add633f7f6b11"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0070145",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 40,
+            "resolved": 7,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "after": {
+            "selected": 40,
+            "resolved": 3,
+            "unresolved": 37,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 40
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:39a69476e1c62938dc4ddc6b891136d35038207c14bc0025e7f00549d2641979",
+            "sha256:cc1f03297a031aba4debeae39d4f14554e8751c6e76a2981a5f7dff2c9d2fb95",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62",
+            "sha256:69d8662ab4da39ddbc36e6276c762aa084a60e8e5833a48b316add633f7f6b11"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-18",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C126357",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_4490",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 26,
+            "resolved": 7,
+            "unresolved": 19,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "after": {
+            "selected": 26,
+            "resolved": 3,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c0e69bbda782165e6e5b2036f81458b334760fa3cee7beaa7fe7b5f673caaae9",
+            "sha256:47162f6d782eb8d3f6240ad02c9d4e30e677c512ee8cb49f071e77e293157473",
+            "sha256:2166555ac930513061b9dd452d0ae1bcaed98c47500a568256265bc36dedc928",
+            "sha256:e21c67e4b069a8eeed494c4b25340198c65751e069ae26890702ca165e6085a8"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0081026",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 29,
+            "resolved": 7,
+            "unresolved": 22,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "after": {
+            "selected": 29,
+            "resolved": 3,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 29
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c0e69bbda782165e6e5b2036f81458b334760fa3cee7beaa7fe7b5f673caaae9",
+            "sha256:47162f6d782eb8d3f6240ad02c9d4e30e677c512ee8cb49f071e77e293157473",
+            "sha256:2166555ac930513061b9dd452d0ae1bcaed98c47500a568256265bc36dedc928",
+            "sha256:d6ca31d3ad7fa63f495ccf40e525aaae2c636cce39662db6fa03e7231162dc5f"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050695",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 24,
+            "resolved": 7,
+            "unresolved": 17,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "after": {
+            "selected": 24,
+            "resolved": 3,
+            "unresolved": 21,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 24
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c0e69bbda782165e6e5b2036f81458b334760fa3cee7beaa7fe7b5f673caaae9",
+            "sha256:2166555ac930513061b9dd452d0ae1bcaed98c47500a568256265bc36dedc928",
+            "sha256:47162f6d782eb8d3f6240ad02c9d4e30e677c512ee8cb49f071e77e293157473",
+            "sha256:d1d343c4a852fc8cb617dea21ba15dd6f83cefbcd75c9e1f8d13111f42a4f5fc"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080897",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 33,
+            "resolved": 8,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "after": {
+            "selected": 33,
+            "resolved": 3,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2166555ac930513061b9dd452d0ae1bcaed98c47500a568256265bc36dedc928",
+            "sha256:c0e69bbda782165e6e5b2036f81458b334760fa3cee7beaa7fe7b5f673caaae9",
+            "sha256:47162f6d782eb8d3f6240ad02c9d4e30e677c512ee8cb49f071e77e293157473",
+            "sha256:5ae03d26cf5185edc23e8c95c0c7a6b9be4f57fc43989b68e9c437164825fe22",
+            "sha256:70d2c59f17384755536d08746b1ec58225ed443270912baf406120aa1c15246c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1788",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 41,
+            "resolved": 9,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 41
+          },
+          "after": {
+            "selected": 41,
+            "resolved": 4,
+            "unresolved": 37,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 41
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:c0e69bbda782165e6e5b2036f81458b334760fa3cee7beaa7fe7b5f673caaae9",
+            "sha256:47162f6d782eb8d3f6240ad02c9d4e30e677c512ee8cb49f071e77e293157473",
+            "sha256:2166555ac930513061b9dd452d0ae1bcaed98c47500a568256265bc36dedc928",
+            "sha256:e21c67e4b069a8eeed494c4b25340198c65751e069ae26890702ca165e6085a8",
+            "sha256:a511ff8495aaf835e040e577dc742dc49c5222693cb35c7f3146deb21ca9f4f9"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-19",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C126688",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0061198",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 34,
+            "resolved": 6,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "after": {
+            "selected": 34,
+            "resolved": 3,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:67b9bc7a07032edc12b6f31291a36310bf56a79cfbb693f9ca966b26ddc4b036",
+            "sha256:743bf01d8186a9400aede5ef795f45dbd99dd01977bbc2c39a4b3434fe273350",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0061201",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 33,
+            "resolved": 6,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "after": {
+            "selected": 33,
+            "resolved": 3,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:67b9bc7a07032edc12b6f31291a36310bf56a79cfbb693f9ca966b26ddc4b036",
+            "sha256:743bf01d8186a9400aede5ef795f45dbd99dd01977bbc2c39a4b3434fe273350",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050663",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 36,
+            "resolved": 5,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "after": {
+            "selected": 36,
+            "resolved": 2,
+            "unresolved": 34,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:67b9bc7a07032edc12b6f31291a36310bf56a79cfbb693f9ca966b26ddc4b036",
+            "sha256:cbbfe52c616391e0799668131cbed116fc7633fee1f4d14e1f0f181f01dadf1f",
+            "sha256:b2a1baff51ce3c1053221759115bf39c1ad6a721bb8bb0fa407ed09276aca914"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0061199",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 36,
+            "resolved": 7,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "after": {
+            "selected": 36,
+            "resolved": 4,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:67b9bc7a07032edc12b6f31291a36310bf56a79cfbb693f9ca966b26ddc4b036",
+            "sha256:743bf01d8186a9400aede5ef795f45dbd99dd01977bbc2c39a4b3434fe273350",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0061200",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 36,
+            "resolved": 7,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "after": {
+            "selected": 36,
+            "resolved": 4,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 36
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:67b9bc7a07032edc12b6f31291a36310bf56a79cfbb693f9ca966b26ddc4b036",
+            "sha256:743bf01d8186a9400aede5ef795f45dbd99dd01977bbc2c39a4b3434fe273350",
+            "sha256:5f777f23dce6c850d5e183fcad83f72561a5e2c7d7c8366bdf5ee068f0d4244c"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-20",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C126740",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111236",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112378",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 7,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0110637",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 7,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 3,
+            "unresolved": 36,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111238",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 6,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 2,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111231",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-21",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C126741",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112379",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 7,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111233",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0110637",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 7,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 3,
+            "unresolved": 36,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112377",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 7,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0112378",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 7,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 3,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-22",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C126743",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111242",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0110637",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 7,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 3,
+            "unresolved": 36,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111231",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0110635",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 39,
+            "resolved": 7,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "after": {
+            "selected": 39,
+            "resolved": 3,
+            "unresolved": 36,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 39
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:0aac2a6b1b5fbe269169238c500bb2a94727f00f64d07b4fe336743d5082c2a9",
+            "sha256:88408bec684b73cbcd18e2d2146d08377502883a4d00e6f075865c30a391bd62"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0111235",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 6,
+            "unresolved": 25,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:721bf0d0025deb4aa6b8d3cab5748fd2ba75b8f0cbe7a4f23e9d4461a3c5d052",
+            "sha256:3730c40c53bac327d30fb0cbcf34c50035df48016cd5c434bbd8f60cc7d086be",
+            "sha256:5fd40fcd6fc42917525e6ff9a994847834c66e169e507358f3ab015d40fe01b8",
+            "sha256:f56db47d3a32da69ed908691be56c430adfa1e6e26c058eac2c6bc8e57c4d6da"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-23",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C128400",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_11080",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "after": {
+            "selected": 0,
+            "resolved": 0,
+            "unresolved": 0,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 0
+          },
+          "newly_unresolved_evidence_ids": []
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_7894",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 26,
+            "resolved": 5,
+            "unresolved": 21,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "after": {
+            "selected": 26,
+            "resolved": 3,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 26
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:6451814988582f0fb5666a31183db8984f838580149050334cd02e78df229b61",
+            "sha256:30fec540db277b60c5383680a6f25c04994c85b056739ea5e2aaaa55d0f0623a"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_13523",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 33,
+            "resolved": 9,
+            "unresolved": 24,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "after": {
+            "selected": 33,
+            "resolved": 5,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 33
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:6451814988582f0fb5666a31183db8984f838580149050334cd02e78df229b61",
+            "sha256:55bb4bdb56909e58ba2b93f702d390b15a2244f0c7d4df0e409377fccdbfe475",
+            "sha256:0bb3db792ee139352d143605fa3ea8ddd40c62e7710a0ea13026cac8ed2fee9d",
+            "sha256:44dbfa095fe0d06d48661aa3d68e522d71266d45f1c3e06c0da1c919fb29339c"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5502",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 32,
+            "resolved": 5,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "after": {
+            "selected": 32,
+            "resolved": 3,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 32
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:6451814988582f0fb5666a31183db8984f838580149050334cd02e78df229b61",
+            "sha256:30fec540db277b60c5383680a6f25c04994c85b056739ea5e2aaaa55d0f0623a"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_12926",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 23,
+            "resolved": 5,
+            "unresolved": 18,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 23
+          },
+          "after": {
+            "selected": 23,
+            "resolved": 3,
+            "unresolved": 20,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 23
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:6451814988582f0fb5666a31183db8984f838580149050334cd02e78df229b61",
+            "sha256:9dd4dd12322227176b578197fa66624409b453251e9143b07827e5d3275e1c5e"
+          ]
+        }
+      ]
+    },
+    {
+      "case_id": "review-24",
+      "source": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C128420",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "pairs": [
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050495",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 31,
+            "resolved": 4,
+            "unresolved": 27,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "after": {
+            "selected": 31,
+            "resolved": 2,
+            "unresolved": 29,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 31
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2c675b9402f61dcf1e89b29ecbcb98b6562ae49c78b20e2f2c20ee327d21195d",
+            "sha256:06bdc7c03b52321b132c46f16109d03f58aa7ce3887985114ee0e57519227629"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050518",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 25,
+            "resolved": 4,
+            "unresolved": 21,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "after": {
+            "selected": 25,
+            "resolved": 2,
+            "unresolved": 23,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 25
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2c675b9402f61dcf1e89b29ecbcb98b6562ae49c78b20e2f2c20ee327d21195d",
+            "sha256:06bdc7c03b52321b132c46f16109d03f58aa7ce3887985114ee0e57519227629"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080827",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 30,
+            "resolved": 4,
+            "unresolved": 26,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "after": {
+            "selected": 30,
+            "resolved": 2,
+            "unresolved": 28,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 30
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2c675b9402f61dcf1e89b29ecbcb98b6562ae49c78b20e2f2c20ee327d21195d",
+            "sha256:06bdc7c03b52321b132c46f16109d03f58aa7ce3887985114ee0e57519227629"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050521",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 34,
+            "resolved": 4,
+            "unresolved": 30,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "after": {
+            "selected": 34,
+            "resolved": 2,
+            "unresolved": 32,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 34
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2c675b9402f61dcf1e89b29ecbcb98b6562ae49c78b20e2f2c20ee327d21195d",
+            "sha256:06bdc7c03b52321b132c46f16109d03f58aa7ce3887985114ee0e57519227629"
+          ]
+        },
+        {
+          "target": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_12287",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "before": {
+            "selected": 35,
+            "resolved": 4,
+            "unresolved": 31,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "after": {
+            "selected": 35,
+            "resolved": 2,
+            "unresolved": 33,
+            "not_exported": 0,
+            "withheld": 0,
+            "graph_supported": 0,
+            "graph_unsupported": 0,
+            "graph_not_recorded": 35
+          },
+          "newly_unresolved_evidence_ids": [
+            "sha256:2c675b9402f61dcf1e89b29ecbcb98b6562ae49c78b20e2f2c20ee327d21195d",
+            "sha256:06bdc7c03b52321b132c46f16109d03f58aa7ce3887985114ee0e57519227629"
+          ]
+        }
+      ]
+    }
+  ],
+  "elapsed_seconds": 25.76035446394235,
+  "before": {
+    "selected": 3443,
+    "resolved": 656,
+    "unresolved": 2787,
+    "not_exported": 0,
+    "withheld": 0,
+    "graph_supported": 0,
+    "graph_unsupported": 0,
+    "graph_not_recorded": 3443
+  },
+  "after": {
+    "selected": 3443,
+    "resolved": 301,
+    "unresolved": 3142,
+    "not_exported": 0,
+    "withheld": 0,
+    "graph_supported": 0,
+    "graph_unsupported": 0,
+    "graph_not_recorded": 3443
+  },
+  "changed_selected_records": 355,
+  "selected_pairs": 120,
+  "surviving_citations_pass_typed_subject": true,
+  "source_receipt_sha256": "sha256:040f95b7b4f319b79287bca6e0d9cb45663aeef96b51fa468f00500b8a178ccc"
+}

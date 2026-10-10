@@ -1,0 +1,38 @@
+{
+  "schema": "exact-publication-audit-sidecar-regression/1",
+  "script_sha256": "sha256:b95d6b074548b32a3f020ea70d506ddc5801343f7b45498f725cbcc65cc0ae0e",
+  "test_sha256": "sha256:672dd12628e4fa645c81318a97b308443f0ae67630be52adcf8ef277dd077c49",
+  "command": "python -m pytest -p no:cacheprovider -q tests/explanation_publication_audit_test.py",
+  "result": {
+    "passed": 2,
+    "failed": 0,
+    "skipped": 0,
+    "elapsed_seconds": 0.33
+  },
+  "coverage": [
+    "Explicit external public metadata works with exact frozen publication hash",
+    "Absent default metadata fails instead of silently using another source",
+    "Changed sidecar bytes fail the frozen hash guard",
+    "Default input/selection.json contract remains compatible",
+    "No write to immutable input"
+  ],
+  "formatting": {
+    "black": "passed,2files",
+    "isort": "passed,2files",
+    "flake8": "passed,repository configuration"
+  },
+  "semantic_rules": {
+    "named": "AST unchanged",
+    "expression": "AST unchanged",
+    "assess_claim": "AST unchanged",
+    "verify_label": "AST unchanged"
+  },
+  "independent_review": "Root reviewed the exact diff and found no material blocker",
+  "initial_edit_check": {
+    "result": "collection error, no tests ran",
+    "cause": "An extra closing quote in the new helper docstring",
+    "correction": "Removed the extra quote before passing test and formatting reruns"
+  },
+  "provider_requests": 0,
+  "publication_modified": false
+}

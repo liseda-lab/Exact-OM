@@ -1,0 +1,187 @@
+{
+  "navigation": {
+    "context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+    "contract_version": "exact-hierarchy/1",
+    "entry_points": "available",
+    "inference": {
+      "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+      "completion": "not_completed",
+      "consistency": "not_established",
+      "failure_code": "TimeoutError",
+      "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+      "justifications": "not_exported",
+      "options": {
+        "backend": "native",
+        "fallback": "error",
+        "max_memory_bytes": 2147483648,
+        "timeout_seconds": 300
+      },
+      "reason": "Native hierarchy preparation did not complete",
+      "scope": "root",
+      "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+      "source_imports_complete": true,
+      "status": "failed",
+      "supported_kinds": [
+        "class"
+      ],
+      "versions": {
+        "pyhermit": "0.2.3",
+        "pyowl-core": "0.2.1"
+      }
+    },
+    "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+    "order": "root_priority_label_iri",
+    "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "preparation_key": "sha256:21664072320e1fe88c020fa379a8323e06c941b71d859028ea1610a76b092eba",
+    "runtime": {
+      "peak_rss_bytes": 1517547520,
+      "preparation_seconds": 415.4505164269358
+    },
+    "source_documents": [
+      "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+    ],
+    "source_root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+  },
+  "observations": {
+    "admitted_input_seconds": 264.0475,
+    "asserted_entry_index_seconds": 113.0328,
+    "claim_boundary": "No completed real NCIT inferred taxonomy, no empty-hierarchy inference and no full joint frontend/release acceptance",
+    "limit_boundary": "300 seconds covers inference input reconstruction and native loading/classification; source preflight, asserted entry indexing and final artifact verification occur outside inference timer",
+    "native_classifier_reached": false,
+    "native_snapshot_load_seconds": 36.8191,
+    "process_elapsed_seconds": 493.69907336798497,
+    "source_verification_seconds": 26.925
+  },
+  "phase_events": [
+    {
+      "call": 1,
+      "elapsed_seconds": 0.0012542828917503357,
+      "phase": "context_verification",
+      "state": "begin"
+    },
+    {
+      "call": 1,
+      "duration_seconds": 26.925193605944514,
+      "elapsed_seconds": 26.926620818907395,
+      "phase": "context_verification",
+      "state": "complete"
+    },
+    {
+      "call": 1,
+      "elapsed_seconds": 26.952710748882964,
+      "phase": "admitted_input",
+      "state": "begin"
+    },
+    {
+      "call": 1,
+      "elapsed_seconds": 26.953154698945582,
+      "phase": "native_snapshot_load",
+      "state": "begin"
+    },
+    {
+      "call": 1,
+      "duration_seconds": 0.14670143881812692,
+      "elapsed_seconds": 27.09989749500528,
+      "phase": "native_snapshot_load",
+      "state": "complete"
+    },
+    {
+      "call": 1,
+      "duration_seconds": 264.0475137559697,
+      "elapsed_seconds": 291.0003114610445,
+      "phase": "admitted_input",
+      "state": "complete"
+    },
+    {
+      "call": 2,
+      "elapsed_seconds": 291.00069985096343,
+      "phase": "native_snapshot_load",
+      "state": "begin"
+    },
+    {
+      "call": 2,
+      "duration_seconds": 36.81909842509776,
+      "elapsed_seconds": 327.81983610102907,
+      "phase": "native_snapshot_load",
+      "state": "complete"
+    },
+    {
+      "call": 1,
+      "elapsed_seconds": 329.3496061130427,
+      "phase": "asserted_entry_index",
+      "state": "begin"
+    },
+    {
+      "call": 1,
+      "duration_seconds": 113.03278799983673,
+      "elapsed_seconds": 442.382452303078,
+      "phase": "asserted_entry_index",
+      "state": "complete"
+    },
+    {
+      "counts": {
+        "admitted_input": 1,
+        "asserted_entry_index": 1,
+        "context_verification": 1,
+        "native_snapshot_load": 2
+      },
+      "elapsed_seconds": 493.69907336798497,
+      "navigation": {
+        "context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+        "contract_version": "exact-hierarchy/1",
+        "entry_points": "available",
+        "inference": {
+          "builtin_bounds": "bounds_in_admitted_signature_retained_otherwise_top_bottom_metadata_only",
+          "completion": "not_completed",
+          "consistency": "not_established",
+          "failure_code": "TimeoutError",
+          "input_sha256": "sha256:b1112227bfa3502cbacc13876465b7f676210343086e152e9e403b4e0a505838",
+          "justifications": "not_exported",
+          "options": {
+            "backend": "native",
+            "fallback": "error",
+            "max_memory_bytes": 2147483648,
+            "timeout_seconds": 300
+          },
+          "reason": "Native hierarchy preparation did not complete",
+          "scope": "root",
+          "semantics": "direct_named_class_taxonomy_between_equivalence_groups",
+          "source_imports_complete": true,
+          "status": "failed",
+          "supported_kinds": [
+            "class"
+          ],
+          "versions": {
+            "pyhermit": "0.2.3",
+            "pyowl-core": "0.2.1"
+          }
+        },
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+        "order": "root_priority_label_iri",
+        "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+        "preparation_key": "sha256:21664072320e1fe88c020fa379a8323e06c941b71d859028ea1610a76b092eba",
+        "runtime": {
+          "peak_rss_bytes": 1517547520,
+          "preparation_seconds": 415.4505164269358
+        },
+        "source_documents": [
+          "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+        ],
+        "source_root_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a"
+      },
+      "phase": "preparation",
+      "state": "complete"
+    }
+  ],
+  "phase_log": {
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/diagnostics/exact-b03-ncit-phases.jsonl",
+    "sha256": "sha256:4b37522522b1a873e7c90385071702ceec66939338476f6978649cb0dec010cc"
+  },
+  "recorded_at": "2026-10-10T13:31:45.232808+00:00",
+  "reproduction_script": {
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/diagnostics/exact-b03-profile-ncit.py",
+    "sha256": "sha256:23d23cbb1d2a0e831190fd016d00f0fcef10f3a0a3778357a5d5c26e678c03e6"
+  },
+  "result": "failed_inference_with_available_asserted_entry_points",
+  "scope": "local derived admitted logical root context; no remote changes"
+}

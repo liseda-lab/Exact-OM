@@ -1,0 +1,175 @@
+{
+  "catalogue_sha256": "sha256:56bb23d772acf62430092ee5da5466a8d88bd890fdb25308f12dac6295e278f3",
+  "cpu_system_seconds": 30.032394,
+  "cpu_user_seconds": 209.567014,
+  "elapsed_seconds": 244.6997710398864,
+  "free_disk_bytes": 3728179200,
+  "generation_mode": "typed-only",
+  "input_clone_receipt_sha256": "sha256:b2f4afdabb048f11e0016696f678013c97f46e2815b0122742334fe60814ba6d",
+  "peak_rss_bytes": 383586304,
+  "policy5_refresh_receipt_sha256": "sha256:e47ec91d503401dd3322deb8d2a711d19931b225b32e2301234af5e7ca7e1269",
+  "provider_dispatch_allowed": false,
+  "publication_sha256": "sha256:edf000e8498b000493f0f7d9812188e03b6b0241fd84e1ca7508d7afb41a040a",
+  "revision": "development-review-s1-interim-20261010",
+  "schema": "exact-typed-interim-preparation/1",
+  "scopes": [
+    {
+      "elapsed_seconds": 0.5966972650494426,
+      "free_disk_bytes": 3754422272,
+      "index_sha256": "80009c709273191eb6d33f107fca0ca86de2ff79480921b7dfdce5b42f4a748e",
+      "scope_id": "review-01"
+    },
+    {
+      "elapsed_seconds": 0.5681056620087475,
+      "free_disk_bytes": 3750002688,
+      "index_sha256": "2fc87cc1d1c9466bfd60816ac8a149639db44923ef4ad59096d59c5ccd29a8e2",
+      "scope_id": "review-02"
+    },
+    {
+      "elapsed_seconds": 0.4679064021911472,
+      "free_disk_bytes": 3745595392,
+      "index_sha256": "2af3262f1abbbc6a49c02da5e2d2f8559fc11bf051ff37bb8fad0480897d4f8f",
+      "scope_id": "review-03"
+    },
+    {
+      "elapsed_seconds": 0.25605693901889026,
+      "free_disk_bytes": 3743510528,
+      "index_sha256": "2082934d42c261026aa5f3ee749cb40182dabff12b0eaab586cc6bcdc458b54f",
+      "scope_id": "review-04"
+    },
+    {
+      "elapsed_seconds": 0.38358149002306163,
+      "free_disk_bytes": 3740057600,
+      "index_sha256": "d76cc122418dde1ed8e79c0edf2ad212679415c64da8e5aaecb3240c783955e6",
+      "scope_id": "review-05"
+    },
+    {
+      "elapsed_seconds": 0.42110236594453454,
+      "free_disk_bytes": 3734327296,
+      "index_sha256": "d2d0c38493dbfec9641733ff68ec98ad9322e97dae643ab41f2070d6c59e1bda",
+      "scope_id": "review-06"
+    },
+    {
+      "elapsed_seconds": 0.5330807310529053,
+      "free_disk_bytes": 3729629184,
+      "index_sha256": "9bfed758a5281e8a83404474d461c59f395df00d678122cfa31b8f70e953e314",
+      "scope_id": "review-07"
+    },
+    {
+      "elapsed_seconds": 0.43335163802839816,
+      "free_disk_bytes": 3726696448,
+      "index_sha256": "6d38620b001bc13770ff37a135872af4b3561218371a1f21e4f8ca8ca09cfcc8",
+      "scope_id": "review-08"
+    },
+    {
+      "elapsed_seconds": 0.4440223118290305,
+      "free_disk_bytes": 3742584832,
+      "index_sha256": "d51e003e2f1af2f632baf0b5172e907932b28d81f2b8b2e60bbe2818ff513473",
+      "scope_id": "review-09"
+    },
+    {
+      "elapsed_seconds": 0.5747559198644012,
+      "free_disk_bytes": 3738427392,
+      "index_sha256": "973e4cbda2b65a6466355375ca9503d635abe39a58c08ed1a4db8ea67b8dd4cc",
+      "scope_id": "review-10"
+    },
+    {
+      "elapsed_seconds": 0.4872016808949411,
+      "free_disk_bytes": 3734061056,
+      "index_sha256": "fe0d0f2dd8eb7b52c48bd37a496245ea70efb88ebe674414c4d32416cea52a9b",
+      "scope_id": "review-11"
+    },
+    {
+      "elapsed_seconds": 0.6163963708095253,
+      "free_disk_bytes": 3729190912,
+      "index_sha256": "33279cbb6a10c7a05c03c3fff705e3ce99d036190b414b714b667507513fbe9b",
+      "scope_id": "review-12"
+    },
+    {
+      "elapsed_seconds": 0.5114300679415464,
+      "free_disk_bytes": 3726004224,
+      "index_sha256": "aa87af66c649ba7385d33756022fe5e24f892947c13b942e725c6039de008002",
+      "scope_id": "review-13"
+    },
+    {
+      "elapsed_seconds": 0.4283385758753866,
+      "free_disk_bytes": 3722301440,
+      "index_sha256": "f073755c5a32e57bda1b4996ab518e3d38abcb80c2975e2f2eca16f139b752ac",
+      "scope_id": "review-14"
+    },
+    {
+      "elapsed_seconds": 0.44858414586633444,
+      "free_disk_bytes": 3718721536,
+      "index_sha256": "a88c15d5cafd597b812658012e83c138f17d4e7d35e718575183346aec56fd3f",
+      "scope_id": "review-15"
+    },
+    {
+      "elapsed_seconds": 0.4528939218726009,
+      "free_disk_bytes": 3714609152,
+      "index_sha256": "1695ad03f6900a0c6bbd48f82f8dd7ad7025e6691be3f90d3062b2130338a1b9",
+      "scope_id": "review-16"
+    },
+    {
+      "elapsed_seconds": 0.5077976880129427,
+      "free_disk_bytes": 3710099456,
+      "index_sha256": "06d65a22a9640d6d7b0db95f609a1ef603d0c0dcc6e60f1f4808d7eb0adc303c",
+      "scope_id": "review-17"
+    },
+    {
+      "elapsed_seconds": 0.43893819907680154,
+      "free_disk_bytes": 3739144192,
+      "index_sha256": "d3d0c0a8b057cfdd96f738f9520477e1760c4872b24c7a51b9996c4e78c500f4",
+      "scope_id": "review-18"
+    },
+    {
+      "elapsed_seconds": 0.524823386920616,
+      "free_disk_bytes": 3738193920,
+      "index_sha256": "e3f4e53aeeddb502bffe11a5577e44346e28fc03622969e0efc88a826658f02d",
+      "scope_id": "review-19"
+    },
+    {
+      "elapsed_seconds": 0.4595222941134125,
+      "free_disk_bytes": 3733528576,
+      "index_sha256": "665acb8a27d4d9eb45bd35a0652d77313fb7f9c2a69d22758c5bcb8d7948ff6d",
+      "scope_id": "review-20"
+    },
+    {
+      "elapsed_seconds": 0.48749460908584297,
+      "free_disk_bytes": 3729600512,
+      "index_sha256": "7f11771334c147aaf353c1b263ee73d2a2488dedf18bcf3d2096bdfc17958ff2",
+      "scope_id": "review-21"
+    },
+    {
+      "elapsed_seconds": 0.4892871880438179,
+      "free_disk_bytes": 3726372864,
+      "index_sha256": "5321d9296dc7962e3d60122f52161159b11c87e9ee26ff4b22a76dc98b92674d",
+      "scope_id": "review-22"
+    },
+    {
+      "elapsed_seconds": 0.45794863486662507,
+      "free_disk_bytes": 3722866688,
+      "index_sha256": "448207f44578fe06410add0a562c5adfcda0d710b231416be5acdf78407993d5",
+      "scope_id": "review-23"
+    },
+    {
+      "elapsed_seconds": 0.5301140369847417,
+      "free_disk_bytes": 3720474624,
+      "index_sha256": "d53647dd69d8ced11af97888d40229842a5338e20af82762b5fbaf58f1cb167a",
+      "scope_id": "review-24"
+    }
+  ],
+  "source_hashes": {
+    "exact_inspect/decisions.py": "sha256:5e112d1e0bfa25ace733faac561467deb2bf448a17a82b8db1eca13a8b5e297f",
+    "exact_inspect/decisions_export.py": "sha256:83fbd4050d3ebc8f3fbfdf94d6575d36500b3419c89e211aefd28b5cd6117ab2",
+    "exact_inspect/descriptions.py": "sha256:8cc76f39a1c52aeefac36cef948f26e6a5a54cc7c56c6d15c9a568a58dd28a33",
+    "exact_inspect/evidence_metadata.py": "sha256:9f14d04b381f96f4976f6c98fe7eec26ff29357e2fa41d6e8872404aa0694c56",
+    "exact_inspect/study/workspace.py": "sha256:915336410be7ee730aee64b107a5ba2e2f21b85675766fa6dc20efcc135b7488",
+    "tools/prepare_review_bundle.py": "sha256:3a8135fc4f4eb0f077183a8f6e9e2670c692df4ce021ff2bc0dfbed722d31760",
+    "tools/review_generation_attempt.py": "sha256:dd900fcc232d64b22bf68def9e09927ba44dcd9ceaf37ee870158c765d9cedcc",
+    "tools/review_pair_inputs.py": "sha256:e10f16e8e2acd1daf0f99516a75a8fc023f0e37efece25a52d1b6c040609239e",
+    "tools/review_private_run_cache.py": "sha256:05877c56749c5263e9e72a5b46dfa824f9c25b33c2746179d642b1e847462cd5",
+    "tools/review_run_cache.py": "sha256:343625847c0b024496054f160a098841e39aeaa5ab313327da6bcb482289c982"
+  },
+  "status": "complete",
+  "source_receipt_sha256": "sha256:e3e91ef9f7fd7091664bada5ca0e2a10b122c63ea064268f0de27b0ce97676c5"
+}

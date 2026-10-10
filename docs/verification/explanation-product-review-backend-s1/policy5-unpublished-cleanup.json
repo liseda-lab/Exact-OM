@@ -1,0 +1,49 @@
+{
+  "schema": "exact-policy-export-cleanup/1",
+  "status": "complete",
+  "reason": "Parent-authorized cleanup of unpublished policy4 exports before exact typed-focal citation filtering in exporter5. Neighbour-origin records remain preserved in unchanged private adapter7 input; no raw inputs, private indexes, provider artifacts or published bytes are deleted.",
+  "free_disk_before": 3804717056,
+  "free_disk_after": 6518366208,
+  "open_file_check": "No lsof users for either exact file",
+  "removed": [
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/package/runs/review/decisions.sqlite",
+      "root": "original",
+      "sha256": "sha256:5b0e19c0fc716b113a8bdbf56ab77b17a26971a9f84a8b9b8661de1c76e542e5",
+      "size_bytes": 2699452416
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-interim-20261010/package/runs/review/decisions.sqlite",
+      "root": "interim",
+      "sha256": "sha256:5b0e19c0fc716b113a8bdbf56ab77b17a26971a9f84a8b9b8661de1c76e542e5",
+      "size_bytes": 2699452416
+    }
+  ],
+  "retained": [
+    {
+      "path": "package/runs/review/decisions.manifest.json",
+      "retained_path": "verification/policy5-public-index-cleanup/retained/original/package/runs/review/decisions.manifest.json",
+      "root": "original",
+      "sha256": "sha256:3ad3c5dd2cac638a0176b57feee6fa8227f0ff22fdd5f27e8c3ae004741df64c"
+    },
+    {
+      "path": "policy-export-inputs.json",
+      "retained_path": "verification/policy5-public-index-cleanup/retained/original/policy-export-inputs.json",
+      "root": "original",
+      "sha256": "sha256:cb8d414815a8988cab6b5b977d4fb0f7e587a433d5675c7264db8e4452902f16"
+    },
+    {
+      "path": "package/runs/review/decisions.manifest.json",
+      "retained_path": "verification/policy5-public-index-cleanup/retained/interim/package/runs/review/decisions.manifest.json",
+      "root": "interim",
+      "sha256": "sha256:3ad3c5dd2cac638a0176b57feee6fa8227f0ff22fdd5f27e8c3ae004741df64c"
+    },
+    {
+      "path": "policy-export-inputs.json",
+      "retained_path": "verification/policy5-public-index-cleanup/retained/interim/policy-export-inputs.json",
+      "root": "interim",
+      "sha256": "sha256:cb8d414815a8988cab6b5b977d4fb0f7e587a433d5675c7264db8e4452902f16"
+    }
+  ],
+  "source_receipt_sha256": "sha256:dd763253c2b1207141c91613b1681155d7145da034aacfad9099f87088638660"
+}

@@ -1,0 +1,61 @@
+{
+  "scope": "B07 lifecycle closure/expiry and backend source identity; synthetic publication mechanics using actual authenticated ASGI HTTP and owned PostgreSQL. Not a real-bundle or browser result.",
+  "passed": 33,
+  "failed": 0,
+  "skipped": 0,
+  "seconds": 15.8,
+  "postgres_host": "127.0.0.1",
+  "postgres_port": 19393,
+  "owned_test_cluster_stopped": true,
+  "command": [
+    "env",
+    "-u",
+    "EXACT_STUDY_TEST_DATABASE_URL",
+    "PYTHONDONTWRITEBYTECODE=1",
+    "PYTHONPATH=/tmp/exact-s1-build",
+    "EXACT_REVIEW_TEST_PGBIN=/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/lib/python3.12/site-packages/pgserver/pginstall/bin",
+    "EXACT_REVIEW_TEST_PGPORT=19393",
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "-m",
+    "pytest",
+    "-q",
+    "-ra",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp=/tmp/exact-b07-identity-final-authorized-tests",
+    "--junitxml=/tmp/exact-b07-identity-final-authorized-junit.xml",
+    "tests/explanation_review_environment_test.py"
+  ],
+  "cwd": "/tmp/exact-s1-build",
+  "source_sha256": {
+    "tools/review_environment.py": "30604fafbdcfafd7373c2c329085c113d1a694d26cbadd8694db74aa2c9fe037",
+    "tests/explanation_review_environment_test.py": "fb91215b70a6bcc73f75fcd42f7404e28dc02e3dda3120219c739190e7c72c00",
+    "docs/explanation-review-environment.md": "023ef4bb7ef9beaae592318ed0bbb5a676af7f48fb6035d68c30352a8206460f"
+  },
+  "checks": [
+    "black --line-length 100: passed",
+    "flake8 --select F,E9: passed",
+    "independent bounded read-only closure and fingerprint reviews: no material blocker"
+  ],
+  "intermediate_results": [
+    {
+      "passed": 20,
+      "failed": 1,
+      "reason": "DB serialized +00:00 versus immutable Z spelling; fixed to exact datetime instant comparison",
+      "subsequent": "21 passed closure suite"
+    },
+    {
+      "passed": 30,
+      "failed": 2,
+      "skipped": 1,
+      "reason": "Initial fingerprint run sandbox denied loopback/process inspection; unchanged suite rerun with required authorized local access passed33"
+    }
+  ],
+  "source_identity_smoke": {
+    "git_commit": "178b8f24d28bbf40278a895ff279781da491526f",
+    "source_sha256": "e2f209d051e66dd7e2d9cc0f82f16adcd402d82c547bb1bfc84b362276460e50",
+    "file_count": 53,
+    "seconds": 0.065,
+    "scope": "Read-only identity computation on integration checkout before final helper merge; not the final prepared environment fingerprint."
+  }
+}

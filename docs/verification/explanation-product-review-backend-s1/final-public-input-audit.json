@@ -1,0 +1,41 @@
+{
+  "candidate_extra": 0,
+  "candidate_missing": 0,
+  "candidate_projection_verification": {
+    "excluded_fields": [
+      "evidence_counts",
+      "evidence_status"
+    ],
+    "order": "pair_id ascending",
+    "preserved": "All other candidate fields, including exact recorded values, scores, ordinal ranks, source-array location, provenance and saved membership.",
+    "private_sha256": "sha256:127ecea5fe8aad5b4853bcb2877f7d54063c1f2103d26f231a0791035daaf54c",
+    "public_sha256": "sha256:127ecea5fe8aad5b4853bcb2877f7d54063c1f2103d26f231a0791035daaf54c",
+    "serialization": "newline-separated canonical compact ASCII JSON [pair_id,candidate_projection]",
+    "status": "equal_for_every_pair"
+  },
+  "evidence_origin_resolution_counts": {
+    "resolved": 3810,
+    "unresolved": 1024142
+  },
+  "evidence_status_counts": {
+    "available": 3810,
+    "not_exported": 1024142
+  },
+  "indexed_global_memberships": 26743,
+  "indexed_unique_typed_candidates": 30374,
+  "membership_extra": 0,
+  "membership_missing": 0,
+  "policy_exporter": "exact-policy-decisions/5",
+  "private_database_sha256": "sha256:b405a4834c5d0b5753f3cc97df8e32079e51b3e92154c4a612b906151282dac4",
+  "public_database_sha256": "sha256:c60384bb0eb0bdaeeb77c68868fec9892d7bb906c70b05193c78a82c84b4c912",
+  "public_manifest_sha256": "sha256:6efb437a24a28806fbfcebd96b4448a5c46b46abb589d30dc68bb8a2df1e623f",
+  "saved_global_memberships": 26743,
+  "saved_unique_typed_candidates": 30374,
+  "schema": "exact-final-public-input-audit/1",
+  "selected_evidence_count": 1027952,
+  "source_candidate_file_sha256": "sha256:bb70a75555131af2eada72a792016b67ba56f66653a68389c83689f61dcdf251",
+  "source_mapping_file_sha256": "sha256:df1acd3e33c52cb76823a3c0b498c3f72ade6d03e150663d6999caef36a3ba38",
+  "status": "complete",
+  "unknown_memberships": 0,
+  "source_receipt_sha256": "sha256:4ad2782518ad063eeb288c1fb3b032574f960f393b51210ee6654381052e8e0f"
+}
