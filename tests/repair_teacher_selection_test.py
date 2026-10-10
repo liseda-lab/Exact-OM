@@ -89,6 +89,10 @@ def test_successor_reserves_train_without_calibration_reset_or_window_extension(
     # Calibration's admission window is over. TRAIN uses its own existing stage;
     # the calibration contract and original charges remain unchanged.
     monkeypatch.setattr(panel.time, "time", lambda: 2000000000)
+    # This is a simulated future TRAIN stage, not an expiry of the Slurm worker
+    # running the fixture. Keep the production bound-artifact deadline guard on.
+    monkeypatch.setenv("EXACT_REPAIR_DEADLINE_EPOCH", "2000003600")
+    settings["deadline_epoch"] = 2000003600
     assert runner._reserve_phase(settings, "train-0", "packet", 0.0048, comparison_id="c0") is None
     after = runner.read(tmp_path / "ledger/phase-reservations.json")
     assert after["request_limits"] == dict(calibration=91, train=325, development=96, test=192)
