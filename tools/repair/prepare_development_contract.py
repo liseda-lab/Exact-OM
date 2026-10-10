@@ -80,6 +80,14 @@ def prepare(campaign, output, repository, final_epoch=6, repair_seconds=30):
         input_amendment=amendment_ref,
     )
     request_profile(template, template["profile"])
+    template["rate_limit_policy"] = dict(
+        authorization=registry["campaign_context"]["transient_provider_policy"],
+        base_seconds=30,
+        max_seconds=300,
+    )
+    from tools.repair.annotation_backoff import validate_policy
+
+    validate_policy(template)
     cases = [case_from_dict(bound(row["evaluator"])) for row in dev["rows"]]
     if len(cases) != 32 or any(c.split != "development" for c in cases):
         raise ValueError("Expected all32 DEV inputs and no TEST")
