@@ -87,6 +87,10 @@ def validate_row(row, manifest, original):
 
 def validate_rows(manifest):
     contract = manifest["packet_admission"]
+    if contract.get("schema") == "exact-repair/recovered-train-packet-admission/v1":
+        from tools.repair.recovered_train_admission import validate_rows as validate_recovered
+
+        return validate_recovered(manifest)
     if contract.get("schema") == "exact-repair/train-input-recovery/v1":
         from tools.repair.train_input_recovery import validate_rows as validate_recovery
 
