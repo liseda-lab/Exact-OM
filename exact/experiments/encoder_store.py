@@ -21,6 +21,7 @@ class EncoderStore:
         self.db = sqlite3.connect(self.path, timeout=30)
         self.db.execute("PRAGMA journal_mode=WAL")
         self.db.execute("PRAGMA synchronous=FULL")
+        self.page_size = self.db.execute("PRAGMA page_size").fetchone()[0]
         self.db.execute("CREATE TABLE IF NOT EXISTS vectors (key TEXT PRIMARY KEY, shape TEXT, raw BLOB, sha256 TEXT)")
         self.counts = dict(connections=1, lookups=0, transactions=0, hits=0,
                            misses=0, corrupt=0, bytes_read=0, bytes_written=0,
@@ -68,8 +69,11 @@ class EncoderStore:
                             raw, hashlib.sha256(raw).hexdigest()))
         size = sum(len(row[2]) for row in encoded)
         limit = max(0, int(os.getenv("EXACT_EMBEDDING_CACHE_MAX_BYTES", str(8 * 1024**3))))
-        growth = 2 * sum(len(raw) + len(key.encode()) + len(shape.encode()) + 512
-                         for key, shape, raw, _ in encoded) + 65536
+        # A 2048-byte vector can occupy a whole 4096-byte leaf page. Reserve
+        # page slack, index/split overhead and both database/WAL copies rather
+        # than assuming dense byte packing. A declined write stays a cache miss.
+        growth = 2 * sum(len(raw) + len(key.encode()) + len(shape.encode()) + 8 * self.page_size
+                         for key, shape, raw, _ in encoded) + 16 * self.page_size
         try:
             with self.db:
                 self.db.execute("BEGIN IMMEDIATE")

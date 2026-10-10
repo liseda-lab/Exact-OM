@@ -2,6 +2,7 @@
 import json
 import multiprocessing
 import os
+from pathlib import Path
 from types import SimpleNamespace
 import pytest
 import torch
@@ -214,6 +215,55 @@ def test_encoder_cap_accounts_for_many_small_row_keys_and_page_overhead(tmp_path
     store.publish({str(index).zfill(64): torch.ones(2) for index in range(1000)})
     assert store.db.execute("SELECT count(*) FROM vectors").fetchone()[0] == 0
     assert store.counts["skipped_writes"] == 1000 and not store.db.in_transaction
+
+
+def test_encoder_bulk_2048_byte_vectors_respect_db_and_wal_cap(tmp_path, monkeypatch):
+    limit = 6 * 1024**2
+    monkeypatch.setenv("EXACT_EMBEDDING_CACHE_MAX_BYTES", str(limit))
+    store = encoder_store(tmp_path / "vectors.sqlite3")
+    # Exercise a commit that checkpoints, retaining both DB and WAL allocation.
+    store.db.execute("PRAGMA wal_autocheckpoint=1")
+    vector = torch.arange(1024, dtype=torch.float16)
+    existing = {str(index).zfill(64): vector for index in range(32)}
+    store.publish(existing)
+    assert store.db.execute("SELECT count(*) FROM vectors").fetchone()[0] == 32
+    assert Path(str(store.path) + "-wal").stat().st_size > 0
+
+    bulk = {str(index).zfill(64): vector for index in range(32, 1056)}
+    store.publish(bulk)
+    physical = sum(path.stat().st_size for path in store.path.parent.glob(store.path.name + "*"))
+    assert physical <= limit
+    assert store.db.execute("SELECT count(*) FROM vectors").fetchone()[0] == 32
+    assert store.counts["skipped_writes"] == 1024 and not store.db.in_transaction
+    assert torch.equal(store.lookup(["0".zfill(64)], torch.float16, 1024)["0".zfill(64)], vector)
+    assert not store.lookup(["32".zfill(64)], torch.float16, 1024)
+
+
+def test_encoder_returns_complete_vectors_when_bulk_publication_exceeds_cap(tmp_path, monkeypatch):
+    class WideConfig(Config):
+        def to_dict(self):
+            return {"hidden_size": 1024, "_commit_hash": self._commit_hash}
+
+    monkeypatch.setenv("EXACT_EMBEDDING_CACHE_DIR", str(tmp_path))
+    monkeypatch.setenv("EXACT_EMBEDDING_CACHE_MAX_BYTES", str(6 * 1024**2))
+    current = scorer()
+    current._cache_tensor_dtype = torch.float16
+    model = SimpleNamespace(config=WideConfig(), training=False)
+    texts = [str(index) for index in range(1024)]
+    calls = []
+
+    def compute(rows):
+        calls.append(list(rows))
+        return torch.tensor([float(text) for text in rows], dtype=torch.float16)[:, None].expand(-1, 1024)
+
+    actual = runtime.cached_encoder_rows(current, Tokenizer(), model, texts + [texts[0]], 16, compute)
+    assert calls == [texts]
+    assert actual.shape == (1025, 1024)
+    assert torch.equal(actual[:-1, 0], torch.arange(1024, dtype=torch.float16))
+    assert torch.equal(actual[-1], actual[0])
+    store = encoder_store(tmp_path / "vectors.sqlite3")
+    assert store.db.execute("SELECT count(*) FROM vectors").fetchone()[0] == 0
+    assert store.counts["skipped_writes"] == 1024 and not store.db.in_transaction
 
 
 def _fork_encoder_probe(path, pipe):
