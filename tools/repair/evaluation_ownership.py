@@ -195,6 +195,13 @@ def validate_owner(manifest, stage):
         expected = validate_lane(manifest, check_visibility=False)
         gpu = manifest["ownership_lane"] == "inference"
         required = {"evaluation", "secondary_evaluation"} if gpu else {"evaluation"}
+        if manifest.get("scope") == "representative_development":
+            from tools.repair.representative_capacity import validate_manifest
+
+            validate_manifest(manifest, check_visibility=False)
+            required = {"learning", "secondary_learning"} if gpu else {"learning"}
+            if set(owner["budget_stages"]) != required:
+                raise ValueError("Engineering must charge only existing learning stages")
         if (
             not required <= set(owner["budget_stages"])
             or owner["gpu_devices"] != ([DEV_GPU] if gpu else [])
