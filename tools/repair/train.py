@@ -29,7 +29,6 @@ from exact.repair.learning import (
     conditional_proposal_loss,
     covered_proposal_loss,
     enumerate_teacher,
-    evaluate_teacher,
     fidelity_comparison_losses,
     generated_checkpoint_criterion,
     interaction_loss,
@@ -803,11 +802,14 @@ def generated_development(
                     label = labeled.value
                     if post_decode_annotation_manifest is not None:
                         from dataclasses import asdict
+
                         from exact.repair.api import write_artifact
                         from exact.repair.pipeline import model_digest
-                        from exact.repair.semantic_fidelity import read_fidelity_training_artifact
-                        from tools.repair.prepare import case_to_dict
+                        from exact.repair.semantic_fidelity import (
+                            read_fidelity_training_artifact,
+                        )
                         from tools.repair.corrective_semantics import annotate_decoded
+                        from tools.repair.prepare import case_to_dict
 
                         manifest = Path(post_decode_annotation_manifest)
                         identity = canonical_hash(
@@ -1051,6 +1053,7 @@ def train_cases(
     post_decode_annotation_manifest: str | None = None,
     execution_schedule: str = "one_stage",
     elementary_seconds: float = 30.0,
+    execution_phase: str | None = None,
 ) -> tuple[Any, dict[str, Any]]:
     """Train masked full-plan tasks and select v3 checkpoints on generated repair quality.
 
@@ -1078,7 +1081,20 @@ def train_cases(
         or resume_endpoint_retrieval is not None
     ):
         raise ValueError("Report recovery requires an existing checkpoint and no other migration")
+    if execution_phase not in {None, "fit", "development"}:
+        raise ValueError("Unknown primary execution phase")
+    if execution_phase is not None and (
+        checkpoint_path is None
+        or sampled_assignments != 0
+        or not development_epochs
+        or patience_enabled is not False
+        or revision != "v3"
+    ):
+        raise ValueError("Separated phases require closed data, checkpoints and frozen DEV epochs")
     identity_options = dict(locals())
+    identity_options.pop("execution_phase")
+    if execution_phase is not None:
+        identity_options["phase_contract"] = "owned-fit-development/v1"
     if final_development_reserve_seconds is None:
         identity_options.pop("final_development_reserve_seconds")
     if development_case_seconds is None:
@@ -1446,8 +1462,12 @@ def train_cases(
     interruption_reason = None
     pending_acquisition: dict[str, Any] = {}
     previous_elapsed = 0.0
+    fit_rng = None
+    first_started_epoch = time.time()
     execution_count = 1
     optimizer_updates = 0
+    optimizer_case_counts = {}
+    optimizer_update_seconds = []
     optimized_parent_counts: dict[str, int] = {}
     head_updates: dict[str, int] = {}
     parameter_gradient_updates: dict[str, int] = {}
@@ -1522,10 +1542,14 @@ def train_cases(
                 recovery_lineage.append(migration)
         recovery_lineage = [*saved.get("recovery_lineage", []), *recovery_lineage]
         previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
+        fit_rng = saved.get("fit_rng")
+        first_started_epoch = saved.get("first_started_epoch", first_started_epoch)
         execution_count = int(saved.get("execution_count", 0)) + 1
         model.load_state_dict(saved["model"])
         optimizer.load_state_dict(saved["optimizer"])
         optimizer_updates = saved.get("optimizer_updates", 0)
+        optimizer_case_counts = saved.get("optimizer_case_counts", {})
+        optimizer_update_seconds = saved.get("optimizer_update_seconds", [])
         optimized_parent_counts = saved.get("optimized_parent_counts", {})
         head_updates = saved.get("head_updates", {})
         parameter_gradient_updates = saved.get("parameter_gradient_updates", {})
@@ -1594,8 +1618,29 @@ def train_cases(
             min(
                 deadline_seconds - elapsed,
                 total_training_seconds - previous_elapsed - elapsed,
+                (
+                    (first_started_epoch + total_training_seconds - time.time())
+                    if execution_phase is not None
+                    else float("inf")
+                ),
                 float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")) - time.time() - 2.0,
             ),
+        )
+
+    def remaining_development_reserve() -> float:
+        if execution_phase is None:
+            return final_development_reserve_seconds or 0.0
+        from tools.repair.primary_runtime import remaining_dev_reserve
+
+        return remaining_dev_reserve(
+            development_epochs,
+            development_case_seconds,
+            seed,
+            target_basis,
+            [case.case_id for case, _ in development],
+            history,
+            development_progress,
+            decode_seconds,
         )
 
     def remaining_optimizer_seconds() -> float:
@@ -1608,7 +1653,17 @@ def train_cases(
                 total_training_seconds
                 - previous_elapsed
                 - elapsed
-                - (final_development_reserve_seconds or 0.0),
+                - remaining_development_reserve(),
+                (
+                    (
+                        first_started_epoch
+                        + total_training_seconds
+                        - time.time()
+                        - remaining_development_reserve()
+                    )
+                    if execution_phase is not None
+                    else float("inf")
+                ),
             ),
         )
 
@@ -1639,9 +1694,13 @@ def train_cases(
                         if graph_schema is not None
                         else {}
                     ),
+                    first_started_epoch=first_started_epoch,
+                    fit_rng=fit_rng,
                     model=model.state_dict(),
                     optimizer=optimizer.state_dict(),
                     optimizer_updates=optimizer_updates,
+                    optimizer_case_counts=optimizer_case_counts,
+                    optimizer_update_seconds=optimizer_update_seconds,
                     optimized_parent_counts=optimized_parent_counts,
                     head_updates=head_updates,
                     parameter_gradient_updates=parameter_gradient_updates,
@@ -2078,6 +2137,13 @@ def train_cases(
                 loss = loss + weight * coverage["loss"] / max(1, len(case.problem.objects))
         return loss
 
+    if execution_phase == "development" and current_phase not in {
+        "development_loss",
+        "development_selection",
+    }:
+        raise ValueError("DEV must start from a committed fit boundary")
+    if execution_phase == "fit" and current_phase in {"development_loss", "development_selection"}:
+        raise ValueError("Fit cannot bypass a pending DEV pass")
     checkpoint(next_epoch, next_offset, saved_loss, saved_optimized)
     for epoch in range(next_epoch, epochs):
         if stopped_early:
@@ -2454,6 +2520,7 @@ def train_cases(
             if remaining_optimizer_seconds() <= 0:
                 interruption_reason = fitting_interruption()
                 break
+            update_started = time.monotonic()
             batch = order[offset : offset + batch_cases]
             optimizer.zero_grad(set_to_none=True)
             loss = torch.stack([case_loss(case, cache) for case, cache in batch]).mean()
@@ -2476,6 +2543,11 @@ def train_cases(
                     parameter_gradient_updates[name] = parameter_gradient_updates.get(name, 0) + 1
             optimizer.step()
             optimizer_updates += 1
+            if device == "cuda":
+                torch.cuda.synchronize()
+            optimizer_update_seconds.append(time.monotonic() - update_started)
+            for case, _ in batch:
+                optimizer_case_counts[case.case_id] = optimizer_case_counts.get(case.case_id, 0) + 1
             for case, _ in batch:
                 optimized_parent_counts[case.structural_parent] = (
                     optimized_parent_counts.get(case.structural_parent, 0) + 1
@@ -2498,14 +2570,36 @@ def train_cases(
             interrupted = True
             checkpoint(epoch, processed, train_loss, optimized)
             break
+        if execution_phase is not None and epoch + 1 not in development_epochs:
+            history.append(
+                dict(
+                    epoch=epoch + 1,
+                    train_loss=train_loss / max(1, optimized),
+                    optimized_cases=optimized,
+                    development_status="not_scheduled",
+                )
+            )
+            current_phase, epoch_order, development_progress = "acquisition", (), {}
+            checkpoint(epoch + 1)
+            continue
         model.eval()
         if current_phase == "train":
             current_phase = "development_loss"
         if development_progress.get("epoch") != epoch:
             development_progress = dict(epoch=epoch, losses={}, decoded={}, generated={})
+        if execution_phase == "fit":
+            from tools.repair.primary_runtime import PhaseBoundary
+
+            fit_rng = dict(
+                cpu=torch.get_rng_state(),
+                python=random.getstate(),
+                cuda=torch.cuda.get_rng_state_all() if device == "cuda" else [],
+            )
+            checkpoint(epoch, len(order), train_loss, optimized)
+            raise PhaseBoundary("development", epoch + 1, optimizer_updates)
         checkpoint(epoch, len(order), train_loss, optimized)
         with torch.no_grad():
-            for case, cache in development:
+            for case, cache in () if execution_phase is not None else development:
                 if case.case_id in development_progress["losses"]:
                     continue
                 if remaining_training_seconds() <= 0:
@@ -2515,7 +2609,11 @@ def train_cases(
                 checkpoint(epoch, len(order), train_loss, optimized)
         if interrupted:
             break
-        dev_loss = sum(development_progress["losses"].values()) / len(development)
+        dev_loss = (
+            sum(development_progress["losses"].values()) / len(development)
+            if execution_phase is None
+            else None
+        )
         current_phase = "development_selection"
         checkpoint(epoch, len(order), train_loss, optimized)
         row: dict[str, Any] = {
@@ -2598,11 +2696,34 @@ def train_cases(
                         scale=quantization_scale,
                     )
                     if case.case_id not in decoded:
-                        decoded[case.case_id] = decoded_development(
-                            objective,
-                            cache,
-                            max_checks=decode_max_checks,
-                            deadline_seconds=max(0.001, case_remaining()),
+                        diagnostic_seconds = case_remaining()
+                        if (
+                            execution_phase is not None
+                            and post_decode_annotation_manifest is not None
+                        ):
+                            annotation = json.loads(
+                                Path(post_decode_annotation_manifest).read_text()
+                            )
+                            annotation_slot = annotation.get("frozen_annotation_slots", {}).get(
+                                canonical_hash(selection_slot)
+                            )
+                            if annotation_slot is not None:
+                                semantic_reserve = float(
+                                    annotation.get("post_decode_reserve_seconds", 182)
+                                )
+                                semantic_reserve += 90 if annotation_slot.get("swapped") else 0
+                                diagnostic_seconds = max(
+                                    0, diagnostic_seconds - semantic_reserve - 2
+                                )
+                        decoded[case.case_id] = (
+                            decoded_development(
+                                objective,
+                                cache,
+                                max_checks=decode_max_checks,
+                                deadline_seconds=max(0.001, diagnostic_seconds),
+                            )
+                            if diagnostic_seconds > 0
+                            else dict(exact_regret=None, status="semantic_reserve")
                         )
                         case_spent[case.case_id] = (
                             prior_case_seconds + time.monotonic() - case_started
@@ -2770,11 +2891,21 @@ def train_cases(
             else:
                 stale_evaluations += 1
         history.append(row)
+        if execution_phase == "development" and fit_rng is not None:
+            torch.set_rng_state(fit_rng["cpu"].cpu())
+            random.setstate(fit_rng["python"])
+            if device == "cuda":
+                torch.cuda.set_rng_state_all([value.cpu() for value in fit_rng["cuda"]])
+            fit_rng = None
         stopped_early = patience_enabled is not False and stale_evaluations >= patience
         current_phase = "acquisition"
         epoch_order = ()
         development_progress = {}
         checkpoint(epoch + 1)
+        if execution_phase == "development" and epoch + 1 < epochs:
+            from tools.repair.primary_runtime import PhaseBoundary
+
+            raise PhaseBoundary("fit", epoch + 1, optimizer_updates)
         if stopped_early:
             break
     if best_state is None:
