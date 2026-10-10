@@ -127,6 +127,7 @@ def summarize_labels(cache, pairs):
 
 
 def audit_case(declaration, reference, plan, outputs, work):
+    round_id = plan.get("round_id", "0")
     receipt = bound(reference)
     if outputs.get(str(Path(reference["path"]).relative_to(work))) != reference["sha256"]:
         raise ValueError("Case receipt is not a bound terminal output")
@@ -167,7 +168,7 @@ def audit_case(declaration, reference, plan, outputs, work):
         control=receipt["control"],
         structural_parent=receipt["parent"],
         split="train",
-        round_id="0",
+        round_id=round_id,
         input=declaration,
         completion=reference,
         plan=binding(plan["_path"]),
@@ -211,7 +212,7 @@ def audit_case(declaration, reference, plan, outputs, work):
                 collection["split"],
                 collection["round_id"],
             )
-            != (case.case_id, case.structural_parent, "train", "0")
+            != (case.case_id, case.structural_parent, "train", round_id)
             or collection["requested"] != 16
             or len(attempts) != 16
         ):
@@ -273,7 +274,7 @@ def aggregate(rows):
     return dict(
         cases=len(rows),
         parents=len(parents),
-        scheduled_slots=16 * len(rows),
+        scheduled_slots=sum(r["scheduled_attempts"] for r in rows),
         slot_statuses=dict(Counter(s["status"] for r in rows for s in r["attempts"])),
         scientific_statuses=dict(Counter(r["scientific_status"] for r in rows)),
         process_statuses=dict(Counter(r["process_status"] for r in rows)),
