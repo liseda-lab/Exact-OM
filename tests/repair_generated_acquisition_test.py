@@ -246,3 +246,55 @@ def test_schedule_preserves_both_denominators_and_rejects_test(tmp_path, monkeyp
     write_artifact(tmp_path / "index.json", index)
     with pytest.raises(ValueError, match="denominator"):
         ga.validate(dict(plan, inputs=binding(tmp_path / "index.json")))
+
+
+def oversized_assignment_payload(case, directory):
+    # Install the fixture inside the real spawned worker, not only its parent.
+    from tests.repair_label_transport_test import oversized_cache
+    from tools.repair import train
+
+    label = oversized_cache(case).labels[0]
+    train._assignment_label = lambda *args, **kwargs: label
+    return ga._assignment_payload(case, label.assignment, (), output_directory=directory)
+
+
+def test_assignment_support_crosses_real_worker_as_lossless_artifact(tmp_path):
+    import pickle
+    from exact.repair.workers import bounded_call
+    from tests.repair_label_transport_test import oversized_cache
+    from tools.repair.corpus import generate_corpus
+
+    case = generate_corpus(
+        revision="v3", parents_per_family=1, siblings_per_parent=1, families=("range",)
+    )[0]
+    expected = oversized_cache(case).labels[0]
+    assert len(pickle.dumps(expected, protocol=5)) > 16 * 1024 * 1024
+    result = bounded_call(
+        oversized_assignment_payload, case, str(tmp_path), timeout=20, memory_mb=1024
+    )
+    assert result.status == "complete", result.detail
+    assert result.cleanup_complete and len(pickle.dumps(result)) < 2048
+    assert result.value["size_bytes"] > 16 * 1024 * 1024
+    restored = read_label_cache(result.value, tmp_path, case)
+    assert restored.labels == (expected,)
+    assert restored.labels[0].feasible is None
+    assert ga._read_assignment_payload(result.value, tmp_path, case, expected.assignment)
+    with pytest.raises(ValueError, match="scheduled assignment"):
+        ga._read_assignment_payload(result.value, tmp_path, case, (999,))
+    with pytest.raises(ValueError, match="different input"):
+        ga._read_assignment_payload(
+            result.value,
+            tmp_path,
+            replace(case, problem=replace(case.problem, evidence=())),
+            expected.assignment,
+        )
+    with pytest.raises(ValueError, match="outside its declared output"):
+        ga._read_assignment_payload(result.value, tmp_path / "other", case, expected.assignment)
+    from pathlib import Path
+
+    path = Path(result.value["path"])
+    with path.open("r+b") as stream:
+        stream.seek(-1, 2)
+        stream.write(b"x")
+    with pytest.raises(ValueError, match="integrity mismatch"):
+        ga._read_assignment_payload(result.value, tmp_path, case, expected.assignment)

@@ -14,7 +14,12 @@ from importlib.metadata import version
 from pathlib import Path
 
 from exact.repair.api import write_artifact
-from exact.repair.learning import RepairLabel, SemanticTargetSpec, collect_sampled_repairs
+from exact.repair.learning import (
+    RepairLabel,
+    SemanticTargetSpec,
+    TeacherCache,
+    collect_sampled_repairs,
+)
 from exact.repair.records import canonical_hash, canonical_json, read_record
 from exact.repair.workers import CallResult, bounded_call
 from tools.repair.acquisition import record_call, raise_on_software_failure
@@ -152,11 +157,36 @@ def _pairs(problem, options):
     return prep.pairs(problem, graph, enabled=True).pairs
 
 
+def _assignment_payload(case, assignment, profile, *, output_directory, **options):
+    """Publish full support evidence before returning a small, authenticated IPC receipt."""
+    from tools.repair.train import _assignment_label
+
+    started = time.monotonic()
+    label = _assignment_label(case, assignment, profile, **options)
+    cache = TeacherCache(
+        tuple(len(obj.candidates) for obj in case.problem.objects),
+        (label,),
+        False,
+        "single_assignment_transport",
+        (("input", case.problem.content_hash),),
+        time.monotonic() - started,
+        schema=f"exact-repair/teacher-cache/{case.schema_revision}",
+    )
+    return publish_label_cache(cache, Path(output_directory))
+
+
+def _read_assignment_payload(artifact, directory, case, assignment):
+    cache = read_label_cache(artifact, directory, case)
+    if len(cache.labels) != 1 or cache.labels[0].assignment != tuple(assignment):
+        raise ValueError("Assignment artifact belongs to another scheduled assignment")
+    return asdict(cache.labels[0])
+
+
 def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
     from exact.repair.pipeline import bounded_freeze_checkpoint
     from exact.repair.maxsat import solve_master
     from tools.repair.evaluate_campaign import generation_options
-    from tools.repair.train import _verify_intended, _assignment_label
+    from tools.repair.train import _verify_intended
 
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -276,7 +306,9 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
                     model_hash=result.value.model_hash,
                 )
             elif name.startswith("label-"):
-                value = asdict(result.value)
+                value = _read_assignment_payload(
+                    result.value, directory / "label-artifacts" / name, args[0], args[1]
+                )
             elif name.startswith("utility-"):
                 value = dict(assignment=result.value.assignment)
             else:
@@ -411,11 +443,12 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
         name = "label-" + canonical_hash(assignment)
         result = call(
             name,
-            _assignment_label,
+            _assignment_payload,
             generated_case,
             assignment,
             profile,
             semantic_target=target,
+            output_directory=str(directory / "label-artifacts" / name),
             cap=resources["full_check_seconds"],
             evidence_directory=directory / "native" / (name + "-checks"),
         )
