@@ -231,7 +231,7 @@ def qualified_contract(manifest):
         == Path(source["ledger_directory"]).resolve()
         and manifest["cost_ceiling_usd"] == source["cost_ceiling_usd"]
         and not manifest.get("teacher_panel")
-        and manifest["request_profiles"] == {profile: source["request_profiles"][profile]}
+        and compatible_input_profile(manifest, source, profile)
         and all(
             manifest[k] == source[k]
             for k in (
@@ -253,3 +253,23 @@ def qualified_contract(manifest):
     ):
         raise ValueError("Qualified teacher successor changed its gate, profile, quota or lineage")
     return proposal, phase, source, previous
+
+
+def compatible_input_profile(manifest, source, profile):
+    """Changing only explicit input limits does not change teacher qualification."""
+    from tools.repair.annotation_profile import request_profile
+
+    if set(manifest["request_profiles"]) != {profile}:
+        return False
+    baseline = source["request_profiles"][profile]
+    if manifest["request_profiles"] == {profile: baseline}:
+        return True
+    controls = manifest["request_profiles"][profile]
+    optional = {"max_input_tokens", "max_input_bytes", "input_amendment"}
+    if {k: v for k, v in controls.items() if k not in optional} != baseline:
+        return False
+    controls = request_profile(manifest, profile)
+    if "input_amendment" in controls:
+        amendment = bound(controls["input_amendment"])
+        return amendment.get("previous_profile_hash") == canonical_hash(baseline)
+    return controls == baseline

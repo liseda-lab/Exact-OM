@@ -21,7 +21,7 @@ from exact.repair.records import canonical_hash, read_record
 from exact.repair.owl import snapshot_from_axioms
 from exact.repair.semantic_fidelity import SemanticEvidencePacketV3, annotation_prompt
 from exact.repair.workers import bounded_call
-from tools.repair.annotation_profile import request_profile
+from tools.repair.annotation_profile import input_limits, request_profile
 from tools.repair.batch import _stage_remaining, freeze, prepare_dispatch, read
 from tools.repair.common_training import load_release
 from tools.repair.corrective_campaign import source_identity
@@ -207,6 +207,7 @@ def packet_for(case, evidence, plans, manifest):
 def packet_admission(packet, manifest, swapped):
     """Same wire envelope with a fixed-length run identity; no router/client creation."""
     controls = request_profile(manifest, manifest["profile"])
+    token_cap, byte_cap = input_limits(controls)
     prompt = annotation_prompt(manifest["prompt_version"])
     context = dict(
         packet=packet.judge_payload(swapped=swapped),
@@ -235,7 +236,7 @@ def packet_admission(packet, manifest, swapped):
     try:
         # A real run ID is a 64-character digest. Reserve 64 tokens beyond
         # the placeholder's count so its tokenization cannot break admission.
-        tokens = input_token_bound(messages, wire, controls["tokenizer"]) + 64
+        tokens = input_token_bound(messages, wire, controls["tokenizer"], byte_cap) + 64
     except ValueError as error:
         if str(error) != "Annotation input exceeds independent byte cap":
             raise
@@ -245,8 +246,8 @@ def packet_admission(packet, manifest, swapped):
     return dict(
         status=(
             "eligible"
-            if packet.eligible and tokens <= 8000
-            else ("unavailable_packet_tokens" if tokens > 8000 else "unavailable_native_plan")
+            if packet.eligible and tokens <= token_cap
+            else ("unavailable_packet_tokens" if tokens > token_cap else "unavailable_native_plan")
         ),
         input_bytes=byte_count,
         input_token_bound=tokens,

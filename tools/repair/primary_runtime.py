@@ -197,6 +197,9 @@ def run_phase(manifest_path, phase, output):
     from tools.repair.common_training import validate_closed_preparation
 
     validate_closed_preparation(cases, preparation, protocol, case_limit=None, retry_labels=False)
+    from tools.repair.training_readiness import require_ready
+
+    require_ready(manifest.get("training_readiness"), manifest["shared_weak_labels"], cases)
     config = train._protocol_arguments(protocol)
     expected = manifest["phase_gpu_uuids"][phase]
     if (phase == "fit" and expected != FIT_GPU) or expected not in {FIT_GPU, DEV_GPU}:

@@ -601,7 +601,9 @@ def test_deadline_after_one_update_does_not_advance_epoch(
         ),
     )
     now = [0.0]
-    monkeypatch.setattr(train, "time", SimpleNamespace(monotonic=lambda: now[0]))
+    monkeypatch.setattr(
+        train, "time", SimpleNamespace(monotonic=lambda: now[0], time=lambda: now[0])
+    )
     options = dict(
         epochs=1,
         hidden_dim=8,

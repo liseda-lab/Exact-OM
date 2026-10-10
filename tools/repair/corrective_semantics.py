@@ -918,12 +918,14 @@ def annotate_packet(
     profile_name = manifest["profile"]
     prices = manifest["prices_per_million"][profile_name]
     # Conservative maximum includes billed reasoning tokens in the output cap.
-    from tools.repair.annotation_profile import request_profile
+    from tools.repair.annotation_profile import input_limits, request_profile
     from exact.repair.annotation_controls import response_format, input_token_bound
 
     controls = request_profile(manifest, profile_name)
     output_cap = controls["max_output_tokens"] if controls else 2000
-    cost = (8000 * prices["input"] + output_cap * prices["output"]) / 1_000_000
+    token_cap, byte_cap = input_limits(controls)
+    total_tokens = token_cap + output_cap
+    cost = (token_cap * prices["input"] + output_cap * prices["output"]) / 1_000_000
     if cost <= 0:
         raise ValueError("Finite positive frozen provider prices required")
     role = TEACHER if packet.split == "train" else EVALUATOR
@@ -932,8 +934,8 @@ def annotate_packet(
     evaluator = profile_name if packet.split != "train" else test
     selected_teacher = profile_name if packet.split == "train" else teacher
     budgets = {
-        TEACHER: AnnotationBudget(416, 416 * 10000, 35, 416 * 90),
-        EVALUATOR: AnnotationBudget(288, 288 * 10000, 35, 288 * 90),
+        TEACHER: AnnotationBudget(416, 416 * total_tokens, 35, 416 * 90),
+        EVALUATOR: AnnotationBudget(288, 288 * total_tokens, 35, 288 * 90),
     }
     parent_splits = manifest["parent_splits"]
     if parent_splits.get(packet.parent_group_id) != packet.split:
@@ -962,8 +964,8 @@ def annotate_packet(
         authorized=True,
         role_profiles={TEACHER: selected_teacher, EVALUATOR: evaluator},
         role_budgets=budgets,
-        aggregate_budget=AnnotationBudget(704, 704 * 10000, manifest["cost_ceiling_usd"], 704 * 90),
-        max_input_bytes=32768 if controls else 8000,
+        aggregate_budget=AnnotationBudget(704, 704 * total_tokens, manifest["cost_ceiling_usd"], 704 * 90),
+        max_input_bytes=byte_cap,
         max_output_tokens=output_cap,
         max_cost_per_request_usd=cost,
         max_seconds_per_request=90,
@@ -1008,8 +1010,9 @@ def annotate_packet(
                 else None
             ),
             controls["tokenizer"] if controls else None,
+            byte_cap,
         )
-        > 8000
+        > token_cap
     ):
         write_artifact(
             receipt_path,

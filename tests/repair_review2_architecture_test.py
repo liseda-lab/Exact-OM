@@ -335,3 +335,31 @@ def test_unsupported_unary_architecture_cannot_be_silently_enabled(tmp_path, mon
     )
     with pytest.raises(ValueError, match="unary_benefit"):
         train.main()
+
+
+def test_satisfied_support_targets_do_not_run_conflict_discovery(monkeypatch):
+    """A completed native check must not spend its remaining budget reproving negatives."""
+    from exact.repair.kernel import materialize
+    from exact.repair.owl import OwlVerifier, snapshot_from_axioms
+    import exact.repair.detection as detection
+
+    p = problem()
+    assignment = tuple(len(o.candidates) - 1 for o in p.objects)
+    axioms, active = materialize(p, assignment)
+    report = OwlVerifier("hermit", backend="python").check_theory(
+        snapshot_from_axioms(axioms),
+        p.policy.monitored_classes,
+        required=p.policy.required,
+        prohibited=p.policy.prohibited,
+        activated=active,
+    )
+    assert report.logical_status == "VERIFIED_FEASIBLE"
+    monkeypatch.setattr(
+        detection, "detect_violations", lambda *a: pytest.fail("unnecessary conflict discovery")
+    )
+    targets = support_targets(p, assignment, report, axioms, active)
+    assert targets and all(t.eligible and not t.violated and t.proof_json is None for t in targets)
+    assert len({t.theory_hash for t in targets}) == 1
+    assert all(
+        t.asserted_axioms == tuple(a.canonical_bytes().hex() for a in axioms) for t in targets
+    )
