@@ -1,0 +1,146 @@
+[
+ {
+  "theme": "light",
+  "case": "before S0 follow-up: faded focal label (ink at opacity 0.35 over surface-2)",
+  "text": "#adaead",
+  "background": "#faf8f4",
+  "contrast": 2.1,
+  "required": 4.5,
+  "meets": false
+ },
+ {
+  "theme": "light",
+  "case": "before S0 follow-up: faded feature label (ink at opacity 0.35 over surface)",
+  "text": "#b0b3b4",
+  "background": "#ffffff",
+  "contrast": 2.11,
+  "required": 4.5,
+  "meets": false
+ },
+ {
+  "theme": "light",
+  "case": "focal label, any state (ink on surface-2)",
+  "text": "#1d2529",
+  "background": "#faf8f4",
+  "contrast": 14.68,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "light",
+  "case": "entity/literal label (ink on surface)",
+  "text": "#1d2529",
+  "background": "#ffffff",
+  "contrast": 15.57,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "light",
+  "case": "faded entity/literal label (ink-2 on surface)",
+  "text": "#4a555c",
+  "background": "#ffffff",
+  "contrast": 7.65,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "light",
+  "case": "relation label on a line (ink-2 on its surface background)",
+  "text": "#4a555c",
+  "background": "#ffffff",
+  "contrast": 7.65,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "light",
+  "case": "selected relation label (ink on surface)",
+  "text": "#1d2529",
+  "background": "#ffffff",
+  "contrast": 15.57,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "light",
+  "case": "group count label (ink-3 on surface)",
+  "text": "#5e6a73",
+  "background": "#ffffff",
+  "contrast": 5.55,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "before S0 follow-up: faded focal label (ink at opacity 0.35 over surface-2)",
+  "text": "#62686c",
+  "background": "#1d2328",
+  "contrast": 2.81,
+  "required": 4.5,
+  "meets": false
+ },
+ {
+  "theme": "dark",
+  "case": "before S0 follow-up: faded feature label (ink at opacity 0.35 over surface)",
+  "text": "#606468",
+  "background": "#191e22",
+  "contrast": 2.82,
+  "required": 4.5,
+  "meets": false
+ },
+ {
+  "theme": "dark",
+  "case": "focal label, any state (ink on surface-2)",
+  "text": "#e3e7ea",
+  "background": "#1d2328",
+  "contrast": 12.76,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "entity/literal label (ink on surface)",
+  "text": "#e3e7ea",
+  "background": "#191e22",
+  "contrast": 13.51,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "faded entity/literal label (ink-2 on surface)",
+  "text": "#b2bcc3",
+  "background": "#191e22",
+  "contrast": 8.7,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "relation label on a line (ink-2 on its surface background)",
+  "text": "#b2bcc3",
+  "background": "#191e22",
+  "contrast": 8.7,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "selected relation label (ink on surface)",
+  "text": "#e3e7ea",
+  "background": "#191e22",
+  "contrast": 13.51,
+  "required": 4.5,
+  "meets": true
+ },
+ {
+  "theme": "dark",
+  "case": "group count label (ink-3 on surface)",
+  "text": "#96a1a9",
+  "background": "#191e22",
+  "contrast": 6.37,
+  "required": 4.5,
+  "meets": true
+ }
+]

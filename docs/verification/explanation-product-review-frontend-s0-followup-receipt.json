@@ -1,0 +1,691 @@
+{
+ "schema_version": "exact-product-review-frontend-s0-followup/1",
+ "recorded_at": "2026-10-10T02:48:30+00:00",
+ "status": "S0_review_findings_R1_R2_R3_R4_C1_corrected_and_verified_on_synthetic_data_against_unchanged_backend; owner_visual_review_manual_accessibility_real_package_and_deployment_gates_open",
+ "synthetic_only": true,
+ "review": "docs/verification/explanation-product-review-frontend-s0-review.md (reviewed through 1fb1cee)",
+ "base_commit": "f80bfcf (frontend sources equal 1fb1cee)",
+ "commits": {
+  "graph_R1_R3_R4": "5185f3e",
+  "drafts_R2": "848cc53",
+  "scores_C1": "7c1fd00",
+  "tests": "d293657",
+  "documentation": "Subsequent commit containing this receipt; deliberately not self-referential"
+ },
+ "backend_changed": false,
+ "reproduction_before_fix": {
+  "review_diagnostics": "3 of 3 reproduced their defects on the pre-fix build (offline draft blank after Next/Previous; stale hierarchy inspector after Show in graph on a grouped annotation; selected only line ending at a node labelled some)",
+  "main_app_regressions_prefix_build": {
+   "build": "archive of HEAD f80bfcf plus the new test files, served on a spare port",
+   "results": [
+    {
+     "test": "product-review-s0-followup.spec.ts:47 graph, item list, inspector and original record agree before and after selection, tab and theme changes",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:85 an unlabelled property is drawn by its local name; parallel and wrapped labels never overlap each other or a node",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:144 every grouped record, a multi-record feature, and undrawable records, after a previous selection and a tab restore",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:194 light, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:194 light, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:194 dark, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:194 dark, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:212 each larger text size keeps the zoom and the selected relation in view, and both compared concepts whenever they fit (21 F01)",
+     "status": "failed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:247 dense columns with long labels: no overlaps, readable start zoom, full text in the list",
+     "status": "passed"
+    },
+    {
+     "test": "product-review-s0-followup.spec.ts:271 trace and scores panel show concise labels; meanings open from accessible disclosures",
+     "status": "failed"
+    }
+   ],
+   "note": "The R3 failure here is on a list attribute added by this pass (harness). Rerun with a text-based list check, R3 fails at the defect: after Show in graph on 'gamma synonym' the inspector still describes 'subclass of Parent P' (baseline-r3)."
+  },
+  "study_regressions_prefix_build": {
+   "offline_next_previous": "failed: answer unchecked on return",
+   "immediate_next_back_multipart": "failed: first row's choice unchecked on return",
+   "reload_with_queued_work": "failed: queued answer not shown",
+   "competing_tabs": "failed: the stale tab's conflicting draft never saved"
+  }
+ },
+ "review_diagnostics_after_fix": {
+  "offline_draft": "fails at its defect assertion: the answer is still checked after Next/Previous",
+  "grouped_record": "fails at its defect assertion: the inspector shows the requested literal, not the previous hierarchy feature",
+  "shared_filler": "capture-only diagnostic; the capture shows two separately labelled lines (holds only, holds some) into one node"
+ },
+ "fixtures": {
+  "study_v2": {
+   "publication_sha256": "04db8d2bbb595a102931ca4ff5ee60cbc1eff2816b46638e6e992c1f65d9085a",
+   "tutorial": "tutorial/2.0-native-2-nav65"
+  },
+  "main_app": {
+   "package_sha256": "3689e862ea29c4dbd7823919302244ab0d573b59ec3001844dd778e003902609",
+   "run": "synthetic-ui-fixture"
+  },
+  "synthetic_graph_overrides": "e2e/graphFixtures.ts: pair-evidence, axiom and label READ responses only, example.org IRIs and synthetic fact IDs; nothing written"
+ },
+ "checks": {
+  "typecheck": "passed (final tree and each follow-up commit)",
+  "unit": {
+   "passed": 102,
+   "failed": 0,
+   "new": 9
+  },
+  "build": "passed (Next 15.5.26 static export)",
+  "browser_complete_suite": {
+   "passed": 112,
+   "failed": 0,
+   "flaky": 0,
+   "skipped": 21,
+   "skips": [
+    "legacy.spec.ts:37 saved-run API and root redirect retain the same-origin run",
+    "legacy.spec.ts:67 saved-run canvas, filters and source navigation remain interactive",
+    "review-screenshots.spec.ts:34 compare, decision trace, graph and browse",
+    "review-screenshots.spec.ts:72 tutorial lessons",
+    "review-screenshots.spec.ts:109 assessment answer kept across offline Next/Previous (S0-R2)",
+    "review-screenshots.spec.ts:130 scored explanation case",
+    "review-screenshots.spec.ts:34 compare, decision trace, graph and browse",
+    "review-screenshots.spec.ts:72 tutorial lessons",
+    "review-screenshots.spec.ts:109 assessment answer kept across offline Next/Previous (S0-R2)",
+    "review-screenshots.spec.ts:130 scored explanation case",
+    "review-screenshots.spec.ts:143 tutorial lesson 1 at 375px",
+    "review-screenshots.spec.ts:223 shared targets, selected relation",
+    "review-screenshots.spec.ts:229 grouped record revealed from the list; undrawn record",
+    "review-screenshots.spec.ts:242 unlabelled and long relation names",
+    "review-screenshots.spec.ts:247 dense with long labels; Fit all",
+    "review-screenshots.spec.ts:255 expanded parents and 200% text on the real fixture",
+    "review-screenshots.spec.ts:223 shared targets, selected relation",
+    "review-screenshots.spec.ts:229 grouped record revealed from the list; undrawn record",
+    "review-screenshots.spec.ts:242 unlabelled and long relation names",
+    "review-screenshots.spec.ts:247 dense with long labels; Fit all",
+    "review-screenshots.spec.ts:255 expanded parents and 200% text on the real fixture"
+   ],
+   "includes_fresh_unseeded_journey": "e2e/study-v2-backend.spec.ts fresh browser journey"
+  },
+  "followup_regressions_separate_runs": [
+   {
+    "report": "followup-run1.json",
+    "expected": 14,
+    "unexpected": 0,
+    "flaky": 0
+   },
+   {
+    "report": "followup-run2.json",
+    "expected": 14,
+    "unexpected": 0,
+    "flaky": 0
+   }
+  ],
+  "review_screenshots": {
+   "complete_capture_run": {
+    "passed": 17,
+    "failed": 2
+   },
+   "assessment_captures_rerun": {
+    "passed": 2,
+    "failed": 0,
+    "reason": "the capture went offline before the practice material loaded; the test now waits for the question first (test timing, not the application)"
+   },
+   "main_app_captures_rerun": {
+    "passed": 2,
+    "failed": 0,
+    "reason": "re-captured after the final 'About these scores' label change"
+   }
+  },
+  "contrast": "docs/verification/explanation-product-review-frontend-s0-followup/contrast.json"
+ },
+ "browser_results": [
+  {
+   "test": "accessibility.spec.ts:168 a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:184 dialog keyboard focus wraps and returns to its trigger",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:203 detail tabs support arrow-key navigation and activation",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:105 comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:112 ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:122 bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:129 study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:134 study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:148 researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:105 comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:112 ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:122 bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:129 study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:134 study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:148 researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:105 comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:112 ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:122 bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:129 study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:134 study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:148 researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:105 comparison accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:112 ontology browsing accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:122 bundle library accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:129 study welcome accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:134 study case, evidence and per-case report accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "accessibility.spec.ts:148 researcher sign-in accessibility",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:10 prepared comparison, evidence, graph and saved pair navigation",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:42 every generated-text citation opens its exact original record and returns focus (C03)",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:63 the graph keeps its view across tabs and draws only supported, legend-matched lines (C07, C08)",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:88 run-discovery failures remain errors and can be retried",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:101 a capped candidate list declares incomplete ranking coverage",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:119 ontology search, independent focus, hierarchy and keyboard dialog",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:138 responsive comparison and persistent theme/text preferences",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:157 local library rejects corrupt input and opens a verified ZIP",
+   "status": "passed"
+  },
+  {
+   "test": "exploration.spec.ts:178 public demo keeps exploration and excludes private/import routes",
+   "status": "passed"
+  },
+  {
+   "test": "fact-pagination.spec.ts:14 main app: full context pages every category beyond its first page, without repeats or false completeness",
+   "status": "passed"
+  },
+  {
+   "test": "fact-pagination.spec.ts:34 main app: a object property's later-page superproperty opens as a object property (R11)",
+   "status": "passed"
+  },
+  {
+   "test": "fact-pagination.spec.ts:34 main app: a data property's later-page superproperty opens as a data property (R11)",
+   "status": "passed"
+  },
+  {
+   "test": "legacy.spec.ts:37 saved-run API and root redirect retain the same-origin run",
+   "status": "skipped"
+  },
+  {
+   "test": "legacy.spec.ts:67 saved-run canvas, filters and source navigation remain interactive",
+   "status": "skipped"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:47 graph, item list, inspector and original record agree before and after selection, tab and theme changes",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:85 an unlabelled property is drawn by its local name; parallel and wrapped labels never overlap each other or a node",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:144 every grouped record, a multi-record feature, and undrawable records, after a previous selection and a tab restore",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:194 light, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:194 light, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:194 dark, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:194 dark, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:212 each larger text size keeps the zoom and the selected relation in view, and both compared concepts whenever they fit (21 F01)",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:247 dense columns with long labels: no overlaps, readable start zoom, full text in the list",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:271 trace and scores panel show concise labels; meanings open from accessible disclosures",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:314 offline: answer, Next, Previous keeps the answer; after reconnecting it is saved and still shown",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:328 immediate Next/Back before the debounce, and a delayed save, keep a multi-part answer",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:348 reload with queued work shows the queued answer and saves it",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0-followup.spec.ts:364 competing tabs: each tab's conflicting draft stays visible, is saved, and does not overwrite the other's",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:42 one-sided channels draw no comparison line; added ontology context saves nothing; a feature saves its exact record for the inspected candidate",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:75 a rejected action is dropped, never resent, and the next valid action, help, navigation and reload all work",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:116 offline evidence shows Saving\u2026 without a tick and saves after reconnecting",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:131 search \u2192 a child that is the compared concept counts as the return; Back appears whenever focus is away",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:163 Show me reveals and focuses the control without doing the step",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:199 Open decision trace, card parent and Show in graph at 1280\u00d7720",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:199 Open decision trace, card parent and Show in graph at 1440\u00d7900",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:199 Open decision trace, card parent and Show in graph at 375\u00d7812",
+   "status": "passed"
+  },
+  {
+   "test": "product-review-s0.spec.ts:229 at 200% text the trace still reveals below the sticky header",
+   "status": "passed"
+  },
+  {
+   "test": "review-screenshots.spec.ts:34 compare, decision trace, graph and browse",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:72 tutorial lessons",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:109 assessment answer kept across offline Next/Previous (S0-R2)",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:130 scored explanation case",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:34 compare, decision trace, graph and browse",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:72 tutorial lessons",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:109 assessment answer kept across offline Next/Previous (S0-R2)",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:130 scored explanation case",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:143 tutorial lesson 1 at 375px",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:223 shared targets, selected relation",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:229 grouped record revealed from the list; undrawn record",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:242 unlabelled and long relation names",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:247 dense with long labels; Fit all",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:255 expanded parents and 200% text on the real fixture",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:223 shared targets, selected relation",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:229 grouped record revealed from the list; undrawn record",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:242 unlabelled and long relation names",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:247 dense with long labels; Fit all",
+   "status": "skipped"
+  },
+  {
+   "test": "review-screenshots.spec.ts:255 expanded parents and 200% text on the real fixture",
+   "status": "skipped"
+  },
+  {
+   "test": "study-recovery.spec.ts:71 a stale tab cannot save into another equal-revision session sharing the cookie",
+   "status": "passed"
+  },
+  {
+   "test": "study-recovery.spec.ts:97 failed explanation content blocks ranking and pending submission does not claim success",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-backend.spec.ts:48 fresh browser journey: training, both conditions, reports and completion over the scoped workspace",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:60 lesson 1 \u2192 2 then reload without any lesson-2 action restores lesson 2, with focus on the new heading",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:74 the assessment landing, a partial draft and a focused question all survive reload",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:108 an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:128 rapid Next/Back while saves are delayed keeps the last destination, on screen and on the server",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:143 navigation while offline is kept in this tab and saved after reconnecting",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:157 a stale second tab adopts the server's position after its conflicting navigation",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:175 opening tutorial help during a scored case keeps completion, assignment and the case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:203 the scored case reads its scoped workspace: six contexts, admitted descriptions and comparisons, then one case_ready",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:225 a v2 explanation case without its workspace descriptor is blocked, never served from prepared excerpts",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:243 capabilities for another scope are incompatible and block the case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:257 a target-context failure blocks ranking and case_ready until a retry succeeds, reusing valid reads",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:288 a slow fifth candidate keeps the case loading; case_ready and case timing start only after it",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:308 a comparison failure blocks with its own label; a profile failure likewise",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:333 an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:343 a 200 response describing another entity is an invalid binding and blocks readiness",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:356 an optional hierarchy failure stays local and does not block submission",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:367 a blocking failure keeps a saved partial ranking and its order through retry",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:384 replacing the session aborts the old case: nothing from it becomes ready",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:398 a second tab loads its own readiness and reports its own ready observation (J05)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:414 pause and resume never reopen case timing before the content is usable again",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:429 a baseline case reads no workspace, and a previous explanation scope is denied after advancing",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:468 v2 exports request and verify analysis 3 in JSON and CSV",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:489 a returned schema other than analysis 3 is reported and not saved (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:506 setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (light)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:506 setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (dark)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:567 a searched non-focal entity's full context pages every category; closing keeps the case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:603 a focal entity's full context shows its description; a citation opens and returns; a parent navigates",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:628 a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:660 a slow required read finishing after another failed cannot unblock the case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:675 a refused optional read stays local; only a refused scope blocks the case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:702 pair_comparison only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:702 original_context only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:702 entity_description only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:702 hierarchy + evidence_table + evidence_graph only: usable once exactly its content renders; a failure blocks and Retry recovers",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:739 comparison only: a recorded absence is usable (diagnostic)",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:778 a delayed check failure cannot undo a successful retry; the draft and cached contexts survive",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:811 a check still in flight from a submitted presentation cannot affect the next case",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:831 a check still in flight from a replaced session cannot affect the new session",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:851 study: a object property's later-page superproperty opens as a object property; the case is kept",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:851 study: a data property's later-page superproperty opens as a data property; the case is kept",
+   "status": "passed"
+  },
+  {
+   "test": "study-v2-integration.spec.ts:885 lesson 1's source card opens both parents as typed classes; lesson 2 saves a typed parent action",
+   "status": "passed"
+  },
+  {
+   "test": "study.spec.ts:69 complete HTTPS/PostgreSQL participant journey, pause, reload, timing and condition isolation",
+   "status": "passed"
+  },
+  {
+   "test": "study.spec.ts:152 v1 explanation cases open card parents with their recorded type (19 F21)",
+   "status": "passed"
+  },
+  {
+   "test": "study.spec.ts:203 offline answers survive reload and reconnect before submission",
+   "status": "passed"
+  },
+  {
+   "test": "study.spec.ts:220 researcher browser authentication, publication, links, progress, exports and closure",
+   "status": "passed"
+  },
+  {
+   "test": "typed-browse.spec.ts:7 NCIT property search preserves kind in hierarchy, URL, reload and full context",
+   "status": "passed"
+  },
+  {
+   "test": "typed-browse.spec.ts:42 an old in-flight search cannot replace the new term's real results",
+   "status": "passed"
+  }
+ ]
+}
