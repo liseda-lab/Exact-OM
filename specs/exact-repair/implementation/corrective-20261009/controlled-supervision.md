@@ -43,3 +43,22 @@ unsupported source and held-out split rejection, native timeout reuse, deadline
 clipping, complete oversized packets, tokenizer integrity and all 308 rows through
 the resumable two-shard entry point. Actual preflight checked all 128 TRAIN
 settings and all 308 frozen pair identities before launch.
+
+## Predeclared lossless packet representation
+
+`semantic-packet-lossless-text-dictionary/v1` is an offline transport candidate
+for oversized complete packets. It substitutes deterministic namespace tokens
+and stores shared literal full-theory blocks once in the same packet's context.
+Every reference expands to the original characters. Expansion must reconstruct
+the entire original packet dictionary and content hash, including both complete
+native plans; theory, policy, plan, assignment and query identities stay fixed.
+There is no ontology alias, source projection, axiom deletion or unsupported
+coverage upgrade. Dictionary-marker collisions and altered content/proofs fail.
+
+Apply this representation uniformly under a rule frozen before paid acquisition;
+recompute both byte and token bounds for every scheduled presentation. Retain all
+original raw packets and their original oversized outcomes. An encoded packet
+that still exceeds either bound remains unavailable. This representation itself
+admits no hosted requests or primary fits. Early engineering samples showed
+substantial byte reductions but remained above at least one bound; no eligible
+coverage claim follows from those samples.
