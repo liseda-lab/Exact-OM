@@ -345,6 +345,71 @@ def test_panel_atomic_reallocation_preserves59_costs_and_resume(tmp_path, monkey
 
 
 @pytest.mark.parametrize(
+    "defect", [None, "unapproved", "clock_reset", "extra_time", "unbound", "ledger", "expired"]
+)
+def test_approved_panel_window_preserves_costs_and_original_clock(tmp_path, monkeypatch, defect):
+    from tools.repair import teacher_panel as panel
+
+    settings, prior = panel_fixture(tmp_path, monkeypatch)
+    proposal = runner.read(settings["teacher_panel"]["proposal"]["path"])
+    now = panel.time.time()
+    started = now - 50000
+    old = json.loads(json.dumps(proposal))
+    old["stage"].update(
+        started_epoch=started, deadline_epoch=started + 21600,
+        latest_admission_epoch=started + 21600 - 900 / 0.7,
+    )
+    timing = dict(
+        schema="exact-repair/teacher-panel-timing-authorization/v1",
+        status="proposed" if defect == "unapproved" else "approved",
+        approval_text="I authorise please run this experiments",
+        previous_proposal=save(tmp_path, "expired-proposal.json", old),
+        approved_epoch=now - 1,
+        window_seconds=7201 if defect == "extra_time" else 7200,
+    )
+    deadline = timing["approved_epoch"] + timing["window_seconds"]
+    proposal["stage"].update(
+        started_epoch=started + (1 if defect == "clock_reset" else 0),
+        deadline_epoch=deadline, proposed_elapsed_seconds=deadline - started,
+        latest_admission_epoch=deadline - 900 / 0.7,
+    )
+    proposal["timing_authorization"] = save(tmp_path, "timing.json", timing)
+    settings["deadline_epoch"] = deadline
+    proposal["contracts"]["teacher"] = canonical_hash(panel.contract(settings))
+    settings["teacher_panel"]["proposal"] = save(tmp_path, "successor-proposal.json", proposal)
+    approval = runner.read(settings["teacher_panel"]["authorization"]["path"])
+    approval.update(proposal=settings["teacher_panel"]["proposal"])
+    if defect != "unbound":
+        approval["timing_authorization"] = proposal["timing_authorization"]
+    settings["teacher_panel"]["authorization"] = save(tmp_path, "successor-approval.json", approval)
+    stage = runner.read(tmp_path / "stage.json")
+    stage["stages"]["calibration"]["started_epoch"] = started
+    stage["stage_limits"]["calibration"]["elapsed_seconds"] = (
+        21600 if defect == "ledger" else deadline - started
+    )
+    runner.write_artifact(tmp_path / "stage.json", stage)
+    if defect == "expired":
+        monkeypatch.setattr(panel.time, "time", lambda: deadline)
+    before = (tmp_path / "ledger/phase-reservations.json").read_bytes()
+    if defect:
+        with pytest.raises((ValueError, PermissionError)):
+            runner._reserve_phase(
+                settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0"
+            )
+        assert (tmp_path / "ledger/phase-reservations.json").read_bytes() == before
+        return
+    runner._reserve_phase(settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0")
+    after = runner.read(tmp_path / "ledger/phase-reservations.json")
+    assert len(after["reservations"]) == 60
+    assert all(after["reservations"][k] == v for k, v in prior["reservations"].items())
+    assert runner.read(tmp_path / "stage.json") == stage
+    assert runner._reserve_phase(
+        settings, "new-0-0", packet().content_hash, 0.0042, comparison_id="panel-0"
+    ) is False
+    assert runner.read(tmp_path / "ledger/phase-reservations.json") == after
+
+
+@pytest.mark.parametrize(
     "defect", ["unapproved", "quota", "contract", "reset", "stage", "late", "unscheduled"]
 )
 def test_panel_refuses_unapproved_changed_or_expired_work(tmp_path, monkeypatch, defect):
