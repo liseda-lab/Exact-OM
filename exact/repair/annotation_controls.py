@@ -58,10 +58,18 @@ def response_format(packet, swapped=False):
 
 
 def validate_wire_controls(controls):
-    if not isinstance(controls, Mapping) or set(controls) != {"reasoning", "response_format"}:
-        raise ValueError("Repair controls require explicit reasoning and strict response_format")
-    reasoning = controls["reasoning"]
-    if dict(reasoning) not in ({"effort": "low"}, {"enabled": False}):
+    if not isinstance(controls, Mapping) or set(controls) not in (
+        {"response_format"},
+        {"reasoning", "response_format"},
+    ):
+        raise ValueError(
+            "Repair controls require strict response_format and optional supported reasoning"
+        )
+    reasoning = controls.get("reasoning")
+    if "reasoning" in controls and dict(reasoning or {}) not in (
+        {"effort": "low"},
+        {"enabled": False},
+    ):
         raise ValueError("Unsupported repair reasoning controls")
     form = controls["response_format"]
     if (

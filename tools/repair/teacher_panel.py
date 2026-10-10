@@ -9,6 +9,7 @@ from exact.repair.records import canonical_hash
 from tools.repair.batch import read, sha
 
 LIMITS = dict(calibration=83, train=333, development=96, test=192)
+FOUR_MODEL_LIMITS = dict(calibration=91, train=325, development=96, test=192)
 PREVIOUS_LIMITS = dict(calibration=64, train=352, development=96, test=192)
 
 
@@ -37,19 +38,21 @@ def panel_contract(manifest, *, require_approval=True):
             or approval.get("proposal") != ref["proposal"]
         ):
             raise PermissionError("Teacher panel requires approval of the exact prepared amendment")
+    four_models = proposal["max_requests"] == 32
+    limits = FOUR_MODEL_LIMITS if four_models else LIMITS
     if not (
         proposal.get("schema") == "exact-repair/teacher-panel-proposal/v1"
         and manifest["phase"] == "calibration"
-        and manifest["request_limits"] == proposal["request_limits"] == LIMITS
+        and manifest["request_limits"] == proposal["request_limits"] == limits
         and prior["request_limits"] == previous["request_limits"] == PREVIOUS_LIMITS
         and manifest["request_budget_amendment"] == previous["request_budget_amendment"]
         and prior["lineage"] == previous["lineage_id"] == manifest["lineage_id"]
         and Path(manifest["ledger_directory"]).resolve()
         == Path(previous["ledger_directory"]).resolve()
         and manifest["cost_ceiling_usd"] == prior["cost_ceiling_usd"] == 35
-        and proposal["max_requests"] == 24
-        and 0 < proposal["max_reserved_usd"] <= 0.11376
-        and proposal["calibration_comparison_identity_limit"] == 48
+        and proposal["max_requests"] in (24, 32)
+        and 0 < proposal["max_reserved_usd"] <= (0.13296 if four_models else 0.11376)
+        and proposal["calibration_comparison_identity_limit"] == (56 if four_models else 48)
         and len(prior["reservations"]) == proposal["prior_requests"] == 59
         and all(r["phase"] == "calibration" for r in prior["reservations"].values())
         and math.isclose(
@@ -126,7 +129,7 @@ def reserve_panel(manifest, proposal, prior, records, slot, packet_hash, compari
     if not completed_panel and time.time() > proposal["stage"]["latest_admission_epoch"]:
         raise ValueError("Full teacher panel no longer fits 70 percent of remaining stage")
     if (
-        len(completed_panel) >= 24
+        len(completed_panel) >= proposal["max_requests"]
         or sum(r["reserved_cost_usd"] for r in completed_panel) + cost
         > proposal["max_reserved_usd"] + 1e-9
     ):
