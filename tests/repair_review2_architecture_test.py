@@ -363,3 +363,27 @@ def test_satisfied_support_targets_do_not_run_conflict_discovery(monkeypatch):
     assert all(
         t.asserted_axioms == tuple(a.canonical_bytes().hex() for a in axioms) for t in targets
     )
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_assignment_label_honors_optional_support_without_losing_native_decision(
+    monkeypatch, enabled
+):
+    from exact.repair.learning import RepairLabel
+
+    case = generate_corpus(
+        split_counts={"train": 1, "development": 0, "test": 0},
+        siblings_per_parent=1,
+        families=("conflicts_higher_order",),
+    )[0]
+    calls = []
+
+    def support(*args):
+        calls.append(args)
+        return ()
+
+    monkeypatch.setattr(train, "support_targets", support)
+    label = train._assignment_label(case, (0, 0, 0), train.DEFAULT_PROFILE, support_enabled=enabled)
+    assert isinstance(label, RepairLabel) and label.feasible is not None
+    assert len(calls) == int(enabled)
+    assert not label.support_targets

@@ -565,6 +565,7 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
             assignment,
             profile,
             semantic_target=target,
+            support_enabled=protocol["model"].get("support_enabled", False),
             output_directory=str(directory / "label-artifacts" / name),
             cap=resources["full_check_seconds"],
             evidence_directory=directory / "native" / (name + "-checks"),
