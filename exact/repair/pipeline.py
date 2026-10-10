@@ -1335,6 +1335,9 @@ def _freeze_worker(
     torch.set_num_threads(1)
     model = RepairModel(payload["metadata"], **payload["config"])
     model.load_state_dict(payload["state_dict"])
+    options = dict(options)
+    model.to(options.pop("device", "cpu"))
+    model.eval()
     return freeze_neural_round(problem, model, **options)
 
 
@@ -1677,6 +1680,11 @@ def staged_verified_repair(
         stages.append(
             dict(
                 phase="selection_verification",
+                first_verified_seconds=(
+                    before - started + result.first_verified_seconds
+                    if result.first_verified_seconds is not None
+                    else None
+                ),
                 epoch=index,
                 status=result.logical_status,
                 input_hash=scoped.content_hash,
