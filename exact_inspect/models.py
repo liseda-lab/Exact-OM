@@ -339,6 +339,16 @@ class MembershipProvenance(WireModel):
     artifact_hash: str | None
 
 
+class SourceCandidateRecord(WireModel):
+    """Exact saved array location and scores; this position is not an ordinal rank."""
+
+    artifact_ref: str
+    source_record_index: int = Field(ge=0)
+    candidate_index: int = Field(ge=0)
+    ordering: Literal["source_decisions_candidates_array"]
+    scores: list[Score]
+
+
 class Candidate(WireModel):
     """A typed candidate summary without graphs or an unqualified raw scorer payload."""
 
@@ -357,6 +367,7 @@ class Candidate(WireModel):
     status: Availability
     decision_status: Availability
     evidence_status: Availability | None = None
+    source_decision_record: SourceCandidateRecord | None = None
 
     @model_validator(mode="after")
     def check_scores_and_membership(self):

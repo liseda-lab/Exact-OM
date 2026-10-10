@@ -287,3 +287,13 @@ run manifest and declares its canonical `dependency_inventory_hash` under
 to obtain the original dependency hashes. It denotes an inventory reference, not a newly
 recorded producer file. Explicit producer artifact references remain unchanged. Admission checks
 the declared inventory schema and recomputed hash, so missing or altered inventories fail closed.
+
+Adapter `decision-adapter/7` retains the same inventory contract and unions typed candidates
+recorded in `source_decisions`, including candidates without explanation exports. On
+`GET /api/v1/runs/{run_id}/candidates`, optional `source_decision_record` binds the zero-based
+`source_record_index` and `candidate_index`, `ordering="source_decisions_candidates_array"`,
+and separately retained `scores` to `artifact_ref`, the exact source-decision file hash.
+Array location is not a retrieval or production rank. Only fixed scalar score/control fields
+enter the adapter. Missing stage/evidence exports remain explicit. A uniquely declared named
+global mapping is admitted only after contained-path, hash and size verification; historical
+canonical mappings retain their existing seam and acquire consumed-byte hashes.

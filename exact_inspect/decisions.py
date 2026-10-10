@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 import sqlite3
 from contextlib import contextmanager
@@ -33,13 +34,165 @@ _SCORE_MEANINGS = {
 }
 
 
-ADAPTER_REVISION = "decision-adapter/6"
+ADAPTER_REVISION = "decision-adapter/7"
 DEPENDENCY_INVENTORY_SCHEMA = "exact-decision-dependency-inventory/1"
 
 
 def dependency_inventory_hash(dependencies):
     """Content address the complete verified run dependency map, without repeating it."""
     return canonical_hash({"schema": DEPENDENCY_INVENTORY_SCHEMA, "dependencies": dependencies})
+
+
+def _source_candidates(document, artifact_ref):
+    """Retain saved typed candidates without treating their array order as a rank.
+
+    The source-decision writer sorts its candidate array by target IRI. It can
+    contain candidates absent from both the explanation and final mapping files.
+    This fixed scalar allowlist never copies private/reference fields or nested
+    producer explanations, even when their names resemble score prefixes.
+    """
+    from exact.runs.decisions import pair_key
+
+    numeric = {
+        "U",
+        "U_ind",
+        "U_dis",
+        "p_llm",
+        "S_base",
+        "S_pair_final",
+        "S_pair_pre_calibration",
+        "S_select",
+        "P_select",
+        "P_rank",
+        "P_match",
+        "S_final",
+        "S_before_source_choice",
+        "Q_pool_miss",
+        "Q_match",
+        "Q_nil",
+        "P_nil",
+        "P_match_pre_nil",
+        "P_rank_without_nil",
+        "nil_rank",
+        "candidate_joint_rank",
+        "selection_accept_threshold",
+        "selection_margin",
+        "selection_entropy",
+        "selection_no_match_prob",
+        "selection_evidence_support",
+        "selection_distinctive",
+        "selection_utility",
+        "selection_target_cardinality",
+        "cand_rank",
+    }
+    controls = {
+        "nil_mode",
+        "nil_ranking_scale",
+        "nil_absence_semantics",
+        "cand_channels",
+        "cand_ordering",
+        "cand_tie_rule",
+        "cand_rank_provenance",
+        "source_choice_reason",
+    }
+    flags = {"threshold_positive", "selection_nil_winner", "selection_target_conflict_enabled"}
+    output = {}
+    for source_index, source in enumerate(document.get("records", [])):
+        candidates = source.get("candidates", [])
+        if not isinstance(candidates, list):
+            raise DomainError(
+                "invalid_source_candidates", "Saved source candidates are invalid.", 422
+            )
+        for index, candidate in enumerate(candidates):
+            if (
+                not isinstance(candidate, dict)
+                or not isinstance(source.get("Src"), str)
+                or not source["Src"]
+                or not isinstance(candidate.get("target"), str)
+                or not candidate["target"]
+                or (
+                    source.get("SrcKind") is not None
+                    and candidate.get("SrcKind") is not None
+                    and source["SrcKind"] != candidate["SrcKind"]
+                )
+            ):
+                raise DomainError(
+                    "invalid_source_candidates", "Saved typed candidate identity is invalid.", 422
+                )
+            record = {
+                "src_iri": source["Src"],
+                "src_kind": candidate.get("SrcKind") or source.get("SrcKind") or "class",
+                "tgt_iri": candidate["target"],
+                "tgt_kind": candidate.get("TgtKind") or "class",
+            }
+            key = pair_key(record)
+            if key in output:
+                raise DomainError(
+                    "invalid_source_candidates", "Duplicate saved typed candidate identity.", 422
+                )
+            values = {
+                name: value
+                for name, value in candidate.items()
+                if (name in numeric and type(value) in {int, float} and math.isfinite(value))
+                or (name in controls and isinstance(value, str))
+                or (name in flags and type(value) is bool)
+            }
+            output[key] = {
+                "record": record,
+                "values": values,
+                "reference": {
+                    "artifact_ref": artifact_ref,
+                    "source_record_index": source_index,
+                    "candidate_index": index,
+                    "ordering": "source_decisions_candidates_array",
+                    "scores": _scores(values, "saved_source_decision"),
+                },
+            }
+    return output
+
+
+def _global_mapping_path(reader, manifest):
+    """Honor one hash-bound manifest mapping in the producer's named TSV format."""
+    canonical = reader.layout.mapping_path("global")
+    declared = []
+    for artifact in manifest.get("artifacts", []):
+        name = artifact.get("path", "")
+        if (
+            artifact.get("kind") == "alignment"
+            and isinstance(name, str)
+            and (
+                Path(name).name == "maps_global.tsv" or Path(name).name.endswith(".maps_global.tsv")
+            )
+        ):
+            declared.append(artifact)
+    if len(declared) > 1:
+        raise DomainError(
+            "ambiguous_alignment", "Multiple saved global mappings are declared.", 409
+        )
+    if not declared:
+        return canonical
+    artifact = declared[0]
+    path = relative_path(reader.layout.root, artifact["path"])
+    raw_hash = artifact.get("sha256")
+    if raw_hash is None and canonical.is_file() and canonical.resolve() == path.resolve():
+        # The stable reader's pre-existing canonical seam supports historical
+        # mappings without a manifest hash. Import binds their actual bytes.
+        return canonical
+    expected = raw_hash.removeprefix("sha256:") if isinstance(raw_hash, str) else ""
+    if (
+        not re.fullmatch(r"[a-f0-9]{64}", expected)
+        or not path.is_file()
+        or file_hash(path) != "sha256:" + expected
+        or ("bytes" in artifact and artifact["bytes"] != path.stat().st_size)
+    ):
+        raise DomainError(
+            "artifact_conflict", "Saved global mapping differs from its manifest.", 409
+        )
+    if canonical.is_file() and canonical.resolve() != path.resolve():
+        raise DomainError(
+            "ambiguous_alignment", "Multiple saved global mappings are available.", 409
+        )
+    return path
 
 
 def _score(name, value, stage):
@@ -356,6 +509,10 @@ def import_run(
         dependencies[reader.layout.relative(reader.layout.source_decisions_path)] = file_hash(
             reader.layout.source_decisions_path
         )
+    saved_candidates = _source_candidates(
+        source_decisions,
+        dependencies.get(reader.layout.relative(reader.layout.source_decisions_path)),
+    )
     run_id = run_id or str(manifest.get("run_id") or canonical_hash(dependencies))
     records: dict[str, dict[str, Any]] = {}
     try:
@@ -363,6 +520,9 @@ def import_run(
             records[pair_key(record)] = record
     except FileNotFoundError:
         pass
+    explained_keys = set(records)
+    for key, candidate in saved_candidates.items():
+        records.setdefault(key, candidate["record"])
     for key, decision in raw_decisions.items():
         records.setdefault(
             key,
@@ -374,10 +534,12 @@ def import_run(
             },
         )
     memberships: dict[str, dict[str, Any]] = {}
-    alignment_path = reader.layout.mapping_path("global")
+    alignment_path = _global_mapping_path(reader, manifest)
     if alignment_path.is_file():
         dependencies[reader.layout.relative(alignment_path)] = file_hash(alignment_path)
-        for raw in reader.mappings("global").to_dict("records"):
+        from exact.utils.data import read_table
+
+        for raw in read_table(alignment_path).to_dict("records"):
             memberships[pair_key(raw)] = raw
             source_iri, sk, target_iri, tk = typed_pair(raw)
             records.setdefault(
@@ -425,7 +587,13 @@ def import_run(
     database = directory / "decisions.sqlite"
     if database.exists():
         raise DomainError("artifact_conflict", "Decision package already exists.", 409)
-    counts = {"pairs": 0, "selected_evidence": 0, "provenance_unavailable": 0}
+    counts = {
+        "pairs": 0,
+        "selected_evidence": 0,
+        "provenance_unavailable": 0,
+        "source_decision_candidates": len(saved_candidates),
+        "source_candidates_without_explanations": len(set(saved_candidates) - explained_keys),
+    }
     inventory_hash = dependency_inventory_hash(dependencies)
     with sqlite3.connect(database) as connection:
         connection.executescript("""CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
@@ -437,7 +605,11 @@ def import_run(
         for key, record in records.items():
             source, target = bindings[key]
             raw = raw_decisions.get(key, record.get("candidate_decision") or {})
-            values = raw.get("values") or candidate_values(record.get("confidences") or {})
+            saved_candidate = saved_candidates.get(key, {})
+            values = {
+                **saved_candidate.get("values", {}),
+                **(raw.get("values") or candidate_values(record.get("confidences") or {})),
+            }
             recorded = raw.get("events") or []
             retrieval: dict[str, Any] = next(
                 (
@@ -544,6 +716,7 @@ def import_run(
                 },
                 "status": "available",
                 "decision_status": "available" if recorded else "not_exported",
+                "source_decision_record": saved_candidate.get("reference"),
             }
             connection.execute(
                 "INSERT INTO pairs VALUES (?,?,?,?,?,?,?,?)",
@@ -650,7 +823,7 @@ class DecisionStore:
         self.directory = Path(directory)
         self._manifest = read_metadata(self.directory / "decisions.manifest.json")
         if (
-            self._manifest.get("implementation") == "decision-adapter/6"
+            self._manifest.get("implementation") in {"decision-adapter/6", "decision-adapter/7"}
             or "dependency_inventory_hash" in self._manifest
         ) and (
             self._manifest.get("dependency_inventory_schema") != DEPENDENCY_INVENTORY_SCHEMA

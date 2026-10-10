@@ -2175,6 +2175,16 @@
               }
             ],
             "title": "Evidence Status"
+          },
+          "source_decision_record": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SourceCandidateRecord"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "additionalProperties": false,
@@ -5868,6 +5878,47 @@
         ],
         "title": "SelectedEvidence",
         "description": "A selected matcher feature and its many-to-many links to original ontology facts."
+      },
+      "SourceCandidateRecord": {
+        "properties": {
+          "artifact_ref": {
+            "type": "string",
+            "title": "Artifact Ref"
+          },
+          "source_record_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Source Record Index"
+          },
+          "candidate_index": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Candidate Index"
+          },
+          "ordering": {
+            "type": "string",
+            "const": "source_decisions_candidates_array",
+            "title": "Ordering"
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "type": "array",
+            "title": "Scores"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "artifact_ref",
+          "source_record_index",
+          "candidate_index",
+          "ordering",
+          "scores"
+        ],
+        "title": "SourceCandidateRecord",
+        "description": "Exact saved array location and scores; this position is not an ordinal rank."
       },
       "StageEvent": {
         "properties": {
