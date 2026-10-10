@@ -406,6 +406,7 @@ class Training(StrictSection):
     patience_enabled: bool | None = None
     max_full_development_evaluations: PositiveCount | None = None
     final_development_reserve_seconds: Amount | None = None
+    development_case_seconds: dict[Text, PositiveAmount] | None = None
 
     @model_serializer(mode="wrap")
     def preserve_legacy_identity(self, handler):
@@ -416,6 +417,7 @@ class Training(StrictSection):
             "patience_enabled",
             "max_full_development_evaluations",
             "final_development_reserve_seconds",
+            "development_case_seconds",
         ):
             if name not in self.model_fields_set:
                 result.pop(name, None)
@@ -564,6 +566,26 @@ class RepairProtocolV3(StrictSection):
                 training.development_case_ids
             ):
                 raise ValueError("DEV case schedule must be nonempty and unique")
+        if training.development_case_seconds is not None:
+            if training.development_epochs is None or training.development_case_ids is None:
+                raise ValueError("Per-case DEV limits require complete epoch/case schedules")
+            slots = {
+                canonical_hash(
+                    dict(
+                        seed=seed,
+                        supervision_condition=self.losses.target_basis,
+                        epoch=epoch,
+                        case_id=case_id,
+                    )
+                )
+                for seed in training.seeds
+                for epoch in training.development_epochs
+                for case_id in training.development_case_ids
+            }
+            if set(training.development_case_seconds) != slots:
+                raise ValueError("Per-case DEV limits must cover exactly every scheduled slot")
+            if max(training.development_case_seconds.values()) > r.case_wall_seconds:
+                raise ValueError("Per-case DEV limit exceeds the outer case envelope")
         if (
             self.generation.execution_schedule == "staged_verified_repair"
             and self.generation.elementary_seconds + r.cleanup_grace_seconds > r.case_wall_seconds

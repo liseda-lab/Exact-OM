@@ -314,6 +314,10 @@ def load_preparation(
     identity = value.pop("hash", None)
     if canonical_hash(value) != identity:
         raise ValueError("Training preparation content hash mismatch")
+    if value.get("schema") == "exact-repair/common-training-preparation/v1":
+        from tools.repair.common_training import load_common_preparation
+
+        return load_common_preparation(value)
     if value.get("schema") not in {
         "exact-repair/training-preparation/v2",
         "exact-repair/training-preparation/v3",
