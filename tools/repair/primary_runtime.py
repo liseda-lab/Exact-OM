@@ -84,6 +84,58 @@ def phase_job(model_id, phase, seconds, *, oversized=False):
     )
 
 
+def fit_reservation_deadline(ledger, model_id, own_attempt, remaining_dev_seconds, now):
+    """Protect DEV GPU occupancy inside the shared model stage, not a new cap.
+
+    Other unsettled attempts retain their entire charged reservation. Our own
+    reservation is already charged by the worker and contributes elapsed time
+    here, avoiding either a reset or double counting its unspent slice.
+    """
+    limit = ledger["stage_limits"][model_id]["gpu_seconds"]
+    used = 0.0
+    for key, row in ledger["attempts"].items():
+        if model_id not in row.get("budget_stages", ()):
+            continue
+        if key == own_attempt and row["status"] != "settled":
+            duration = max(0, now - row["started_epoch"])
+        else:
+            duration = row.get("elapsed_seconds", row["reserved_seconds"])
+        used += duration * row["resources"]["gpus"]
+    return now + max(0, limit - used - remaining_dev_seconds)
+
+
+def reserve_future_dev_gpu(manifest, config, state):
+    import torch
+
+    ledger = read(Path(os.environ["EXACT_REPAIR_STAGE_LEDGER"]))
+    step_id = os.environ["SLURM_JOB_ID"] + "." + os.environ["SLURM_STEP_ID"]
+    owned = []
+    for key, row in ledger["attempts"].items():
+        step = Path(key) / "step.json"
+        if row["status"] != "settled" and step.exists() and read(step).get("step_id") == step_id:
+            owned.append(key)
+    if len(owned) != 1:
+        raise ValueError("Primary fit requires one charged nonce-bound stage owner")
+    model_id = "model-" + config["target_basis"] + "-" + str(manifest["seed"])
+    required = {"learning", "primary_training", model_id}
+    if not required <= set(ledger["attempts"][owned[0]]["budget_stages"]):
+        raise ValueError("Primary fit is missing cumulative model/stage membership")
+    saved = torch.load(state, weights_only=True, map_location="cpu") if state.exists() else {}
+    reserve = remaining_dev_reserve(
+        config["development_epochs"],
+        config.get("development_case_seconds"),
+        manifest["seed"],
+        config["target_basis"],
+        config["development_case_ids"],
+        saved.get("history", []),
+        saved.get("development_progress", {}),
+        config["decode_seconds"],
+    )
+    os.environ["EXACT_REPAIR_OPTIMIZER_DEADLINE_EPOCH"] = str(
+        fit_reservation_deadline(ledger, model_id, owned[0], reserve, time.time())
+    )
+
+
 def owned_device(expected):
     import torch
 
@@ -95,6 +147,20 @@ def owned_device(expected):
     if actual.removeprefix("GPU-").lower() != expected.removeprefix("GPU-").lower():
         raise ValueError("Visible GPU UUID differs from the admitted owner")
     return actual
+
+
+def scheduled_runtime_development(cases, caches, config):
+    """Missing DEV caches use the same frozen costs/target as the fitting inputs."""
+    from tools.repair.train import scheduled_development
+
+    return scheduled_development(
+        cases,
+        caches,
+        profile=config["profile"],
+        desired_family_weight=config.get("desired_family_weight", 1.0),
+        false_positive_weight=config.get("false_positive_weight", 1.0),
+        expected_case_ids=config["development_case_ids"],
+    )
 
 
 def run_phase(manifest_path, phase, output):
@@ -149,6 +215,8 @@ def run_phase(manifest_path, phase, output):
     state.mkdir(parents=True, exist_ok=True)
     with (state / "phase.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if phase == "fit":
+            reserve_future_dev_gpu(manifest, config, state / "training-state.pt")
         labels = read_fidelity_training_artifact(
             authenticate(manifest["shared_weak_labels"]), "train"
         )
@@ -165,9 +233,7 @@ def run_phase(manifest_path, phase, output):
         fitting = [
             (c, caches[c.case_id]) for c in cases if c.split == "train" and c.case_id in caches
         ]
-        dev = train.scheduled_development(
-            cases, caches, expected_case_ids=config["development_case_ids"]
-        )
+        dev = scheduled_runtime_development(cases, caches, config)
         try:
             # Normal completion has the existing full selection report. Publish
             # selected weights only after both scheduled passes and common endpoint.
@@ -256,9 +322,7 @@ def qualify(prepared_path, output, seconds=600):
         profile=train._protocol_profile(protocol),
     )
     fitting = [(c, caches[c.case_id]) for c in cases if c.split == "train" and c.case_id in caches]
-    dev = train.scheduled_development(
-        cases, caches, expected_case_ids=config["development_case_ids"]
-    )
+    dev = scheduled_runtime_development(cases, caches, config)
     torch.cuda.reset_peak_memory_stats()
     try:
         train.train_cases(fitting, dev, **config)
