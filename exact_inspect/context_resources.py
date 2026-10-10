@@ -102,7 +102,11 @@ def export_ontology_resource(
     receipt_path = destination.with_suffix(destination.suffix + ".receipt.json")
     if receipt_path.exists():
         validate_ontology_resource(
-            destination, receipt_path, policy_hash=policy.policy_hash, ontology_ids=[version]
+            destination,
+            receipt_path,
+            policy_hash=policy.policy_hash,
+            ontology_ids=[version],
+            context=context,
         )
         return receipt_path
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -228,6 +232,7 @@ def validate_ontology_resource(
     *,
     policy_hash: str | None = None,
     ontology_ids: Any = (),
+    context: Any = None,
 ) -> dict[str, Any]:
     """Verify preparation admission and bytes without invoking an OWL parser.
 
@@ -275,7 +280,61 @@ def validate_ontology_resource(
         "resource_sha256"
     ):
         raise ValueError("Ontology resource bytes do not match admission receipt")
+    if context is not None:
+        validate_ontology_resource_context(receipt, context)
     return receipt
+
+
+def validate_ontology_resource_context(receipt: dict[str, Any], context: Any) -> None:
+    """Bind a verified resource receipt to its current context or exact filtered child.
+
+    A parent export remains valid for a physical projection made with that exact
+    policy. This preserves the original receipt and requires the recorded source
+    hash, policy, scope, documents and complete retained inventory to agree.
+    """
+    manifest = context.manifest
+    version = context.ontology_version_id
+    policy = VisibilityPolicy.model_validate(receipt["policy"])
+    if (
+        receipt["ontology_version_id"] != version
+        or receipt["policy_hash"] != policy.policy_hash
+        or receipt.get("scope") != manifest.get("scope")
+        or receipt.get("source_documents")
+        != [record["source_sha256"] for record in manifest["sources"]]
+    ):
+        raise ValueError("Ontology resource differs from its current context provenance")
+    current_hash = manifest["artifacts"]["context.sqlite"]
+    if receipt.get("source_context_sha256") != current_hash:
+        filtered = manifest.get("policy_filter", {})
+        if (
+            filtered.get("schema") != "exact-policy-context/2"
+            or filtered.get("policy_hash") != policy.policy_hash
+            or filtered.get("policy") != policy.model_dump(mode="json")
+            or filtered.get("source_context_sha256") != receipt.get("source_context_sha256")
+            or manifest.get("preparation_key")
+            != canonical_hash(
+                {
+                    "schema": "exact-policy-context/2",
+                    "source_context_sha256": receipt.get("source_context_sha256"),
+                    "policy": policy.model_dump(mode="json"),
+                }
+            )
+            or manifest.get("completeness", {}).get("extraction") != "complete_for_policy"
+        ):
+            raise ValueError("Ontology resource lacks an exact same-policy context lineage")
+    counts = manifest.get("completeness", {}).get("category_counts")
+    retained = receipt.get("retained_categories")
+    if any(
+        not isinstance(values, dict)
+        or any(type(count) is not int or count <= 0 for count in values.values())
+        for values in (counts, retained)
+    ):
+        raise ValueError("Ontology resource lacks a complete retained category inventory")
+    expected = {
+        category: count for category, count in counts.items() if _allowed(policy, version, category)
+    }
+    if sum(counts.values()) != manifest["completeness"].get("axiom_count") or retained != expected:
+        raise ValueError("Ontology resource retained counts differ from the current context")
 
 
 def main() -> None:
