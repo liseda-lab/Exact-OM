@@ -205,6 +205,18 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
         ),
     )
     operation, settings = row["adapter"]["operation"], row["settings"]
+    immutable(
+        directory / "operation.json",
+        dict(
+            row_id=row.get("id", canonical_hash(row)),
+            operation=operation,
+            device=device,
+            started_epoch=time.time(),
+            input_hash=problem.content_hash,
+            model=model,
+            shared_pool=pool,
+        ),
+    )
     queries = public.get("observable_queries", [])
     if (
         operation
@@ -458,7 +470,12 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
     """One exclusive shard owner; terminal scientific unknowns are never replayed."""
     if manifest.get("schema") != SCHEMA or not manifest.get("execution_authorized"):
         raise ValueError("Primary evaluation is not admitted")
-    if manifest.get("scope") != "fixture":
+    engineering = manifest.get("scope") == "representative_development"
+    if engineering:
+        from tools.repair.representative_capacity import validate_manifest
+
+        validate_manifest(manifest)
+    elif manifest.get("scope") != "fixture":
         if now() < manifest["not_before_epoch"] or not manifest.get("model_freeze_receipt"):
             raise ValueError("TEST remains closed until the model freeze")
         freeze = bound(manifest["model_freeze_receipt"])
@@ -513,12 +530,13 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             from tools.repair.evaluation_ownership import validate_owner
 
             validate_owner(manifest, stage)
-        first = stage.get("stages", {}).get("evaluation", {}).get("started_epoch")
+        stage_name = "learning" if engineering else "evaluation"
+        first = stage.get("stages", {}).get(stage_name, {}).get("started_epoch")
         if first is None:
             raise ValueError("Evaluation first admission must be durably reserved")
         limit = min(
             manifest["deadline_epoch"],
-            first + 40 * 3600,
+            first + (66 if engineering else 40) * 3600,
             float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")),
         )
         from tools.repair.evaluation_ownership import external_pools
@@ -632,6 +650,8 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     detail=outcome.detail,
                     cleanup_complete=outcome.cleanup_complete,
                     charged_seconds=now() - started,
+                    started_epoch=started,
+                    finished_epoch=now(),
                     reserved_seconds=row["case_seconds"],
                     resources=dict(outcome.resource_usage),
                     shared_cost_reference=dependency,
