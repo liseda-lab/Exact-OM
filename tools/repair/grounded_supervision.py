@@ -233,7 +233,9 @@ def packet_admission(packet, manifest, swapped):
         json.dumps(messages, ensure_ascii=False, separators=(",", ":")).encode()
     ) + len(json.dumps(wire).encode())
     try:
-        tokens = input_token_bound(messages, wire, controls["tokenizer"])
+        # A real run ID is a 64-character digest. Reserve 64 tokens beyond
+        # the placeholder's count so its tokenization cannot break admission.
+        tokens = input_token_bound(messages, wire, controls["tokenizer"]) + 64
     except ValueError as error:
         if str(error) != "Annotation input exceeds independent byte cap":
             raise

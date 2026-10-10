@@ -48,6 +48,7 @@ from tools.repair.batch import read, sha
 from tools.repair.expanded_corpus import immutable
 
 PHASE_LIMITS = {"calibration": 32, "train": 384, "development": 96, "test": 192}
+SERVICE_LIMITS = {"train": 8 * 3600, "development": 4 * 3600, "test": 8 * 3600}
 COMPARISON_LIMITS = {"calibration": 32, "train": 256, "development": 64, "test": 128}
 REALLOCATED_LIMITS = {"calibration": 64, "train": 352, "development": 96, "test": 192}
 
@@ -753,9 +754,9 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
                 raise ValueError("Teacher panel amendment binding changed")
         if amendment and amendment.get("qualified_phase"):
             prior = amendment["qualified_phase"]
-            if (state.get("teacher_panel_amendment") != amendment["qualified_panel_binding"]
-                    or any(state["reservations"].get(k) != v
-                           for k, v in prior["reservations"].items())):
+            if state.get("teacher_panel_amendment") != amendment["qualified_panel_binding"] or any(
+                state["reservations"].get(k) != v for k, v in prior["reservations"].items()
+            ):
                 raise ValueError("Qualified teacher successor would reset calibration history")
         if state["request_limits"] != limits:
             raise ValueError("Annotation request limits changed without compatible amendment")
@@ -833,6 +834,11 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
         )
         if comparison_id not in unique and len(unique) >= comparison_limit:
             raise AnnotationBudgetExhausted("Cumulative unique comparison quota exhausted")
+        service_limit = SERVICE_LIMITS.get(manifest["phase"])
+        # Charge the full frozen request allowance, including unknown delivery.
+        # Old records have the same 90-second cap and are never replenished.
+        if service_limit is not None and 90 * (len(same) + 1) > service_limit:
+            raise AnnotationBudgetExhausted("Cumulative hosted service allowance exhausted")
         if len(same) >= limits[manifest["phase"]] or len(records) >= 704:
             raise AnnotationBudgetExhausted("Cumulative annotation request quota exhausted")
         if (
@@ -1375,14 +1381,58 @@ def run(manifest_path, output):
                 manifest_sha256=sha(path),
             ),
         )
+    admitted = None
+    if manifest.get("packet_admission"):
+        from tools.repair.train_packet_admission import validate_rows
+
+        admitted = validate_rows(manifest)
+    elif any(
+        row.get("status") or ("packet" in row and row["packet"] is None)
+        for row in manifest["slots"]
+    ):
+        raise ValueError("Closed annotation rows require a bound packet admission contract")
     started = time.monotonic()
     rows = []
-    failure = _authentication_preflight(manifest, output)
+
+    def unavailable(row):
+        return dict(
+            id=row["id"],
+            status=row["status"],
+            artifact=None,
+            original_status=row["original_status"],
+            original_row=row["original_row"],
+            attempted=False,
+        )
+
+    def pending(row):
+        if admitted is not None and row["status"] != "eligible":
+            return unavailable(row)
+        return dict(id=row["id"], status="not_attempted_provider_failure", artifact=None)
+
+    def save(failure=None):
+        write_artifact(
+            Path(output) / "report.json",
+            dict(
+                schema="exact-repair/corrective-annotation-report/v1",
+                scheduled=len(manifest["slots"]),
+                recorded=len(rows),
+                rows=rows,
+                provider_policy_deferrals=deferrals,
+                calibration_exclusions=exclusions,
+                **(
+                    _failure_report_fields(failure)
+                    if failure
+                    else dict(
+                        status="complete" if len(rows) == len(manifest["slots"]) else "running"
+                    )
+                ),
+            ),
+        )
+
+    eligible = admitted is None or any(r["status"] == "eligible" for r in manifest["slots"])
+    failure = _authentication_preflight(manifest, output) if eligible else None
     if failure:
-        rows = [
-            dict(id=row["id"], status="not_attempted_provider_failure", artifact=None)
-            for row in manifest["slots"]
-        ]
+        rows = [pending(row) for row in manifest["slots"]]
         write_artifact(
             Path(output) / "report.json",
             dict(
@@ -1395,6 +1445,10 @@ def run(manifest_path, output):
         )
         raise ConfirmedAnnotationFailure(failure)
     for index, row in enumerate(manifest["slots"]):
+        if admitted is not None and row["status"] != "eligible":
+            rows.append(unavailable(row))
+            save()
+            continue
         profile = row.get("profile", manifest["profile"])
         deferred = deferrals.get(profile)
         excluded = exclusions.get(profile)
@@ -1461,28 +1515,8 @@ def run(manifest_path, output):
             )
         )
         if failure:
-            rows.extend(
-                dict(id=pending["id"], status="not_attempted_provider_failure", artifact=None)
-                for pending in manifest["slots"][index + 1 :]
-            )
-        write_artifact(
-            Path(output) / "report.json",
-            dict(
-                schema="exact-repair/corrective-annotation-report/v1",
-                scheduled=len(manifest["slots"]),
-                recorded=len(rows),
-                rows=rows,
-                provider_policy_deferrals=deferrals,
-                calibration_exclusions=exclusions,
-                **(
-                    _failure_report_fields(failure.evidence)
-                    if failure
-                    else dict(
-                        status="complete" if len(rows) == len(manifest["slots"]) else "running"
-                    )
-                ),
-            ),
-        )
+            rows.extend(pending(tail) for tail in manifest["slots"][index + 1 :])
+        save(failure.evidence if failure else None)
         if failure:
             raise failure
     return rows
