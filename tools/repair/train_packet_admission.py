@@ -121,6 +121,80 @@ def validate_rows(manifest):
     return rows
 
 
+def validate_pretransmission_recovery(manifest):
+    """One explicit technical successor; absence of wire alone never grants retry."""
+    import json
+    import sqlite3
+
+    proof = bound(manifest["pretransmission_recovery"])
+    original = bound(proof["predecessor_manifest"])
+    if (
+        proof.get("schema") != "exact-repair/controlled-byte-guard-recovery/v1"
+        or proof.get("cause") != "controlled_profile_legacy_8000_byte_guard"
+        or proof.get("same_cause_unsuccessful_attempts") != 1
+        or proof.get("max_unsuccessful_attempts") != 2
+        or proof.get("costs_reset") is not False
+        or original.get("pretransmission_recovery")
+        or {k: v for k, v in manifest.items() if k != "pretransmission_recovery"} != original
+    ):
+        raise ValueError("Technical recovery changed its original scientific contract")
+    terminal, outputs, _, _ = validate_completion(bound(proof["predecessor_run"]))
+    work = Path(terminal["work"])
+    prior = bound(proof["phase_before"])
+    current = read(Path(manifest["ledger_directory"]) / "phase-reservations.json")
+    if any(current["reservations"].get(k) != v for k, v in prior["reservations"].items()):
+        raise ValueError("Technical recovery erased earlier reservations")
+    path = Path(manifest["ledger_directory"]) / "requests.sqlite3"
+    with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as db:
+        wires = [json.loads(r[0]) for r in db.execute("SELECT identity FROM requests")]
+        for row in original["slots"]:
+            if row["status"] != "eligible":
+                continue
+            refs = proof["slots"][row["id"]]
+            receipt = output_bound(refs["receipt"], work, outputs)
+            schedule = read_record(output_bound(refs["schedule"], work, outputs))
+            run = read_record(output_bound(refs["run"], work, outputs))
+            previous = prior["reservations"].get(canonical_hash(("train", row["id"])))
+            if (
+                receipt.get("status") != "annotation_unavailable"
+                or receipt.get("error")
+                != "Evidence cannot fit the frozen input budget; no silent truncation"
+                or receipt.get("confirmed_failure") is not None
+                or run.max_input_bytes != 8000
+                or previous is None
+                or previous["state"] != "unresolved"
+                or previous["request_basis"]
+                != canonical_hash((original, row["id"], schedule.packet.content_hash))
+                or schedule.packet != read_record(bound(row["packet"]))
+                or len(schedule.slots) != 1
+                or db.execute(
+                    "SELECT 1 FROM repair_annotation_reserves WHERE run_id=?", (run.run_id,)
+                ).fetchone()
+            ):
+                raise ValueError("Recovery is not a proven pre-transmission byte-guard failure")
+            parameters = schedule.slots[0]["parameters"]
+            payload = {
+                k: parameters[k]
+                for k in (
+                    "model",
+                    "messages",
+                    "max_tokens",
+                    "temperature",
+                    "provider",
+                    "reasoning",
+                    "response_format",
+                )
+                if k in parameters
+            }
+            if any(
+                w.get("role") == parameters["role"]
+                and canonical_hash(w.get("payload")) == canonical_hash(payload)
+                for w in wires
+            ):
+                raise ValueError("Original request reached the wire ledger; no automatic retry")
+    return proof
+
+
 def prepare(campaign, output, repository):
     from tools.repair.corrective_semantics import _request_budget, validate_manifest
 
