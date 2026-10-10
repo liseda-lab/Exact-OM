@@ -48,6 +48,12 @@ from exact.repair.records import (
 from exact.repair.workers import bounded_call
 from tools.repair.corpus import GeneratedCase
 from tools.repair.training_report import publish_report, read_report
+from tools.repair.phase_timing import (
+    checkpoint_identity,
+    load_training_state,
+    phase,
+    traced_training,
+)
 
 DEFAULT_PROFILE = (
     ("delete", 0.1),
@@ -143,22 +149,28 @@ def save_training_state(path: Path, state: dict) -> None:
     """Atomically publish a tensors-and-primitives checkpoint, including optimizer/RNG."""
     import torch
 
-    path.parent.mkdir(parents=True, exist_ok=True)
-    descriptor, temporary = tempfile.mkstemp(prefix=".training-", dir=path.parent)
-    try:
-        with os.fdopen(descriptor, "wb") as stream:
-            torch.save(state, stream)
-            stream.flush()
-            os.fsync(stream.fileno())
-        os.replace(temporary, path)
-        directory = os.open(path.parent, os.O_RDONLY)
+    with phase("checkpoint_write", path=str(path), **checkpoint_identity(state)) as measured:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary = tempfile.mkstemp(prefix=".training-", dir=path.parent)
         try:
-            os.fsync(directory)
+            with os.fdopen(descriptor, "wb") as stream:
+                with phase("checkpoint_serialize") as serialized:
+                    torch.save(state, stream)
+                    serialized["bytes"] = stream.tell()
+                    measured["bytes"] = stream.tell()
+                with phase("checkpoint_flush_fsync"):
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            with phase("checkpoint_replace_directory_fsync"):
+                os.replace(temporary, path)
+                directory = os.open(path.parent, os.O_RDONLY)
+                try:
+                    os.fsync(directory)
+                finally:
+                    os.close(directory)
         finally:
-            os.close(directory)
-    finally:
-        if os.path.exists(temporary):
-            os.unlink(temporary)
+            if os.path.exists(temporary):
+                os.unlink(temporary)
 
 
 def _publish_training_checkpoint(state: dict, directory: Path) -> dict:
@@ -952,6 +964,7 @@ def generated_development(
     }
 
 
+@traced_training
 def train_cases(
     training: Sequence[tuple[GeneratedCase, TeacherCache]],
     development: Sequence[tuple[GeneratedCase, TeacherCache]],
@@ -1355,43 +1368,44 @@ def train_cases(
     retrieval_config = preparation.retrieval_config
     torch.manual_seed(seed)
     all_cases = [*training, *development]
-    retrievals = {
-        case.case_id: retrieve_vocabulary(case.problem, config=retrieval_config)
-        for case, _ in all_cases
-    }
-    graphs = {
-        case.case_id: preparation.graph(case.problem, retrievals[case.case_id])
-        for case, _ in all_cases
-    }
-    grammars = {}
-    if proposal_arm == "grammar_mixture":
-        for case, _ in all_cases:
-            for obj in case.problem.objects:
-                menu = retrievals[case.case_id].for_object(obj.object_id)
-                grammars[case.case_id, obj.object_id] = mapping_grammar(
-                    obj,
-                    menu.classes,
-                    menu.properties,
-                    max_depth=max_depth,
-                    max_constructors=max_constructors,
-                    fixed_axioms=case.problem.fixed_axioms,
-                    source_classes=menu.source_classes,
-                    target_classes=menu.target_classes,
-                    source_properties=menu.source_properties,
-                    target_properties=menu.target_properties,
-                    constraint_identity=canonical_hash((case.problem.policy, menu)),
-                )
-                if revision == "v3":
-                    grammars[case.case_id, obj.object_id] = with_immutable_context(
-                        grammars[case.case_id, obj.object_id],
-                        case.problem.fixed_axioms,
-                        case.problem.policy,
+    with phase("setup_graph_grammar_pairs"):
+        retrievals = {
+            case.case_id: retrieve_vocabulary(case.problem, config=retrieval_config)
+            for case, _ in all_cases
+        }
+        graphs = {
+            case.case_id: preparation.graph(case.problem, retrievals[case.case_id])
+            for case, _ in all_cases
+        }
+        grammars = {}
+        if proposal_arm == "grammar_mixture":
+            for case, _ in all_cases:
+                for obj in case.problem.objects:
+                    menu = retrievals[case.case_id].for_object(obj.object_id)
+                    grammars[case.case_id, obj.object_id] = mapping_grammar(
+                        obj,
+                        menu.classes,
+                        menu.properties,
+                        max_depth=max_depth,
+                        max_constructors=max_constructors,
+                        fixed_axioms=case.problem.fixed_axioms,
+                        source_classes=menu.source_classes,
+                        target_classes=menu.target_classes,
+                        source_properties=menu.source_properties,
+                        target_properties=menu.target_properties,
+                        constraint_identity=canonical_hash((case.problem.policy, menu)),
                     )
-    pair_reports = {
-        case.case_id: preparation.pairs(case.problem, graphs[case.case_id], enabled=pairwise)
-        for case, _ in all_cases
-    }
-    interaction_pairs = {key: report.pairs for key, report in pair_reports.items()}
+                    if revision == "v3":
+                        grammars[case.case_id, obj.object_id] = with_immutable_context(
+                            grammars[case.case_id, obj.object_id],
+                            case.problem.fixed_axioms,
+                            case.problem.policy,
+                        )
+        pair_reports = {
+            case.case_id: preparation.pairs(case.problem, graphs[case.case_id], enabled=pairwise)
+            for case, _ in all_cases
+        }
+        interaction_pairs = {key: report.pairs for key, report in pair_reports.items()}
     proposal_coverage: dict[str, dict[str, Any]] = {}
     loss_eligibility: dict[str, dict[str, Any]] = {}
     acquisition_reports: list[dict] = []
@@ -1404,21 +1418,22 @@ def train_cases(
     from exact.repair.graph_schema import training_metadata
 
     metadata = training_metadata((node_types, edge_types), graph_schema, warm_start_metadata)
-    model = RepairModel(
-        metadata,
-        graph_schema=graph_schema,
-        hidden_dim=hidden_dim,
-        heads=heads,
-        layers=layers,
-        dropout=dropout,
-        encoder=encoder,
-        pairwise=pairwise,
-        revision=revision,
-        plan_risk=plan_risk,
-        support_enabled=support_enabled,
-        support_readout_identity=support_readout_identity,
-        pair_factor_bound=pair_factor_bound,
-    ).to(device)
+    with phase("setup_model"):
+        model = RepairModel(
+            metadata,
+            graph_schema=graph_schema,
+            hidden_dim=hidden_dim,
+            heads=heads,
+            layers=layers,
+            dropout=dropout,
+            encoder=encoder,
+            pairwise=pairwise,
+            revision=revision,
+            plan_risk=plan_risk,
+            support_enabled=support_enabled,
+            support_readout_identity=support_readout_identity,
+            pair_factor_bound=pair_factor_bound,
+        ).to(device)
     adaptation_new_parameters = []
     if warm_start_weights is not None:
         restored_weights = dict(warm_start_weights)
@@ -1439,17 +1454,20 @@ def train_cases(
             raise ValueError("Warm-start weights have incompatible model keys")
         adaptation_new_parameters = list(loaded.missing_keys)
     warm_start_hash = model_digest(model) if warm_start_weights is not None else None
-    implementation = canonical_hash(
-        [
-            (path.name, path.read_bytes().hex())
-            for path in sorted(
-                (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
-            )
-        ]
-        + [("train.py", Path(__file__).read_bytes().hex())]
-    )
-    resume_identity = canonical_hash((identity_options, warm_start_hash, implementation))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate, weight_decay=weight_decay)
+    with phase("setup_identity_optimizer"):
+        implementation = canonical_hash(
+            [
+                (path.name, path.read_bytes().hex())
+                for path in sorted(
+                    (Path(__file__).resolve().parents[2] / "exact" / "repair").glob("*.py")
+                )
+            ]
+            + [("train.py", Path(__file__).read_bytes().hex())]
+        )
+        resume_identity = canonical_hash((identity_options, warm_start_hash, implementation))
+        optimizer = torch.optim.AdamW(
+            model.parameters(), lr=learning_rate, weight_decay=weight_decay
+        )
     history: list[dict[str, Any]] = []
     best_criterion, best_state, best_epoch = None, None, None
     stale_evaluations = 0
@@ -1474,7 +1492,7 @@ def train_cases(
     acquisition_schedules: dict[int, tuple[str, ...]] = {}
     recovery_lineage: list[dict[str, Any]] = []
     if checkpoint_path is not None and checkpoint_path.exists():
-        saved = torch.load(checkpoint_path, weights_only=True, map_location=device)
+        saved = load_training_state(checkpoint_path, map_location=device)
         if graph_schema is not None and (
             saved.get("graph_schema") != graph_schema
             or saved.get("graph_schema_hash") != model.graph_schema_hash
@@ -1540,76 +1558,79 @@ def train_cases(
                 )
                 saved["pending_acquisition"]["case_deadline_exhausted"] = True
                 recovery_lineage.append(migration)
-        recovery_lineage = [*saved.get("recovery_lineage", []), *recovery_lineage]
-        previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
-        fit_rng = saved.get("fit_rng")
-        first_started_epoch = saved.get("first_started_epoch", first_started_epoch)
-        execution_count = int(saved.get("execution_count", 0)) + 1
-        model.load_state_dict(saved["model"])
-        optimizer.load_state_dict(saved["optimizer"])
-        optimizer_updates = saved.get("optimizer_updates", 0)
-        optimizer_case_counts = saved.get("optimizer_case_counts", {})
-        optimizer_update_seconds = saved.get("optimizer_update_seconds", [])
-        optimized_parent_counts = saved.get("optimized_parent_counts", {})
-        head_updates = saved.get("head_updates", {})
-        parameter_gradient_updates = saved.get("parameter_gradient_updates", {})
-        acquisition_schedules = saved.get("acquisition_schedules", {})
-        torch.set_rng_state(saved["cpu_rng"].cpu())
-        if device == "cuda":
-            torch.cuda.set_rng_state_all([state.cpu() for state in saved["cuda_rng"]])
-        random.setstate(saved["python_rng"])
-        next_epoch, next_offset = saved["next_epoch"], saved["next_offset"]
-        current_phase = saved.get("phase", "acquisition")
-        epoch_order = tuple(saved.get("epoch_order", ()))
-        development_progress = saved.get("development_progress", {})
-        pending_acquisition = saved.get("pending_acquisition", {})
-        saved_loss, saved_optimized = saved["train_loss"], saved["optimized"]
-        history = saved["history"]
-        best_criterion, best_state, best_epoch = (
-            saved["best_criterion"],
-            saved["best_state"],
-            saved["best_epoch"],
-        )
-        stale_evaluations, stopped_early = saved["stale_evaluations"], saved["stopped_early"]
-        proposal_coverage = saved["proposal_coverage"]
-        loss_eligibility = saved.get("loss_eligibility", {})
-        failed_compilations = set(saved["failed_compilations"])
-        acquisition_epoch = saved.get("acquisition_epoch", -1)
-        acquisition_completed = {tuple(row) for row in saved.get("acquisition_completed", [])}
-        acquisition_reports = saved.get("acquisition_reports", [])
-        if revision == "v3":
-            from tools.repair.prepare import cache_from_dict, case_from_dict
+        with phase("checkpoint_restore", **checkpoint_identity(saved)):
+            recovery_lineage = [*saved.get("recovery_lineage", []), *recovery_lineage]
+            previous_elapsed = float(saved.get("elapsed_seconds", 0.0))
+            fit_rng = saved.get("fit_rng")
+            first_started_epoch = saved.get("first_started_epoch", first_started_epoch)
+            execution_count = int(saved.get("execution_count", 0)) + 1
+            model.load_state_dict(saved["model"])
+            optimizer.load_state_dict(saved["optimizer"])
+            optimizer_updates = saved.get("optimizer_updates", 0)
+            optimizer_case_counts = saved.get("optimizer_case_counts", {})
+            optimizer_update_seconds = saved.get("optimizer_update_seconds", [])
+            optimized_parent_counts = saved.get("optimized_parent_counts", {})
+            head_updates = saved.get("head_updates", {})
+            parameter_gradient_updates = saved.get("parameter_gradient_updates", {})
+            acquisition_schedules = saved.get("acquisition_schedules", {})
+            torch.set_rng_state(saved["cpu_rng"].cpu())
+            if device == "cuda":
+                torch.cuda.set_rng_state_all([state.cpu() for state in saved["cuda_rng"]])
+            random.setstate(saved["python_rng"])
+            next_epoch, next_offset = saved["next_epoch"], saved["next_offset"]
+            current_phase = saved.get("phase", "acquisition")
+            epoch_order = tuple(saved.get("epoch_order", ()))
+            development_progress = saved.get("development_progress", {})
+            pending_acquisition = saved.get("pending_acquisition", {})
+            saved_loss, saved_optimized = saved["train_loss"], saved["optimized"]
+            history = saved["history"]
+            best_criterion, best_state, best_epoch = (
+                saved["best_criterion"],
+                saved["best_state"],
+                saved["best_epoch"],
+            )
+            stale_evaluations, stopped_early = saved["stale_evaluations"], saved["stopped_early"]
+            proposal_coverage = saved["proposal_coverage"]
+            loss_eligibility = saved.get("loss_eligibility", {})
+            failed_compilations = set(saved["failed_compilations"])
+            acquisition_epoch = saved.get("acquisition_epoch", -1)
+            acquisition_completed = {tuple(row) for row in saved.get("acquisition_completed", [])}
+            acquisition_reports = saved.get("acquisition_reports", [])
+            if revision == "v3":
+                from tools.repair.prepare import cache_from_dict, case_from_dict
 
-            sampled_training = {
-                key: (case_from_dict(value[0]), cache_from_dict(value[1]))
-                for key, value in saved.get("sampled_training", {}).items()
-            }
-            for _, (case, cache) in sampled_training.items():
-                key = case.case_id
-                retrieval = retrieve_vocabulary(case.problem, config=retrieval_config)
-                retrievals[key] = retrieval
-                graphs[key] = preparation.graph(case.problem, retrieval)
-                pair_reports[key] = preparation.pairs(case.problem, graphs[key], enabled=pairwise)
-                interaction_pairs[key] = pair_reports[key].pairs
-                for obj in case.problem.objects:
-                    menu = retrieval.for_object(obj.object_id)
-                    grammars[key, obj.object_id] = with_immutable_context(
-                        mapping_grammar(
-                            obj,
-                            menu.classes,
-                            menu.properties,
-                            max_depth=max_depth,
-                            max_constructors=max_constructors,
-                            fixed_axioms=case.problem.fixed_axioms,
-                            source_classes=menu.source_classes,
-                            target_classes=menu.target_classes,
-                            source_properties=menu.source_properties,
-                            target_properties=menu.target_properties,
-                            constraint_identity=canonical_hash((case.problem.policy, menu)),
-                        ),
-                        case.problem.fixed_axioms,
-                        case.problem.policy,
+                sampled_training = {
+                    key: (case_from_dict(value[0]), cache_from_dict(value[1]))
+                    for key, value in saved.get("sampled_training", {}).items()
+                }
+                for _, (case, cache) in sampled_training.items():
+                    key = case.case_id
+                    retrieval = retrieve_vocabulary(case.problem, config=retrieval_config)
+                    retrievals[key] = retrieval
+                    graphs[key] = preparation.graph(case.problem, retrieval)
+                    pair_reports[key] = preparation.pairs(
+                        case.problem, graphs[key], enabled=pairwise
                     )
+                    interaction_pairs[key] = pair_reports[key].pairs
+                    for obj in case.problem.objects:
+                        menu = retrieval.for_object(obj.object_id)
+                        grammars[key, obj.object_id] = with_immutable_context(
+                            mapping_grammar(
+                                obj,
+                                menu.classes,
+                                menu.properties,
+                                max_depth=max_depth,
+                                max_constructors=max_constructors,
+                                fixed_axioms=case.problem.fixed_axioms,
+                                source_classes=menu.source_classes,
+                                target_classes=menu.target_classes,
+                                source_properties=menu.source_properties,
+                                target_properties=menu.target_properties,
+                                constraint_identity=canonical_hash((case.problem.policy, menu)),
+                            ),
+                            case.problem.fixed_axioms,
+                            case.problem.policy,
+                        )
 
     def remaining_training_seconds() -> float:
         elapsed = time.monotonic() - started
@@ -1683,9 +1704,8 @@ def train_cases(
 
             from tools.repair.prepare import case_to_dict
 
-            save_training_state(
-                checkpoint_path,
-                dict(
+            with phase("checkpoint_snapshot", identity=resume_identity, epoch=epoch, offset=offset):
+                state = dict(
                     schema=f"exact-repair/training-state/{revision}",
                     identity=resume_identity,
                     **(
@@ -1756,8 +1776,8 @@ def train_cases(
                         key: (case_to_dict(case), asdict(cache))
                         for key, (case, cache) in sampled_training.items()
                     },
-                ),
-            )
+                )
+            save_training_state(checkpoint_path, state)
 
     if revision == "v2" and not any(
         cache.complete and any(label.usable for label in cache.labels) for _, cache in development
