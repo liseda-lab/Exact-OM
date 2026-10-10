@@ -103,6 +103,7 @@ def test_read_surfaces_require_real_class_edges_and_check_continuation(monkeypat
                         result["returned_count"] += 1
                     elif defect == "parity":
                         result["items"] = [{"edge": "changed"}]
+        result.setdefault("status", "available" if result["items"] else "absent_in_scope")
         return SimpleNamespace(json=lambda: result)
 
     journey.request = request
@@ -124,3 +125,66 @@ def test_read_surfaces_require_real_class_edges_and_check_continuation(monkeypat
             for direction in ("parents", "children")
         }
     assert hierarchy_probes and all(probe == source for probe in hierarchy_probes)
+
+
+def test_read_surfaces_try_another_real_class_when_first_focal_class_has_no_edges(monkeypatch):
+    empty = dict(ontology_version_id="one", iri="urn:empty-class", kind="class")
+    connected = {**empty, "iri": "urn:connected-class"}
+    annotation = {**empty, "iri": "urn:annotation", "kind": "annotation_property"}
+    journey = Journey.__new__(Journey)
+    journey.config = {"ports": {"exploration": 19185}}
+    journey.definition = {
+        "cases": [{"source": empty, "candidates": [{"entity": empty}, {"entity": connected}]}]
+    }
+    journey.report = {}
+    monkeypatch.setattr(environment, "processes", lambda config: {"exploration": {"pid": 1}})
+    monkeypatch.setattr(environment, "owned", lambda *args: True)
+    probes = []
+
+    def request(method, path, *, params, label):
+        if path.endswith("/entities"):
+            result = dict(items=[dict(entity=annotation)], returned_count=1, total_count=1)
+        elif params["direction"] == "ancestors":
+            assert params["iri"] == connected["iri"]
+            result = dict(items=[{"edge": "parent"}], nodes=[connected])
+        else:
+            probes.append(params["iri"])
+            rows = [{"edge": "parent"}] if params["iri"] == connected["iri"] else []
+            result = dict(items=rows, returned_count=len(rows))
+        result.setdefault("status", "available" if result["items"] else "absent_in_scope")
+        return SimpleNamespace(json=lambda: result)
+
+    journey.request = request
+    journey.complete_read_surfaces("/workspace", {"ontology_versions": ["one"]})
+    result = journey.report["complete_read_surfaces"]["ontologies"][0]
+    assert result["hierarchy_probes_attempted"] == 2
+    assert result["hierarchy_empty_probes"] == 1
+    assert probes == [empty["iri"]] * 4 + [connected["iri"]] * 4
+    assert all(value["first_page_edges"] for value in result["hierarchy"].values())
+
+
+def test_empty_probe_selection_does_not_hide_main_study_edge_disagreement():
+    source = dict(ontology_version_id="one", iri="urn:first", kind="class")
+    journey = Journey.__new__(Journey)
+
+    def request(method, path, *, params, label):
+        rows = [] if path == "/workspace/hierarchy" else [{"edge": "mismatch"}]
+        return SimpleNamespace(
+            json=lambda: dict(items=rows, returned_count=len(rows), status="available")
+        )
+
+    journey.request = request
+    with pytest.raises(VerificationError, match="same_hierarchy_edges"):
+        journey.hierarchy_probe(
+            "/workspace", "https://main/api/v1", "one", [source, {**source, "iri": "urn:second"}]
+        )
+
+
+def test_probe_selection_does_not_treat_unavailable_hierarchy_as_empty():
+    source = dict(ontology_version_id="one", iri="urn:first", kind="class")
+    journey = Journey.__new__(Journey)
+    journey.request = lambda *args, **kwargs: SimpleNamespace(
+        json=lambda: dict(items=[], returned_count=0, status="not_exported")
+    )
+    with pytest.raises(VerificationError, match="hierarchy_page_available"):
+        journey.hierarchy_probe("/workspace", "https://main/api/v1", "one", [source])

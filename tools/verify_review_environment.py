@@ -499,6 +499,75 @@ class Journey:
             expected=403,
         )
 
+    def hierarchy_probe(self, prefix, main, version, candidates):
+        """Find a real nonempty class without assuming every focal class has edges."""
+        unique = {}
+        for entity in candidates:
+            if entity["ontology_version_id"] == version and entity["kind"] == "class":
+                unique.setdefault(canonical_hash(entity), entity)
+        for attempted, hierarchy_probe in enumerate(list(unique.values())[:200], start=1):
+            entity_query = {**hierarchy_probe, "limit": 100, "basis": "literal_asserted"}
+            hierarchy_counts = {}
+            for direction in ("parents", "children"):
+                responses, continuations = [], []
+                for path, label in (
+                    (prefix + "/hierarchy", "study_hierarchy_page"),
+                    (main + "/hierarchy", "main_hierarchy_page"),
+                ):
+                    page = self.request(
+                        "GET", path, params={**entity_query, "direction": direction}, label=label
+                    ).json()
+                    require(
+                        page.get("status") in {"available", "absent_in_scope"},
+                        "hierarchy_page_available",
+                    )
+                    require(page["returned_count"] == len(page["items"]), "hierarchy_page_count")
+                    responses.append(page)
+                    if page.get("next_cursor"):
+                        continuation = self.request(
+                            "GET",
+                            path,
+                            params={
+                                **entity_query,
+                                "direction": direction,
+                                "cursor": page["next_cursor"],
+                            },
+                            label=label + "2",
+                        ).json()
+                        require(
+                            continuation.get("status") in {"available", "absent_in_scope"},
+                            "hierarchy_continuation_available",
+                        )
+                        require(
+                            continuation["returned_count"] == len(continuation["items"]),
+                            "hierarchy_continuation_count",
+                        )
+                        continuations.append(continuation["items"])
+                        require(
+                            not (
+                                {canonical_hash(r) for r in page["items"]}
+                                & {canonical_hash(r) for r in continuation["items"]}
+                            ),
+                            "hierarchy_page_continuation",
+                        )
+                    else:
+                        continuations.append([])
+                require(
+                    bool(responses[0].get("next_cursor")) == bool(responses[1].get("next_cursor")),
+                    "same_hierarchy_continuation_presence",
+                )
+                require(responses[0]["status"] == responses[1]["status"], "same_hierarchy_status")
+                require(responses[0]["items"] == responses[1]["items"], "same_hierarchy_edges")
+                require(continuations[0] == continuations[1], "same_hierarchy_continuation")
+                hierarchy_counts[direction] = {
+                    "first_page_edges": len(responses[0]["items"]),
+                    "continuation_edges": len(continuations[0]),
+                    "continuation_exercised": bool(responses[0].get("next_cursor")),
+                }
+            if any(value["first_page_edges"] for value in hierarchy_counts.values()):
+                return hierarchy_probe, hierarchy_counts, attempted
+        raise VerificationError("nonempty_class_hierarchy_exercised")
+
     def complete_read_surfaces(self, prefix, capabilities):
         """Check full indexed data and graph inputs; this does not render a graph."""
         record = environment.processes(self.config).get("exploration")
@@ -544,67 +613,10 @@ class Journey:
                     label=label,
                 ).json()
                 require(probe in [r["entity"] for r in found["items"]], "exact_iri_search_identity")
-            hierarchy_probe = next(
-                (
-                    entity
-                    for entity in focal_entities
-                    if entity["ontology_version_id"] == version and entity["kind"] == "class"
-                ),
-                probe,
+            hierarchy_probe, hierarchy_counts, attempted = self.hierarchy_probe(
+                prefix, main, version, [*focal_entities, *samples]
             )
             entity_query = {**hierarchy_probe, "limit": 100, "basis": "literal_asserted"}
-            hierarchy_counts = {}
-            for direction in ("parents", "children"):
-                responses, continuations = [], []
-                for path, label in (
-                    (prefix + "/hierarchy", "study_hierarchy_page"),
-                    (main + "/hierarchy", "main_hierarchy_page"),
-                ):
-                    page = self.request(
-                        "GET", path, params={**entity_query, "direction": direction}, label=label
-                    ).json()
-                    require(page["returned_count"] == len(page["items"]), "hierarchy_page_count")
-                    responses.append(page)
-                    if page.get("next_cursor"):
-                        continuation = self.request(
-                            "GET",
-                            path,
-                            params={
-                                **entity_query,
-                                "direction": direction,
-                                "cursor": page["next_cursor"],
-                            },
-                            label=label + "2",
-                        ).json()
-                        require(
-                            continuation["returned_count"] == len(continuation["items"]),
-                            "hierarchy_continuation_count",
-                        )
-                        continuations.append(continuation["items"])
-                        require(
-                            not (
-                                {canonical_hash(r) for r in page["items"]}
-                                & {canonical_hash(r) for r in continuation["items"]}
-                            ),
-                            "hierarchy_page_continuation",
-                        )
-                    else:
-                        continuations.append([])
-                require(
-                    bool(responses[0].get("next_cursor")) == bool(responses[1].get("next_cursor")),
-                    "same_hierarchy_continuation_presence",
-                )
-                require(responses[0]["items"] == responses[1]["items"], "same_hierarchy_edges")
-                require(continuations[0] == continuations[1], "same_hierarchy_continuation")
-                hierarchy_counts[direction] = {
-                    "first_page_edges": len(responses[0]["items"]),
-                    "continuation_edges": len(continuations[0]),
-                    "continuation_exercised": bool(responses[0].get("next_cursor")),
-                }
-            require(
-                any(value["first_page_edges"] for value in hierarchy_counts.values()),
-                "nonempty_class_hierarchy_exercised",
-            )
             graph = self.request(
                 "GET",
                 main + "/hierarchy",
@@ -624,6 +636,8 @@ class Journey:
                     "ancestor_graph_nodes": len(graph["nodes"]),
                     "ancestor_graph_edges": len(graph["items"]),
                     "hierarchy": hierarchy_counts,
+                    "hierarchy_probes_attempted": attempted,
+                    "hierarchy_empty_probes": attempted - 1,
                     "seconds": round(time.monotonic() - started, 3),
                 }
             )
