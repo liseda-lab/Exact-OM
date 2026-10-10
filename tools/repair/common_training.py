@@ -46,6 +46,12 @@ def load_release(reference, audit_run):
     prior = bound(release["prior_release"])
     for run in [*prior["runs"], *release["refinement_runs"]]:
         validate_completion(run)
+    if release.get("operation") == "authorized_unknown_label_correction":
+        bound(release["correction_amendment"])
+        bound(release["correction_predecessor"])
+        for run in [release["correction_qualification"], *release["correction_histories"],
+                    *release["correction_runs"]]:
+            validate_completion(run)
     for item in release["common"].values():
         if isinstance(item, dict) and "path" in item and "sha256" in item:
             authenticate(item)
