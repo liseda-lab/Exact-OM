@@ -909,6 +909,7 @@ def collect_sampled_repairs(
     quartet_attempts: int = 0,
     eligible_pairs: Sequence[tuple[int, int]] | None = None,
     plan_quotas: Mapping[str, int] | None = None,
+    quartet_assignments: Sequence[Sequence[int]] | None = None,
     resume_state: Mapping[str, Any] | None = None,
     progress: Callable | None = None,
 ) -> SampledRepairRound:
@@ -1035,6 +1036,27 @@ def collect_sampled_repairs(
                 break
         if len(sources["quartet"]) >= quotas["quartet"]:
             break
+    if quartet_assignments is not None:
+        explicit = [tuple(row) for row in quartet_assignments]
+        if len(explicit) > quotas["quartet"] or len(explicit) % 4:
+            raise ValueError("Explicit quartets must fit the frozen four-slot groups")
+        for start in range(0, len(explicit), 4):
+            group = explicit[start : start + 4]
+            if any(
+                len(row) != len(counts)
+                or any(type(c) is not int or not 0 <= c < n for c, n in zip(row, counts))
+                for row in group
+            ):
+                raise ValueError("Explicit quartet assignment outside inventory")
+            changed = tuple(i for i in range(len(counts)) if len({row[i] for row in group}) > 1)
+            if (
+                len(set(group)) != 4
+                or len(changed) != 2
+                or any(len({row[i] for row in group}) != 2 for i in changed)
+                or (eligible_pairs is not None and changed not in eligible_pairs)
+            ):
+                raise ValueError("Explicit quartet must be an eligible same-background rectangle")
+        sources["quartet"] = [(row, None) for row in explicit]
     # Resolve every slot before calling a verifier. A finite source exhaustion is
     # an unavailable slot, never an implicit transfer to another stratum.
     schedule: list[dict[str, Any]] = []
@@ -1072,6 +1094,8 @@ def collect_sampled_repairs(
         quartet_attempts=quartet_attempts,
         eligible_pairs=None if eligible_pairs is None else tuple(eligible_pairs),
     )
+    if quartet_assignments is not None:
+        settings["quartet_assignments"] = tuple(tuple(row) for row in quartet_assignments)
     sampler_hash = canonical_hash((settings, counts, schedule))
     dependencies = dict(
         revision="exact-repair/collection-dependencies/v1",

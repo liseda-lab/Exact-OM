@@ -11,13 +11,23 @@ from tools.repair.prepare import case_to_dict
 
 def test_nonce_and_step_must_match_terminal_receipt(tmp_path):
     for name, value in {
-        "completion": dict(dispatch_nonce="same", step_id="14451.40", status="complete", exit_code=0,
-            batch=str(tmp_path / "batch.json"), job_id="job"),
+        "completion": dict(
+            dispatch_nonce="same",
+            step_id="14451.40",
+            status="complete",
+            exit_code=0,
+            batch=str(tmp_path / "batch.json"),
+            job_id="job",
+        ),
         "step": dict(dispatch_nonce="same", step_id="14451.40"),
-        "outputs": {}, "batch": dict(jobs=[dict(id="job")]),
+        "outputs": {},
+        "batch": dict(jobs=[dict(id="job")]),
     }.items():
         write_artifact(tmp_path / (name + ".json"), value)
-    run = {name: binding(tmp_path / (name + ".json")) for name in ("completion", "step", "outputs", "batch")}
+    run = {
+        name: binding(tmp_path / (name + ".json"))
+        for name in ("completion", "step", "outputs", "batch")
+    }
     run.update(dispatch_nonce="same", step_id="14451.40", expected_status="complete")
     release.validate_completion(run)
     with pytest.raises(ValueError, match="nonce/Slurm"):
@@ -35,10 +45,14 @@ def test_interrupted_tail_is_retained_without_claiming_no_delivery():
 
 
 def test_risk_semantic_pair_and_proposal_masks_are_distinct():
-    labels = tuple(RepairLabel(assignment, True, value, 0) for assignment, value in (
-        ((0, 0), 0), ((1, 0), 1), ((0, 1), 1), ((1, 1), 3))) + (
-        RepairLabel((2, 0), False, None, 0), RepairLabel((2, 1), None, None, 0),
-        RepairLabel((0, 2), True, None, 0))
+    labels = tuple(
+        RepairLabel(assignment, True, value, 0)
+        for assignment, value in (((0, 0), 0), ((1, 0), 1), ((0, 1), 1), ((1, 1), 3))
+    ) + (
+        RepairLabel((2, 0), False, None, 0),
+        RepairLabel((2, 1), None, None, 0),
+        RepairLabel((0, 2), True, None, 0),
+    )
     cache = TeacherCache((3, 3), labels, False, "partial", (), 1)
     result = release.summarize_labels(cache, ((0, 1),))
     assert result["symbolic_value"] == 4 and result["risk"] == 6
@@ -50,7 +64,9 @@ def test_risk_semantic_pair_and_proposal_masks_are_distinct():
     assert release.summarize_labels(cache, ())["pair"] == 0
 
 
-def test_entry_point_audit_authenticates_generated_cache_and_preserves_missing_case(tmp_path, monkeypatch):
+def test_entry_point_audit_authenticates_generated_cache_and_preserves_missing_case(
+    tmp_path, monkeypatch
+):
     from tests.repair_generated_acquisition_test import fixture
 
     case, _, plan, protocol, *_ = fixture(tmp_path, monkeypatch)
@@ -60,12 +76,25 @@ def test_entry_point_audit_authenticates_generated_cache_and_preserves_missing_c
     plan.update(protocol=binding(tmp_path / "protocol.json"), _path=str(tmp_path / "plan.json"))
     write_artifact(tmp_path / "plan.json", plan)
     write_artifact(tmp_path / "input.json", case_to_dict(case))
-    declaration = dict(case_id=case.case_id, family=case.family, control=case.control,
-        structural_parent=case.structural_parent, input_hash=case.problem.content_hash,
-        evaluator=binding(tmp_path / "input.json"))
-    value = dict(case_id=case.case_id, family=case.family, control=case.control, parent=case.structural_parent,
-        scheduled_attempts=16, cleanup_complete=True, status="complete", result=result,
-        partial_state=binding(tmp_path / "state.json"))
+    declaration = dict(
+        case_id=case.case_id,
+        family=case.family,
+        control=case.control,
+        structural_parent=case.structural_parent,
+        input_hash=case.problem.content_hash,
+        evaluator=binding(tmp_path / "input.json"),
+    )
+    value = dict(
+        case_id=case.case_id,
+        family=case.family,
+        control=case.control,
+        parent=case.structural_parent,
+        scheduled_attempts=16,
+        cleanup_complete=True,
+        status="complete",
+        result=result,
+        partial_state=binding(tmp_path / "state.json"),
+    )
     write_artifact(tmp_path / "completion.json", value)
     ref = binding(tmp_path / "completion.json")
     row = release.audit_case(declaration, ref, plan, {"completion.json": ref["sha256"]}, tmp_path)
@@ -78,7 +107,9 @@ def test_entry_point_audit_authenticates_generated_cache_and_preserves_missing_c
     with pytest.raises(ValueError, match="dependency changed"):
         release.audit_case(declaration, ref, plan, {"completion.json": ref["sha256"]}, tmp_path)
     ref = binding(tmp_path / "completion.json")
-    failed = release.audit_case(declaration, ref, plan, {"completion.json": ref["sha256"]}, tmp_path)
+    failed = release.audit_case(
+        declaration, ref, plan, {"completion.json": ref["sha256"]}, tmp_path
+    )
     assert failed["masks"] is None and len(failed["attempts"]) == 16
     summary = release.aggregate([row, failed])
     assert summary["cases"] == 2 and summary["scheduled_slots"] == 32

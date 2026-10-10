@@ -30,6 +30,51 @@ from tools.repair.prepare import case_from_dict, case_to_dict, publish_label_cac
 
 SCHEMA = "exact-repair/common-generated-acquisition/v1"
 QUOTAS = dict(utility=4, proposal=4, diversity=4, quartet=4, uniform=0)
+REFINEMENT_QUOTAS = dict(utility=0, proposal=0, diversity=0, quartet=16, uniform=0)
+
+
+def refinement_quartets(cache, pairs):
+    """TRAIN-only missing rectangles, ranked by known feasible coverage, never target value.
+
+    Preserve every prior decision, including unknowns. A second round spends
+    checks only on previously unvisited assignments of the exact same inventory.
+    """
+    labels = {row.assignment: row for row in cache.labels}
+    candidates = {}
+    for base in sorted(row.assignment for row in cache.labels if row.usable):
+        for i, j in sorted(tuple(pair) for pair in pairs):
+            for left in range(cache.candidate_counts[i]):
+                if left == base[i]:
+                    continue
+                for right in range(cache.candidate_counts[j]):
+                    if right == base[j]:
+                        continue
+                    rectangle = []
+                    for a, b in (
+                        (base[i], base[j]),
+                        (left, base[j]),
+                        (base[i], right),
+                        (left, right),
+                    ):
+                        assignment = list(base)
+                        assignment[i], assignment[j] = a, b
+                        rectangle.append(tuple(assignment))
+                    rectangle = tuple(sorted(rectangle))
+                    if any(row in labels and not labels[row].usable for row in rectangle):
+                        continue
+                    missing = sum(row not in labels for row in rectangle)
+                    if missing:
+                        candidates[rectangle] = missing
+    selected, newly_planned = [], set()
+    for rectangle, _ in sorted(candidates.items(), key=lambda item: (item[1], item[0])):
+        unseen = set(rectangle) - labels.keys() - newly_planned
+        if not unseen:
+            continue
+        selected.extend(rectangle)
+        newly_planned.update(unseen)
+        if len(selected) == 16:
+            break
+    return selected
 
 
 def validate(plan):
@@ -39,7 +84,7 @@ def validate(plan):
         or plan.get("model_updates") != 0
         or plan.get("round_id") not in ("0", "1")
         or plan.get("shared_conditions") != ["symbolic", "symbolic_plus_llm"]
-        or plan.get("plan_quotas") != QUOTAS
+        or plan.get("plan_quotas") != (REFINEMENT_QUOTAS if plan.get("round_id") == "1" else QUOTAS)
     ):
         raise ValueError("Invalid common TRAIN acquisition contract")
     index = verify_binding(plan["inputs"])
@@ -82,6 +127,44 @@ def validate(plan):
         ):
             raise ValueError("Acquisition case identity changed")
         selected.append((row, record))
+    if plan["round_id"] == "1":
+        release = verify_binding(plan["prior_release"])
+        if (
+            release.get("schema") != "exact-repair/common-generated-shared-release/v1"
+            or release.get("status") != "complete"
+        ):
+            raise ValueError("Refinement requires a complete authenticated round-zero release")
+        admitted = {
+            ref["path"]: ref for shard in release["shards"] for ref in verify_binding(shard)["rows"]
+        }
+        if set(plan["prior_rows"]) != set(plan["case_ids"]) or set(
+            plan["quartet_assignments"]
+        ) != set(plan["case_ids"]):
+            raise ValueError("Refinement case schedule differs")
+        for key in plan["case_ids"]:
+            ref = plan["prior_rows"][key]
+            if admitted.get(ref["path"]) != ref:
+                raise ValueError("Refinement row outside shared release")
+            prior = verify_binding(ref)
+            original = verify_binding(prior["plan"])
+            if (
+                prior["case_id"] != key
+                or prior["round_id"] != "0"
+                or prior["scientific_status"] != "collected"
+                or prior["process_status"] != "complete"
+            ):
+                raise ValueError("Refinement cannot replay a failed or unavailable round-zero case")
+            if any(
+                original[field] != plan[field]
+                for field in (
+                    "checkpoint",
+                    "protocol",
+                    "inputs",
+                    "generator_source",
+                    "target_revision",
+                )
+            ):
+                raise ValueError("Refinement changes frozen scientific dependencies")
     return selected, protocol
 
 
@@ -328,12 +411,18 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
         return value if result.status == "complete" else result
 
     save()
-    parent = call(
-        "parent",
-        _verify_intended,
-        case,
-        cap=resources["initial_parent_seconds"],
-        evidence_directory=directory / "native" / "parent-checks",
+    prior_cache = None
+    prior = verify_binding(plan["prior_rows"][case.case_id]) if plan["round_id"] == "1" else None
+    parent = (
+        True
+        if prior
+        else call(
+            "parent",
+            _verify_intended,
+            case,
+            cap=resources["initial_parent_seconds"],
+            evidence_directory=directory / "native" / "parent-checks",
+        )
     )
     if parent is not True:
         return finish(
@@ -349,15 +438,19 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
     options = generation_options(protocol, directory / "compiler-cache")
     options["seed"] = plan["seed"]
     options["compile_seconds"] = min(options["compile_seconds"], max(0.001, left()))
-    generated = call(
-        "generation",
-        bounded_freeze_checkpoint,
-        case.problem,
-        plan["checkpoint"]["path"],
-        checkpoint_sha256=plan["checkpoint"]["sha256"],
-        cap=resources["generation_seconds"],
-        final_candidate_removals=dict(case.final_candidate_removals),
-        **options,
+    generated = (
+        verify_binding(prior["generated"])
+        if prior
+        else call(
+            "generation",
+            bounded_freeze_checkpoint,
+            case.problem,
+            plan["checkpoint"]["path"],
+            checkpoint_sha256=plan["checkpoint"]["sha256"],
+            cap=resources["generation_seconds"],
+            final_candidate_removals=dict(case.final_candidate_removals),
+            **options,
+        )
     )
     if isinstance(generated, CallResult):
         return finish(
@@ -371,6 +464,21 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
             )
         )
     generated_case = case_from_dict(generated["case"])
+    if prior:
+        if (
+            generated_case.case_id,
+            generated_case.structural_parent,
+            generated_case.split,
+            generated_case.probes,
+        ) != (case.case_id, case.structural_parent, "train", case.probes):
+            raise ValueError("Refinement generated input identity changed")
+        prior_cache = read_label_cache(
+            prior["cache"], Path(prior["cache"]["path"]).parent, generated_case
+        )
+        state.setdefault("proposed", [])
+        state.setdefault("pairs", prior["eligible_pairs"])
+        state.setdefault("pair_status", "reused_round0")
+        state["prior_row"] = plan["prior_rows"][case.case_id]
     generated_path = directory / "generated.json"
     if not generated_path.exists():
         write_artifact(generated_path, generated)
@@ -438,8 +546,17 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
         profile=canonical_hash(profile),
         semantic_target=target.content_hash,
     )
+    if prior_cache is not None and dict(prior_cache.hashes) != hashes:
+        raise ValueError("Refinement cannot reuse labels with different exact dependencies")
+    reused = {row.assignment: row for row in prior_cache.labels} if prior_cache else {}
 
     def label(assignment):
+        if assignment in reused:
+            state.setdefault("reused_assignments", {})[canonical_hash(assignment)] = list(
+                assignment
+            )
+            save()
+            return reused[assignment]
         name = "label-" + canonical_hash(assignment)
         result = call(
             name,
@@ -494,11 +611,12 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
         deadline_seconds=left() if cpu_left() > 0 else 0,
         seed=plan["seed"],
         proposed=state["proposed"],
-        plan_quotas=QUOTAS,
+        plan_quotas=plan.get("plan_quotas", QUOTAS),
         # The bounded-call/checkpoint transport is JSON: restore pair tuples
         # before the collector performs tuple membership checks. Keep this at
         # the boundary so historical sampler identities remain unchanged.
         eligible_pairs=tuple(tuple(pair) for pair in state["pairs"]),
+        quartet_assignments=plan.get("quartet_assignments", {}).get(case.case_id),
         object_candidate_ids=tuple(
             (o.object_id, tuple(c.candidate_id for c in o.candidates)) for o in problem.objects
         ),

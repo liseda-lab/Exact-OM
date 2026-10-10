@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from exact.repair.api import write_artifact
-from exact.repair.learning import RepairLabel
+from exact.repair.learning import RepairLabel, TeacherCache, collect_sampled_repairs
 from exact.repair.records import (
     make_objective,
     FrozenMapping,
@@ -171,6 +171,101 @@ def test_json_pair_transport_preserves_all_four_quartet_slots(tmp_path, monkeypa
     assert len({tuple(row["assignment"]) for row in slots}) == 4
     before = len(calls)
     ga.case_worker(case_to_dict(case), plan, protocol, tmp_path, "pairs", 1300)
+    assert len(calls) == before
+
+
+def test_refinement_preserves_old_unknowns_and_ignores_target_magnitude():
+    labels = (
+        RepairLabel((0, 0), True, 1, 0),
+        RepairLabel((1, 0), True, 2, 0),
+        RepairLabel((0, 1), True, 3, 0),
+        RepairLabel((2, 0), None, None, 0),
+    )
+    cache = TeacherCache((3, 3), labels, False, "round0", (), 1)
+    selected = ga.refinement_quartets(cache, ((0, 1),))
+    assert selected[:4] == [(0, 0), (0, 1), (1, 0), (1, 1)]
+    assert (2, 0) not in selected and len(selected) <= 16
+    changed = replace(
+        cache,
+        labels=tuple(
+            replace(row, benefit=100 - row.benefit) if row.usable else row for row in labels
+        ),
+    )
+    assert ga.refinement_quartets(changed, ((0, 1),)) == selected
+    assert ga.refinement_quartets(cache, ()) == []
+
+
+def test_explicit_quartets_bind_sampler_and_reject_invalid_rectangles():
+    options = dict(
+        case_id="case",
+        parent_group_id="parent",
+        split="train",
+        hashes={
+            name: name
+            for name in (
+                "input",
+                "patch",
+                "policy",
+                "query",
+                "inventory",
+                "backend",
+                "profile",
+                "semantic_target",
+            )
+        },
+        model_hash="model",
+        round_id="1",
+        max_assignments=16,
+        deadline_seconds=10,
+        plan_quotas=ga.REFINEMENT_QUOTAS,
+        eligible_pairs=((0, 1),),
+    )
+    checks = []
+
+    def label(assignment):
+        checks.append(assignment)
+        return RepairLabel(assignment, True, 1, 0)
+
+    rectangle = ((0, 0), (0, 1), (1, 0), (1, 1))
+    result = collect_sampled_repairs((3, 3), label, quartet_assignments=rectangle, **options)
+    assert len(checks) == 4 and len(result.attempts) == 16
+    assert all(row["quartet_complete"] for row in result.attempts[:4])
+    assert all(row["status"] == "unavailable" for row in result.attempts[4:])
+    with pytest.raises(ValueError, match="same-background rectangle"):
+        collect_sampled_repairs((3, 3), label, quartet_assignments=((0, 0),) * 4, **options)
+    assert len(checks) == 4
+
+
+def test_refinement_entrypoint_reuses_exact_labels_without_parent_or_generation_calls(
+    tmp_path, monkeypatch
+):
+    from pathlib import Path
+
+    case, generated, plan, protocol, calls, clock, limits = fixture(tmp_path / "old", monkeypatch)
+    monkeypatch.setattr(ga, "_pairs", lambda *args: ((0, 1),))
+    old = ga.case_worker(case_to_dict(case), plan, protocol, tmp_path / "old", "old", 1300)
+    cache = read_label_cache(old["cache"], tmp_path / "old/cache", replace(case, problem=generated))
+    prior = dict(generated=old["generated"], cache=old["cache"], eligible_pairs=[[0, 1]])
+    write_artifact(tmp_path / "prior.json", prior)
+    selected = ga.refinement_quartets(cache, ((0, 1),))
+    assert selected
+    second = dict(
+        plan,
+        round_id="1",
+        plan_quotas=ga.REFINEMENT_QUOTAS,
+        prior_rows={case.case_id: binding(tmp_path / "prior.json")},
+        quartet_assignments={case.case_id: selected},
+    )
+    old_calls = set(calls)
+    result = ga.case_worker(case_to_dict(case), second, protocol, tmp_path / "new", "new", 1400)
+    names = {path.stem for path in (tmp_path / "new/calls").glob("*.json")}
+    assert all(name.startswith("label-") for name in names)
+    assert len(calls) == len(set(calls))
+    collection = ga.verify_binding(result["collection"])
+    assert collection["round_id"] == "1" and len(collection["attempts"]) == 16
+    assert set(calls) - old_calls == set(selected) - old_calls
+    before = len(calls)
+    ga.case_worker(case_to_dict(case), second, protocol, tmp_path / "new", "new", 1500)
     assert len(calls) == before
 
 
