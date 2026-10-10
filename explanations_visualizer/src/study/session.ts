@@ -172,6 +172,8 @@ export function useStudySession() {
   }, []);
 
   const retryNow = useCallback(() => queue.current?.retry(), []);
+  /** The latest accepted state, synchronously: the revision queued writes are made against. */
+  const current = useCallback(() => stateRef.current, []);
   const clearNotice = useCallback(() => setSave({ kind: "idle" }), []);
   const downloadRecovery = useCallback(() => {
     if (!recovery) return;
@@ -182,6 +184,6 @@ export function useStudySession() {
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }, [recovery]);
-  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current?.size ?? 0, queued: () => queue.current?.queued() ?? [], hasRecovery: recovery !== null, downloadRecovery };
+  return { phase, state, save, online, mutate, refresh, retryNow, clearNotice, pendingCount: () => queue.current?.size ?? 0, queued: () => queue.current?.queued() ?? [], current, hasRecovery: recovery !== null, downloadRecovery };
 }
 export type StudySession = ReturnType<typeof useStudySession>;

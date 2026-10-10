@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Dialog } from "@/components/common/Dialog";
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
-import { IconCheck } from "@/components/common/Icons";
+import { IconCheck, IconWarning } from "@/components/common/Icons";
 import { CaseLayout, answerSummaryOf } from "@/components/study/CaseLayout";
 import { IdentityCard } from "@/components/study/IdentityCard";
 import { AnswerPanel, CandidateRows, useRanking, type RankingEvent, type RankingValue } from "@/components/study/RankingPanel";
@@ -34,8 +34,8 @@ import type { Telemetry } from "@/study/telemetry";
 import { workspaceEvent } from "@/study/workspaceEvents";
 import { uuid, type StudySession } from "@/study/session";
 import { assessmentPosition, followAcknowledged, lessonPosition, restoredPosition } from "@/study/tutorialPosition";
-import { AssessmentDrafts, canonical } from "@/study/assessmentDrafts";
-import { DiscardedMutation } from "@/study/mutationQueue";
+import { AssessmentDrafts, canonical, type KeptConflict } from "@/study/assessmentDrafts";
+import { DiscardedMutation, ReplacedMutation, type QueueState } from "@/study/mutationQueue";
 import { LessonEvidence, evidenceFor, type LessonSignal } from "@/study/tutorialProgress";
 import type { AssessmentItem, AssessmentResponse, ExplanationResource, LessonRequirement, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
 
@@ -84,66 +84,90 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
   const acknowledgedRef = useRef(acknowledged);
   acknowledgedRef.current = acknowledged;
 
-  // Visible assessment drafts above the keyed question cards (S0-R2): queued work restored after
-  // a reload is shown, a newer local edit is never replaced by an older or competing server
-  // draft, and pending drafts are saved again after a conflict refresh or a discarded write.
+  // Visible assessment drafts above the keyed question cards (S0-R2, S0-FU-R1, S0-FU-R2): each
+  // write is followed to its settlement, including writes restored after a reload; an older
+  // acknowledgement never replaces a newer edit; and after a failure an answer is saved again only
+  // when the saved answer still equals the one it started from. Otherwise the saved answer is
+  // shown and this tab's answer is kept for the participant to choose (see assessmentDrafts.ts).
   const drafts = useRef<AssessmentDrafts | null>(null);
-  if (!drafts.current) {
-    drafts.current = new AssessmentDrafts();
-    const latest = new Map<string, AssessmentResponse>();
-    for (const entry of session.queued()) {
-      const draft = entry.path === "/api/v1/study/tutorial/progress" ? (entry.body.assessment_draft as { question_id?: string; response?: AssessmentResponse } | undefined) : undefined;
-      if (draft?.question_id && draft.response) latest.set(draft.question_id, draft.response);
-    }
-    drafts.current.seed(Array.from(latest, ([questionId, response]) => ({ questionId, response })));
-  }
   const [, setDraftVersion] = useState(0);
-  const serverDrafts = progress?.assessment_drafts;
-  const serverDraftsRef = useRef(serverDrafts);
-  serverDraftsRef.current = serverDrafts;
-  useEffect(() => {
-    drafts.current!.reconcile(serverDrafts);
+  const conflictKey = `exact.study.assessment-conflicts.${state.session_id}`;
+  /** The saved answers in the latest accepted state: the revision the next write is made against. */
+  const observed = useCallback(() => session.current()?.tutorial_progress?.assessment_drafts, [session]);
+  const keepConflicts = useCallback(() => {
+    const kept = drafts.current!.conflicts();
+    try {
+      if (kept.length) window.sessionStorage.setItem(conflictKey, JSON.stringify(kept));
+      else window.sessionStorage.removeItem(conflictKey);
+    } catch {
+      /* the recovery archive still holds the unsaved answer */
+    }
+  }, [conflictKey]);
+  const sendDraftRef = useRef<(questionId: string, response: AssessmentResponse) => void>(() => undefined);
+  /** After any settlement or new state: finish saved work, re-save safe failures, keep conflicts. */
+  const settle = useCallback(() => {
+    const resaves = drafts.current!.observe(observed());
     setDraftVersion((value) => value + 1);
-  }, [serverDrafts]);
-  const conflicts = useRef(new Map<string, number>());
+    keepConflicts();
+    for (const resave of resaves) sendDraftRef.current(resave.questionId, resave.response);
+  }, [observed, keepConflicts]);
+  const settleRef = useRef(settle);
+  settleRef.current = settle;
+  const track = useCallback((questionId: string, settled: Promise<QueueState>) => {
+    settled.then(
+      (next) => {
+        drafts.current!.acknowledged(questionId, (next as StudyState).tutorial_progress?.assessment_drafts);
+        settleRef.current();
+      },
+      (error) => {
+        if (error instanceof ReplacedMutation) drafts.current!.replaced(questionId);
+        else drafts.current!.failed(questionId);
+        settleRef.current();
+      },
+    );
+  }, []);
+  if (!drafts.current) {
+    const store = new AssessmentDrafts();
+    store.restoreConflicts(readConflicts(conflictKey, tutorial));
+    // Writes restored after a reload are followed to their settlement like new ones (S0-FU-R2).
+    const restored = session.queued().flatMap((entry) => {
+      const draft = entry.path === PROGRESS_PATH ? (entry.body.assessment_draft as { question_id?: string; response?: AssessmentResponse } | undefined) : undefined;
+      if (!draft?.question_id || !draft.response) return [];
+      const base = entry.meta?.assessment_base;
+      return [{ questionId: draft.question_id, response: draft.response, base: typeof base === "string" ? base : null, settled: entry.settled }];
+    });
+    store.seed(restored);
+    drafts.current = store;
+    for (const write of restored) track(write.questionId, write.settled);
+  }
+  const serverDrafts = progress?.assessment_drafts;
+  useEffect(() => settleRef.current(), [serverDrafts]);
   const sendDraft = useCallback(
     (questionId: string, response: AssessmentResponse) => {
       const store = drafts.current!;
       store.sent(questionId);
-      session
-        .mutate({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { tutorial_version: tutorial.version, assessment_draft: { question_id: questionId, response } }, coalesce: `tutorial:item:${questionId}`, debounceMs: 500 })
-        .then((next) => {
-          conflicts.current.delete(questionId);
-          store.settled(questionId, next.tutorial_progress?.assessment_drafts);
-          setDraftVersion((value) => value + 1);
-        })
-        .catch((error) => {
-          store.settled(questionId, serverDraftsRef.current);
-          setDraftVersion((value) => value + 1);
-          // A conflict refresh or a write discarded behind another failure: save the visible
-          // draft again on top of the refreshed state (bounded, so two tabs cannot loop).
-          const retry = error instanceof DiscardedMutation || (error instanceof ApiError && error.status === 409);
-          if (!retry) return;
-          const count = (conflicts.current.get(questionId) ?? 0) + 1;
-          conflicts.current.set(questionId, count);
-          if (count <= 3)
-            window.setTimeout(() => {
-              const pending = drafts.current!.pending().find((item) => item.questionId === questionId);
-              if (pending) sendDraftRef.current(questionId, pending.response);
-            }, 0);
-        });
+      // The base travels with the queued write (never to the server), so a reload keeps the proof.
+      track(questionId, session.mutate({ method: "PUT", path: PROGRESS_PATH, body: { tutorial_version: tutorial.version, assessment_draft: { question_id: questionId, response } }, coalesce: `tutorial:item:${questionId}`, debounceMs: 500, meta: { assessment_base: store.baseOf(questionId) } }));
     },
-    [session, tutorial.version],
+    [session, tutorial.version, track],
   );
-  const sendDraftRef = useRef(sendDraft);
   sendDraftRef.current = sendDraft;
   const editDraft = useCallback(
     (questionId: string, response: AssessmentResponse) => {
-      drafts.current!.edit(questionId, response);
+      if (drafts.current!.edit(questionId, response, observed()?.[questionId])) sendDraft(questionId, response);
       setDraftVersion((value) => value + 1);
-      sendDraft(questionId, response);
+      keepConflicts();
     },
-    [sendDraft],
+    [sendDraft, observed, keepConflicts],
+  );
+  const resolveDraft = useCallback(
+    (questionId: string, choice: "mine" | "saved") => {
+      const mine = drafts.current!.resolve(questionId, choice, observed()?.[questionId]);
+      if (mine) sendDraft(questionId, mine);
+      setDraftVersion((value) => value + 1);
+      keepConflicts();
+    },
+    [sendDraft, observed, keepConflicts],
   );
 
   // Valid lesson evidence that the server has not acknowledged yet (21 F01.4–5). "Saving…" is
@@ -400,7 +424,9 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
           focusedQuestion={position.question_id}
           outstandingLessons={outstandingLessons}
           draftOf={(item) => drafts.current!.value(item.question_id, serverDrafts?.[item.question_id], emptyResponse(item))}
+          conflictOf={(item) => drafts.current!.conflict(item.question_id)}
           onDraft={editDraft}
+          onResolve={resolveDraft}
         />
       )}
       {helpOpen && lesson && (
@@ -686,7 +712,9 @@ function Assessment({
   focusedQuestion,
   outstandingLessons,
   draftOf,
+  conflictOf,
   onDraft,
+  onResolve,
 }: {
   tutorial: TutorialPublic;
   state: StudyState;
@@ -695,9 +723,12 @@ function Assessment({
   onQuestion: (questionId: string) => void;
   focusedQuestion: string | null;
   outstandingLessons: TutorialLesson[];
-  /** The visible answer for a question (a pending local edit, else the server's draft). */
+  /** The visible answer for a question (this tab's unsaved answer, else the saved one). */
   draftOf: (item: AssessmentItem) => AssessmentResponse;
+  /** This tab's answer kept when another tab or device saved a different one. */
+  conflictOf: (item: AssessmentItem) => AssessmentResponse | null;
   onDraft: (questionId: string, response: AssessmentResponse) => void;
+  onResolve: (questionId: string, choice: "mine" | "saved") => void;
 }) {
   const progress = state.tutorial_progress ?? null;
   const passed = new Set(progress?.passed_items ?? []);
@@ -728,16 +759,16 @@ function Assessment({
             {tutorial.assessment.map((item, index) => (
               <li key={item.question_id}>
                 <button type="button" className={index === currentIndex ? "btn btn-sm current" : "btn btn-sm"} aria-current={item.question_id === focusedQuestion ? "location" : index === currentIndex ? "step" : undefined} onClick={() => onQuestion(item.question_id)}>
-                  {passed.has(item.question_id) ? <IconCheck /> : null}
+                  {passed.has(item.question_id) ? <IconCheck /> : conflictOf(item) ? <IconWarning /> : null}
                   {index + 1} · {item.title}
-                  {passed.has(item.question_id) ? <span className="sr-only"> (passed)</span> : null}
+                  {passed.has(item.question_id) ? <span className="sr-only"> (passed)</span> : conflictOf(item) ? <span className="sr-only"> (choose which answer to keep)</span> : null}
                 </button>
               </li>
             ))}
           </ol>
         </nav>
       </section>
-      <AssessmentCard key={current.question_id} item={current} number={currentIndex + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(current.question_id)} onRevisit={onRevisit} response={draftOf(current)} onChange={(next) => onDraft(current.question_id, next)} />
+      <AssessmentCard key={current.question_id} item={current} number={currentIndex + 1} state={state} session={session} tutorial={tutorial} passed={passed.has(current.question_id)} onRevisit={onRevisit} response={draftOf(current)} conflict={conflictOf(current)} onChange={(next) => onDraft(current.question_id, next)} onResolve={(choice) => onResolve(current.question_id, choice)} />
       <div className="study-actions question-steps">
         <button type="button" className="btn" disabled={currentIndex === 0} onClick={() => onQuestion(tutorial.assessment[currentIndex - 1].question_id)}>
           Previous question
@@ -782,6 +813,34 @@ function Assessment({
   );
 }
 
+const PROGRESS_PATH = "/api/v1/study/tutorial/progress";
+
+/** Conflicts kept from before a reload in this tab, for this tutorial's questions only. */
+function readConflicts(key: string, tutorial: TutorialPublic): KeptConflict[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored: unknown = JSON.parse(window.sessionStorage.getItem(key) ?? "[]");
+    if (!Array.isArray(stored)) return [];
+    const ids = new Set(tutorial.assessment.map((item) => item.question_id));
+    return stored.filter(
+      (item): item is KeptConflict =>
+        Boolean(item) && typeof item.questionId === "string" && ids.has(item.questionId) && Boolean(item.response) && typeof item.response === "object" && !Array.isArray(item.response) && (item.base === null || typeof item.base === "string"),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** An answer in words, for the choice offered during a conflict. */
+function describeResponse(item: AssessmentItem, response: AssessmentResponse): string {
+  const label = (options: { code: string; label: string }[] | undefined, code: string) => options?.find((option) => option.code === code)?.label ?? code;
+  if (item.kind === "single") return response.choice ? label(item.options, response.choice) : "No answer";
+  if (item.kind === "multiple") return response.choices?.length ? response.choices.map((code) => label(item.options, code)).join(" · ") : "No answer";
+  const parts = (item.rows ?? []).filter((row) => response.matches?.[row.row_id]).map((row) => `${row.label}: ${label(item.row_options, response.matches![row.row_id])}`);
+  if (item.kind === "match_and_single" && item.part_b && response.part_b) parts.push(`${item.part_b.prompt} ${label(item.part_b.options, response.part_b)}`);
+  return parts.length ? parts.join(" · ") : "No answer";
+}
+
 function emptyResponse(item: AssessmentItem): AssessmentResponse {
   if (item.kind === "multiple") return { choices: [] };
   if (item.kind === "match" || item.kind === "match_and_single") return { matches: {} };
@@ -805,7 +864,9 @@ function AssessmentCard({
   passed,
   onRevisit,
   response,
+  conflict,
   onChange,
+  onResolve,
 }: {
   item: AssessmentItem;
   number: number;
@@ -816,7 +877,10 @@ function AssessmentCard({
   onRevisit: (lessonId: string) => void;
   /** The visible answer, held above this keyed card so navigation never loses it (S0-R2). */
   response: AssessmentResponse;
+  /** This tab's unsaved answer when the saved answer changed elsewhere (S0-FU-R1). */
+  conflict: AssessmentResponse | null;
   onChange: (next: AssessmentResponse) => void;
+  onResolve: (choice: "mine" | "saved") => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -859,6 +923,25 @@ function AssessmentCard({
           </span>
         )}
       </div>
+      {conflict && !passed && (
+        <div className="note note-warn assessment-conflict" role="status">
+          <IconWarning />
+          <div>
+            <p>
+              <strong>Another tab or device saved a different answer to this question.</strong> The saved answer is shown below. This tab’s answer was not saved:
+            </p>
+            <p className="assessment-conflict-answer">{describeResponse(item, conflict)}</p>
+            <div className="study-actions">
+              <button type="button" className="btn btn-sm" onClick={() => onResolve("mine")}>
+                Use this tab’s answer
+              </button>
+              <button type="button" className="btn btn-sm" onClick={() => onResolve("saved")}>
+                Keep the saved answer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <fieldset className="assessment-fieldset" disabled={passed || busy}>
         <legend className="question-label">{item.prompt}</legend>
         {item.kind === "single" && (
@@ -917,9 +1000,10 @@ function AssessmentCard({
       </fieldset>
       {!passed && (
         <div className="study-actions">
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={submit}>
+          <button type="button" className="btn btn-primary" disabled={busy || Boolean(conflict)} onClick={submit}>
             {busy ? "Checking…" : attempts.length ? "Check again" : "Check answer"}
           </button>
+          {conflict && <span className="meta">Choose which answer to keep before checking.</span>}
           {error && (
             <span className="field-error" role="alert" tabIndex={-1} ref={errorRef}>
               {error}

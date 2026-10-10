@@ -9,13 +9,17 @@ export interface Mutation {
   debounceMs?: number;
   /** The operation can move the participant to another step (timing closes first). */
   transition?: boolean;
+  /** Client-only context kept with the queued write and restored after a reload; never sent. */
+  meta?: Record<string, unknown>;
 }
 
 /** Participant write routes, including the planned exact-study/2.0 routes (16 B2–B4). */
 export const OUTBOX_ROUTE = /^\/api\/v1\/study\/(?:consent|setup|pause|resume|complete|questionnaires\/(?:background|final)|tutorial\/(?:progress|assessment|complete)|cases\/[^/]+\/(?:draft|submit|consultation|consultation\/draft))$/;
 export interface QueueState { session_id: string; revision: number }
 export interface PendingMutation extends Mutation { key: string; expected: number }
-interface Entry extends PendingMutation { resolve: (value: QueueState) => void; reject: (error: unknown) => void }
+interface Entry extends PendingMutation { resolve: (value: QueueState) => void; reject: (error: unknown) => void; settled: Promise<QueueState> }
+/** A queued write as seen by the page: what it carries and how it settles. */
+export interface QueuedMutation { path: string; body: Record<string, unknown>; meta?: Record<string, unknown>; settled: Promise<QueueState> }
 export type QueueStatus = "saving" | "saved" | "offline";
 interface Options {
   state: QueueState;
@@ -43,6 +47,25 @@ export class DiscardedMutation extends Error {
   }
 }
 
+/** An unsent draft replaced by a newer draft for the same item (coalescing); never an error. */
+export class ReplacedMutation extends Error {
+  constructor() {
+    super("Replaced by a newer unsent draft.");
+    this.name = "ReplacedMutation";
+  }
+}
+
+/** A queue entry with its own settlement promise. */
+function settleable(pending: PendingMutation): Entry {
+  let resolve!: (value: QueueState) => void;
+  let reject!: (error: unknown) => void;
+  const settled = new Promise<QueueState>((onResolve, onReject) => {
+    resolve = onResolve;
+    reject = onReject;
+  });
+  return { ...pending, resolve, reject, settled };
+}
+
 const MAX_ENTRIES = 32;
 const MAX_BYTES = 256 * 1024;
 
@@ -66,7 +89,12 @@ export class MutationQueue {
       if (stored.session_id !== options.state.session_id || !Array.isArray(stored.entries) || stored.entries.length > MAX_ENTRIES) throw new Error("Invalid outbox");
       this.entries = stored.entries.map((entry: PendingMutation) => {
         if (!entry || !["PUT", "POST"].includes(entry.method) || typeof entry.path !== "string" || !OUTBOX_ROUTE.test(entry.path) || !entry.body || typeof entry.body !== "object" || Array.isArray(entry.body) || typeof entry.key !== "string" || !Number.isSafeInteger(entry.expected) || entry.expected < 0) throw new Error("Invalid outbox entry");
-        return { ...entry, resolve: () => undefined, reject: () => undefined };
+        if (entry.meta !== undefined && (!entry.meta || typeof entry.meta !== "object" || Array.isArray(entry.meta))) throw new Error("Invalid outbox entry");
+        // A restored write settles like a new one, so the page can follow it (S0-FU-R2); it may
+        // have no listener, so an unobserved failure is not reported as unhandled.
+        const restored = settleable(entry);
+        restored.settled.catch(() => undefined);
+        return restored;
       });
     } catch {
       this.entries = [];
@@ -77,9 +105,12 @@ export class MutationQueue {
 
   get size() { return this.entries.length; }
 
-  /** Copies of the unsent writes, oldest first (a reloaded page shows what it still holds). */
-  queued(): { path: string; body: Record<string, unknown> }[] {
-    return this.entries.map((entry) => ({ path: entry.path, body: structuredClone(entry.body) }));
+  /**
+   * The unsent writes, oldest first, including those restored after a reload: copies of what
+   * they carry and the promise each settles with (acknowledged, rejected, discarded or replaced).
+   */
+  queued(): QueuedMutation[] {
+    return this.entries.map((entry) => ({ path: entry.path, body: structuredClone(entry.body), meta: entry.meta ? structuredClone(entry.meta) : undefined, settled: entry.settled }));
   }
 
   observe(state: QueueState) {
@@ -87,28 +118,28 @@ export class MutationQueue {
   }
 
   private snapshot() {
-    return JSON.stringify({ session_id: this.options.state.session_id, entries: this.entries.map(({ resolve: _resolve, reject: _reject, ...entry }) => entry) });
+    return JSON.stringify({ session_id: this.options.state.session_id, entries: this.entries.map(({ resolve: _resolve, reject: _reject, settled: _settled, ...entry }) => entry) });
   }
 
   private persist() { this.options.save(this.entries.length ? this.snapshot() : null); }
 
   enqueue(mutation: Mutation): Promise<QueueState> {
     if (this.stopped) return Promise.reject(new Error("This study session is no longer active."));
-    return new Promise((resolve, reject) => {
-      // Only coalesce the last unsent entry: never reorder a draft across a submission.
-      const last = this.entries.at(-1);
-      const replace = !!mutation.coalesce && !!last && last !== this.inFlight && last.coalesce === mutation.coalesce;
-      const expected = replace ? last!.expected : last ? last.expected + 1 : this.revision;
-      const entry: Entry = { ...mutation, key: this.options.key(), expected, resolve, reject };
-      if (this.entries.length >= MAX_ENTRIES && !replace) return reject(new Error("Too many changes are waiting. Reconnect before making more changes."));
-      if (JSON.stringify(entry).length + this.snapshot().length > MAX_BYTES) return reject(new Error("Unsaved changes exceed the local recovery limit. Reconnect to save them."));
-      if (replace) {
-        this.entries[this.entries.length - 1] = entry;
-        last!.reject(new Error("Replaced by a newer unsent draft."));
-      } else this.entries.push(entry);
-      this.persist();
-      void this.start();
-    });
+    // Only coalesce the last unsent entry: never reorder a draft across a submission.
+    const last = this.entries.at(-1);
+    const replace = !!mutation.coalesce && !!last && last !== this.inFlight && last.coalesce === mutation.coalesce;
+    const expected = replace ? last!.expected : last ? last.expected + 1 : this.revision;
+    const entry = settleable({ ...mutation, key: this.options.key(), expected });
+    if (this.entries.length >= MAX_ENTRIES && !replace) return Promise.reject(new Error("Too many changes are waiting. Reconnect before making more changes."));
+    const { resolve: _resolve, reject: _reject, settled: _settled, ...stored } = entry;
+    if (JSON.stringify(stored).length + this.snapshot().length > MAX_BYTES) return Promise.reject(new Error("Unsaved changes exceed the local recovery limit. Reconnect to save them."));
+    if (replace) {
+      this.entries[this.entries.length - 1] = entry;
+      last!.reject(new ReplacedMutation());
+    } else this.entries.push(entry);
+    this.persist();
+    void this.start();
+    return entry.settled;
   }
 
   retry() { this.wake?.(); }

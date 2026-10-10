@@ -1215,6 +1215,24 @@
   border-color: var(--ok-line, var(--line));
 }
 
+/* Another tab saved a different answer: the saved answer is shown, this tab's kept for a choice (S0-FU-R1). */
+.assessment-conflict {
+  margin-bottom: 1rem;
+}
+
+.assessment-conflict p {
+  margin: 0 0 0.375rem;
+}
+
+.assessment-conflict-answer {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.assessment-conflict .study-actions {
+  margin-top: 0.5rem;
+}
+
 .assessment-fieldset {
   border: 0;
   margin: 0;

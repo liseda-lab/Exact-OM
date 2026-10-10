@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { MutationQueue, OUTBOX_ROUTE, type PendingMutation, type QueueState } from "./mutationQueue.ts";
+import { DiscardedMutation, MutationQueue, OUTBOX_ROUTE, ReplacedMutation, type PendingMutation, type QueueState } from "./mutationQueue.ts";
 
 const state = { session_id: "session-a", revision: 0 };
 const draft = (value: string) => ({ method: "PUT" as const, path: "/api/v1/study/cases/c/draft", body: { value }, coalesce: "draft:c" });
@@ -146,5 +146,55 @@ test("a draft never coalesces across an assessment attempt or a final consultati
   const stored = JSON.parse(f.saved()!);
   assert.deepEqual(stored.entries.map((entry: PendingMutation) => entry.body.value ?? entry.body.attempt_id), ["draft one", "a1", "draft three"]);
   assert.deepEqual(stored.entries.map((entry: PendingMutation) => entry.expected), [0, 1, 2]);
+  f.queue.stop();
+});
+
+test("restored writes settle like new ones and keep their client-only context (S0-FU-R2)", async () => {
+  const first = fixture(() => new Promise(() => undefined));
+  void first.queue.enqueue({ ...draft("intermediate"), meta: { assessment_base: "\"saved\"" } }).catch(() => undefined);
+  void first.queue.enqueue({ method: "PUT", path: "/api/v1/study/tutorial/progress", body: { value: "latest" }, meta: { assessment_base: "\"intermediate\"" } }).catch(() => undefined);
+  first.queue.stop();
+  const sent: PendingMutation[] = [];
+  let finish!: (value: QueueState) => void;
+  const restored = fixture((entry) => { sent.push(entry); return sent.length === 1 ? Promise.resolve({ ...state, revision: 1 }) : new Promise((resolve) => { finish = resolve; }); }, first.saved());
+  const queued = restored.queue.queued();
+  assert.deepEqual(queued.map((entry) => entry.meta?.assessment_base), ["\"saved\"", "\"intermediate\""]);
+  const outcomes: string[] = [];
+  queued.forEach((entry, index) => entry.settled.then(() => outcomes.push(`ack ${index}`)));
+  void restored.queue.start();
+  await tick();
+  assert.deepEqual(outcomes, ["ack 0"], "the latest restored write is still outstanding");
+  finish({ ...state, revision: 2 });
+  await tick();
+  await tick();
+  assert.deepEqual(outcomes, ["ack 0", "ack 1"]);
+  assert.equal(sent[1].meta?.assessment_base, "\"intermediate\"", "the context stays with the entry; the page never sends it");
+});
+
+test("a restored write's terminal failure is observable, and unobserved ones are not unhandled", async () => {
+  const first = fixture(() => new Promise(() => undefined));
+  void first.queue.enqueue(draft("one")).catch(() => undefined);
+  void first.queue.enqueue({ method: "POST", path: "/api/v1/study/pause", body: {} }).catch(() => undefined);
+  first.queue.stop();
+  const restored = fixture(() => Promise.reject(new Error("conflict")), first.saved());
+  const [sent, behind] = restored.queue.queued();
+  const failures = Promise.all([sent.settled.catch((error) => error), behind.settled.catch((error) => error)]);
+  await restored.queue.start();
+  const [error, discarded] = await failures;
+  assert.equal(error.message, "conflict");
+  assert.ok(discarded instanceof DiscardedMutation);
+  // A third restored write nobody follows rejects silently (no unhandled rejection).
+  const lone = fixture(() => new Promise(() => undefined));
+  void lone.queue.enqueue(draft("alone")).catch(() => undefined);
+  lone.queue.stop();
+  await fixture(() => Promise.reject(new Error("conflict")), lone.saved()).queue.start();
+});
+
+test("a coalesced draft is told it was replaced, not that it failed", async () => {
+  const f = fixture(() => new Promise(() => undefined));
+  void f.queue.enqueue({ method: "POST", path: "/api/v1/study/pause", body: {} }).catch(() => undefined);
+  const older = f.queue.enqueue(draft("older")).catch((error) => error);
+  void f.queue.enqueue(draft("newer")).catch(() => undefined);
+  assert.ok((await older) instanceof ReplacedMutation);
   f.queue.stop();
 });
