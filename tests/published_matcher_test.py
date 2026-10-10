@@ -98,3 +98,20 @@ def test_unbounded_or_escaping_matcher_is_rejected(tmp_path):
         validate_binding({**cell.published_matcher, "timeout_seconds": 0})
     with pytest.raises(ValueError, match="inside its pinned bundle"):
         validate_binding({**cell.published_matcher, "jar": "../matcher.jar"})
+
+
+def test_reference_free_published_run_never_opens_reporting_labels(tmp_path, monkeypatch):
+    import pandas as pd
+    cell = _cell(tmp_path)
+    cell.resolved_config["data"]["refs"] = {}
+    (tmp_path / "valid.tsv").unlink()
+    def invoke(command, cwd, output, timeout, stop):
+        (cwd / "logmap2_mappings.rdf").write_text("fixture mappings")
+        return 0, 0.01, 1000
+    monkeypatch.setattr("exact.experiments.published_matcher._invoke", invoke)
+    monkeypatch.setattr("exact.experiments.published_matcher.read_alignment", lambda _: pd.DataFrame([
+        {"SrcEntity": "urn:s1", "TgtEntity": "urn:t1", "Relation": "=", "Score": 0.9}]))
+    monkeypatch.setattr("exact.experiments.published_matcher._evaluate", lambda *args: pytest.fail("read labels"))
+    assert run_cell(cell, evaluate=False)[0] == 0
+    assert (cell.output_dir / "alignment/maps_global.tsv").is_file()
+    assert not (cell.output_dir / "evaluation").exists()

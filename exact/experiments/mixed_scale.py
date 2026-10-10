@@ -354,7 +354,7 @@ def _population_identity(record):
             "source_documents": sorted(row["source_sha256"] for row in core["closure"]["source_documents"])}
 
 
-def _validate_case_deployment(manifest, case, cell):
+def _validate_case_deployment(manifest, case, cell, *, cohort=None):
     from exact.experiments.public_inference import validate_population
     from exact.experiments.submission import _pools
     populations = {}
@@ -371,14 +371,16 @@ def _validate_case_deployment(manifest, case, cell):
         if len(manifest["runs"]) != 1 or "public_candidates" in manifest:
             raise ValueError("Global deployment must retain a single complete global assignment")
         return populations
-    receipt = read_binding(case["local_queries"])
+    receipt = read_binding(case["local_queries"]) if cohort is None else {
+        "labels_exposed": False, "original_query_rows": cohort["local_query_count"],
+        "outputs": {"public_queries": manifest["public_candidates"]}}
     public = receipt["outputs"]["public_queries"]
     verified(public)
     verified(manifest["public_candidates"])
     queries = _pools(Path(public["path"]), manifest["track"])
     if (receipt.get("labels_exposed") is not False
             or receipt.get("original_query_rows") != len(queries)
-            or case.get("query_count", len(queries)) != len(queries)
+            or (cohort is None and case.get("query_count", len(queries)) != len(queries))
             or manifest.get("query_count") != len(queries)
             or manifest.get("queries") != queries
             or manifest["public_candidates"]["sha256"] != public["sha256"]
@@ -428,8 +430,6 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
     for cell in design["cells"]:
         row = dict(cell, status="pending_binding", physical_execution=None)
         if cell["id"] in dependencies:
-            if cell["section"] not in {"primary", "supervision"}:
-                raise ValueError("Bounded and published cells require their own execution descriptors")
             manifest = read_binding(dependencies[cell["id"]])
             if manifest.get("kind") != "reference_free_inference" or manifest.get("run_eval") is not False:
                 raise ValueError("Full inference requires the reference-free deployment manifest")
@@ -437,7 +437,9 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                 raise ValueError("Deployment requires its exact corrected selection/fitting recipe binding")
             recipe_binding = frozen["fitting_recipes"][cell["id"]]
             recipe = read_binding(recipe_binding)
-            if (recipe.get("kind") != "frozen_final_fitting_recipe" or recipe.get("cell_id") != cell["id"]
+            published = cell["section"] == "published"
+            recipe_kind = "frozen_published_recipe" if published else "frozen_final_fitting_recipe"
+            if (recipe.get("kind") != recipe_kind or recipe.get("cell_id") != cell["id"]
                     or recipe.get("selected_config") != manifest.get("selected_config")
                     or recipe.get("runtime_fitted_artifacts") != manifest.get("runtime_fitted_artifacts")
                     or not isinstance(recipe.get("artifacts"), dict)):
@@ -445,7 +447,22 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
             verified(recipe["selected_config"])
             if recipe.get("runtime_fitted_artifacts"):
                 verified(recipe["runtime_fitted_artifacts"])
-            populations = _validate_case_deployment(manifest, cases[cell["case"]], cell)
+            case_name = {"D0_E03": "H0", "D1": "H1", "D_H2_valid": "H2"}.get(cell["case"], cell["case"])
+            cohort = None
+            if cell["section"] in {"bounded", "components"}:
+                from exact.experiments.corrected_worker import cohort_case
+                cohort = cohort_case(manifest, cell, cases[case_name], selection_freeze)
+            elif "cohort" in manifest:
+                raise ValueError("A full-population cell cannot use a bounded cohort")
+            if published:
+                from exact.experiments.published_matcher import validate_binding
+                from exact.utils.provenance import sha256_path
+                matcher = validate_binding(recipe["published_matcher"])
+                if (manifest.get("published_matcher") != matcher
+                        or sha256_path(Path(matcher["bundle"]["path"])) != matcher["bundle"]["sha256"]
+                        or recipe["artifacts"]):
+                    raise ValueError("Published cell must use its pinned deterministic matcher without fitted Exact heads")
+            populations = _validate_case_deployment(manifest, cases[case_name], cell, cohort=cohort)
             for run in manifest["runs"]:
                 config = ConfigModel.load_config(verified(run["config"]))
                 from exact.experiments.rationale_policy import require_rationale_policy
@@ -469,7 +486,8 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                             != populations[side]["filter_ignored_alignment_classes"]):
                         raise ValueError("Deployment config changed its native population policy")
                 if cell["mode"] == "global_alignment":
-                    if binding(config.data.source_universe)["sha256"] != populations["source"]["population"]["sha256"]:
+                    expected_source = cohort["source_ids_sha256"] if cohort else populations["source"]["population"]["sha256"]
+                    if binding(config.data.source_universe)["sha256"] != expected_source:
                         raise ValueError("Global deployment config changed its full source universe")
                 else:
                     from exact.experiments.submission import _pools, NIL_IRI
@@ -489,6 +507,13 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
             row.update(status="bound_not_admitted", inference=dependencies[cell["id"]],
                        fitting_recipe=recipe_binding,
                        physical_execution=dependencies[cell["id"]]["sha256"])
+            from exact.experiments.corrected_worker import compile_worker_descriptor
+            row["worker"] = compile_worker_descriptor(destination, cell=cell,
+                inference=dependencies[cell["id"]], fitting_recipe=recipe_binding,
+                selection_freeze=selection_freeze, public_case=cases[case_name],
+                public_inputs=binding(public_inputs), source_revision=source_revision)
+            row["worker_command"] = ["python", "-m", "tools.run_corrected_cell", "--descriptor",
+                                     row["worker"]["path"], "--admission", "REVIEWED_ADMISSION.json"]
         logical.append(row)
     pending = live.get("pending", live.get("pending_batches", []))
     candidates = [row for row in pending if row.get("id") in {"E17-run-once-followup", "E17-published-run-once-followup"}]
@@ -500,6 +525,7 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                                          preserve_all_other_rows=True, fresh_dispatch_nonces_required=True),
                   launchable=False, blockers=blockers, live_queue_changed=False,
                   historical_accounting_retained=True, generate_rationales=False,
+                  worker_descriptors=sum("worker" in row for row in logical),
                   spending_limits_changed=False, heavy_gpu_workers=1,
                   future_scientific_acceptance=["actual_output_coverage_and_submission_validation", "organizer_results"],
                   next_action="Bind missing receipts, prepare guarded descriptors, obtain rollout authorization, revalidate registry then atomically replace only unstarted E17 rows")

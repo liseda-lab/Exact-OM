@@ -178,7 +178,7 @@ def evaluate_cell(cell: Any) -> None:
     _evaluate(cell, _population(cell)[0])
 
 
-def run_cell(cell: Any) -> tuple[int, float, int]:
+def run_cell(cell: Any, *, evaluate: bool = True) -> tuple[int, float, int]:
     """Run no fitting/LLM code; preserve raw mappings, then use Exact's evaluator."""
     binding = validate_binding(cell.published_matcher)
     bundle = Path(binding["bundle"]["path"]).resolve()
@@ -260,7 +260,8 @@ def run_cell(cell: Any) -> tuple[int, float, int]:
                 "llm": {"attempts": 0},
             },
         )
-        evaluation_start = time.monotonic()
-        _evaluate(cell, groups)
-        elapsed += time.monotonic() - evaluation_start
+        if evaluate:
+            evaluation_start = time.monotonic()
+            _evaluate(cell, groups)
+            elapsed += time.monotonic() - evaluation_start
     return code, elapsed, peak

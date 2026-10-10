@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare an offline corrected successor bundle; never edit the live queue."""
+"""Prepare corrected cells and bound worker descriptors; never edit the live queue."""
 from __future__ import annotations
 
 import argparse
@@ -14,7 +14,9 @@ def main():
     parser.add_argument("--public-inputs", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--selection-freeze")
-    parser.add_argument("--deployments", help="JSON map from logical cell IDs to manifest bindings")
+    parser.add_argument("--deployments", help=(
+        "JSON map from corrected cell IDs to immutable reference-free manifests; "
+        "bounded manifests bind a cohort, published manifests also bind published_matcher"))
     parser.add_argument("--source-revision")
     args = parser.parse_args()
     deployments = None
