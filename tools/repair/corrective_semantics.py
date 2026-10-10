@@ -1176,7 +1176,11 @@ def annotate_comparison(
     """Original plus a scheduled audit; missing or discordant audits cannot label."""
     started = time.monotonic()
     output = Path(output)
-    original: Path | None = annotate_packet(
+    if manifest.get("rate_limit_policy"):
+        from tools.repair.annotation_backoff import annotate as annotate_presentation
+    else:
+        annotate_presentation = annotate_packet
+    original: Path | None = annotate_presentation(
         packet,
         manifest,
         output / "original",
@@ -1186,7 +1190,7 @@ def annotate_comparison(
     )
     if original is None or not order_swap_audit:
         return original
-    swapped: Path | None = annotate_packet(
+    swapped: Path | None = annotate_presentation(
         packet,
         manifest,
         output / "swapped",

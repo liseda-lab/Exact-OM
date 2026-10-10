@@ -155,3 +155,23 @@ def test_runner_uses_authorized_backoff_and_publishes_normal_terminal_artifacts(
     assert result[0]["artifact"] == str(tmp_path / "output/s/labels.json")
     assert runner.read(tmp_path / "output/report.json")["status"] == "complete"
     assert len(calls) == 2
+
+
+def test_fresh_comparison_path_recovers_429_without_resampling_valid_labels(tmp_path, monkeypatch):
+    _, calls = install(tmp_path, monkeypatch, [rejection(), response(judgment(packet()))])
+    config = settings(tmp_path)
+    output = tmp_path / "fresh-decoded-comparison"
+    result = runner.annotate_comparison(
+        packet(), config, output, comparison_id="dev-slot", order_swap_audit=False, seconds=300
+    )
+    assert result == output / "original/labels.json"
+    assert len(calls) == 2
+    state = runner.read(output / "original/backoff.json")
+    assert state["complete"] and len(state["failures"]) == 1
+    assert (
+        runner.annotate_comparison(
+            packet(), config, output, comparison_id="dev-slot", order_swap_audit=False, seconds=1
+        )
+        == result
+    )
+    assert len(calls) == 2
