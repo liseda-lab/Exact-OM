@@ -527,6 +527,9 @@ def filter_evidence_items(
 
     ``physically_filtered`` uses prepared SQLite indexes and requires their matching
     policy hash. Request handling uses each context's existing policy-aware axiom API.
+    Original links must also reference the selected feature's exact typed entity.
+    Generic feature resolution may legitimately find a neighbour's original axiom;
+    that is not an admitted citation for this focal selected-evidence contract.
     Request failures propagate; they must never become an apparently empty selection.
     """
     result = []
@@ -534,6 +537,7 @@ def filter_evidence_items(
         fact_ids = item.get("fact_ids") or []
         context = contexts.get(item["entity"]["ontology_version_id"])
         visible = bool(fact_ids and context is not None)
+        subject_mismatch = False
         if visible and physically_filtered:
             if context.manifest.get("policy_filter", {}).get("policy_hash") != policy.policy_hash:
                 raise ValueError("Portable evidence requires a physically filtered context")
@@ -546,6 +550,17 @@ def filter_evidence_items(
                     )
                 }
             visible = set(fact_ids) == available
+            if visible:
+                with context._connection() as facts:
+                    bound = {
+                        r[0]
+                        for r in facts.execute(
+                            "SELECT axiom_id FROM refs WHERE iri=? AND kind=? "
+                            "AND axiom_id IN (" + marks + ")",
+                            [item["entity"]["iri"], item["entity"]["kind"], *fact_ids],
+                        )
+                    }
+                subject_mismatch = set(fact_ids) != bound
         elif visible:
             try:
                 for fact_id in fact_ids:
@@ -558,6 +573,16 @@ def filter_evidence_items(
                 if exc.status_code != 404:
                     raise
                 visible = False
+            if visible:
+                try:
+                    for fact_id in fact_ids:
+                        context.fact(fact_id, item["entity"], policy=policy)
+                except KeyError:
+                    subject_mismatch = True
+                except DomainError as exc:
+                    if exc.status_code != 404:
+                        raise
+                    subject_mismatch = True
         allowed = {
             key: item[key]
             for key in (
@@ -586,9 +611,15 @@ def filter_evidence_items(
             source_axiom_refs=[],
             historical_item_alias=None,
         )
-        if not visible:
+        if not visible or subject_mismatch:
             allowed.update(fact_ids=[], feature_id=None)
-            if fact_ids or item.get("origin_resolution") == "withheld":
+            if subject_mismatch:
+                allowed.update(
+                    status="not_exported",
+                    origin_resolution="unresolved",
+                    reason="Original facts do not bind to the selected feature's typed entity.",
+                )
+            elif fact_ids or item.get("origin_resolution") == "withheld":
                 allowed.update(
                     status="filtered",
                     origin_resolution="withheld",
@@ -596,11 +627,16 @@ def filter_evidence_items(
                 )
             else:
                 allowed.setdefault("origin_resolution", "not_exported")
-                allowed["reason"] = (
-                    "Original fact mapping was not resolved."
-                    if allowed["origin_resolution"] == "unresolved"
-                    else "Original fact mapping was not exported."
-                )
+                if not (
+                    allowed["origin_resolution"] == "unresolved"
+                    and item.get("reason")
+                    == "Original facts do not bind to the selected feature's typed entity."
+                ):
+                    allowed["reason"] = (
+                        "Original fact mapping was not resolved."
+                        if allowed["origin_resolution"] == "unresolved"
+                        else "Original fact mapping was not exported."
+                    )
             # Derivation premises may refer to hidden originals; no copied raw strings.
         result.append(allowed)
     return result

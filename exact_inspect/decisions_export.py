@@ -17,7 +17,7 @@ from .evidence_metadata import (
     filter_pair_metadata,
 )
 
-POLICY_EXPORTER_REVISION = "exact-policy-decisions/4"
+POLICY_EXPORTER_REVISION = "exact-policy-decisions/5"
 
 
 def export_policy_run(

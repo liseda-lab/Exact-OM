@@ -165,6 +165,9 @@ def test_counts_preserve_source_only_unresolved_withheld_and_unsupported_list_li
                 raise DomainError("withheld", "Hidden original", 404)
             return {"id": fid}
 
+        def fact(self, fid, entity, policy):
+            return self.axiom(fid, policy)
+
     safe = filter_evidence_items(items, {"ov": Context()}, VisibilityPolicy())
     assert len(safe) == 4
     for item in safe:

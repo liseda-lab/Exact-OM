@@ -246,6 +246,11 @@ def _admit_pair_metadata(value, candidate, case, rows):
     metadata = value["evidence_metadata"]
     if metadata["counts"]["selected"] != len(rows):
         raise ValueError("Evidence comparison does not cover the selected feature inventory")
+    # Historical indexes may retain original links that current evidence reads
+    # correctly tombstone. Redact those bridge links before checking the remaining
+    # citations; evidence identity, side/channel/family and typed pair checks still
+    # run for every bridge, including unavailable ones.
+    metadata = filter_pair_metadata(metadata, rows)
     recorded_bridges(
         {"evidence_bridges": metadata["bridges"]},
         rows,
@@ -253,7 +258,7 @@ def _admit_pair_metadata(value, candidate, case, rows):
         value["target"],
         (),
     )
-    value["evidence_metadata"] = filter_pair_metadata(metadata, rows)
+    value["evidence_metadata"] = metadata
     return value
 
 

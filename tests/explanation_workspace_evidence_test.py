@@ -148,10 +148,26 @@ def test_scoped_evidence_keeps_all_rows_but_redacts_raw_projections(
     assert file_hash(database) == frozen_hash
 
 
-def test_scoped_sanitization_keeps_typed_subject_admission(tmp_path):
+def test_scoped_sanitization_keeps_typed_subject_admission(tmp_path, monkeypatch):
     context, case, policy, rows, _ = prepared_evidence(tmp_path)
     other_fact = context.facts(case["candidates"][0]["entity"], category="labels")["items"][0]
     wrong_subject = copy.deepcopy(rows[0])
     wrong_subject["fact_ids"] = [other_fact["fact_id"]]
+    scope = build_scope(tmp_path, context, case, policy, [wrong_subject])
+    with sqlite3.connect(tmp_path / scope.index_path) as db:
+        saved = json.loads(db.execute("SELECT payload FROM evidence").fetchone()[0])
+    assert saved["origin_resolution"] == "unresolved" and saved["fact_ids"] == []
+    # The admission guard remains strict for any link surviving the filter.
+    monkeypatch.setattr(
+        "exact_inspect.evidence_metadata.filter_evidence_items", lambda items, *a, **k: items
+    )
+    from exact_inspect.study.workspace import _admit_evidence
+
     with pytest.raises(ValueError, match="outside the admitted typed subject"):
-        build_scope(tmp_path, context, case, policy, [wrong_subject])
+        _admit_evidence(
+            wrong_subject,
+            case["candidates"][0],
+            case,
+            policy,
+            {context.ontology_version_id: context},
+        )

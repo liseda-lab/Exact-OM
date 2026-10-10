@@ -301,3 +301,13 @@ Array location is not a retrieval or production rank. Only fixed scalar score/co
 enter the adapter. Missing stage/evidence exports remain explicit. A uniquely declared named
 global mapping is admitted only after contained-path, hash and size verification; historical
 canonical mappings retain their existing seam and acquire consumed-byte hashes.
+
+Policy export `exact-policy-decisions/5` also requires each selected-evidence citation to
+reference the feature's exact focal IRI and kind. Generic context resolution can legitimately
+find an original axiom of a neighbouring concept; that alone does not support a focal citation.
+Such selected records remain counted with `status: "not_exported"`,
+`origin_resolution: "unresolved"`, empty `fact_ids` and a specific typed-entity reason. Mixed
+valid/neighbour citations are conservatively unresolved as a whole record. Originals excluded
+by policy remain `withheld`, a separate state. Serving historical indexes applies the same
+projection without rewriting their bytes. Keep the unresolved record visible in the list;
+do not treat it as zero selected evidence or create an original-fact graph edge from it.

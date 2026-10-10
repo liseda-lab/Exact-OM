@@ -1,0 +1,96 @@
+{
+  "provenance": {
+    "kind": "retained_real_local300_selected_evidence_and_admitted_original",
+    "case_id": "review-01",
+    "source_context_sha256": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738",
+    "source_ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+    "note": "Exact retained selected row and admitted axiom. Tests build a tiny native scope from this AST; runtime version/fact identifiers are rebound only to that test scope."
+  },
+  "record": {
+    "target": "http://purl.obolibrary.org/obo/DOID_10153",
+    "evidence": {
+      "evidence_id": "sha256:7f3964d2c08390181a50765103b515272f20e5274733e205892dc930a3225719",
+      "channel": "hierarchy",
+      "family": "is_a",
+      "side": "source",
+      "role": "is_a",
+      "entity": {
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+        "kind": "class"
+      },
+      "feature_id": "sha256:b5d2b1ef9c964944841b916a78cbb6a309e22780b118c9519a1e1f8d965efeda",
+      "fact_ids": [
+        "sha256:b7fd8eecfccbd645b29cee4800a84a656f66f4a6c98de2b8bd1724c4552eb167"
+      ],
+      "values": {
+        "support": 0.9619140625,
+        "importance": 0.17341549295774647
+      },
+      "interpretation": "projected",
+      "provenance_status": "derived_from_saved_artifacts",
+      "status": "available",
+      "reason": null,
+      "origin_resolution": "resolved",
+      "graph_projection": "not_recorded",
+      "display": {},
+      "semantic_terms": {},
+      "axiom_origins": [],
+      "source_axiom_refs": [],
+      "historical_item_alias": null
+    },
+    "bad_fact_id": "sha256:b7fd8eecfccbd645b29cee4800a84a656f66f4a6c98de2b8bd1724c4552eb167",
+    "actual_refs": [
+      [
+        "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4432",
+        "class"
+      ],
+      [
+        "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4572",
+        "class"
+      ],
+      [
+        "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7523",
+        "class"
+      ]
+    ]
+  },
+  "axiom": {
+    "ast": {
+      "annotations": [],
+      "expressions": [
+        {
+          "iri": {
+            "type": "IRI",
+            "value": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7523"
+          },
+          "kind": "class",
+          "type": "Class"
+        },
+        {
+          "operands": [
+            {
+              "iri": {
+                "type": "IRI",
+                "value": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4432"
+              },
+              "kind": "class",
+              "type": "Class"
+            },
+            {
+              "iri": {
+                "type": "IRI",
+                "value": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4572"
+              },
+              "kind": "class",
+              "type": "Class"
+            }
+          ],
+          "type": "ObjectIntersectionOf"
+        }
+      ],
+      "type": "EquivalentClasses"
+    },
+    "original_axiom_digest": "sha256:b98902033cfdcc32e7201c6d3cb7a3db72a6f4b733c9d9f6f237636f9f116fda"
+  }
+}
