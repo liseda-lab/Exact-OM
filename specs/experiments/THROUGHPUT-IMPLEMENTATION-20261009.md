@@ -1,5 +1,11 @@
 # Scoring implementation and corrected-study handoff
 
+**2026-10-10 review continuation:**
+[THROUGHPUT-REVIEW-20261010.md](THROUGHPUT-REVIEW-20261010.md) records subsequent
+correctness fixes and the authorized post-G4 supervisor verification queue.
+The no-queue-change statements below describe the original implementation task.
+Full corrected campaign rollout remains separately gated.
+
 Recorded 2026-10-09; verification continued into 2026-10-10 UTC. **Implementation is
 partially accepted; deployment is blocked.** The experimental batched path failed
 real-GPU evidence parity and missed 200 cold unique pairs/s. CPU fixture success

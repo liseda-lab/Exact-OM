@@ -4,6 +4,19 @@ specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
 updated_at: '2026-10-10'
 status: implemented_with_failed_gpu_batching_acceptance_not_deployed
+review_20261010:
+  handoff: specs/experiments/THROUGHPUT-REVIEW-20261010.md
+  authorization: review_and_supervisor_managed_post_G4_checks_only
+  source_commit: d205cdeed08505ea21422b96a626bd691df2c358
+  recipe_admission_fix: 6b33909a
+  publication_receipt: data/experiments-v2/throughput-review-20261010-01/publication.json
+  GPU_check_ids: [gpu-checks-01-H0, gpu-checks-01-H1, gpu-checks-01-H2]
+  preparation_followup: T09-fitted-checks-and-admission-prepare-20261010
+  actual_4090_throughput: pending
+  experimental_batching_scientifically_admitted: false
+  actual_fitted_recipe_harness: requires_extension
+  complete_admission_forecast: requires_implementation_and_measurements
+  full_corrected_campaign_rollout: not_authorized_by_this_review
 authority:
   requested_deliverable: Implementation, verification and offline successor preparation; no live rollout
   specification_preparation_authorized: true

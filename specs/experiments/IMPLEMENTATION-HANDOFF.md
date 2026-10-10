@@ -1,5 +1,13 @@
 # Batch implementation handoff
 
+**2026-10-10 current continuation:** read the
+[throughput implementation review](THROUGHPUT-REVIEW-20261010.md) and the live
+registry's `throughput_review_20261010` handoff before acting on the historical
+schedule below. Post-G4 RTX 4090 checks are authorized; the old full E17 schedule
+is held for the corrected design and remaining scientific/resource gates.
+Preserve the active G4 worker and its recovery lineage. Binary fixture checks do
+not qualify actual fitted recipes, and experimental batching remains disabled.
+
 **2026-09-25. E09 resubmitted; subsequent batches require measured admission.**
 Six days is a soft target on liseda-03 only. Continue to use detached Slurm steps inside
 allocation 14372; retain the interactive shell. The current E09 continuation uses its own

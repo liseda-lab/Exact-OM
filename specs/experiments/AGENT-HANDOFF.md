@@ -1,5 +1,10 @@
 # Agent handoff: implement and execute v2
 
+**2026-10-10 latest review:** follow
+[THROUGHPUT-REVIEW-20261010.md](THROUGHPUT-REVIEW-20261010.md) for the authorized
+post-G4 checks and held E17 rows. It supersedes the earlier blanket no-verification-
+queue authorization below; it does not authorize full campaign rollout.
+
 **2026-10-10 scoring/corrected-study continuation:** use the current
 [implementation handoff](THROUGHPUT-IMPLEMENTATION-20261009.md) and
 [machine-readable status](throughput-final-plan-20261009.yaml) first. The older
