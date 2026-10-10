@@ -495,7 +495,10 @@ def case_worker(record, plan, protocol, directory, identity, deadline_epoch):
         seed=plan["seed"],
         proposed=state["proposed"],
         plan_quotas=QUOTAS,
-        eligible_pairs=state["pairs"],
+        # The bounded-call/checkpoint transport is JSON: restore pair tuples
+        # before the collector performs tuple membership checks. Keep this at
+        # the boundary so historical sampler identities remain unchanged.
+        eligible_pairs=tuple(tuple(pair) for pair in state["pairs"]),
         object_candidate_ids=tuple(
             (o.object_id, tuple(c.candidate_id for c in o.candidates)) for o in problem.objects
         ),

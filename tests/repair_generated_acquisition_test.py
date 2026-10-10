@@ -157,6 +157,23 @@ def test_every_nested_call_clips_to_one_case_and_stage_clock(tmp_path, monkeypat
     assert len(calls) == before
 
 
+def test_json_pair_transport_preserves_all_four_quartet_slots(tmp_path, monkeypatch):
+    case, _, plan, protocol, calls, clock, limits = fixture(tmp_path, monkeypatch)
+    monkeypatch.setattr(ga, "_pairs", lambda *args: ((0, 1),))
+    result = ga.case_worker(case_to_dict(case), plan, protocol, tmp_path, "pairs", 1300)
+    state = ga.read(tmp_path / "state.json")
+    assert state["pairs"] == [[0, 1]]  # Actual serialized boundary, including resume.
+    collection = ga.verify_binding(result["collection"])
+    slots = [row for row in collection["attempts"] if row["stratum"] == "quartet"]
+    assert len(slots) == 4
+    assert all(row["assignment"] is not None for row in slots)
+    assert all(row["quartet_complete"] for row in slots)
+    assert len({tuple(row["assignment"]) for row in slots}) == 4
+    before = len(calls)
+    ga.case_worker(case_to_dict(case), plan, protocol, tmp_path, "pairs", 1300)
+    assert len(calls) == before
+
+
 def test_resume_partial_collection_reuses_committed_native_labels(tmp_path, monkeypatch):
     case, generated, plan, protocol, calls, clock, limits = fixture(tmp_path, monkeypatch)
     original = ga.collect_sampled_repairs
