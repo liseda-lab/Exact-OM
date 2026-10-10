@@ -1,0 +1,13 @@
+# Closed shared training preparation
+
+`tools.repair.prepare_common_training CAMPAIGN OUTPUT` prepares an inert successor from the nonce-bound final two-round acquisition release. It authenticates the committed generated inventories and union caches and retains all TRAIN and DEV declarations, including missing caches. The normal `tools.repair.train --prepared` loader accepts its reference-only manifests. Closed preparations reject case filtering, label retries and nonzero in-fit sampled assignments.
+
+The six protocols use seeds 13/37/73 with the same data order, costs, architecture and update opportunities. The candidate endpoint is epoch 50 with DEV at epochs 5 and 50. Execution remains disabled until measured common-endpoint admission, the existing teacher-panel gate, grounded shared weak labels and TRAIN-only scale calibration are resolved. The template weak weights are not a frozen scale. Conference contributes no admitted training cases, so the cohort is explicitly generated-only.
+
+Schema `schema-v3.6.json` adds optional `training.development_case_seconds`, keyed by the canonical seed/condition/epoch/case slot hash. Its keys must cover the entire declared schedule. Omission preserves legacy serialized protocol identity. The trainer commits each case's absolute deadline before starting work; interruption and queued recovery cannot renew it. Diagnostic and generated DEV work share the case limit and are clipped by the worker deadline with cleanup time reserved.
+
+The input-only DEV schedule contains 384 rows, 64 semantic slots and 14 independent swapped calls. Every case has one semantic slot in each condition across the seed/pass schedule. Both arms use identical subsets and limits. The candidate repair allowance is 120 seconds, plus the existing 182-second semantic reserve and 90 seconds for audited slots. The schedule reserves 58,988 case-worker seconds and 7,020 hosted-service seconds. These arithmetic bounds are not measured throughput or GPU admission. The final-pass reserve in each protocol equals that model's frozen final-case schedule.
+
+TRAIN annotation intentions preserve 256 comparison slots and 52 swaps in two shards, each below 256 scheduled rows. They are not executable annotation packets: actual verified plans, grounded evidence and the selected pinned provider remain prerequisites. All schedules retain the already approved request-amendment bindings. No pending amendment is silently adopted.
+
+Preparation does not launch a job, transmit a request, select a teacher or open TEST outcomes. The current monolithic training entry point is not admitted for the campaign's separate GPU roles; phase scheduling and cumulative GPU/model budgets must pass an explicit successor admission before fitting.

@@ -1047,6 +1047,7 @@ def train_cases(
     patience_enabled: bool | None = None,
     max_full_development_evaluations: int | None = None,
     final_development_reserve_seconds: float | None = None,
+    development_case_seconds: Mapping[str, float] | None = None,
     post_decode_annotation_manifest: str | None = None,
     execution_schedule: str = "one_stage",
     elementary_seconds: float = 30.0,
@@ -1080,6 +1081,8 @@ def train_cases(
     identity_options = dict(locals())
     if final_development_reserve_seconds is None:
         identity_options.pop("final_development_reserve_seconds")
+    if development_case_seconds is None:
+        identity_options.pop("development_case_seconds")
     if post_decode_annotation_manifest is not None:
         identity_options["post_decode_annotation_manifest_hash"] = hashlib.sha256(
             Path(post_decode_annotation_manifest).read_bytes()
@@ -1257,6 +1260,21 @@ def train_cases(
         or set(development_case_ids) != {case.case_id for case, _ in development}
     ):
         raise ValueError("Development case-ID set differs from the frozen schedule")
+    if development_case_seconds is not None:
+        slots = {
+            canonical_hash(
+                dict(
+                    seed=seed, supervision_condition=target_basis, epoch=epoch, case_id=case.case_id
+                )
+            )
+            for epoch in (development_epochs or ())
+            for case, _ in development
+        }
+        if set(development_case_seconds) != slots or any(
+            not math.isfinite(v) or v <= 0 or v > decode_seconds
+            for v in development_case_seconds.values()
+        ):
+            raise ValueError("Per-case DEV limits differ from the frozen schedule/envelope")
     patience = epochs if patience is None else patience
     if patience < 1 or min_dev_improvement < 0:
         raise ValueError("Invalid checkpoint patience/improvement")
@@ -1573,7 +1591,11 @@ def train_cases(
         elapsed = time.monotonic() - started
         return max(
             0.0,
-            min(deadline_seconds - elapsed, total_training_seconds - previous_elapsed - elapsed),
+            min(
+                deadline_seconds - elapsed,
+                total_training_seconds - previous_elapsed - elapsed,
+                float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")) - time.time() - 2.0,
+            ),
         )
 
     def remaining_optimizer_seconds() -> float:
@@ -1582,6 +1604,7 @@ def train_cases(
             0.0,
             min(
                 deadline_seconds - elapsed,
+                float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")) - time.time() - 2.0,
                 total_training_seconds
                 - previous_elapsed
                 - elapsed
@@ -2523,6 +2546,44 @@ def train_cases(
                     if remaining <= 0:
                         interrupted = True
                         break
+                    selection_slot = dict(
+                        seed=seed,
+                        supervision_condition=target_basis,
+                        epoch=epoch + 1,
+                        case_id=case.case_id,
+                    )
+                    case_limit = (
+                        development_case_seconds[canonical_hash(selection_slot)]
+                        if development_case_seconds is not None
+                        else decode_seconds
+                    )
+                    # A durable absolute deadline charges interruption/queue time
+                    # too. Commit it before work so a killed call cannot renew it.
+                    case_spent = development_progress.setdefault("case_seconds_spent", {})
+                    prior_case_seconds = case_spent.get(case.case_id, 0.0)
+                    case_deadlines = development_progress.setdefault("case_deadlines_epoch", {})
+                    if case.case_id not in case_deadlines:
+                        case_deadlines[case.case_id] = min(
+                            time.time() + max(0.0, case_limit - prior_case_seconds),
+                            float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")),
+                        )
+                        checkpoint(epoch, len(order), train_loss, optimized)
+                    case_started = time.monotonic()
+
+                    def case_remaining():
+                        return max(
+                            0.0,
+                            min(
+                                remaining_training_seconds(),
+                                case_deadlines[case.case_id] - time.time(),
+                            ),
+                        )
+
+                    if case_remaining() <= 0:
+                        decoded.setdefault(case.case_id, dict(exact_regret=None))
+                        generated_reports[case.case_id] = dict(status="case_budget_unavailable")
+                        checkpoint(epoch, len(order), train_loss, optimized)
+                        continue
                     memory = model.encode(graphs[case.case_id])
                     unary, pairs = model.score_inventory(
                         case.problem.objects,
@@ -2541,18 +2602,28 @@ def train_cases(
                             objective,
                             cache,
                             max_checks=decode_max_checks,
-                            deadline_seconds=min(decode_seconds, remaining),
+                            deadline_seconds=max(0.001, case_remaining()),
+                        )
+                        case_spent[case.case_id] = (
+                            prior_case_seconds + time.monotonic() - case_started
                         )
                         checkpoint(epoch, len(order), train_loss, optimized)
                     remaining = remaining_training_seconds()
                     if remaining <= 0:
                         interrupted = True
                         break
+                    if case_remaining() <= 0:
+                        generated_reports[case.case_id] = dict(status="case_budget_unavailable")
+                        case_spent[case.case_id] = (
+                            prior_case_seconds + time.monotonic() - case_started
+                        )
+                        checkpoint(epoch, len(order), train_loss, optimized)
+                        continue
                     generated_reports[case.case_id] = generated_development(
                         model,
                         case,
                         cache,
-                        seconds=min(decode_seconds, remaining),
+                        seconds=case_remaining(),
                         temperature=proposal_temperature,
                         selection_options=selection_options,
                         case_cpu_seconds=case_cpu_seconds,
@@ -2608,6 +2679,7 @@ def train_cases(
                         retrieval_config=retrieval_config,
                     )
 
+                    case_spent[case.case_id] = prior_case_seconds + time.monotonic() - case_started
                     checkpoint(epoch, len(order), train_loss, optimized)
             if interrupted:
                 checkpoint(epoch, len(order), train_loss, optimized)
@@ -2903,6 +2975,7 @@ def _protocol_arguments(protocol: Mapping[str, Any]) -> dict[str, Any]:
                 "patience_enabled",
                 "max_full_development_evaluations",
                 "final_development_reserve_seconds",
+                "development_case_seconds",
             )
             if training.get(key) is not None
         },
@@ -3314,6 +3387,15 @@ def main() -> int:
                 cases = generated.value
             caches = {}
             preparation = {"requested": len(cases), "produced": len(cases), "origin": "generated"}
+        from tools.repair.common_training import validate_closed_preparation
+
+        validate_closed_preparation(
+            cases,
+            preparation,
+            protocol,
+            case_limit=args.case_limit,
+            retry_labels=args.retry_label_transport_errors,
+        )
         # Keep every omitted/test/unknown case in the denominator and evaluator store.
         selected, counts = [], {"train": 0, "development": 0}
         for case in cases:
