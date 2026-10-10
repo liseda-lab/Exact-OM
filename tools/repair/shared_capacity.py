@@ -22,6 +22,26 @@ from tools.repair.shared_release import authenticate, bound, immutable
 CONDITIONS = ("symbolic", "symbolic_plus_llm")
 
 
+def common_inputs(registry):
+    """Prefer the authenticated correction without rewriting the old preparation."""
+    corrected = registry.get("corrected_symbolic_release")
+    if corrected:
+        return corrected["release"], corrected["audit"]
+    common = bound(registry["common_training_preparation"]["preparation"])
+    return common["common_release"], common["audit_run"]
+
+
+def capacity_job_ids(output):
+    """Version ownership with the preparation; never replay a completed job ID."""
+    version = Path(output).name
+    if not version.startswith("shared-loss-capacity-"):
+        raise ValueError("Expected a versioned shared-loss-capacity preparation")
+    suffix = version.removeprefix("shared-loss-capacity-")
+    if not suffix:
+        raise ValueError("Capacity preparation requires a version")
+    return f"qualify-shared-loss-5090-{suffix}", f"qualify-shared-dev-2080-{suffix}"
+
+
 def scale_audit(cases, caches, labels, contexts, protocol):
     from exact.repair.semantic_fidelity import offline_plan_label
     from tools.repair.train import _protocol_profile
@@ -88,9 +108,12 @@ def prepare(campaign, release_path, output, repository):
     shared = read(release_path)
     labels = read_fidelity_training_artifact(authenticate(shared["labels"]), "train")
     contexts = bound(shared["rating_contexts"])
-    common = bound(registry["common_training_preparation"]["preparation"])
+    common_release, audit_run = common_inputs(registry)
     teacher = bound(registry["qualified_teacher_preparation"]["preparation"])
-    cases, caches, _ = load_release(common["common_release"], common["audit_run"])
+    cases, caches, _ = load_release(common_release, audit_run)
+    from tools.repair.training_readiness import require_ready
+
+    readiness = require_ready(shared.get("readiness"), shared["labels"], cases)
     protocol = training_projection_v3(load_protocol_v3(authenticate(teacher["protocols"][1])))
     audit = scale_audit(cases, caches, labels, contexts, protocol)
     immutable(output / "scale.json", audit)
@@ -108,13 +131,15 @@ def prepare(campaign, release_path, output, repository):
         immutable(path, RepairProtocolV3.model_validate(p).model_dump(by_alias=True))
         protocols.append(binding(path))
         prep = dict(schema="exact-repair/common-training-preparation/v1",
-                    release=common["common_release"], audit_run=common["audit_run"], protocol=binding(path))
+                    release=common_release, audit_run=audit_run, protocol=binding(path))
         prep_path = output / "preparations" / path.name
         immutable(prep_path, dict(prep, hash=canonical_hash(prep)))
         preparations[path.stem] = binding(prep_path)
     manifest = dict(
         schema="exact-repair/shared-capacity/v1", purpose="disposable_engineering_only",
         shared_release=binding(release_path), labels=shared["labels"], rating_contexts=shared["rating_contexts"],
+        common_release=common_release, common_release_audit=audit_run,
+        training_readiness=shared["readiness"], readiness_measurement=readiness,
         scale=binding(output / "scale.json"), preparations=preparations,
         expected_train_cases=128, expected_dev_cases=32, seed=13,
         conditions=list(CONDITIONS), fit_seconds_per_condition=1050, dev_seconds_per_case=30,
@@ -124,7 +149,10 @@ def prepare(campaign, release_path, output, repository):
     )
     immutable(output / "manifest.json", manifest)
     jobs = []
-    fit_id, dev_id = "qualify-shared-loss-5090-001", "qualify-shared-dev-2080-001"
+    fit_id, dev_id = capacity_job_ids(output)
+    existing_ids = {r["id"] for r in registry["runs"] + registry.get("pending_batches", [])}
+    if existing_ids.intersection((fit_id, dev_id)):
+        raise ValueError("Capacity job already registered; prepare a versioned successor")
     for lane, job_id, cpus, mem, gpu, gres, seconds in (
         ("fit", fit_id, 4, 24576, FIT_GPU, "gpu:rtx5090:1", 2800),
         ("development", dev_id, 5, 30720, DEV_GPU, "gpu:rtx2080ti:1", 2800),
@@ -160,12 +188,15 @@ def prepare(campaign, release_path, output, repository):
     )
     immutable(output / "batch-spec.json", spec)
     batch = freeze(output / "batch-spec.json", campaign / "batches" / output.name)
-    dependencies = ["annotate-controlled-train-00-001-byte-recovery-001", "annotate-controlled-train-01-001-byte-recovery-001"]
+    dependencies = sorted({bound(ref["completion"])["job_id"] for ref in
+                           [audit_run, *shared.get("recovery_receipts", [])]})
     descriptors = [prepare_dispatch(batch, j["id"], campaign / "attempts" / j["id"] / "001",
                                    tmux_socket=campaign / "supervisor/tmux.sock", depends_on=dependencies) for j in jobs]
     result = dict(schema="exact-repair/shared-capacity-preparation/v1", status="prepared_not_queued",
                   source_commit=source["revision"], shared_release=binding(release_path), scale=binding(output / "scale.json"),
                   manifest=binding(output / "manifest.json"), batch=binding(batch), descriptors=descriptors,
+                  common_release=common_release, common_release_audit=audit_run,
+                  training_readiness=shared["readiness"],
                   protocols=protocols, primary_fit_admitted=False, endpoint_frozen=False)
     immutable(output / "prepared.json", result)
     return result
