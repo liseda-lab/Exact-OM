@@ -17,6 +17,7 @@ from ..contracts import (
     canonical_hash,
     canonical_json,
 )
+from ..descriptions import description_templates, preparation_metadata
 from ..generation import ExplanationOutput, FactPacket, comparison_templates, grounding
 from .models import EntityRef as StudyEntity
 from .resources import (
@@ -64,7 +65,12 @@ def build_explanation_resource(
         original = context.axiom(raw["axiom_ref"], policy=policy)
         authoritative = context.fact(raw["axiom_ref"], entity, policy=policy)
         for field in ("fact_id", "subject", "predicate_iri", "value", "interpretation", "category"):
-            if raw.get(field) != authoritative.get(field):
+            actual = raw.get(field)
+            if field == "value" and isinstance(actual, dict) and "ast" in actual:
+                if actual["ast"] != original["ast"]:
+                    raise ValueError("Description AST differs from its admitted original")
+                actual = {k: v for k, v in actual.items() if k != "ast"}
+            if actual != authoritative.get(field):
                 raise ValueError("Generation packet fact differs from the original ontology")
         value = dict(
             raw.get("value") or {"term_type": "expression_ref", "expression_id": raw["axiom_ref"]}
@@ -147,8 +153,6 @@ def build_explanation_resource(
                     continue
                 admit(original_fact)
                 resolved.append(fact_id)
-            if row.get("fact_ids") and not resolved:
-                continue
             evidence_links.append(
                 EvidenceLink(
                     evidence_id=row["evidence_id"],
@@ -158,6 +162,13 @@ def build_explanation_resource(
                     role=row["side"],
                     interpretation="projected",
                     status="available" if resolved else "not_exported",
+                    origin_resolution=row.get("origin_resolution")
+                    or (
+                        "resolved"
+                        if resolved
+                        else "withheld" if row.get("fact_ids") else "not_exported"
+                    ),
+                    graph_projection=row.get("graph_projection"),
                     scores=[
                         Score(
                             name=name,
@@ -176,6 +187,7 @@ def build_explanation_resource(
 
     profiles: list[GroundedClaim] = []
     comparisons: list[GroundedClaim] = []
+    independent_reviews = {}
     for result in explanations:
         manifest = result["manifest"]
         packet = packet_map[manifest["packet_hash"]]
@@ -186,9 +198,25 @@ def build_explanation_resource(
         ):
             raise ValueError("Generated artifact does not match its permitted input packet")
         output = ExplanationOutput(claims=result["claims"])
-        if grounding(output, packet)[0] != "validated":
+        reviewed = result.get("independent_review") is not None
+        review_hash = None
+        if reviewed:
+            from ..description_review import IndependentReviewSupport
+            from ..descriptions import validate_prepared_support
+
+            validate_prepared_support(result, contexts, policy)
+            review_hash = canonical_hash(result["independent_review"])
+            independent_reviews[review_hash] = IndependentReviewSupport(
+                receipt=result["independent_review"],
+                packet=packet,
+                generation_manifest=manifest,
+                generation_manifest_sha256=canonical_hash(manifest).removeprefix("sha256:"),
+            )
+        elif grounding(output, packet)[0] != "validated":
             raise ValueError("Generated claims do not have verified original support")
-        templates = comparison_templates(packet)
+        descriptions = description_templates(packet)
+        templates = comparison_templates(packet) + descriptions
+        preparation = preparation_metadata(result)
         target = profiles if packet.task == "entity_profile" else comparisons
         for claim in output.claims:
             if not claim.fact_ids:
@@ -208,7 +236,19 @@ def build_explanation_resource(
                     text=claim.text,
                     fact_ids=claim.fact_ids,
                     category=claim.category,
-                    grounding="semantic_template" if is_template else "exact_extract",
+                    grounding=(
+                        "independent_review"
+                        if reviewed
+                        else (
+                            "typed_description"
+                            if is_template
+                            and packet.selection.get("description_contract")
+                            == "exact-description/2"
+                            else "semantic_template" if is_template else "exact_extract"
+                        )
+                    ),
+                    **preparation,
+                    reviewer_receipt=review_hash,
                     scoped_entities=[
                         StudyEntity.model_validate(e.model_dump()) for e in packet.entities
                     ],
@@ -272,6 +312,7 @@ def build_explanation_resource(
         referenced_labels_truncated=labels_truncated,
         entity_profiles=profiles,
         pair_comparison=comparisons,
+        independent_reviews=independent_reviews,
         hierarchy=list(edges.values()),
         evidence=evidence_links,
         limitations=list(dict.fromkeys(limitations)),

@@ -12,7 +12,12 @@ from typing import Annotated, Any, Literal
 from pydantic import Field, StrictInt, model_validator
 
 from ..context_semantics import ANNOTATION_REGISTRY, _category, _iri, _visible_node
-from ..contracts import Score, VisibilityPolicy, canonical_json
+from ..contracts import Score, VisibilityPolicy, canonical_hash, canonical_json
+from ..description_review import (
+    Digest,
+    IndependentReviewSupport,
+    validate_receipt_claims,
+)
 from .models import EntityRef, Identifier, StrictModel
 from .owl_ast import validate_annotation, validate_axiom
 
@@ -162,7 +167,17 @@ class GroundedClaim(StrictModel):
     text: Annotated[str, Field(min_length=1, max_length=4000)]
     fact_ids: Annotated[list[Identifier], Field(min_length=1, max_length=20)]
     interpretation: Literal["generated"] = "generated"
-    grounding: Literal["exact_extract", "semantic_template"]
+    grounding: Literal[
+        "exact_extract", "semantic_template", "typed_description", "independent_review"
+    ]
+    preparation_kind: Literal["grounded_description", "fact_extract", "factual_fallback"] | None = (
+        None
+    )
+    support_status: (
+        Literal["typed_template_support", "exact_support", "fallback", "independently_reviewed"]
+        | None
+    ) = None
+    support_reasons: list[str] = Field(default_factory=list)
     category: Literal[
         "meaning",
         "scope",
@@ -189,6 +204,8 @@ class HierarchyEdge(StrictModel):
 
 
 class EvidenceLink(StrictModel):
+    origin_resolution: Literal["resolved", "unresolved", "not_exported", "withheld"] | None = None
+    graph_projection: Literal["supported", "unsupported", "not_recorded"] | None = None
     evidence_id: Identifier
     candidate_id: Identifier
     fact_ids: list[Identifier]
@@ -252,6 +269,9 @@ class ExplanationResource(StrictModel):
     referenced_labels_truncated: bool = False
     entity_profiles: list[GroundedClaim] = Field(default_factory=list)
     pair_comparison: list[GroundedClaim] = Field(default_factory=list)
+    independent_reviews: dict[Digest, IndependentReviewSupport] = Field(
+        default_factory=dict, max_length=100
+    )
     hierarchy: list[HierarchyEdge] = Field(default_factory=list)
     evidence: list[EvidenceLink] = Field(default_factory=list)
     limitations: list[str] = Field(default_factory=list)
@@ -310,7 +330,56 @@ class ExplanationResource(StrictModel):
             > REFERENCED_LABEL_BYTES
         ):
             raise ValueError("Referenced labels exceed the prepared byte budget")
+        for review_hash, support in self.independent_reviews.items():
+            # Recheck the full nested envelope even when the caller supplied a
+            # previously constructed model with mutable JSON descendants.
+            support = IndependentReviewSupport.model_validate(support.model_dump(mode="json"))
+            if (
+                review_hash != canonical_hash(support.receipt)
+                or support.packet.policy_hash != "sha256:" + self.policy_hash
+            ):
+                raise ValueError("Independent review is outside the frozen packet or policy")
+            reviewed = [
+                claim
+                for claim in self.entity_profiles + self.pair_comparison
+                if claim.reviewer_receipt == review_hash
+            ]
+            validate_receipt_claims(
+                support.receipt, support.packet, [claim.model_dump() for claim in reviewed]
+            )
+            for raw in support.packet.facts:
+                subject = EntityRef.model_validate(raw["subject"])
+                key = (raw["fact_id"], (subject.ontology_version_id, subject.iri, subject.kind))
+                original = contextual_facts.get(key)
+                if original is None or any(
+                    raw.get(field) != getattr(original, field)
+                    for field in (
+                        "fact_id",
+                        "predicate_iri",
+                        "category",
+                        "axiom_ref",
+                        "interpretation",
+                    )
+                ):
+                    raise ValueError("Reviewed packet original differs from the admitted facts")
+                if OriginalValue.model_validate(raw["value"]) != original.value:
+                    raise ValueError("Reviewed packet value differs from its original")
+            for claim in reviewed:
+                if (
+                    claim.grounding != "independent_review"
+                    or claim.support_status != "independently_reviewed"
+                    or claim.preparation_kind != "grounded_description"
+                    or claim.generation_manifest_sha256 != support.generation_manifest_sha256
+                    or [e.model_dump() for e in claim.scoped_entities]
+                    != [e.model_dump() for e in support.packet.entities]
+                ):
+                    raise ValueError("Reviewed claim scope differs from its support record")
         for claim in self.entity_profiles + self.pair_comparison:
+            if (
+                claim.grounding == "independent_review"
+                and claim.reviewer_receipt not in self.independent_reviews
+            ):
+                raise ValueError("Independent claim review receipt is unavailable")
             if not set(claim.fact_ids) <= set(facts):
                 raise ValueError("Claim references an unavailable fact")
             scope = {(e.ontology_version_id, e.iri, e.kind) for e in claim.scoped_entities}
@@ -324,12 +393,15 @@ class ExplanationResource(StrictModel):
                 or (fact.subject.ontology_version_id, fact.subject.iri, fact.subject.kind) in scope
             }:
                 raise ValueError("An exact extract must equal a cited original literal")
-            if claim.grounding == "semantic_template":
+            if claim.grounding in {"semantic_template", "typed_description"}:
                 from ..contracts import EntityRef as CoreEntity
+                from ..descriptions import DESCRIPTION_VERSION, description_templates
                 from ..generation import FactPacket, comparison_templates
 
-                if len(claim.scoped_entities) != 2:
+                if claim.grounding == "semantic_template" and len(claim.scoped_entities) != 2:
                     raise ValueError("Comparison requires its ordered, permitted entity pair")
+                if not 1 <= len(claim.scoped_entities) <= 2:
+                    raise ValueError("Description requires its permitted typed entity scope")
                 pair = [CoreEntity.model_validate(e.model_dump()) for e in claim.scoped_entities]
                 if not set(claim.packet_fact_ids) <= set(facts):
                     raise ValueError("Comparison packet refers to unavailable facts")
@@ -368,19 +440,23 @@ class ExplanationResource(StrictModel):
                             )
                         selected.append(copies[0].model_dump())
                 packet = FactPacket(
-                    task="pair_comparison",
+                    task="pair_comparison" if len(pair) == 2 else "entity_profile",
                     entities=pair,
                     context_hashes=[],
                     policy_hash=self.policy_hash,
                     facts=selected,
                     missingness=[],
-                    selection={},
+                    selection=(
+                        {"description_contract": DESCRIPTION_VERSION}
+                        if claim.grounding == "typed_description"
+                        else {}
+                    ),
                 )
                 if not any(
                     claim.text == template.text
                     and claim.category == template.category
                     and set(claim.fact_ids) == set(template.fact_ids)
-                    for template in comparison_templates(packet)
+                    for template in comparison_templates(packet) + description_templates(packet)
                 ):
                     raise ValueError("Comparison does not match a grounded semantic template")
         for edge in self.hierarchy:

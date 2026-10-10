@@ -1,0 +1,223 @@
+{
+  "$defs": {
+    "EntityRef": {
+      "additionalProperties": false,
+      "description": "An ontology-scoped typed entity; punning and duplicate labels remain distinct.",
+      "properties": {
+        "ontology_version_id": {
+          "minLength": 1,
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri",
+        "kind"
+      ],
+      "title": "EntityRef",
+      "type": "object"
+    },
+    "ReviewCaseSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/EntityRef"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/EntityRef"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "source",
+        "targets"
+      ],
+      "title": "ReviewCaseSummary",
+      "type": "object"
+    },
+    "ReviewOntology": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_version_id": {
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "context_sha256": {
+          "title": "Context Sha256",
+          "type": "string"
+        },
+        "root_sha256": {
+          "title": "Root Sha256",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "imports_complete": {
+          "title": "Imports Complete",
+          "type": "boolean"
+        },
+        "entity_count": {
+          "minimum": 0,
+          "title": "Entity Count",
+          "type": "integer"
+        },
+        "axiom_count": {
+          "minimum": 0,
+          "title": "Axiom Count",
+          "type": "integer"
+        },
+        "inference_status": {
+          "title": "Inference Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "name",
+        "context_sha256",
+        "root_sha256",
+        "scope",
+        "imports_complete",
+        "entity_count",
+        "axiom_count",
+        "inference_status"
+      ],
+      "title": "ReviewOntology",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "exact-review-about/1",
+      "default": "exact-review-about/1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "purpose": {
+      "const": "development_review",
+      "default": "development_review",
+      "title": "Purpose",
+      "type": "string"
+    },
+    "title": {
+      "maxLength": 160,
+      "title": "Title",
+      "type": "string"
+    },
+    "prepared_at": {
+      "title": "Prepared At",
+      "type": "string"
+    },
+    "source_run_id": {
+      "title": "Source Run Id",
+      "type": "string"
+    },
+    "run_manifest_sha256": {
+      "title": "Run Manifest Sha256",
+      "type": "string"
+    },
+    "selection_sha256": {
+      "title": "Selection Sha256",
+      "type": "string"
+    },
+    "policy_sha256": {
+      "title": "Policy Sha256",
+      "type": "string"
+    },
+    "source_count": {
+      "minimum": 1,
+      "title": "Source Count",
+      "type": "integer"
+    },
+    "presented_pairs": {
+      "minimum": 1,
+      "title": "Presented Pairs",
+      "type": "integer"
+    },
+    "correctness_metrics": {
+      "const": "disabled",
+      "default": "disabled",
+      "title": "Correctness Metrics",
+      "type": "string"
+    },
+    "coverage": {
+      "additionalProperties": {
+        "type": "integer"
+      },
+      "title": "Coverage",
+      "type": "object"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/ReviewCaseSummary"
+      },
+      "maxItems": 200,
+      "title": "Cases",
+      "type": "array"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Limitations",
+      "type": "array"
+    },
+    "ontologies": {
+      "items": {
+        "$ref": "#/$defs/ReviewOntology"
+      },
+      "maxItems": 20,
+      "title": "Ontologies",
+      "type": "array"
+    }
+  },
+  "required": [
+    "title",
+    "prepared_at",
+    "source_run_id",
+    "run_manifest_sha256",
+    "selection_sha256",
+    "policy_sha256",
+    "source_count",
+    "presented_pairs",
+    "coverage",
+    "limitations",
+    "ontologies"
+  ],
+  "title": "ReviewBundleSummary",
+  "type": "object"
+}

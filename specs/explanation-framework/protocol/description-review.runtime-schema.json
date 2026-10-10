@@ -1,0 +1,146 @@
+{
+  "$defs": {
+    "ClaimReviewDecision": {
+      "additionalProperties": false,
+      "properties": {
+        "ordinal": {
+          "maximum": 23,
+          "minimum": 0,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "claim_id": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Claim Id",
+          "type": "string"
+        },
+        "claim_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Claim Hash",
+          "type": "string"
+        },
+        "decision": {
+          "enum": [
+            "approved",
+            "rejected"
+          ],
+          "title": "Decision",
+          "type": "string"
+        },
+        "support_explanation": {
+          "maxLength": 4000,
+          "minLength": 20,
+          "title": "Support Explanation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ordinal",
+        "claim_id",
+        "claim_hash",
+        "decision",
+        "support_explanation"
+      ],
+      "title": "ClaimReviewDecision",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "exact-description-review/1",
+      "default": "exact-description-review/1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "reviewer_id": {
+      "maxLength": 256,
+      "minLength": 1,
+      "title": "Reviewer Id",
+      "type": "string"
+    },
+    "reviewer_kind": {
+      "enum": [
+        "human",
+        "independent_agent"
+      ],
+      "title": "Reviewer Kind",
+      "type": "string"
+    },
+    "review_provenance": {
+      "maxLength": 2000,
+      "minLength": 20,
+      "title": "Review Provenance",
+      "type": "string"
+    },
+    "source_explanation_id": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Source Explanation Id",
+      "type": "string"
+    },
+    "source_manifest_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Source Manifest Hash",
+      "type": "string"
+    },
+    "source_generation_status": {
+      "enum": [
+        "validated",
+        "failed",
+        "ambiguous"
+      ],
+      "title": "Source Generation Status",
+      "type": "string"
+    },
+    "packet_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Packet Hash",
+      "type": "string"
+    },
+    "policy_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "response_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Response Hash",
+      "type": "string"
+    },
+    "claims_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Claims Hash",
+      "type": "string"
+    },
+    "input_hash": {
+      "pattern": "^sha256:[a-f0-9]{64}$",
+      "title": "Input Hash",
+      "type": "string"
+    },
+    "decisions": {
+      "items": {
+        "$ref": "#/$defs/ClaimReviewDecision"
+      },
+      "maxItems": 24,
+      "minItems": 1,
+      "title": "Decisions",
+      "type": "array"
+    }
+  },
+  "required": [
+    "reviewer_id",
+    "reviewer_kind",
+    "review_provenance",
+    "source_explanation_id",
+    "source_manifest_hash",
+    "source_generation_status",
+    "packet_hash",
+    "policy_hash",
+    "response_hash",
+    "claims_hash",
+    "input_hash",
+    "decisions"
+  ],
+  "title": "IndependentDescriptionReview",
+  "type": "object"
+}

@@ -28,44 +28,88 @@
       "title": "ByteSourceSpan",
       "type": "object"
     },
-    "EntityRef": {
+    "ClaimReviewDecision": {
       "additionalProperties": false,
       "properties": {
-        "ontology_version_id": {
-          "maxLength": 128,
-          "minLength": 1,
-          "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Ontology Version Id",
+        "ordinal": {
+          "maximum": 23,
+          "minimum": 0,
+          "title": "Ordinal",
+          "type": "integer"
+        },
+        "claim_id": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Claim Id",
           "type": "string"
         },
-        "iri": {
-          "maxLength": 2048,
-          "minLength": 1,
-          "title": "Iri",
+        "claim_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Claim Hash",
           "type": "string"
         },
-        "kind": {
-          "default": "class",
+        "decision": {
           "enum": [
-            "class",
-            "object_property",
-            "data_property",
-            "individual"
+            "approved",
+            "rejected"
           ],
-          "title": "Kind",
+          "title": "Decision",
+          "type": "string"
+        },
+        "support_explanation": {
+          "maxLength": 4000,
+          "minLength": 20,
+          "title": "Support Explanation",
           "type": "string"
         }
       },
       "required": [
-        "ontology_version_id",
-        "iri"
+        "ordinal",
+        "claim_id",
+        "claim_hash",
+        "decision",
+        "support_explanation"
       ],
-      "title": "EntityRef",
+      "title": "ClaimReviewDecision",
       "type": "object"
     },
     "EvidenceLink": {
       "additionalProperties": false,
       "properties": {
+        "origin_resolution": {
+          "anyOf": [
+            {
+              "enum": [
+                "resolved",
+                "unresolved",
+                "not_exported",
+                "withheld"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Origin Resolution"
+        },
+        "graph_projection": {
+          "anyOf": [
+            {
+              "enum": [
+                "supported",
+                "unsupported",
+                "not_recorded"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Graph Projection"
+        },
         "evidence_id": {
           "maxLength": 128,
           "minLength": 1,
@@ -217,6 +261,92 @@
       "title": "FactOrigin",
       "type": "object"
     },
+    "FactPacket": {
+      "additionalProperties": false,
+      "description": "Candidate-blind entity input, or score-blind pair input with frozen profile dependencies.",
+      "properties": {
+        "task": {
+          "enum": [
+            "entity_profile",
+            "pair_comparison"
+          ],
+          "title": "Task",
+          "type": "string"
+        },
+        "entities": {
+          "items": {
+            "$ref": "#/$defs/exact_inspect__contracts__EntityRef"
+          },
+          "maxItems": 2,
+          "minItems": 1,
+          "title": "Entities",
+          "type": "array"
+        },
+        "context_hashes": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Context Hashes",
+          "type": "array"
+        },
+        "policy_hash": {
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "facts": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "maxItems": 100,
+          "title": "Facts",
+          "type": "array"
+        },
+        "missingness": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Missingness",
+          "type": "array"
+        },
+        "profile_dependencies": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Profile Dependencies",
+          "type": "array"
+        },
+        "profiles": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Profiles",
+          "type": "array"
+        },
+        "language": {
+          "default": "en",
+          "title": "Language",
+          "type": "string"
+        },
+        "selection": {
+          "additionalProperties": true,
+          "title": "Selection",
+          "type": "object"
+        }
+      },
+      "required": [
+        "task",
+        "entities",
+        "context_hashes",
+        "policy_hash",
+        "facts",
+        "missingness",
+        "selection"
+      ],
+      "title": "FactPacket",
+      "type": "object"
+    },
     "GroundedClaim": {
       "additionalProperties": false,
       "properties": {
@@ -254,10 +384,54 @@
         "grounding": {
           "enum": [
             "exact_extract",
-            "semantic_template"
+            "semantic_template",
+            "typed_description",
+            "independent_review"
           ],
           "title": "Grounding",
           "type": "string"
+        },
+        "preparation_kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "grounded_description",
+                "fact_extract",
+                "factual_fallback"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Preparation Kind"
+        },
+        "support_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "typed_template_support",
+                "exact_support",
+                "fallback",
+                "independently_reviewed"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Support Status"
+        },
+        "support_reasons": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Support Reasons",
+          "type": "array"
         },
         "category": {
           "default": "key_fact",
@@ -276,7 +450,7 @@
         },
         "scoped_entities": {
           "items": {
-            "$ref": "#/$defs/EntityRef"
+            "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
           },
           "maxItems": 2,
           "title": "Scoped Entities",
@@ -295,7 +469,7 @@
         },
         "packet_fact_subjects": {
           "items": {
-            "$ref": "#/$defs/EntityRef"
+            "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
           },
           "maxItems": 100,
           "title": "Packet Fact Subjects",
@@ -336,10 +510,10 @@
       "additionalProperties": false,
       "properties": {
         "child": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "parent": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "basis": {
           "enum": [
@@ -383,6 +557,138 @@
       "title": "HierarchyEdge",
       "type": "object"
     },
+    "IndependentDescriptionReview": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "exact-description-review/1",
+          "default": "exact-description-review/1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "reviewer_id": {
+          "maxLength": 256,
+          "minLength": 1,
+          "title": "Reviewer Id",
+          "type": "string"
+        },
+        "reviewer_kind": {
+          "enum": [
+            "human",
+            "independent_agent"
+          ],
+          "title": "Reviewer Kind",
+          "type": "string"
+        },
+        "review_provenance": {
+          "maxLength": 2000,
+          "minLength": 20,
+          "title": "Review Provenance",
+          "type": "string"
+        },
+        "source_explanation_id": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Source Explanation Id",
+          "type": "string"
+        },
+        "source_manifest_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Source Manifest Hash",
+          "type": "string"
+        },
+        "source_generation_status": {
+          "enum": [
+            "validated",
+            "failed",
+            "ambiguous"
+          ],
+          "title": "Source Generation Status",
+          "type": "string"
+        },
+        "packet_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Packet Hash",
+          "type": "string"
+        },
+        "policy_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "response_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Response Hash",
+          "type": "string"
+        },
+        "claims_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Claims Hash",
+          "type": "string"
+        },
+        "input_hash": {
+          "pattern": "^sha256:[a-f0-9]{64}$",
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "decisions": {
+          "items": {
+            "$ref": "#/$defs/ClaimReviewDecision"
+          },
+          "maxItems": 24,
+          "minItems": 1,
+          "title": "Decisions",
+          "type": "array"
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "reviewer_kind",
+        "review_provenance",
+        "source_explanation_id",
+        "source_manifest_hash",
+        "source_generation_status",
+        "packet_hash",
+        "policy_hash",
+        "response_hash",
+        "claims_hash",
+        "input_hash",
+        "decisions"
+      ],
+      "title": "IndependentDescriptionReview",
+      "type": "object"
+    },
+    "IndependentReviewSupport": {
+      "additionalProperties": false,
+      "properties": {
+        "receipt": {
+          "$ref": "#/$defs/IndependentDescriptionReview"
+        },
+        "packet": {
+          "$ref": "#/$defs/FactPacket"
+        },
+        "generation_manifest": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Generation Manifest",
+          "type": "object"
+        },
+        "generation_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Generation Manifest Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "receipt",
+        "packet",
+        "generation_manifest",
+        "generation_manifest_sha256"
+      ],
+      "title": "IndependentReviewSupport",
+      "type": "object"
+    },
+    "JsonValue": {},
     "OriginalFact": {
       "additionalProperties": false,
       "properties": {
@@ -394,7 +700,7 @@
           "type": "string"
         },
         "subject": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "predicate_iri": {
           "anyOf": [
@@ -689,6 +995,74 @@
       ],
       "title": "Score",
       "type": "object"
+    },
+    "exact_inspect__contracts__EntityRef": {
+      "additionalProperties": false,
+      "description": "An ontology-scoped typed entity; punning and duplicate labels remain distinct.",
+      "properties": {
+        "ontology_version_id": {
+          "minLength": 1,
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri",
+        "kind"
+      ],
+      "title": "EntityRef",
+      "type": "object"
+    },
+    "exact_inspect__study__models__EntityRef": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_version_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "default": "class",
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri"
+      ],
+      "title": "EntityRef",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -713,7 +1087,7 @@
     },
     "entities": {
       "items": {
-        "$ref": "#/$defs/EntityRef"
+        "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
       },
       "minItems": 1,
       "title": "Entities",
@@ -752,6 +1126,16 @@
       },
       "title": "Pair Comparison",
       "type": "array"
+    },
+    "independent_reviews": {
+      "maxProperties": 100,
+      "patternProperties": {
+        "^sha256:[a-f0-9]{64}$": {
+          "$ref": "#/$defs/IndependentReviewSupport"
+        }
+      },
+      "title": "Independent Reviews",
+      "type": "object"
     },
     "hierarchy": {
       "items": {

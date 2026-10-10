@@ -84,6 +84,8 @@ class ForbidMatcher(importlib.abc.MetaPathFinder):
             raise AssertionError('Minimal study runtime attempted forbidden import: ' + fullname)
 sys.meta_path.insert(0, ForbidMatcher())
 from exact_inspect.study.api import create_study_app
+from exact_inspect.descriptions import validate_prepared_support
+assert callable(validate_prepared_support)
 assets = app_root / 'study-assets'
 assets.mkdir()
 app = create_study_app('sqlite:///' + str(app_root / 'study.sqlite'), 's' * 40, 'r' * 40,
@@ -118,5 +120,13 @@ print(json.dumps({'copied_runtime_import': 'passed', 'route_count': len(paths), 
     receipt = json.loads(result.stdout)
     assert receipt["copied_runtime_import"] == "passed"
     assert "exact_inspect.study.workspace" in receipt["loaded_local_modules"]
+    for module in (
+        "description_review",
+        "descriptions",
+        "review_metadata",
+        "evidence_metadata",
+        "navigation",
+    ):
+        assert f"exact_inspect.{module}" in receipt["loaded_local_modules"]
     assert receipt["route_count"] > 20
     assert len(copied) > 3

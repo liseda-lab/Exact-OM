@@ -29,3 +29,6 @@ exercise assignment and scoring semantics; never mount them as participant resou
 validator checks both JSON Schemas, entity identity consistency, participant fixture shapes,
 eight balanced schedules, nine scoring examples and rejection of ambiguous ranking payloads.
 It still does not test real database persistence, browser behavior or Render deployment.
+
+
+S1 runtime additions are frozen by `python -m tools.freeze_explanation_contracts --check`: the study publication/resource/API files plus `exploration.runtime-openapi.json`, `review-about.runtime-schema.json` and `description-review.runtime-schema.json`. The concrete S2 action, navigation, description, form and review-discovery contract is [the backend S1 handoff](../../../docs/verification/explanation-product-review-backend-s1-contracts.md). These schemas establish implemented boundaries; they do not establish real inference, successful provider preparation, frontend S2 or joint acceptance.

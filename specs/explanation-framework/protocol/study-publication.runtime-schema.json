@@ -598,7 +598,7 @@
           "type": "string"
         },
         "entity": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "label": {
           "maxLength": 512,
@@ -771,39 +771,235 @@
       "title": "ConstructionProvenance",
       "type": "object"
     },
-    "EntityRef": {
+    "DevelopmentReviewDefinition": {
       "additionalProperties": false,
       "properties": {
-        "ontology_version_id": {
+        "contract_version": {
+          "const": "exact-study/2.0",
+          "default": "exact-study/2.0",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "study_revision": {
           "maxLength": 128,
           "minLength": 1,
           "pattern": "^[A-Za-z0-9_.:/-]+$",
-          "title": "Ontology Version Id",
+          "title": "Study Revision",
           "type": "string"
         },
-        "iri": {
-          "maxLength": 2048,
+        "software_version": {
+          "maxLength": 128,
           "minLength": 1,
-          "title": "Iri",
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Software Version",
           "type": "string"
         },
-        "kind": {
-          "default": "class",
-          "enum": [
-            "class",
-            "object_property",
-            "data_property",
-            "individual"
-          ],
-          "title": "Kind",
+        "information_version": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Information Version",
           "type": "string"
+        },
+        "information_text": {
+          "minLength": 1,
+          "title": "Information Text",
+          "type": "string"
+        },
+        "consent_text": {
+          "minLength": 1,
+          "title": "Consent Text",
+          "type": "string"
+        },
+        "instructions": {
+          "minLength": 1,
+          "title": "Instructions",
+          "type": "string"
+        },
+        "setup_instructions": {
+          "minLength": 1,
+          "title": "Setup Instructions",
+          "type": "string"
+        },
+        "tutorial_steps": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Tutorial Steps",
+          "type": "array"
+        },
+        "practice_cases": {
+          "items": {
+            "$ref": "#/$defs/PracticeCase"
+          },
+          "maxItems": 4,
+          "title": "Practice Cases",
+          "type": "array"
+        },
+        "form_version": {
+          "default": "exact-study-forms/2",
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Form Version",
+          "type": "string"
+        },
+        "closes_at": {
+          "format": "date-time",
+          "title": "Closes At",
+          "type": "string"
+        },
+        "synthetic": {
+          "const": false,
+          "default": false,
+          "title": "Synthetic",
+          "type": "boolean"
+        },
+        "policy_hash": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Policy Hash",
+          "type": "string"
+        },
+        "visibility_policy": {
+          "$ref": "#/$defs/VisibilityPolicy"
+        },
+        "analysis_plan": {
+          "minLength": 1,
+          "title": "Analysis Plan",
+          "type": "string"
+        },
+        "launch_approvals": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "title": "Launch Approvals",
+          "type": "array"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/FrozenCase"
+          },
+          "minItems": 2,
+          "title": "Cases",
+          "type": "array"
+        },
+        "assets": {
+          "items": {
+            "$ref": "#/$defs/AssetV2"
+          },
+          "title": "Assets",
+          "type": "array"
+        },
+        "schedules": {
+          "items": {
+            "$ref": "#/$defs/Schedule"
+          },
+          "maxItems": 64,
+          "minItems": 4,
+          "title": "Schedules",
+          "type": "array"
+        },
+        "components": {
+          "default": [
+            "original_context",
+            "entity_description",
+            "hierarchy",
+            "evidence_table",
+            "evidence_graph",
+            "pair_comparison"
+          ],
+          "items": {
+            "enum": [
+              "original_context",
+              "entity_description",
+              "hierarchy",
+              "evidence_table",
+              "evidence_graph",
+              "pair_comparison"
+            ],
+            "type": "string"
+          },
+          "title": "Components",
+          "type": "array"
+        },
+        "tutorial": {
+          "$ref": "#/$defs/TutorialDefinition"
+        },
+        "protocol_versions": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProtocolVersions"
+            },
+            {
+              "$ref": "#/$defs/ProtocolVersionsV3"
+            }
+          ],
+          "title": "Protocol Versions"
+        },
+        "workspace_scopes": {
+          "items": {
+            "$ref": "#/$defs/WorkspaceScope"
+          },
+          "minItems": 1,
+          "title": "Workspace Scopes",
+          "type": "array"
+        },
+        "resource_scope_analysis_rule": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Resource Scope Analysis Rule",
+          "type": "string"
+        },
+        "purpose": {
+          "const": "development_review",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "correctness_metrics": {
+          "const": "disabled",
+          "default": "disabled",
+          "title": "Correctness Metrics",
+          "type": "string"
+        },
+        "review_provenance": {
+          "$ref": "#/$defs/ReviewProvenance"
+        },
+        "review_bundle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReviewBundleSummary"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
-        "ontology_version_id",
-        "iri"
+        "study_revision",
+        "software_version",
+        "information_version",
+        "information_text",
+        "consent_text",
+        "instructions",
+        "setup_instructions",
+        "closes_at",
+        "policy_hash",
+        "visibility_policy",
+        "analysis_plan",
+        "cases",
+        "assets",
+        "schedules",
+        "tutorial",
+        "protocol_versions",
+        "workspace_scopes",
+        "resource_scope_analysis_rule",
+        "purpose",
+        "review_provenance"
       ],
-      "title": "EntityRef",
+      "title": "DevelopmentReviewDefinition",
       "type": "object"
     },
     "FrozenCase": {
@@ -817,7 +1013,7 @@
           "type": "string"
         },
         "source": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "source_label": {
           "maxLength": 512,
@@ -1162,6 +1358,85 @@
       "title": "ProtocolVersions",
       "type": "object"
     },
+    "ProtocolVersionsV3": {
+      "additionalProperties": false,
+      "properties": {
+        "setup": {
+          "const": "setup/3",
+          "title": "Setup",
+          "type": "string"
+        },
+        "tutorial": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Tutorial",
+          "type": "string"
+        },
+        "assessment": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Assessment",
+          "type": "string"
+        },
+        "forms": {
+          "const": "exact-study-forms/3",
+          "title": "Forms",
+          "type": "string"
+        },
+        "consultation": {
+          "const": "consultation/3",
+          "title": "Consultation",
+          "type": "string"
+        },
+        "methods": {
+          "const": "study-methods/3",
+          "title": "Methods",
+          "type": "string"
+        },
+        "information": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Information",
+          "type": "string"
+        },
+        "resource_policy": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Resource Policy",
+          "type": "string"
+        },
+        "software": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Software",
+          "type": "string"
+        },
+        "export": {
+          "const": "exact-study-analysis/4",
+          "title": "Export",
+          "type": "string"
+        }
+      },
+      "required": [
+        "setup",
+        "tutorial",
+        "assessment",
+        "forms",
+        "consultation",
+        "methods",
+        "information",
+        "resource_policy",
+        "software",
+        "export"
+      ],
+      "title": "ProtocolVersionsV3",
+      "type": "object"
+    },
     "PublicAssetV2": {
       "additionalProperties": false,
       "properties": {
@@ -1250,6 +1525,236 @@
         "policy_hash"
       ],
       "title": "PublicAssetV2",
+      "type": "object"
+    },
+    "ReviewBundleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "exact-review-about/1",
+          "default": "exact-review-about/1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "purpose": {
+          "const": "development_review",
+          "default": "development_review",
+          "title": "Purpose",
+          "type": "string"
+        },
+        "title": {
+          "maxLength": 160,
+          "title": "Title",
+          "type": "string"
+        },
+        "prepared_at": {
+          "title": "Prepared At",
+          "type": "string"
+        },
+        "source_run_id": {
+          "title": "Source Run Id",
+          "type": "string"
+        },
+        "run_manifest_sha256": {
+          "title": "Run Manifest Sha256",
+          "type": "string"
+        },
+        "selection_sha256": {
+          "title": "Selection Sha256",
+          "type": "string"
+        },
+        "policy_sha256": {
+          "title": "Policy Sha256",
+          "type": "string"
+        },
+        "source_count": {
+          "minimum": 1,
+          "title": "Source Count",
+          "type": "integer"
+        },
+        "presented_pairs": {
+          "minimum": 1,
+          "title": "Presented Pairs",
+          "type": "integer"
+        },
+        "correctness_metrics": {
+          "const": "disabled",
+          "default": "disabled",
+          "title": "Correctness Metrics",
+          "type": "string"
+        },
+        "coverage": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Coverage",
+          "type": "object"
+        },
+        "cases": {
+          "items": {
+            "$ref": "#/$defs/ReviewCaseSummary"
+          },
+          "maxItems": 200,
+          "title": "Cases",
+          "type": "array"
+        },
+        "limitations": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Limitations",
+          "type": "array"
+        },
+        "ontologies": {
+          "items": {
+            "$ref": "#/$defs/ReviewOntology"
+          },
+          "maxItems": 20,
+          "title": "Ontologies",
+          "type": "array"
+        }
+      },
+      "required": [
+        "title",
+        "prepared_at",
+        "source_run_id",
+        "run_manifest_sha256",
+        "selection_sha256",
+        "policy_sha256",
+        "source_count",
+        "presented_pairs",
+        "coverage",
+        "limitations",
+        "ontologies"
+      ],
+      "title": "ReviewBundleSummary",
+      "type": "object"
+    },
+    "ReviewCaseSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/exact_inspect__contracts__EntityRef"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/exact_inspect__contracts__EntityRef"
+          },
+          "maxItems": 100,
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        }
+      },
+      "required": [
+        "case_id",
+        "source",
+        "targets"
+      ],
+      "title": "ReviewCaseSummary",
+      "type": "object"
+    },
+    "ReviewOntology": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_version_id": {
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "context_sha256": {
+          "title": "Context Sha256",
+          "type": "string"
+        },
+        "root_sha256": {
+          "title": "Root Sha256",
+          "type": "string"
+        },
+        "scope": {
+          "title": "Scope",
+          "type": "string"
+        },
+        "imports_complete": {
+          "title": "Imports Complete",
+          "type": "boolean"
+        },
+        "entity_count": {
+          "minimum": 0,
+          "title": "Entity Count",
+          "type": "integer"
+        },
+        "axiom_count": {
+          "minimum": 0,
+          "title": "Axiom Count",
+          "type": "integer"
+        },
+        "inference_status": {
+          "title": "Inference Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "name",
+        "context_sha256",
+        "root_sha256",
+        "scope",
+        "imports_complete",
+        "entity_count",
+        "axiom_count",
+        "inference_status"
+      ],
+      "title": "ReviewOntology",
+      "type": "object"
+    },
+    "ReviewProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "bundle_version": {
+          "const": "exact-development-review/1",
+          "default": "exact-development-review/1",
+          "title": "Bundle Version",
+          "type": "string"
+        },
+        "run_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Run Manifest Sha256",
+          "type": "string"
+        },
+        "selection_manifest_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Selection Manifest Sha256",
+          "type": "string"
+        },
+        "source_run_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Source Run Id",
+          "type": "string"
+        },
+        "limitation": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Limitation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "run_manifest_sha256",
+        "selection_manifest_sha256",
+        "source_run_id",
+        "limitation"
+      ],
+      "title": "ReviewProvenance",
       "type": "object"
     },
     "Schedule": {
@@ -1606,7 +2111,15 @@
           "$ref": "#/$defs/TutorialDefinition"
         },
         "protocol_versions": {
-          "$ref": "#/$defs/ProtocolVersions"
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ProtocolVersions"
+            },
+            {
+              "$ref": "#/$defs/ProtocolVersionsV3"
+            }
+          ],
+          "title": "Protocol Versions"
         },
         "workspace_scopes": {
           "items": {
@@ -1658,7 +2171,7 @@
           "type": "string"
         },
         "source": {
-          "$ref": "#/$defs/EntityRef"
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
         },
         "source_label": {
           "maxLength": 512,
@@ -2050,6 +2563,74 @@
       ],
       "title": "WorkspaceScope",
       "type": "object"
+    },
+    "exact_inspect__contracts__EntityRef": {
+      "additionalProperties": false,
+      "description": "An ontology-scoped typed entity; punning and duplicate labels remain distinct.",
+      "properties": {
+        "ontology_version_id": {
+          "minLength": 1,
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri",
+        "kind"
+      ],
+      "title": "EntityRef",
+      "type": "object"
+    },
+    "exact_inspect__study__models__EntityRef": {
+      "additionalProperties": false,
+      "properties": {
+        "ontology_version_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "pattern": "^[A-Za-z0-9_.:/-]+$",
+          "title": "Ontology Version Id",
+          "type": "string"
+        },
+        "iri": {
+          "maxLength": 2048,
+          "minLength": 1,
+          "title": "Iri",
+          "type": "string"
+        },
+        "kind": {
+          "default": "class",
+          "enum": [
+            "class",
+            "object_property",
+            "data_property",
+            "individual"
+          ],
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ontology_version_id",
+        "iri"
+      ],
+      "title": "EntityRef",
+      "type": "object"
     }
   },
   "additionalProperties": false,
@@ -2061,6 +2642,9 @@
         },
         {
           "$ref": "#/$defs/StudyDefinitionV2"
+        },
+        {
+          "$ref": "#/$defs/DevelopmentReviewDefinition"
         }
       ],
       "title": "Definition"

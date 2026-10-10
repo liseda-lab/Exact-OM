@@ -279,6 +279,10 @@ def filter_evidence_items(
             try:
                 for fact_id in fact_ids:
                     context.axiom(fact_id, policy=policy)
+            except KeyError:
+                # OntologyContext uses the same absence boundary for missing
+                # originals and originals excluded by the effective policy.
+                visible = False
             except DomainError as exc:
                 if exc.status_code != 404:
                     raise

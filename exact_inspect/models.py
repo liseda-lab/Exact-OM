@@ -7,6 +7,7 @@ from typing import Annotated, Any, Literal
 from pydantic import ConfigDict, Field, JsonValue, model_serializer, model_validator
 
 from .contracts import Availability, EntityRef, Page, Scope, Score, WireModel
+from .description_review import IndependentDescriptionReview
 from .evidence_metadata import ExactMatchBasis, PairEvidenceMetadata
 from .generation import FactPacket
 
@@ -165,6 +166,7 @@ class GenerationManifest(ResourceModel):
     """Frozen generation dependencies and actual provider identity, excluding secrets."""
 
     description_contract: Literal["exact-description/2"] | None = None
+    description_review_hash: str | None = Field(default=None, pattern=r"^sha256:[a-f0-9]{64}$")
     ontology_context_hashes: list[str]
     visibility_policy_hash: str
     packet_hash: str
@@ -183,6 +185,8 @@ class GenerationManifest(ResourceModel):
         value = handler(self)
         if self.description_contract is None:
             value.pop("description_contract", None)
+        if self.description_review_hash is None:
+            value.pop("description_review_hash", None)
         return value
 
 
@@ -199,12 +203,23 @@ class GeneratedExplanationResponse(ResourceModel):
     preparation_kind: Literal["grounded_description", "fact_extract", "factual_fallback"] | None = (
         None
     )
-    support_status: Literal["typed_template_support", "exact_support", "fallback"] | None = None
+    support_status: (
+        Literal["typed_template_support", "exact_support", "fallback", "independently_reviewed"]
+        | None
+    ) = None
+    independent_review: IndependentDescriptionReview | None = None
     support_reasons: list[str] = Field(default_factory=list)
     support_packet: FactPacket | None = None
     manifest: GenerationManifest
     limitations: list[str]
     fixture_provenance: str
+
+    @model_validator(mode="after")
+    def check_preparation_metadata(self):
+        from .descriptions import validate_metadata_envelope
+
+        validate_metadata_envelope(self.model_dump(mode="json"))
+        return self
 
 
 class RunSummary(WireModel):

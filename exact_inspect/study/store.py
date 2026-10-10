@@ -152,8 +152,49 @@ class StudyStore:
             c["case_id"] for c in study["cases"]
         }:
             raise StudyError(422, "Each case requires an independently adjudicated key")
+        # An exact retry reads the frozen publication. New reachability rules must
+        # not reinterpret historical tutorial resources or rewrite their bytes.
+        study["questionnaires"] = definitions(
+            study["components"],
+            study["form_version"],
+            ordered=study["contract_version"] == "exact-study/2.0",
+        )
+        with self.transaction() as db:
+            prior = db.execute(
+                "SELECT payload, frozen_hash FROM studies WHERE revision = ?",
+                (study["study_revision"],),
+            ).fetchone()
+            if prior:
+                frozen = json.loads(prior["payload"])
+                # Compare the submitted definition, retaining the questionnaire
+                # materialization that was frozen by that historical version.
+                submitted = {**study, "questionnaires": frozen["questionnaires"]}
+                if digest(canonical(submitted)) == prior["frozen_hash"]:
+                    old_keys = json.loads(
+                        db.execute(
+                            "SELECT payload FROM researcher_case_keys WHERE study_revision = ?",
+                            (study["study_revision"],),
+                        ).fetchone()["payload"]
+                    )
+                    if keys != old_keys:
+                        raise StudyError(409, "Published adjudication is immutable")
+                    return {
+                        "study_revision": study["study_revision"],
+                        "frozen_hash": prior["frozen_hash"],
+                        "synthetic": study["synthetic"],
+                    }
         for case in study["cases"]:
             key = keys[case["case_id"]]
+            if study.get("purpose") != "development_review" and (
+                key["case_kind"] == "unresolved" or key["origin"] == "unresolved"
+            ):
+                raise StudyError(422, "Unresolved case keys require development review purpose")
+            if study.get("purpose") == "development_review" and (
+                key["case_kind"] != "unresolved"
+                or key["origin"] != "unresolved"
+                or key["acceptable_candidate_ids"]
+            ):
+                raise StudyError(422, "Development review correctness must remain unresolved")
             candidate_ids = {c["candidate_id"] for c in case["candidates"]}
             accepted = set(key["acceptable_candidate_ids"])
             if not accepted <= candidate_ids or len(accepted) != len(
@@ -164,13 +205,20 @@ class StudyStore:
                 key["case_kind"] == "answer_absent" and accepted
             ):
                 raise StudyError(422, "Adjudication does not match case kind")
-            if set(key["original_production_ranks"]) != candidate_ids:
-                raise StudyError(
-                    422, "Production rank provenance is required for all five candidates"
-                )
-            ranks = list(key["original_production_ranks"].values())
-            if len(set(ranks)) != 5:
-                raise StudyError(422, "Production ranks must be unique")
+            unrecorded_review_ranks = (
+                study.get("purpose") == "development_review"
+                and key["case_kind"] == "unresolved"
+                and key["origin"] == "unresolved"
+                and not key["original_production_ranks"]
+            )
+            if not unrecorded_review_ranks:
+                if set(key["original_production_ranks"]) != candidate_ids:
+                    raise StudyError(
+                        422, "Production rank provenance is required for all five candidates"
+                    )
+                ranks = list(key["original_production_ranks"].values())
+                if len(set(ranks)) != 5:
+                    raise StudyError(422, "Production ranks must be unique")
             if key["origin"] == "constructed" and not key["construction_provenance"]:
                 raise StudyError(
                     422, "Constructed candidates require private original-set provenance"
@@ -281,7 +329,12 @@ class StudyStore:
                 validate_publication(self, study, admitted_ontologies, admitted_explanations)
                 validate_publication_workspaces(self, study, admitted_explanations)
             except ValueError as exc:
-                raise StudyError(422, str(exc)) from exc
+                from .tutorial_validation import TutorialValidationError
+
+                error = StudyError(422, str(exc))
+                if isinstance(exc, TutorialValidationError):
+                    error.validation = exc.as_dict()
+                raise error from exc
         study["questionnaires"] = definitions(
             study["components"],
             study["form_version"],
@@ -426,6 +479,8 @@ class StudyStore:
                 timezone.utc
             ):
                 raise StudyError(410, "Study closed")
+            if study.get("purpose") == "development_review" and not test:
+                raise StudyError(422, "Development review only permits test sessions")
             if study["synthetic"] and not test:
                 raise StudyError(422, "Synthetic studies only permit test sessions")
             for _ in range(count):
@@ -456,7 +511,7 @@ class StudyStore:
                 issued.append({"session_id": sid, "invitation": f"/participate#invite={secret}"})
         return {"invitations": issued}
 
-    def exchange(self, secret):
+    def exchange(self, secret, *, client_contract=None):
         """Reuse the same invitation after cookie loss without starting participation."""
         with self.transaction() as db:
             found = db.execute(
@@ -470,6 +525,13 @@ class StudyStore:
                 raise StudyError(401, "Invitation unavailable") from exc
             if state["stage"] == "closed":
                 raise StudyError(401, "Invitation unavailable")
+            if (
+                study.get("form_version") == "exact-study-forms/3"
+                and client_contract != "study-review/1"
+            ):
+                raise StudyError(
+                    409, "This publication requires a client supporting study-review/1"
+                )
             return row["id"], row["generation"], self._public_state(row, state, study)
 
     def reissue(self, sid, *, revoke=False):
@@ -561,7 +623,20 @@ class StudyStore:
                     not in {r["asset_id"] for r in study["tutorial"]["case"]["ontology_resources"]}
                 )
             ],
-            "synthetic": bool(row["test"]),
+            "synthetic": (
+                study["synthetic"]
+                if study.get("purpose") == "development_review"
+                else bool(row["test"])
+            ),
+            **(
+                {
+                    "purpose": "development_review",
+                    "correctness_metrics": "disabled",
+                    "review_bundle": study.get("review_bundle"),
+                }
+                if study.get("purpose") == "development_review"
+                else {}
+            ),
             "gap_recovery": "Report external_work, break or unknown through resume after an unexpected disconnect; wall time is never assumed active.",
         }
 
@@ -632,6 +707,10 @@ class StudyStore:
             # Old requests were hashed with all old defaults. Keep that exact
             # canonical shape; omission/null of the legacy alias both preserve position.
             data.pop("position", None)
+        if operation == "tutorial_progress":
+            for action in data.get("actions", []):
+                if action.get("evidence_id") is None:
+                    action.pop("evidence_id", None)
         request_hash = digest(
             canonical({"operation": operation, "case_id": case_id, "payload": data})
         )
@@ -658,7 +737,16 @@ class StudyStore:
             content = {
                 k: v for k, v in data.items() if k not in {"idempotency_key", "expected_revision"}
             }
-            self._transition(db, row, state, study, operation, content, case_id)
+            self._transition(
+                db,
+                row,
+                state,
+                study,
+                operation,
+                content,
+                case_id,
+                supplied_fields=payload.model_fields_set,
+            )
             state["revision"] += 1
             db.execute(
                 "UPDATE sessions SET revision = ?, state = ? WHERE id = ?",
@@ -681,7 +769,7 @@ class StudyStore:
             )
             return result
 
-    def _transition(self, db, row, state, study, operation, data, case_id):
+    def _transition(self, db, row, state, study, operation, data, case_id, *, supplied_fields):
         stage = state["stage"]
         if operation == "consent":
             if stage != "welcome" or data["information_version"] != study["information_version"]:
@@ -693,6 +781,13 @@ class StudyStore:
             raise StudyError(403, "Consent is required")
         v2 = study["contract_version"] == "exact-study/2.0"
         forms3 = study.get("protocol_versions", {}).get("methods") == "study-methods/3"
+        validation_data = {**data, "expected_revision": 0, "idempotency_key": "validation"}
+        if operation == "tutorial_progress":
+            # Revalidation must retain omission of the legacy navigation alias.
+            # The full default-bearing data above remains unchanged for historical
+            # request hashes, stored history, and acknowledged mutation receipts.
+            if "current_lesson_id" not in supplied_fields:
+                validation_data.pop("current_lesson_id", None)
         if forms3 and operation in {
             "setup",
             "tutorial_progress",
@@ -713,9 +808,7 @@ class StudyStore:
                 "consultation_draft": ConsultationDraftV3,
             }[operation]
             try:
-                normalized = validator.model_validate(
-                    {**data, "expected_revision": 0, "idempotency_key": "validation"}
-                ).model_dump(mode="json")
+                normalized = validator.model_validate(validation_data).model_dump(mode="json")
             except ValueError as exc:
                 raise StudyError(
                     422, "Answer does not match the frozen study-methods/3 contract"
@@ -730,9 +823,7 @@ class StudyStore:
             from .v2_models import TutorialProgressMutation
 
             try:
-                TutorialProgressMutation.model_validate(
-                    {**data, "expected_revision": 0, "idempotency_key": "validation"}
-                )
+                TutorialProgressMutation.model_validate(validation_data)
             except ValueError as exc:
                 raise StudyError(
                     422, "Answer does not match the historical tutorial contract"
@@ -756,7 +847,11 @@ class StudyStore:
             try:
                 if operation == "tutorial_progress":
                     apply_progress(
-                        self, study, progress, data, state.setdefault("tutorial_action_state", {})
+                        self,
+                        study,
+                        progress,
+                        data,
+                        state.setdefault("tutorial_action_state", {}),
                     )
                 elif operation == "tutorial_assessment":
                     attempt(study["tutorial"], progress, data, utcnow())
@@ -777,7 +872,12 @@ class StudyStore:
                 else:
                     raise StudyError(404, "Unknown tutorial operation")
             except ValueError as exc:
-                raise StudyError(422, str(exc)) from exc
+                from .tutorial_validation import TutorialValidationError
+
+                error = StudyError(422, str(exc))
+                if isinstance(exc, TutorialValidationError):
+                    error.validation = exc.as_dict()
+                raise error from exc
             return
         if operation == "setup" and v2:
             if "setup_version" not in data:
@@ -963,7 +1063,11 @@ class StudyStore:
             if operation == "consultation_draft":
                 state["consultation_drafts"][case_id] = receipt
                 return
-            state["consultations"][case_id] = {**receipt, "case_id": case_id, "submitted_at": now}
+            state["consultations"][case_id] = {
+                **receipt,
+                "case_id": case_id,
+                "submitted_at": now,
+            }
             state["consultation_drafts"].pop(case_id, None)
             state["case_index"] += 1
             state["stage"] = "case" if self._current(state) else "final"
@@ -1273,7 +1377,8 @@ class StudyStore:
                 raise StudyError(422, "Analysis schema is unsupported for this study contract")
             if include_named_methods and (not forms3 or schema != "exact-study-analysis/4"):
                 raise StudyError(
-                    422, "Named-method export requires study-methods/3 and exact-study-analysis/4"
+                    422,
+                    "Named-method export requires study-methods/3 and exact-study-analysis/4",
                 )
             corrected_timing = schema in {"exact-study-analysis/3", "exact-study-analysis/4"}
             private_method_fields = {"other_editor", "other_resource", "other_method"} - (
@@ -1297,7 +1402,10 @@ class StudyStore:
                 if forms3:
                     method_responses.extend(
                         method_response_rows(
-                            state, study, row["id"], include_named_methods=include_named_methods
+                            state,
+                            study,
+                            row["id"],
+                            include_named_methods=include_named_methods,
                         )
                     )
                 events = self._records(db, "events", row["id"])
@@ -1575,6 +1683,10 @@ class StudyStore:
             if forms3:
                 content["method_responses"] = method_responses
                 content["data_dictionary"].update(analysis4_dictionary())
+            if study.get("purpose") == "development_review":
+                content.update(purpose="development_review", correctness_metrics="disabled")
+                content["summary"] = {"status": "disabled_development_review"}
+                content["condition_summaries"] = {}
             if include_keys:
                 content["researcher_case_keys"] = keys
             export_id, now = str(uuid4()), utcnow()

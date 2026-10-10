@@ -21,6 +21,7 @@ from .models import (
     StudyState,
 )
 from .workspace import WorkspaceScope
+from ..review_metadata import ReviewBundleSummary
 
 Method = Literal[
     "protege",
@@ -231,6 +232,7 @@ class TutorialActionEntity(EntityRef):
 
 
 class TutorialAction(StrictModel):
+    evidence_id: Identifier | None = None
     requirement_id: Identifier
     action: RequirementAction
     candidate_id: Identifier | None = None
@@ -682,6 +684,9 @@ class FormsV3(StrictModel):
 
 
 class StudyStateV3(StudyStateV2):
+    review_bundle: ReviewBundleSummary | None = None
+    purpose: Literal["development_review"] | None = None
+    correctness_metrics: Literal["disabled"] | None = None
     protocol_versions: ProtocolVersionsV3
     forms: FormsV3
     setup: SetupReceiptV3 | None

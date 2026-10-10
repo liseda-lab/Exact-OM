@@ -39,10 +39,20 @@ def main():
     )
     parser.add_argument("--include-test", action="store_true")
     parser.add_argument("--include-keys", action="store_true")
+    parser.add_argument(
+        "--include-named-methods",
+        action="store_true",
+        help="Explicit researcher opt-in for restricted method details in analysis/4",
+    )
     parser.add_argument("--format", choices=["json", "csv"], default="json")
     parser.add_argument(
         "--analysis-schema",
-        choices=["exact-study-analysis/1", "exact-study-analysis/2", "exact-study-analysis/3"],
+        choices=[
+            "exact-study-analysis/1",
+            "exact-study-analysis/2",
+            "exact-study-analysis/3",
+            "exact-study-analysis/4",
+        ],
         help="Derived analysis schema; omission uses the frozen source export version. /2 retains historical timing semantics; use /3 for corrected v2 observations.",
     )
     parser.add_argument("--output", type=Path, required=True)
@@ -84,6 +94,7 @@ def main():
                 {
                     "include_test": str(args.include_test).lower(),
                     "include_keys": str(args.include_keys).lower(),
+                    "include_named_methods": str(args.include_named_methods).lower(),
                     "format": args.format,
                     **(
                         {"analysis_schema": args.analysis_schema}

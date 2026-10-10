@@ -27,8 +27,8 @@ def ledger(store, session_id):
 
 @pytest.mark.parametrize("schema_failure", [False, True])
 def test_safe_422_has_correlation_without_mutating_and_same_key_can_then_succeed(
-    corrected, schema_failure
-):  # noqa: F811
+    corrected, schema_failure  # noqa: F811
+):
     client, store, publication = corrected
     state = reach_tutorial(client, publication)
     valid = next(
@@ -53,12 +53,19 @@ def test_safe_422_has_correlation_without_mutating_and_same_key_can_then_succeed
     assert response.status_code == 422, response.text
     rejected = response.json()
     assert len(rejected["detail"]) < 160
+    if schema_failure:
+        assert isinstance(rejected["detail"], list)
+        assert any(error["loc"][-1] == "unexpected_input" for error in rejected["detail"])
+        assert all(set(error) == {"loc", "type", "msg"} for error in rejected["detail"])
+    else:
+        assert isinstance(rejected["detail"], str)
     assert marker not in json.dumps(rejected)
     assert rejected["validation"]["code"] == (
         "tutorial_action_payload_invalid" if schema_failure else "tutorial_fact_out_of_scope"
     )
     assert rejected["validation"]["action_ids"]
     UUID(rejected["correlation_id"])
+    assert response.headers["X-Request-ID"] == rejected["correlation_id"]
     assert client.get("/api/v1/study/state").json() == state
     assert ledger(store, state["session_id"]) == before
     body["actions"] = [valid]
@@ -67,6 +74,37 @@ def test_safe_422_has_correlation_without_mutating_and_same_key_can_then_succeed
     assert accepted.json()["revision"] == state["revision"] + 1
     assert client.put("/api/v1/study/tutorial/progress", json=body).json() == accepted.json()
     assert ledger(store, state["session_id"])["mutations"] == before["mutations"] + 1
+
+
+def test_schema_diagnostics_identify_only_the_outer_action_index(corrected):  # noqa: F811
+    client, store, publication = corrected
+    state = reach_tutorial(client, publication)
+    valid = next(
+        a
+        for a in actions_for(publication.definition, store.assets_dir)
+        if a["action"] == "open_original_axiom"
+    )
+    actions = [copy.deepcopy(valid) for _ in range(4)]
+    actions[3]["asset_ids"] = [None]
+    base = {
+        "expected_revision": state["revision"],
+        "tutorial_version": state["tutorial"]["version"],
+    }
+    for content, expected in [
+        ({"actions": actions}, ["actions[3]"]),
+        ({"completed_requirements": [valid["requirement_id"], None]}, []),
+    ]:
+        response = client.put(
+            "/api/v1/study/tutorial/progress",
+            json={
+                **base,
+                "idempotency_key": uuid4().hex,
+                **content,
+            },
+        )
+        assert response.status_code == 422
+        assert response.json()["validation"]["action_ids"] == expected
+        assert client.get("/api/v1/study/state").json() == state
 
 
 def test_receipt_from_before_optional_evidence_identity_still_replays(corrected):  # noqa: F811

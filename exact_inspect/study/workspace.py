@@ -191,10 +191,13 @@ def _admit_explanation(value, case, policy, contexts):
 
 
 def _admit_evidence(value, candidate, case, policy, contexts):
+    from ..evidence_metadata import filter_evidence_items
+
     result = _strict_projection(SelectedEvidence, value)
     expected = case["source"] if result["side"] == "source" else candidate["entity"]
     if result["entity"] != expected:
         raise ValueError("Selected evidence differs from its active-case pair")
+    result = filter_evidence_items([result], contexts, policy, physically_filtered=True)[0]
     context = contexts[expected["ontology_version_id"]]
     for fid in result["fact_ids"]:
         try:
@@ -203,7 +206,7 @@ def _admit_evidence(value, candidate, case, policy, contexts):
             raise ValueError("Evidence citation is outside the admitted typed subject") from exc
     # The strict main evidence contract preserves recorded projection, missingness,
     # selection numbers and unsupported graph forms without inventing feature pairs.
-    return result
+    return _strict_projection(SelectedEvidence, result)
 
 
 def build_workspace_scope(
@@ -1088,8 +1091,17 @@ def install_workspace_routes(router, store, participant_dependency):
                 raise _error(403, "Evidence component is outside the admitted workspace")
             if candidate_id not in {c["candidate_id"] for c in w.case["candidates"]}:
                 raise _error(403, "Evidence is outside the current case")
-            return w.indexed_page(
+            page = w.indexed_page(
                 "evidence", "candidate_id=?", [candidate_id], cursor=cursor, limit=limit
             )
+            from ..evidence_metadata import filter_evidence_items
+
+            # Older frozen indexes may retain raw unresolved projection strings.
+            # Apply the current visibility boundary without rewriting their bytes
+            # or changing selected-record counts and cursor order.
+            page["items"] = filter_evidence_items(
+                page["items"], w.contexts, w.policy, physically_filtered=True
+            )
+            return page
 
         return read(scope_id, identity, result)

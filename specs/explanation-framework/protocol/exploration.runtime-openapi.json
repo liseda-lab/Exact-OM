@@ -1,0 +1,5841 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Exact Explain",
+    "version": "exact-explain/1.0"
+  },
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "summary": "Health",
+        "operationId": "health_api_v1_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/review-bundle": {
+      "get": {
+        "summary": "Review Bundle",
+        "operationId": "review_bundle_api_v1_review_bundle_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReviewBundleSummary"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ontologies": {
+      "get": {
+        "summary": "Ontologies",
+        "operationId": "ontologies_api_v1_ontologies_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs": {
+      "get": {
+        "summary": "Runs",
+        "description": "List saved runs whose ontologies the policy permits; no pair data is loaded.",
+        "operationId": "runs_api_v1_runs_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_RunSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/labels": {
+      "get": {
+        "summary": "Labels",
+        "description": "Batch display labels for typed entities in one ontology version.",
+        "operationId": "labels_api_v1_labels_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 100,
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LabelsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entities": {
+      "get": {
+        "summary": "Entities",
+        "operationId": "entities_api_v1_entities_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "class",
+                    "object_property",
+                    "data_property",
+                    "individual"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "term",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512,
+              "default": "",
+              "title": "Term"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entity-context": {
+      "get": {
+        "summary": "Entity Context",
+        "operationId": "entity_context_api_v1_entity_context_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityContextResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/entity-facts": {
+      "get": {
+        "summary": "Entity Facts",
+        "operationId": "entity_facts_api_v1_entity_facts_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "asserted",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_Fact_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ontologies/{ontology_id}/entry-points": {
+      "get": {
+        "summary": "Entry Points",
+        "operationId": "entry_points_api_v1_ontologies__ontology_id__entry_points_get",
+        "parameters": [
+          {
+            "name": "ontology_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "literal_asserted",
+                "structural_navigation",
+                "reasoner_inferred"
+              ],
+              "type": "string",
+              "default": "literal_asserted",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryPointPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/ontologies/{ontology_id}/equivalents": {
+      "get": {
+        "summary": "Equivalents",
+        "operationId": "equivalents_api_v1_ontologies__ontology_id__equivalents_get",
+        "parameters": [
+          {
+            "name": "ontology_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EntityRef_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hierarchy": {
+      "get": {
+        "summary": "Hierarchy",
+        "operationId": "hierarchy_api_v1_hierarchy_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "direction",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "parents",
+                "children",
+                "ancestors"
+              ],
+              "type": "string",
+              "default": "parents",
+              "title": "Direction"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "literal_asserted",
+                "structural_navigation",
+                "reasoner_inferred"
+              ],
+              "type": "string",
+              "default": "literal_asserted",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 1000,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedHierarchyPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/axioms/{axiom_id}/stream": {
+      "get": {
+        "summary": "Stream Axiom",
+        "operationId": "stream_axiom_api_v1_axioms__axiom_id__stream_get",
+        "parameters": [
+          {
+            "name": "axiom_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Axiom Id"
+            }
+          },
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/axioms/{axiom_id}": {
+      "get": {
+        "summary": "Axiom",
+        "operationId": "axiom_api_v1_axioms__axiom_id__get",
+        "parameters": [
+          {
+            "name": "axiom_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Axiom Id"
+            }
+          },
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AxiomResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/sources": {
+      "get": {
+        "summary": "Sources",
+        "operationId": "sources_api_v1_runs__run_id__sources_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/candidates": {
+      "get": {
+        "summary": "Candidates",
+        "operationId": "candidates_api_v1_runs__run_id__candidates_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source"
+            }
+          },
+          {
+            "name": "source_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Source Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_Candidate_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/pair": {
+      "get": {
+        "summary": "Pair",
+        "operationId": "pair_api_v1_runs__run_id__pair_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "pair_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pair Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/runs/{run_id}/pair-evidence": {
+      "get": {
+        "summary": "Evidence",
+        "operationId": "evidence_api_v1_runs__run_id__pair_evidence_get",
+        "parameters": [
+          {
+            "name": "run_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Run Id"
+            }
+          },
+          {
+            "name": "pair_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Pair Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_SelectedEvidence_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/explanations": {
+      "get": {
+        "summary": "Explanation List",
+        "description": "Discover prepared explanations about an entity or an ordered/unordered entity pair.",
+        "operationId": "explanation_list_api_v1_explanations_get",
+        "parameters": [
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "task",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "entity_profile",
+                    "pair_comparison"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Task"
+            }
+          },
+          {
+            "name": "counterpart_ontology_version_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Counterpart Ontology Version Id"
+            }
+          },
+          {
+            "name": "counterpart_iri",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Counterpart Iri"
+            }
+          },
+          {
+            "name": "counterpart_kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Counterpart Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_ExplanationSummary_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/explanations/{explanation_id}": {
+      "get": {
+        "summary": "Explanation",
+        "operationId": "explanation_api_v1_explanations__explanation_id__get",
+        "parameters": [
+          {
+            "name": "explanation_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Explanation Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GeneratedExplanationResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/jobs/{job_id}": {
+      "get": {
+        "summary": "Job",
+        "operationId": "job_api_v1_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles": {
+      "get": {
+        "summary": "Bundles",
+        "operationId": "bundles_api_v1_bundles_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 100,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "",
+              "title": "After"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/page": {
+      "get": {
+        "summary": "Bundle Page",
+        "operationId": "bundle_page_api_v1_bundles_page_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_dict_str__Any__"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/import-jobs": {
+      "post": {
+        "summary": "Create Import",
+        "operationId": "create_import_api_v1_bundles_import_jobs_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/import-jobs/{job_id}": {
+      "get": {
+        "summary": "Import Progress",
+        "operationId": "import_progress_api_v1_bundles_import_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Cancel Import",
+        "operationId": "cancel_import_api_v1_bundles_import_jobs__job_id__delete",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/import": {
+      "post": {
+        "summary": "Import Bundle",
+        "operationId": "import_bundle_api_v1_bundles_import_post",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/{package_id}/select": {
+      "post": {
+        "summary": "Select",
+        "operationId": "select_api_v1_bundles__package_id__select_post",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/bundles/{package_id}": {
+      "get": {
+        "summary": "Bundle Metadata",
+        "operationId": "bundle_metadata_api_v1_bundles__package_id__get",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove Bundle",
+        "operationId": "remove_bundle_api_v1_bundles__package_id__delete",
+        "parameters": [
+          {
+            "name": "package_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Package Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AxiomInterpretation": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "structurally_derived",
+              "reasoner_inferred",
+              "projected"
+            ],
+            "title": "Kind"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "scope"
+        ],
+        "title": "AxiomInterpretation",
+        "description": "Explicit assertion/derivation basis and frozen ontology scope."
+      },
+      "AxiomOrigin": {
+        "properties": {
+          "document_key": {
+            "type": "string",
+            "title": "Document Key"
+          },
+          "source_sha256": {
+            "type": "string",
+            "title": "Source Sha256"
+          },
+          "span": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/JsonValue"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Span"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "document_key",
+          "source_sha256"
+        ],
+        "title": "AxiomOrigin",
+        "description": "Exact native source occurrence, including an optional original source span."
+      },
+      "AxiomRendering": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "text"
+        ],
+        "title": "AxiomRendering",
+        "description": "A faithful display rendering may be incomplete without losing the original AST."
+      },
+      "AxiomResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "fact_id": {
+            "type": "string",
+            "title": "Fact Id"
+          },
+          "axiom_id": {
+            "type": "string",
+            "title": "Axiom Id"
+          },
+          "ontology_version_id": {
+            "type": "string",
+            "title": "Ontology Version Id"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "interpretation": {
+            "$ref": "#/components/schemas/AxiomInterpretation"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Availability"
+          },
+          "ast": {
+            "$ref": "#/components/schemas/OwlExpression"
+          },
+          "origins": {
+            "items": {
+              "$ref": "#/components/schemas/AxiomOrigin"
+            },
+            "type": "array",
+            "title": "Origins"
+          },
+          "original_axiom_digest": {
+            "type": "string",
+            "title": "Original Axiom Digest"
+          },
+          "original_syntax": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Syntax"
+          },
+          "original_format": {
+            "type": "string",
+            "title": "Original Format"
+          },
+          "original_availability": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Original Availability",
+            "default": "available"
+          },
+          "rendering": {
+            "$ref": "#/components/schemas/AxiomRendering"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "id",
+          "fact_id",
+          "axiom_id",
+          "ontology_version_id",
+          "category",
+          "interpretation",
+          "availability",
+          "ast",
+          "origins",
+          "original_axiom_digest",
+          "original_syntax",
+          "original_format",
+          "rendering"
+        ],
+        "title": "AxiomResponse",
+        "description": "Original axiom identity, native structured form, rendering and visibility status."
+      },
+      "Candidate": {
+        "properties": {
+          "pair_id": {
+            "type": "string",
+            "title": "Pair Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "target": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "type": "array",
+            "title": "Scores"
+          },
+          "retrieval_channels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Retrieval Channels"
+          },
+          "ordinal_ranks": {
+            "$ref": "#/components/schemas/OrdinalRanks"
+          },
+          "evidence_counts": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/EvidenceCounts"
+                },
+                "type": "array"
+              },
+              {
+                "$ref": "#/components/schemas/VisibleEvidenceCounts"
+              }
+            ],
+            "title": "Evidence Counts"
+          },
+          "nil": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Nil"
+          },
+          "saved_alignment_member": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Alignment Member"
+          },
+          "membership_provenance": {
+            "$ref": "#/components/schemas/MembershipProvenance"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status"
+          },
+          "decision_status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Decision Status"
+          },
+          "evidence_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "absent_in_scope",
+                  "not_exported",
+                  "unavailable_source",
+                  "unresolved_import",
+                  "unsupported",
+                  "filtered",
+                  "partial",
+                  "failed",
+                  "not_requested",
+                  "not_run"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "pair_id",
+          "source",
+          "target",
+          "scores",
+          "retrieval_channels",
+          "ordinal_ranks",
+          "evidence_counts",
+          "nil",
+          "saved_alignment_member",
+          "membership_provenance",
+          "status",
+          "decision_status"
+        ],
+        "title": "Candidate",
+        "description": "A typed candidate summary without graphs or an unqualified raw scorer payload."
+      },
+      "ClaimReviewDecision": {
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Ordinal"
+          },
+          "claim_id": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claim Id"
+          },
+          "claim_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claim Hash"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "support_explanation": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 20,
+            "title": "Support Explanation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ordinal",
+          "claim_id",
+          "claim_hash",
+          "decision",
+          "support_explanation"
+        ],
+        "title": "ClaimReviewDecision"
+      },
+      "EntityContextResponse": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "const": "entity_context",
+            "title": "Artifact Type"
+          },
+          "contract_version": {
+            "type": "string",
+            "const": "exact-explain/1.0",
+            "title": "Contract Version"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "alignment_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Alignment Eligible"
+          },
+          "alignment_eligibility_status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "not_requested",
+              "not_exported"
+            ],
+            "title": "Alignment Eligibility Status",
+            "default": "not_exported"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/Label"
+            },
+            "type": "array",
+            "title": "Labels"
+          },
+          "definitions": {
+            "$ref": "#/components/schemas/Page_Fact_"
+          },
+          "synonyms": {
+            "$ref": "#/components/schemas/Page_Fact_"
+          },
+          "parents": {
+            "$ref": "#/components/schemas/Page_Fact_"
+          },
+          "capabilities": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Capabilities"
+          },
+          "context_scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "fixture_provenance": {
+            "type": "string",
+            "title": "Fixture Provenance"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "artifact_type",
+          "contract_version",
+          "entity",
+          "labels",
+          "definitions",
+          "synonyms",
+          "parents",
+          "capabilities",
+          "context_scope",
+          "fixture_provenance"
+        ],
+        "title": "EntityContextResponse",
+        "description": "Independent summary with bounded original-fact categories."
+      },
+      "EntityRef": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ontology Version Id"
+          },
+          "iri": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Iri"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "class",
+              "object_property",
+              "data_property",
+              "individual"
+            ],
+            "title": "Kind"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "iri",
+          "kind"
+        ],
+        "title": "EntityRef",
+        "description": "An ontology-scoped typed entity; punning and duplicate labels remain distinct."
+      },
+      "EntryPoint": {
+        "properties": {
+          "entity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "preferred_label": {
+            "$ref": "#/components/schemas/PreferredLabel"
+          },
+          "entry_kind": {
+            "type": "string",
+            "enum": [
+              "named_root",
+              "component_entry",
+              "entity_listing"
+            ],
+            "title": "Entry Kind"
+          },
+          "component_size": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Component Size"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entity",
+          "preferred_label",
+          "entry_kind",
+          "component_size"
+        ],
+        "title": "EntryPoint"
+      },
+      "EntryPointPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntryPoint"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "navigation_contract": {
+            "type": "string",
+            "const": "exact-hierarchy/1",
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "default_entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "completeness": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Completeness"
+          },
+          "inference": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope",
+          "basis",
+          "completeness",
+          "inference"
+        ],
+        "title": "EntryPointPage"
+      },
+      "EvidenceBridge": {
+        "properties": {
+          "bridge_id": {
+            "type": "string",
+            "title": "Bridge Id"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "channel_comparison",
+              "feature_correspondence"
+            ],
+            "title": "Level"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "withheld"
+            ],
+            "title": "Status",
+            "default": "recorded"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "target": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "source_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Evidence Ids"
+          },
+          "target_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Evidence Ids"
+          },
+          "source_fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Fact Ids"
+          },
+          "target_fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Fact Ids"
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Artifact Refs"
+          },
+          "interpretation": {
+            "type": "string",
+            "const": "matcher_comparison",
+            "title": "Interpretation",
+            "default": "matcher_comparison"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bridge_id",
+          "level",
+          "channel",
+          "source",
+          "target",
+          "artifact_refs"
+        ],
+        "title": "EvidenceBridge",
+        "description": "Matcher comparison metadata, never an original ontology relationship."
+      },
+      "EvidenceCompleteness": {
+        "properties": {
+          "selected": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Selected"
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved"
+          },
+          "unresolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unresolved"
+          },
+          "not_exported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Not Exported"
+          },
+          "withheld": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Withheld"
+          },
+          "graph_supported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Supported"
+          },
+          "graph_unsupported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Unsupported"
+          },
+          "graph_not_recorded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Not Recorded"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selected",
+          "resolved",
+          "unresolved",
+          "not_exported",
+          "withheld",
+          "graph_supported",
+          "graph_unsupported",
+          "graph_not_recorded"
+        ],
+        "title": "EvidenceCompleteness"
+      },
+      "EvidenceCounts": {
+        "properties": {
+          "side": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Side"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "available_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Available Count"
+          },
+          "ontology_available_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ontology Available Count"
+          },
+          "eligible_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Eligible Count"
+          },
+          "selected_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Selected Count"
+          },
+          "selection_limit": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Selection Limit"
+          },
+          "omission_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Omission Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "side",
+          "channel",
+          "family",
+          "scope",
+          "available_count",
+          "eligible_count",
+          "selected_count",
+          "selection_limit",
+          "omission_reason"
+        ],
+        "title": "EvidenceCounts",
+        "description": "Available features refer to the declared cache scope, not ontology completeness."
+      },
+      "ExactBasisInput": {
+        "properties": {
+          "entity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Value"
+          },
+          "predicate_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicate Iri"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entity",
+          "value"
+        ],
+        "title": "ExactBasisInput"
+      },
+      "ExactMatchBasis": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "not_recorded",
+              "not_applicable",
+              "withheld"
+            ],
+            "title": "Status"
+          },
+          "predicate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "normalized_label_equality",
+                  "candidate_token_key_equality",
+                  "recorded_other"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicate"
+          },
+          "normalization_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalization Rule"
+          },
+          "comparison_key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Key"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExactBasisInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExactBasisInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifact Refs"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "reason_code"
+        ],
+        "title": "ExactMatchBasis",
+        "description": "Only an explicitly saved producer basis may have status recorded."
+      },
+      "ExplanationSummary": {
+        "properties": {
+          "explanation_id": {
+            "type": "string",
+            "title": "Explanation Id"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "entity_profile",
+              "pair_comparison"
+            ],
+            "title": "Task"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "title": "Entities"
+          },
+          "grounding_status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "unverified",
+              "rejected"
+            ],
+            "title": "Grounding Status"
+          },
+          "generation_status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "dispatched",
+              "response_saved",
+              "validated",
+              "failed",
+              "ambiguous"
+            ],
+            "title": "Generation Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "explanation_id",
+          "task",
+          "entities",
+          "grounding_status",
+          "generation_status"
+        ],
+        "title": "ExplanationSummary",
+        "description": "Prepared text discovery without exposing or loading its claims into the response."
+      },
+      "ExpressionTerm": {
+        "properties": {
+          "term_type": {
+            "type": "string",
+            "const": "expression_ref",
+            "title": "Term Type"
+          },
+          "expression_id": {
+            "type": "string",
+            "title": "Expression Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "term_type",
+          "expression_id"
+        ],
+        "title": "ExpressionTerm",
+        "description": "A lossless structured expression loaded through explicit axiom detail."
+      },
+      "Fact": {
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "title": "Fact Id"
+          },
+          "subject": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "predicate_iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Predicate Iri"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/IriTerm"
+                  },
+                  {
+                    "$ref": "#/components/schemas/LiteralTerm"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ExpressionTerm"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "term_type",
+                  "mapping": {
+                    "expression_ref": "#/components/schemas/ExpressionTerm",
+                    "iri": "#/components/schemas/IriTerm",
+                    "literal": "#/components/schemas/LiteralTerm"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "axiom_ref": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axiom Ref"
+          },
+          "interpretation": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "structurally_derived",
+              "reasoner_inferred",
+              "projected",
+              "matcher_comparison",
+              "generated"
+            ],
+            "title": "Interpretation"
+          },
+          "origins": {
+            "items": {
+              "$ref": "#/components/schemas/Origin"
+            },
+            "type": "array",
+            "title": "Origins"
+          },
+          "premise_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Premise Ids"
+          },
+          "derivation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Derivation Id"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "fact_id",
+          "subject",
+          "predicate_iri",
+          "value",
+          "axiom_ref",
+          "interpretation",
+          "origins",
+          "premise_ids",
+          "derivation_id"
+        ],
+        "title": "Fact",
+        "description": "Ontology fact with semantic identity and explicit interpretation basis."
+      },
+      "FactPacket": {
+        "properties": {
+          "task": {
+            "type": "string",
+            "enum": [
+              "entity_profile",
+              "pair_comparison"
+            ],
+            "title": "Task"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Entities"
+          },
+          "context_hashes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Hashes"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "facts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Facts"
+          },
+          "missingness": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingness"
+          },
+          "profile_dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profile Dependencies"
+          },
+          "profiles": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "selection": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Selection"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task",
+          "entities",
+          "context_hashes",
+          "policy_hash",
+          "facts",
+          "missingness",
+          "selection"
+        ],
+        "title": "FactPacket",
+        "description": "Candidate-blind entity input, or score-blind pair input with frozen profile dependencies."
+      },
+      "FeatureDerivation": {
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider"
+          },
+          "version": {
+            "type": "string",
+            "title": "Version"
+          },
+          "rules": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Rules"
+          },
+          "premises": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Premises"
+          },
+          "premises_unavailable": {
+            "type": "boolean",
+            "title": "Premises Unavailable"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "provider",
+          "version",
+          "rules",
+          "premises",
+          "premises_unavailable"
+        ],
+        "title": "FeatureDerivation",
+        "description": "Projection rules remain distinct from the original asserted ontology facts."
+      },
+      "GeneratedExplanationResponse": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "const": "generated_explanation",
+            "title": "Artifact Type"
+          },
+          "contract_version": {
+            "type": "string",
+            "const": "exact-explain/1.0",
+            "title": "Contract Version"
+          },
+          "explanation_id": {
+            "type": "string",
+            "title": "Explanation Id"
+          },
+          "task": {
+            "type": "string",
+            "enum": [
+              "entity_profile",
+              "pair_comparison"
+            ],
+            "title": "Task"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "title": "Entities"
+          },
+          "claims": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "grounding_status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "unverified",
+              "rejected"
+            ],
+            "title": "Grounding Status"
+          },
+          "preparation_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "grounded_description",
+                  "fact_extract",
+                  "factual_fallback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation Kind"
+          },
+          "support_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "typed_template_support",
+                  "exact_support",
+                  "fallback",
+                  "independently_reviewed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Status"
+          },
+          "independent_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndependentDescriptionReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "support_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Support Reasons"
+          },
+          "support_packet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactPacket"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "manifest": {
+            "$ref": "#/components/schemas/GenerationManifest"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Limitations"
+          },
+          "fixture_provenance": {
+            "type": "string",
+            "title": "Fixture Provenance"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "artifact_type",
+          "contract_version",
+          "explanation_id",
+          "task",
+          "entities",
+          "claims",
+          "grounding_status",
+          "manifest",
+          "limitations",
+          "fixture_provenance"
+        ],
+        "title": "GeneratedExplanationResponse",
+        "description": "Prepared generated artifact, with grounding and generation failure represented separately."
+      },
+      "GenerationManifest": {
+        "properties": {
+          "description_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "exact-description/2"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Contract"
+          },
+          "description_review_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Review Hash"
+          },
+          "ontology_context_hashes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Ontology Context Hashes"
+          },
+          "visibility_policy_hash": {
+            "type": "string",
+            "title": "Visibility Policy Hash"
+          },
+          "packet_hash": {
+            "type": "string",
+            "title": "Packet Hash"
+          },
+          "prompt_hash": {
+            "type": "string",
+            "title": "Prompt Hash"
+          },
+          "output_schema": {
+            "type": "string",
+            "title": "Output Schema"
+          },
+          "requested_model": {
+            "type": "string",
+            "title": "Requested Model"
+          },
+          "returned_model": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Returned Model"
+          },
+          "provider": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider"
+          },
+          "parameters_hash": {
+            "type": "string",
+            "title": "Parameters Hash"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language"
+          },
+          "response_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Hash"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "dispatched",
+              "response_saved",
+              "validated",
+              "failed",
+              "ambiguous"
+            ],
+            "title": "Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "ontology_context_hashes",
+          "visibility_policy_hash",
+          "packet_hash",
+          "prompt_hash",
+          "output_schema",
+          "requested_model",
+          "returned_model",
+          "provider",
+          "parameters_hash",
+          "language",
+          "response_hash",
+          "status"
+        ],
+        "title": "GenerationManifest",
+        "description": "Frozen generation dependencies and actual provider identity, excluding secrets."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "Health": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "not_requested"
+            ],
+            "title": "Status"
+          },
+          "contract_version": {
+            "type": "string",
+            "title": "Contract Version",
+            "default": "exact-explain/1.0"
+          },
+          "profile": {
+            "type": "string",
+            "enum": [
+              "local_app",
+              "public_demo"
+            ],
+            "title": "Profile"
+          },
+          "package_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Package Id"
+          },
+          "capabilities": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Capabilities"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "profile",
+          "package_id",
+          "capabilities"
+        ],
+        "title": "Health",
+        "description": "Public service readiness without filesystem or credential metadata."
+      },
+      "IndependentDescriptionReview": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "const": "exact-description-review/1",
+            "title": "Contract Version",
+            "default": "exact-description-review/1"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Reviewer Id"
+          },
+          "reviewer_kind": {
+            "type": "string",
+            "enum": [
+              "human",
+              "independent_agent"
+            ],
+            "title": "Reviewer Kind"
+          },
+          "review_provenance": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 20,
+            "title": "Review Provenance"
+          },
+          "source_explanation_id": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Source Explanation Id"
+          },
+          "source_manifest_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Source Manifest Hash"
+          },
+          "source_generation_status": {
+            "type": "string",
+            "enum": [
+              "validated",
+              "failed",
+              "ambiguous"
+            ],
+            "title": "Source Generation Status"
+          },
+          "packet_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Packet Hash"
+          },
+          "policy_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Policy Hash"
+          },
+          "response_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Response Hash"
+          },
+          "claims_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claims Hash"
+          },
+          "input_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Input Hash"
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/ClaimReviewDecision"
+            },
+            "type": "array",
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Decisions"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "reviewer_id",
+          "reviewer_kind",
+          "review_provenance",
+          "source_explanation_id",
+          "source_manifest_hash",
+          "source_generation_status",
+          "packet_hash",
+          "policy_hash",
+          "response_hash",
+          "claims_hash",
+          "input_hash",
+          "decisions"
+        ],
+        "title": "IndependentDescriptionReview"
+      },
+      "IriTerm": {
+        "properties": {
+          "term_type": {
+            "type": "string",
+            "const": "iri",
+            "title": "Term Type"
+          },
+          "iri": {
+            "type": "string",
+            "title": "Iri"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "term_type",
+          "iri"
+        ],
+        "title": "IriTerm",
+        "description": "An exact named term."
+      },
+      "JsonValue": {},
+      "Label": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "predicate_iri": {
+            "type": "string",
+            "title": "Predicate Iri"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "text",
+          "language",
+          "predicate_iri"
+        ],
+        "title": "Label",
+        "description": "Display text never replaces an entity's typed identity."
+      },
+      "LabelLookup": {
+        "properties": {
+          "entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "iri": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Iri"
+          },
+          "preferred_label": {
+            "$ref": "#/components/schemas/PreferredLabel"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "entity",
+          "preferred_label"
+        ],
+        "title": "LabelLookup",
+        "description": "One typed label result; undeclared IRIs retain their requested identity."
+      },
+      "LabelsResponse": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "title": "Ontology Version Id"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/LabelLookup"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "items",
+          "returned_count"
+        ],
+        "title": "LabelsResponse",
+        "description": "Bounded batch lookup; punning may produce multiple typed results per IRI."
+      },
+      "LiteralTerm": {
+        "properties": {
+          "term_type": {
+            "type": "string",
+            "const": "literal",
+            "title": "Term Type"
+          },
+          "lexical_form": {
+            "type": "string",
+            "title": "Lexical Form"
+          },
+          "datatype": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datatype"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "term_type",
+          "lexical_form",
+          "datatype",
+          "language"
+        ],
+        "title": "LiteralTerm",
+        "description": "Lossless literal identity, including lexical spelling, datatype and language."
+      },
+      "MembershipProvenance": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "derived_from_saved_artifacts",
+              "unavailable"
+            ],
+            "title": "Status"
+          },
+          "artifact_hash": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Artifact Hash"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "artifact_hash"
+        ],
+        "title": "MembershipProvenance",
+        "description": "Final membership is supported by the saved alignment, never a score threshold."
+      },
+      "OrdinalRanks": {
+        "properties": {
+          "candidate_joint_rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Joint Rank"
+          },
+          "nil_rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Nil Rank"
+          },
+          "joint_ordering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joint Ordering"
+          },
+          "joint_tie_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Joint Tie Rule"
+          },
+          "retrieval_rank": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Rank"
+          },
+          "retrieval_ordering": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Ordering"
+          },
+          "retrieval_tie_rule": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Tie Rule"
+          },
+          "retrieval_provenance": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retrieval Provenance"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "OrdinalRanks",
+        "description": "Ordinals are separate from scores and retain their ordering/tie provenance."
+      },
+      "Origin": {
+        "properties": {
+          "document_sha256": {
+            "type": "string",
+            "title": "Document Sha256"
+          },
+          "axiom_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Axiom Id"
+          },
+          "source_span": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Span"
+          },
+          "provenance_status": {
+            "type": "string",
+            "title": "Provenance Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "document_sha256",
+          "axiom_id",
+          "source_span",
+          "provenance_status"
+        ],
+        "title": "Origin",
+        "description": "Original asserted axiom provenance, distinct from interpretation rules."
+      },
+      "OwlExpression": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Type"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "OwlExpression",
+        "description": "Typed OWL constructor; constructor-specific fields remain lossless additive JSON."
+      },
+      "Page_Candidate_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Candidate"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[Candidate]"
+      },
+      "Page_EntityRef_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[EntityRef]"
+      },
+      "Page_ExplanationSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ExplanationSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[ExplanationSummary]"
+      },
+      "Page_Fact_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[Fact]"
+      },
+      "Page_RunSummary_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/RunSummary"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[RunSummary]"
+      },
+      "Page_SelectedEvidence_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/SelectedEvidence"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[SelectedEvidence]"
+      },
+      "Page_dict_str__Any__": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[dict[str, Any]]"
+      },
+      "PairEvidenceMetadata": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "exact-evidence-metadata/1",
+            "title": "Version",
+            "default": "exact-evidence-metadata/1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "selected",
+              "none_selected",
+              "not_exported",
+              "request_failed"
+            ],
+            "title": "Status"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/EvidenceCompleteness"
+          },
+          "bridge_status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "not_recorded",
+              "withheld"
+            ],
+            "title": "Bridge Status"
+          },
+          "bridges": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceBridge"
+            },
+            "type": "array",
+            "title": "Bridges"
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "saved_run",
+              "prepared_visibility_policy"
+            ],
+            "title": "Scope",
+            "default": "saved_run"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "counts",
+          "bridge_status"
+        ],
+        "title": "PairEvidenceMetadata"
+      },
+      "PairResponse": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "const": "pair_decision_trace",
+            "title": "Artifact Type"
+          },
+          "contract_version": {
+            "type": "string",
+            "const": "exact-explain/1.0",
+            "title": "Contract Version"
+          },
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "pair_id": {
+            "type": "string",
+            "title": "Pair Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "target": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "events": {
+            "items": {
+              "$ref": "#/components/schemas/StageEvent"
+            },
+            "type": "array",
+            "title": "Events"
+          },
+          "saved_alignment_member": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Saved Alignment Member"
+          },
+          "relation": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "equivalent",
+                  "source_narrower",
+                  "source_broader",
+                  "not_equivalent",
+                  "unresolved"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relation"
+          },
+          "relation_basis": {
+            "type": "string",
+            "enum": [
+              "default_convention",
+              "graph_closure_with_anchors",
+              "recorded_other",
+              "unavailable"
+            ],
+            "title": "Relation Basis"
+          },
+          "assumption_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Assumption Refs"
+          },
+          "evidence_metadata": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PairEvidenceMetadata"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fixture_provenance": {
+            "type": "string",
+            "title": "Fixture Provenance"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "artifact_type",
+          "contract_version",
+          "run_id",
+          "pair_id",
+          "source",
+          "target",
+          "events",
+          "saved_alignment_member",
+          "relation",
+          "relation_basis",
+          "assumption_refs",
+          "fixture_provenance"
+        ],
+        "title": "PairResponse",
+        "description": "Immutable pair binding, original decisions and actual persisted membership."
+      },
+      "PreferredLabel": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "requested_language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Requested Language"
+          },
+          "language_fallback": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language Fallback"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "value"
+        ],
+        "title": "PreferredLabel",
+        "description": "Policy-visible display label or an explicit scoped absence."
+      },
+      "PreparedHierarchyPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "node_budget_reached": {
+            "type": "boolean",
+            "title": "Node Budget Reached",
+            "default": false
+          },
+          "navigation_contract": {
+            "type": "string",
+            "const": "exact-hierarchy/1",
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "inference": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference"
+          },
+          "entity_semantics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Semantics"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "PreparedHierarchyPage"
+      },
+      "ReviewBundleSummary": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "exact-review-about/1",
+            "title": "Schema Version",
+            "default": "exact-review-about/1"
+          },
+          "purpose": {
+            "type": "string",
+            "const": "development_review",
+            "title": "Purpose",
+            "default": "development_review"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "title": "Title"
+          },
+          "prepared_at": {
+            "type": "string",
+            "title": "Prepared At"
+          },
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "run_manifest_sha256": {
+            "type": "string",
+            "title": "Run Manifest Sha256"
+          },
+          "selection_sha256": {
+            "type": "string",
+            "title": "Selection Sha256"
+          },
+          "policy_sha256": {
+            "type": "string",
+            "title": "Policy Sha256"
+          },
+          "source_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Count"
+          },
+          "presented_pairs": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Presented Pairs"
+          },
+          "correctness_metrics": {
+            "type": "string",
+            "const": "disabled",
+            "title": "Correctness Metrics",
+            "default": "disabled"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Coverage"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewCaseSummary"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Cases"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Limitations"
+          },
+          "ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewOntology"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Ontologies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "prepared_at",
+          "source_run_id",
+          "run_manifest_sha256",
+          "selection_sha256",
+          "policy_sha256",
+          "source_count",
+          "presented_pairs",
+          "coverage",
+          "limitations",
+          "ontologies"
+        ],
+        "title": "ReviewBundleSummary"
+      },
+      "ReviewCaseSummary": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Targets"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "source",
+          "targets"
+        ],
+        "title": "ReviewCaseSummary"
+      },
+      "ReviewOntology": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "title": "Ontology Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "context_sha256": {
+            "type": "string",
+            "title": "Context Sha256"
+          },
+          "root_sha256": {
+            "type": "string",
+            "title": "Root Sha256"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "imports_complete": {
+            "type": "boolean",
+            "title": "Imports Complete"
+          },
+          "entity_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entity Count"
+          },
+          "axiom_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Axiom Count"
+          },
+          "inference_status": {
+            "type": "string",
+            "title": "Inference Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "name",
+          "context_sha256",
+          "root_sha256",
+          "scope",
+          "imports_complete",
+          "entity_count",
+          "axiom_count",
+          "inference_status"
+        ],
+        "title": "ReviewOntology"
+      },
+      "RunSummary": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "title": "Run Id"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "source_ontology_version_id": {
+            "type": "string",
+            "title": "Source Ontology Version Id"
+          },
+          "target_ontology_version_id": {
+            "type": "string",
+            "title": "Target Ontology Version Id"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "available",
+                  "absent_in_scope",
+                  "not_exported",
+                  "unavailable_source",
+                  "unresolved_import",
+                  "unsupported",
+                  "filtered",
+                  "partial",
+                  "failed",
+                  "not_requested",
+                  "not_run"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "counts": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "string"
+                }
+              ]
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "revision",
+          "source_ontology_version_id",
+          "target_ontology_version_id",
+          "status",
+          "counts"
+        ],
+        "title": "RunSummary",
+        "description": "Saved run discovery metadata; pair records and graphs remain unloaded."
+      },
+      "Scope": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "title": "Ontology Version Id"
+          },
+          "context_revision": {
+            "type": "string",
+            "title": "Context Revision"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "visibility_policy_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Visibility Policy Hash"
+          },
+          "filter_id": {
+            "type": "string",
+            "title": "Filter Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "context_revision",
+          "basis",
+          "visibility_policy_hash",
+          "filter_id"
+        ],
+        "title": "Scope",
+        "description": "The complete semantic scope to which a collection cursor is bound."
+      },
+      "Score": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "stage": {
+            "type": "string",
+            "title": "Stage"
+          },
+          "value": {
+            "type": "number",
+            "title": "Value"
+          },
+          "meaning": {
+            "type": "string",
+            "title": "Meaning"
+          },
+          "range": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "number"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Range"
+          },
+          "calibration_status": {
+            "type": "string",
+            "enum": [
+              "not_established",
+              "validated",
+              "not_applicable"
+            ],
+            "title": "Calibration Status",
+            "default": "not_established"
+          },
+          "calibration_artifact": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibration Artifact"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "name",
+          "stage",
+          "value",
+          "meaning"
+        ],
+        "title": "Score",
+        "description": "A recorded value with stage semantics, never an implied calibrated probability."
+      },
+      "SelectedEvidence": {
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "title": "Evidence Id"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "side": {
+            "type": "string",
+            "enum": [
+              "source",
+              "target"
+            ],
+            "title": "Side"
+          },
+          "role": {
+            "type": "string",
+            "title": "Role"
+          },
+          "entity": {
+            "$ref": "#/components/schemas/EntityRef"
+          },
+          "feature_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Feature Id"
+          },
+          "fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Fact Ids"
+          },
+          "source_axiom_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Axiom Refs"
+          },
+          "axiom_origins": {
+            "items": {
+              "additionalProperties": {
+                "$ref": "#/components/schemas/JsonValue"
+              },
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Axiom Origins"
+          },
+          "semantic_terms": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Semantic Terms"
+          },
+          "historical_item_alias": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Historical Item Alias"
+          },
+          "display": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "type": "object",
+            "title": "Display"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Values"
+          },
+          "interpretation": {
+            "type": "string",
+            "enum": [
+              "asserted",
+              "structurally_derived",
+              "reasoner_inferred",
+              "projected",
+              "matcher_comparison",
+              "generated"
+            ],
+            "title": "Interpretation"
+          },
+          "derivation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FeatureDerivation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "provenance_status": {
+            "type": "string",
+            "title": "Provenance Status"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status"
+          },
+          "origin_resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "resolved",
+                  "unresolved",
+                  "not_exported",
+                  "withheld"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Resolution"
+          },
+          "graph_projection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "not_recorded"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Projection"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "evidence_id",
+          "channel",
+          "side",
+          "role",
+          "entity",
+          "feature_id",
+          "fact_ids",
+          "source_axiom_refs",
+          "axiom_origins",
+          "semantic_terms",
+          "historical_item_alias",
+          "display",
+          "values",
+          "interpretation",
+          "provenance_status",
+          "status",
+          "reason"
+        ],
+        "title": "SelectedEvidence",
+        "description": "A selected matcher feature and its many-to-many links to original ontology facts."
+      },
+      "StageEvent": {
+        "properties": {
+          "stage": {
+            "type": "string",
+            "enum": [
+              "retrieval",
+              "prefilter",
+              "pair_scoring",
+              "llm_signal",
+              "selection",
+              "threshold",
+              "cardinality",
+              "extraction",
+              "relation_typing",
+              "repair"
+            ],
+            "title": "Stage"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "not_run",
+              "not_recorded",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "retained",
+              "rejected",
+              "abstained",
+              "selected",
+              "not_selected",
+              "not_applicable",
+              "unknown"
+            ],
+            "title": "Outcome"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "exact_basis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExactMatchBasis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scores": {
+            "items": {
+              "$ref": "#/components/schemas/Score"
+            },
+            "type": "array",
+            "title": "Scores"
+          },
+          "competitor_pair_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Competitor Pair Ids"
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifact Refs"
+          },
+          "implementation_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Implementation Id"
+          },
+          "provenance_status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "derived_from_saved_artifacts",
+              "recomputed",
+              "unavailable"
+            ],
+            "title": "Provenance Status"
+          }
+        },
+        "additionalProperties": true,
+        "type": "object",
+        "required": [
+          "stage",
+          "status",
+          "outcome",
+          "reason_code",
+          "scores",
+          "competitor_pair_ids",
+          "artifact_refs",
+          "implementation_id",
+          "provenance_status"
+        ],
+        "title": "StageEvent",
+        "description": "Bounded finite pipeline event with recorded or explicitly absent stage evidence."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VisibleEvidenceCounts": {
+        "properties": {
+          "visible_selected": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Visible Selected"
+          },
+          "scope": {
+            "type": "string",
+            "const": "prepared_visibility_policy",
+            "title": "Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "visible_selected",
+          "scope"
+        ],
+        "title": "VisibleEvidenceCounts",
+        "description": "Physical policy export reveals only its visible evidence count."
+      }
+    }
+  }
+}

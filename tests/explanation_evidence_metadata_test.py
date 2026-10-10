@@ -229,8 +229,8 @@ def test_only_explicit_recorded_bridges_can_connect_both_sides_and_punned_entiti
 
 
 def test_real_http_lists_all_selected_statuses_with_scoped_original_links(
-    prepared, tmp_path
-):  # noqa: F811
+    prepared, tmp_path  # noqa: F811
+):
     _, package, _, _ = prepared
     manifest = validate_bundle(package)
     oid, locator = next(iter(manifest.ontologies.items()))
@@ -322,3 +322,132 @@ def test_origin_missingness_does_not_erase_recorded_projection_limitation():
     assert safe[1]["origin_resolution"] == "unresolved"
     assert safe[1]["graph_projection"] == "unsupported"
     assert evidence_completeness(safe)["graph_unsupported"] == 2
+
+
+def test_real_policy_hidden_and_missing_originals_keep_api_tombstones(tmp_path):
+    import pyowl_core as core
+
+    from exact_inspect.context import build_context_package
+    from exact_inspect.contracts import file_hash
+
+    context = build_context_package(
+        core.load_snapshot(b"""Ontology(
+          Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
+          AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Visible label")
+          AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:A> "PRIVATE HIDDEN SOURCE")
+          AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:B> "PRIVATE HIDDEN TARGET")
+        )"""),
+        tmp_path / "ontology",
+    )
+    oid = context.ontology_version_id
+    source = {"ontology_version_id": oid, "iri": "urn:A", "kind": "class"}
+    target = {**source, "iri": "urn:B"}
+    label = context.facts(source, category="labels")["items"][0]
+    hidden = context.facts(source, category="definitions")["items"][0]
+    target_hidden = context.facts(target, category="definitions")["items"][0]
+    policy = VisibilityPolicy(ontology_ids=(oid,), categories=("labels",))
+    with pytest.raises(KeyError):
+        context.axiom(hidden["fact_id"], policy=policy)
+    with pytest.raises(KeyError):
+        context.axiom("sha256:" + "0" * 64, policy=policy)
+    record = {
+        "src_iri": "urn:A",
+        "tgt_iri": "urn:B",
+        "src_kind": "class",
+        "tgt_kind": "class",
+        "attributes": {
+            "source": [
+                {
+                    "property_iri": fact["predicate_iri"],
+                    "value": fact["value"]["lexical_form"],
+                    "datatype": fact["value"]["datatype"],
+                    "language": fact["value"]["language"],
+                }
+                for fact in (label, hidden)
+            ]
+            + [{"property_iri": "urn:missing-original", "value": "PRIVATE MISSING ORIGINAL"}]
+        },
+        "candidate_decision": {
+            "events": [
+                {
+                    "stage": "prefilter",
+                    "status": "completed",
+                    "outcome": "retained",
+                    "reason_code": "exact_match_protected",
+                    "exact_basis": {
+                        "status": "recorded",
+                        "predicate": "recorded_other",
+                        "normalization_rule": "saved-rule/v1",
+                        "comparison_key": "PRIVATE KEY",
+                        "source": {
+                            "entity": source,
+                            "value": "PRIVATE HIDDEN SOURCE",
+                            "fact_ids": [hidden["fact_id"]],
+                        },
+                        "target": {
+                            "entity": target,
+                            "value": "PRIVATE HIDDEN TARGET",
+                            "fact_ids": [target_hidden["fact_id"]],
+                        },
+                        "artifact_refs": ["sha256:saved-inputs"],
+                        "reason_code": "saved_exact_inputs",
+                    },
+                }
+            ]
+        },
+    }
+    run = tmp_path / "source-run"
+    ExplanationStore.create(run).append([record])
+
+    def resolver(item, entity):
+        if item.get("property_iri") == "urn:missing-original":
+            return {"fact_ids": ["sha256:" + "0" * 64]}
+        return context.resolve_feature(item, entity)
+
+    import_run(
+        run,
+        tmp_path / "decisions",
+        source_ontology_version_id=oid,
+        target_ontology_version_id=oid,
+        run_id="policy-hidden",
+        evidence_resolver=resolver,
+    )
+    package = publish_bundle(
+        tmp_path,
+        audience="local",
+        policy=policy,
+        ontologies={oid: "ontology"},
+        runs={"policy-hidden": "decisions"},
+    )
+    before = file_hash(tmp_path / "decisions" / "decisions.sqlite")
+    pair_id = DecisionStore(tmp_path / "decisions").candidates("urn:A")["items"][0]["pair_id"]
+    with TestClient(create_prepared_app(package)) as client:
+        params = {"pair_id": pair_id, "limit": 1}
+        items = []
+        while True:
+            response = client.get("/api/v1/runs/policy-hidden/pair-evidence", params=params)
+            assert response.status_code == 200, response.text
+            page = response.json()
+            assert page["total_count"] == 3
+            items.extend(page["items"])
+            if not page["next_cursor"]:
+                break
+            params["cursor"] = page["next_cursor"]
+        assert len({item["evidence_id"] for item in items}) == 3
+        assert [item["origin_resolution"] for item in items].count("withheld") == 2
+        assert [item["origin_resolution"] for item in items].count("resolved") == 1
+        assert "PRIVATE" not in json.dumps(items)
+        for item in items:
+            if item["origin_resolution"] == "withheld":
+                assert item["fact_ids"] == [] and item["feature_id"] is None
+        response = client.get("/api/v1/runs/policy-hidden/pair", params={"pair_id": pair_id})
+        assert response.status_code == 200, response.text
+        trace = response.json()
+        assert trace["evidence_metadata"]["counts"]["selected"] == 3
+        assert trace["evidence_metadata"]["counts"]["withheld"] == 2
+        exact = next(
+            event["exact_basis"] for event in trace["events"] if event["stage"] == "prefilter"
+        )
+        assert exact["status"] == "withheld" and exact["source"] is None and exact["target"] is None
+        assert "PRIVATE" not in response.text
+    assert file_hash(tmp_path / "decisions" / "decisions.sqlite") == before

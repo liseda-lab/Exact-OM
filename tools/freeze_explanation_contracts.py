@@ -11,6 +11,9 @@ from exact_inspect.study.api import create_study_app
 from exact_inspect.study.models import Publish
 from exact_inspect.study.resources import ExplanationResource
 from exact_inspect.study.v2_models import TutorialDefinition
+from exact_inspect.service import create_prepared_app
+from exact_inspect.review_metadata import ReviewBundleSummary
+from exact_inspect.description_review import IndependentDescriptionReview
 
 
 def snapshots():
@@ -23,6 +26,9 @@ def snapshots():
             allow_test_sqlite=True,
         )
         return {
+            "exploration.runtime-openapi.json": create_prepared_app(None).openapi(),
+            "review-about.runtime-schema.json": ReviewBundleSummary.model_json_schema(),
+            "description-review.runtime-schema.json": IndependentDescriptionReview.model_json_schema(),
             "study.runtime-openapi.json": app.openapi(),
             "study-resource.runtime-schema.json": ExplanationResource.model_json_schema(),
             "study-publication.runtime-schema.json": Publish.model_json_schema(),

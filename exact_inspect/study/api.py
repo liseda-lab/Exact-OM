@@ -270,7 +270,9 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
     def exchange(body: Exchange, response: Response):
         auth.exchange_allowed()
         try:
-            sid, generation, state = store.exchange(body.secret)
+            sid, generation, state = store.exchange(
+                body.secret, client_contract=body.client_contract
+            )
         except StudyError:
             auth.exchange_failed()
             raise
@@ -433,6 +435,12 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     @router.post("/admin/studies", dependencies=[Depends(auth.researcher)])
     def publish(body: Publish):
+        from urllib.parse import urlsplit
+
+        if getattr(body.definition, "purpose", None) == "development_review" and urlsplit(
+            origin
+        ).hostname not in {"localhost", "127.0.0.1", "::1"}:
+            raise StudyError(422, "Development review requires a loopback review service")
         return store.publish(body)
 
     @router.get(
@@ -540,18 +548,52 @@ def create_study_app(
     @app.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
         # Pydantic's default "input" field can echo invitation secrets or free text.
-        return JSONResponse(
-            {
-                "detail": [
-                    {"loc": list(error["loc"]), "type": error["type"], "msg": error["msg"]}
+        detail = [
+            {"loc": list(error["loc"]), "type": error["type"], "msg": error["msg"]}
+            for error in exc.errors()
+        ]
+        if request.url.path.endswith("/study/tutorial/progress"):
+            from uuid import uuid4
+
+            correlation_id = uuid4().hex
+            indices = sorted(
+                {
+                    index
                     for error in exc.errors()
-                ]
-            },
-            status_code=422,
-        )
+                    for field, index in zip(error["loc"], error["loc"][1:])
+                    if field == "actions" and type(index) is int
+                }
+            )
+            return JSONResponse(
+                {
+                    "detail": detail,
+                    "validation": {
+                        "code": "tutorial_action_payload_invalid",
+                        "requirement_ids": [],
+                        "action_ids": [f"actions[{index}]" for index in indices],
+                    },
+                    "correlation_id": correlation_id,
+                },
+                status_code=422,
+                headers={"X-Request-ID": correlation_id},
+            )
+        return JSONResponse({"detail": detail}, status_code=422)
 
     @app.exception_handler(StudyError)
     async def study_error(request, exc):
+        if hasattr(exc, "validation"):
+            from uuid import uuid4
+
+            correlation_id = uuid4().hex
+            return JSONResponse(
+                {
+                    "detail": exc.message,
+                    "validation": exc.validation,
+                    "correlation_id": correlation_id,
+                },
+                status_code=exc.status,
+                headers={"X-Request-ID": correlation_id},
+            )
         return JSONResponse(
             {
                 "detail": exc.message,

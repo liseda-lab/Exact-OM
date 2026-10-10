@@ -65,9 +65,13 @@ def revisions(store, *, limit=50, cursor=None):
                     "export_version": versions.get("export", "exact-study-analysis/1"),
                     "source_export_version": versions.get("export", "exact-study-analysis/1"),
                     "supported_analysis_schemas": (
-                        ["exact-study-analysis/2", "exact-study-analysis/3"]
-                        if protocol == "exact-study/2.0"
-                        else ["exact-study-analysis/1"]
+                        ["exact-study-analysis/4"]
+                        if definition.get("form_version") == "exact-study-forms/3"
+                        else (
+                            ["exact-study-analysis/2", "exact-study-analysis/3"]
+                            if protocol == "exact-study/2.0"
+                            else ["exact-study-analysis/1"]
+                        )
                     ),
                     "frozen_hash": row["frozen_hash"],
                     "closed": bool(row["closed"]),

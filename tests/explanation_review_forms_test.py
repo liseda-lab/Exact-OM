@@ -43,7 +43,12 @@ def review(tmp_path):
     store = app.state.study_store
     store.publish(frozen)
     client = TestClient(app, base_url=ORIGIN, headers={"Origin": ORIGIN})
-    state = ok(client.post("/api/v1/study/session", json={"secret": invite(store, frozen)}))
+    state = ok(
+        client.post(
+            "/api/v1/study/session",
+            json={"secret": invite(store, frozen), "client_contract": "study-review/1"},
+        )
+    )
     client.headers["X-Study-Session"] = state["session_id"]
     return client, store, frozen
 
@@ -156,6 +161,41 @@ def train(client, store, frozen):
             )
         )
     return ok(mutate(client, "POST", "tutorial/complete", tutorial_version=tutorial.version))
+
+
+def test_review_tutorial_position_only_request_preserves_omission_and_replay(review):
+    client, store, frozen = review
+    state = consent(client, frozen)
+    ok(setup(client, submitted=True))
+    state = ok(background(client, answers_for(state["forms"])))
+    destination = {
+        "view": "lesson",
+        "lesson_id": state["tutorial"]["lessons"][1]["lesson_id"],
+        "question_id": None,
+    }
+    path = "/api/v1/study/tutorial/progress"
+    body = {
+        "idempotency_key": uuid4().hex,
+        "expected_revision": state["revision"],
+        "tutorial_version": state["tutorial"]["version"],
+        "position": destination,
+    }
+    accepted = ok(client.put(path, json=body))
+    assert accepted["tutorial_progress"]["position"] == destination
+    assert client.get("/api/v1/study/state").json() == accepted
+    assert client.put(path, json=body).json() == accepted
+    # Explicit null still disagrees with a lesson position; omission is distinct.
+    rejected = client.put(
+        path,
+        json={
+            **body,
+            "idempotency_key": uuid4().hex,
+            "expected_revision": accepted["revision"],
+            "current_lesson_id": None,
+        },
+    )
+    assert rejected.status_code == 422
+    assert client.get("/api/v1/study/state").json() == accepted
 
 
 def submit_ranking(client):
@@ -351,7 +391,11 @@ def test_actual_consultation_export_opt_in_and_immutable_restart(review):
         {"consulted_external_ontologies": True},
         {"consulted_external_ontologies": True, "methods": ["reasoner"]},
         {"consulted_external_ontologies": True, "methods": ["protege", "protege"]},
-        {"consulted_external_ontologies": True, "methods": ["other_method"], "other_method": " "},
+        {
+            "consulted_external_ontologies": True,
+            "methods": ["other_method"],
+            "other_method": " ",
+        },
         {
             "consulted_external_ontologies": True,
             "methods": ["other_method"],
@@ -361,7 +405,11 @@ def test_actual_consultation_export_opt_in_and_immutable_restart(review):
         assert consultation(client, state, **values).status_code == 422
     ok(
         consultation(
-            client, state, draft=True, consulted_external_ontologies=True, methods=["other_method"]
+            client,
+            state,
+            draft=True,
+            consulted_external_ontologies=True,
+            methods=["other_method"],
         )
     )
     draft_export = export(client, frozen)

@@ -219,7 +219,11 @@ class StudyDefinition(StrictModel):
             and self.policy_hash != self.visibility_policy.policy_hash.removeprefix("sha256:")
         ):
             raise ValueError("Study policy hash must match its immutable visibility policy")
-        if not self.synthetic and not self.launch_approvals:
+        if (
+            not self.synthetic
+            and not self.launch_approvals
+            and getattr(self, "purpose", None) != "development_review"
+        ):
             raise ValueError("Live publication requires owner-supplied launch approvals")
         if len(self.components) != len(set(self.components)):
             raise ValueError("Duplicate explanation component")
@@ -308,7 +312,7 @@ class StudyDefinition(StrictModel):
 
 
 class Publish(StrictModel):
-    definition: StudyDefinition | StudyDefinitionV2
+    definition: StudyDefinition | StudyDefinitionV2 | DevelopmentReviewDefinition
     case_keys: list[CaseKey]
 
 
@@ -456,6 +460,7 @@ class TimingSegment(StrictModel):
 
 class Exchange(StrictModel):
     secret: Annotated[str, Field(min_length=32, max_length=128)]
+    client_contract: Literal["study-review/1"] | None = None
 
 
 class Invitations(StrictModel):
@@ -596,5 +601,7 @@ class TimingAcknowledgement(StrictModel):
 
 # Additive v2 publication dispatch leaves all legacy model defaults and bytes intact.
 from .v2_models import StudyDefinitionV2  # noqa: E402
+
+from .review_models import DevelopmentReviewDefinition  # noqa: E402
 
 Publish.model_rebuild()

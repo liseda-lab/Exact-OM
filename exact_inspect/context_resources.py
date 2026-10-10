@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import atomic_json
-from .context_semantics import ANNOTATION_REGISTRY, _allowed, decode_payload
+from .context_semantics import ANNOTATION_REGISTRY, _allowed, decode_payload, typed_node
 from .contracts import VisibilityPolicy, canonical_hash, file_hash
 
 RECEIPT_SCHEMA = "exact-ontology-resource/1"
@@ -29,6 +29,57 @@ _LOGICAL_CATEGORIES = {
     "characteristics",
     "axioms",
 }
+
+
+def _native_admitted_axiom(ast, core):
+    """Recover native model values from the lossless admitted structural projection.
+
+    Physical annotation filtering intentionally removes unrestricted original
+    bytes. The remaining typed AST is still authoritative. Installed structural
+    constructors validate it; native canonical encoding and decoding verify the
+    result before the native renderer is used. No OWL syntax is parsed or built
+    here, and no missing constructor fields are guessed.
+    """
+    constructors = {
+        name: value
+        for name, value in vars(core).items()
+        if isinstance(value, type)
+        and issubclass(value, core.StructuralNode)
+        and dataclasses.is_dataclass(value)
+        and value.__name__ == name
+    }
+
+    def restore(node):
+        if isinstance(node, list):
+            return tuple(restore(item) for item in node)
+        if not isinstance(node, dict):
+            if node is None or type(node) in {str, int, float, bool}:
+                return node
+            raise ValueError("Unsupported admitted structural value")
+        constructor = constructors.get(node.get("type"))
+        if constructor is None:
+            raise ValueError("Unsupported admitted structural constructor")
+        fields = dataclasses.fields(constructor)
+        if set(node) != {"type", *(field.name for field in fields)}:
+            raise ValueError("Admitted structural constructor fields differ")
+        values = {field.name: restore(node[field.name]) for field in fields if field.init}
+        # Public typed Entity subclasses fix their own kind in the constructor.
+        # The exact roundtrip below checks the recorded kind rather than silently
+        # accepting a class/property/individual substitution.
+        if issubclass(constructor, core.Entity):
+            values.pop("kind")
+        try:
+            return constructor(**values)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid admitted structural constructor values") from exc
+
+    axiom = restore(ast)
+    if not isinstance(axiom, core.AxiomNode) or typed_node(axiom) != ast:
+        raise ValueError("Admitted axiom differs from its native structural roundtrip")
+    decoded = core.decode_canonical(core.canonical_bytes(axiom))
+    if typed_node(decoded) != ast:
+        raise ValueError("Admitted axiom differs from native canonical decoding")
+    return decoded
 
 
 def export_ontology_resource(
@@ -128,7 +179,14 @@ def export_ontology_resource(
                     removed[category] = removed.get(category, 0) + 1
                     continue
                 payload = decode_payload(row["payload"])
-                axiom = core.decode_canonical(base64.b64decode(payload["original_syntax"]))
+                original = payload.get("original_syntax")
+                axiom = (
+                    core.decode_canonical(base64.b64decode(original, validate=True))
+                    if original is not None
+                    else _native_admitted_axiom(payload["ast"], core)
+                )
+                if typed_node(axiom) != payload["ast"]:
+                    raise ValueError("Original axiom bytes differ from their admitted structure")
                 batch.append(filtered(axiom))
                 retained[category] = retained.get(category, 0) + 1
                 if len(batch) >= 1000:

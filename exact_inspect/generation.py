@@ -217,7 +217,24 @@ def comparison_packet(
             for p in profiles
         ],
         language=source.language,
-        selection={"source": source.selection, "target": target.selection, "per_entity_limit": 50},
+        selection={
+            **(
+                {"description_prose": True}
+                if source.selection.get("description_prose") is True
+                and target.selection.get("description_prose") is True
+                else {}
+            ),
+            "source": source.selection,
+            "target": target.selection,
+            "per_entity_limit": 50,
+            **(
+                {"description_contract": source.selection["description_contract"]}
+                if source.selection.get("description_contract")
+                == target.selection.get("description_contract")
+                and source.selection.get("description_contract")
+                else {}
+            ),
+        },
     )
 
 
@@ -240,12 +257,26 @@ def comparison_templates(packet: FactPacket) -> list[Claim]:
     ]
     claims = []
     for category, name in (("definitions", "definition"), ("labels", "label")):
+        descriptive = packet.selection.get("description_contract") == "exact-description/2"
+        if descriptive and category == "labels":
+            continue
         source = next((f for f in sides[0] if f.get("category") == category), None)
         target = next((f for f in sides[1] if f.get("category") == category), None)
         if source and target:
             kind: Literal["agreement", "difference"]
             a, b = source["value"]["lexical_form"], target["value"]["lexical_form"]
-            if a == b:
+            if descriptive:
+                # Explicit excerpts preserve original wording without presenting
+                # the selected prefix as the complete ontology definition.
+                def excerpt(text):
+                    return text if len(text) <= 180 else text[:180] + "…"
+
+                text = (
+                    f"Source definition excerpt: “{excerpt(a)}”. Target definition excerpt: “{excerpt(b)}”. "
+                    "These excerpts alone do not establish equivalence or incompatibility."
+                )
+                kind = "agreement" if a == b else "difference"
+            elif a == b:
                 text = f"Both entities have this recorded {name}: “{a}”. Shared wording alone does not establish equivalence."
                 kind = "agreement"
             else:
@@ -268,7 +299,9 @@ def grounding(output: ExplanationOutput, packet: FactPacket) -> tuple[str, list[
     """Validate scope and exact supported excerpts; paraphrase semantics remain unverified."""
     facts = {f["fact_id"]: f for f in packet.facts}
     reasons = []
-    templates = comparison_templates(packet)
+    from .descriptions import description_templates
+
+    templates = comparison_templates(packet) + description_templates(packet)
     if any(text not in packet.missingness for text in output.limitations):
         reasons.append("Generated limitations require semantic review")
     for claim in output.claims:
@@ -367,15 +400,42 @@ class ExplanationJobs:
         """Prepare one explanation explicitly; identical dependencies reuse verified output."""
         if not 0 <= max_repairs <= 2:
             raise ValueError("At most two repair attempts are supported")
+        from .descriptions import (
+            COMPARISON_PROMPT_V2,
+            COMPARISON_PROSE_PROMPT_V2,
+            DESCRIPTION_VERSION,
+            PROFILE_PROMPT_V2,
+            PROFILE_PROSE_PROMPT_V2,
+            description_templates,
+        )
+
+        descriptive = packet.selection.get("description_contract") == DESCRIPTION_VERSION
+        prose = descriptive and packet.selection.get("description_prose") is True
+        if prose and prompt is None:
+            prompt = (
+                PROFILE_PROSE_PROMPT_V2
+                if packet.task == "entity_profile"
+                else COMPARISON_PROSE_PROMPT_V2
+            )
         prompt = prompt or (
-            PROFILE_PROMPT if packet.task == "entity_profile" else COMPARISON_PROMPT
+            (PROFILE_PROMPT_V2 if packet.task == "entity_profile" else COMPARISON_PROMPT_V2)
+            if descriptive
+            else (PROFILE_PROMPT if packet.task == "entity_profile" else COMPARISON_PROMPT)
         )
         identity = {
             "packet": packet.model_dump(mode="json"),
             "profile": profile.model_dump(),
             "prompt": prompt,
             "schema": ExplanationOutput.model_json_schema(),
-            "implementation": "grounding-excerpts-and-comparisons/5",
+            "implementation": (
+                "grounding-prose-review/1"
+                if prose
+                else (
+                    "grounding-descriptions/2"
+                    if descriptive
+                    else "grounding-excerpts-and-comparisons/5"
+                )
+            ),
             "max_repairs": max_repairs,
         }
         key = canonical_hash(identity)
@@ -417,7 +477,7 @@ class ExplanationJobs:
             prior_identity = {}
             prior = self.root
             can_replay = False
-            for revision in (4, 3, 2):
+            for revision in (() if descriptive else (4, 3, 2)):
                 candidate_identity = {
                     **identity,
                     "implementation": f"grounding-excerpts-and-comparisons/{revision}",
@@ -465,6 +525,16 @@ class ExplanationJobs:
                         "content": canonical_json(
                             {
                                 **packet.model_dump(mode="json"),
+                                **(
+                                    {
+                                        "supported_description_templates": [
+                                            c.model_dump(exclude={"claim_id"})
+                                            for c in description_templates(packet)
+                                        ]
+                                    }
+                                    if descriptive
+                                    else {}
+                                ),
                                 "supported_comparison_templates": [
                                     c.model_dump(exclude={"claim_id"})
                                     for c in comparison_templates(packet)
@@ -511,6 +581,11 @@ class ExplanationJobs:
                         directory / f"review-{attempt}.json",
                         {"grounding_status": state, "reasons": reasons},
                     )
+                    if prose and state == "unverified":
+                        # Semantic approval is a distinct offline operation. Keep
+                        # this response for that review rather than asking the
+                        # same provider to approve or rewrite its own semantics.
+                        break
                 except DomainError:
                     raise
                 except ValidationError as exc:
@@ -585,6 +660,19 @@ class ExplanationJobs:
                     "category_alias_normalization": adaptations,
                 },
             }
+            if descriptive:
+                from .descriptions import selected_support
+
+                supported = description_templates(packet) + comparison_templates(packet)
+                preparation_kind, support_status = selected_support(claims, packet, status)
+                result.update(
+                    preparation_kind=preparation_kind,
+                    support_status=support_status,
+                    support_reasons=reasons
+                    or ([] if supported else ["No supported non-label description available."]),
+                    support_packet=packet.model_dump(mode="json"),
+                )
+                result["manifest"]["description_contract"] = DESCRIPTION_VERSION
             atomic_json(
                 directory / "receipt.json",
                 {

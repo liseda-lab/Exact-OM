@@ -50,6 +50,7 @@ from .models import (
     SelectedEvidence,
 )
 from .navigation import EntryPointPage, PreparedHierarchyPage
+from .review_metadata import ReviewBundleSummary
 
 
 class Health(WireModel):
@@ -415,6 +416,20 @@ def create_prepared_app(
             package_id=active.manifest.package_id if active else None,
             capabilities=active.manifest.capabilities if active else {},
         )
+
+    @app.get("/api/v1/review-bundle", response_model=ReviewBundleSummary)
+    def review_bundle():
+        value = service().manifest.provenance.get("review_bundle")
+        if value is None:
+            raise DomainError(
+                "review_bundle_not_available", "No development review catalogue is prepared", 404
+            )
+        try:
+            return ReviewBundleSummary.model_validate(value)
+        except ValueError as exc:
+            raise DomainError(
+                "review_bundle_invalid", "Review catalogue failed validation", 409
+            ) from exc
 
     @app.get("/api/v1/ontologies", response_model=Page[dict[str, Any]])
     def ontologies(limit: int = Query(20, ge=1, le=100), cursor: str | None = None):

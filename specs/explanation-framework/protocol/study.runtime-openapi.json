@@ -744,6 +744,268 @@
         }
       }
     },
+    "/api/v1/study/workspace/{scope_id}/entry-points": {
+      "get": {
+        "summary": "Entry Points",
+        "operationId": "entry_points_api_v1_study_workspace__scope_id__entry_points_get",
+        "parameters": [
+          {
+            "name": "scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope Id"
+            }
+          },
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "literal_asserted",
+                "structural_navigation",
+                "reasoner_inferred"
+              ],
+              "type": "string",
+              "default": "literal_asserted",
+              "title": "Basis"
+            }
+          },
+          {
+            "name": "language",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Language"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "X-Study-Session",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            },
+            "description": "Expected session ID; a cookie switch returns 409 before mutation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryPointPage"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/study/workspace/{scope_id}/equivalents": {
+      "get": {
+        "summary": "Equivalents",
+        "operationId": "equivalents_api_v1_study_workspace__scope_id__equivalents_get",
+        "parameters": [
+          {
+            "name": "scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope Id"
+            }
+          },
+          {
+            "name": "ontology_version_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ontology Version Id"
+            }
+          },
+          {
+            "name": "iri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "title": "Iri"
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "class",
+                "object_property",
+                "data_property",
+                "individual"
+              ],
+              "type": "string",
+              "default": "class",
+              "title": "Kind"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Cursor"
+            }
+          },
+          {
+            "name": "X-Study-Session",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            },
+            "description": "Expected session ID; a cookie switch returns 409 before mutation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page_EntityRef_"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/study/workspace/{scope_id}/hierarchy": {
       "get": {
         "summary": "Hierarchy",
@@ -876,7 +1138,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/HierarchyPage"
+                  "$ref": "#/components/schemas/PreparedHierarchyPage"
                 }
               }
             }
@@ -1576,6 +1838,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Exchange Api V1 Study Session Post"
@@ -1612,6 +1877,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response State Api V1 Study State Get"
@@ -1668,6 +1936,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Consent Api V1 Study Consent Put"
@@ -1723,6 +1994,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/SetupV2"
+                  },
+                  {
+                    "$ref": "#/components/schemas/SetupV3"
                   }
                 ],
                 "title": "Body"
@@ -1742,6 +2016,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Setup Api V1 Study Setup Put"
@@ -1789,7 +2066,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/TutorialProgressMutation"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/TutorialProgressMutation"
+                  },
+                  {
+                    "$ref": "#/components/schemas/TutorialProgressMutationV3"
+                  }
+                ],
+                "title": "Body"
               }
             }
           }
@@ -1800,7 +2085,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudyStateV2"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
+                    }
+                  ],
+                  "title": "Response Tutorial Progress Api V1 Study Tutorial Progress Put"
                 }
               }
             }
@@ -1856,7 +2149,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudyStateV2"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
+                    }
+                  ],
+                  "title": "Response Tutorial Assessment Api V1 Study Tutorial Assessment Post"
                 }
               }
             }
@@ -1912,7 +2213,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudyStateV2"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
+                    }
+                  ],
+                  "title": "Response Tutorial Complete Api V1 Study Tutorial Complete Post"
                 }
               }
             }
@@ -1985,6 +2294,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Questionnaire Api V1 Study Questionnaires  Form Id  Put"
@@ -2099,7 +2411,15 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConsultationDraftV2"
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ConsultationDraftV2"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsultationDraftV3"
+                  }
+                ],
+                "title": "Body"
               }
             }
           }
@@ -2110,7 +2430,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/StudyStateV2"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
+                    }
+                  ],
+                  "title": "Response Consultation Draft Api V1 Study Cases  Case Id  Consultation Draft Put"
                 }
               }
             }
@@ -2183,6 +2511,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Draft Api V1 Study Cases  Case Id  Draft Put"
@@ -2258,6 +2589,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Submit Api V1 Study Cases  Case Id  Submit Post"
@@ -2322,6 +2656,9 @@
                   },
                   {
                     "$ref": "#/components/schemas/ConsultationV2"
+                  },
+                  {
+                    "$ref": "#/components/schemas/ConsultationV3"
                   }
                 ],
                 "title": "Body"
@@ -2341,6 +2678,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Consultation Api V1 Study Cases  Case Id  Consultation Put"
@@ -2547,6 +2887,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Pause Api V1 Study Pause Post"
@@ -2613,6 +2956,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Resume Api V1 Study Resume Post"
@@ -2679,6 +3025,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/StudyStateV2"
+                    },
+                    {
+                      "$ref": "#/components/schemas/StudyStateV3"
                     }
                   ],
                   "title": "Response Complete Api V1 Study Complete Post"
@@ -3083,7 +3432,8 @@
                   "enum": [
                     "exact-study-analysis/1",
                     "exact-study-analysis/2",
-                    "exact-study-analysis/3"
+                    "exact-study-analysis/3",
+                    "exact-study-analysis/4"
                   ],
                   "type": "string"
                 },
@@ -3092,6 +3442,16 @@
                 }
               ],
               "title": "Analysis Schema"
+            }
+          },
+          {
+            "name": "include_named_methods",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Include Named Methods"
             }
           }
         ],
@@ -4093,54 +4453,7 @@
         ],
         "title": "Block"
       },
-      "Candidate-Input": {
-        "properties": {
-          "candidate_id": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.:/-]+$",
-            "title": "Candidate Id"
-          },
-          "entity": {
-            "$ref": "#/components/schemas/EntityRef-Input"
-          },
-          "label": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "Label"
-          },
-          "score": {
-            "type": "number",
-            "title": "Score"
-          },
-          "score_meaning": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "Score Meaning"
-          },
-          "display_position": {
-            "type": "integer",
-            "maximum": 5.0,
-            "minimum": 1.0,
-            "title": "Display Position"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "candidate_id",
-          "entity",
-          "label",
-          "score",
-          "score_meaning",
-          "display_position"
-        ],
-        "title": "Candidate"
-      },
-      "Candidate-Output": {
+      "Candidate": {
         "properties": {
           "candidate_id": {
             "type": "string",
@@ -4276,6 +4589,50 @@
           "original_production_ranks"
         ],
         "title": "CaseKey"
+      },
+      "ClaimReviewDecision": {
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "maximum": 23.0,
+            "minimum": 0.0,
+            "title": "Ordinal"
+          },
+          "claim_id": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claim Id"
+          },
+          "claim_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claim Hash"
+          },
+          "decision": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ],
+            "title": "Decision"
+          },
+          "support_explanation": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 20,
+            "title": "Support Explanation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ordinal",
+          "claim_id",
+          "claim_hash",
+          "decision",
+          "support_explanation"
+        ],
+        "title": "ClaimReviewDecision"
       },
       "Consent": {
         "properties": {
@@ -4571,6 +4928,101 @@
         ],
         "title": "ConsultationDraftV2"
       },
+      "ConsultationDraftV3": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Idempotency Key"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "presentation_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Presentation Id"
+          },
+          "form_version": {
+            "type": "string",
+            "const": "exact-study-forms/3",
+            "title": "Form Version"
+          },
+          "consultation_version": {
+            "type": "string",
+            "const": "consultation/3",
+            "title": "Consultation Version"
+          },
+          "consulted_external_ontologies": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consulted External Ontologies"
+          },
+          "methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Methods"
+          },
+          "other_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Method"
+          },
+          "resource_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supplied_only",
+                  "different_or_additional",
+                  "unsure"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_revision",
+          "presentation_id",
+          "form_version",
+          "consultation_version"
+        ],
+        "title": "ConsultationDraftV3"
+      },
       "ConsultationReceipt": {
         "properties": {
           "consulted_external_ontologies": {
@@ -4766,6 +5218,119 @@
         ],
         "title": "ConsultationReceiptV2"
       },
+      "ConsultationReceiptV3": {
+        "properties": {
+          "presentation_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Presentation Id"
+          },
+          "form_version": {
+            "type": "string",
+            "const": "exact-study-forms/3",
+            "title": "Form Version"
+          },
+          "consultation_version": {
+            "type": "string",
+            "const": "consultation/3",
+            "title": "Consultation Version"
+          },
+          "consulted_external_ontologies": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consulted External Ontologies"
+          },
+          "methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method"
+              ]
+            },
+            "type": "array",
+            "title": "Methods"
+          },
+          "other_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Method"
+          },
+          "resource_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supplied_only",
+                  "different_or_additional",
+                  "unsure"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Scope"
+          },
+          "saved_at": {
+            "type": "string",
+            "title": "Saved At"
+          },
+          "case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Case Id"
+          },
+          "submitted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Submitted At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "presentation_id",
+          "form_version",
+          "consultation_version",
+          "consulted_external_ontologies",
+          "methods",
+          "other_method",
+          "resource_scope",
+          "saved_at"
+        ],
+        "title": "ConsultationReceiptV3"
+      },
       "ConsultationV2": {
         "properties": {
           "idempotency_key": {
@@ -4885,6 +5450,331 @@
         ],
         "title": "ConsultationV2"
       },
+      "ConsultationV3": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Idempotency Key"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "presentation_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Presentation Id"
+          },
+          "form_version": {
+            "type": "string",
+            "const": "exact-study-forms/3",
+            "title": "Form Version"
+          },
+          "consultation_version": {
+            "type": "string",
+            "const": "consultation/3",
+            "title": "Consultation Version"
+          },
+          "consulted_external_ontologies": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Consulted External Ontologies"
+          },
+          "methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method"
+              ]
+            },
+            "type": "array",
+            "maxItems": 3,
+            "title": "Methods"
+          },
+          "other_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Method"
+          },
+          "resource_scope": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supplied_only",
+                  "different_or_additional",
+                  "unsure"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resource Scope"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_revision",
+          "presentation_id",
+          "form_version",
+          "consultation_version"
+        ],
+        "title": "ConsultationV3"
+      },
+      "DevelopmentReviewDefinition": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "const": "exact-study/2.0",
+            "title": "Contract Version",
+            "default": "exact-study/2.0"
+          },
+          "study_revision": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Study Revision"
+          },
+          "software_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Software Version"
+          },
+          "information_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Information Version"
+          },
+          "information_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Information Text"
+          },
+          "consent_text": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Consent Text"
+          },
+          "instructions": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Instructions"
+          },
+          "setup_instructions": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Setup Instructions"
+          },
+          "tutorial_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tutorial Steps"
+          },
+          "practice_cases": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeCase"
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Practice Cases"
+          },
+          "form_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Form Version",
+            "default": "exact-study-forms/2"
+          },
+          "closes_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Closes At"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "const": false,
+            "title": "Synthetic",
+            "default": false
+          },
+          "policy_hash": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Policy Hash"
+          },
+          "visibility_policy": {
+            "$ref": "#/components/schemas/VisibilityPolicy"
+          },
+          "analysis_plan": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Analysis Plan"
+          },
+          "launch_approvals": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 0,
+            "title": "Launch Approvals"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/FrozenCase"
+            },
+            "type": "array",
+            "minItems": 2,
+            "title": "Cases"
+          },
+          "assets": {
+            "items": {
+              "$ref": "#/components/schemas/AssetV2"
+            },
+            "type": "array",
+            "title": "Assets"
+          },
+          "schedules": {
+            "items": {
+              "$ref": "#/components/schemas/Schedule"
+            },
+            "type": "array",
+            "maxItems": 64,
+            "minItems": 4,
+            "title": "Schedules"
+          },
+          "components": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "original_context",
+                "entity_description",
+                "hierarchy",
+                "evidence_table",
+                "evidence_graph",
+                "pair_comparison"
+              ]
+            },
+            "type": "array",
+            "title": "Components",
+            "default": [
+              "original_context",
+              "entity_description",
+              "hierarchy",
+              "evidence_table",
+              "evidence_graph",
+              "pair_comparison"
+            ]
+          },
+          "tutorial": {
+            "$ref": "#/components/schemas/TutorialDefinition"
+          },
+          "protocol_versions": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProtocolVersions"
+              },
+              {
+                "$ref": "#/components/schemas/ProtocolVersionsV3"
+              }
+            ],
+            "title": "Protocol Versions"
+          },
+          "workspace_scopes": {
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceScope"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Workspace Scopes"
+          },
+          "resource_scope_analysis_rule": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Resource Scope Analysis Rule"
+          },
+          "purpose": {
+            "type": "string",
+            "const": "development_review",
+            "title": "Purpose"
+          },
+          "correctness_metrics": {
+            "type": "string",
+            "const": "disabled",
+            "title": "Correctness Metrics",
+            "default": "disabled"
+          },
+          "review_provenance": {
+            "$ref": "#/components/schemas/ReviewProvenance"
+          },
+          "review_bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewBundleSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "study_revision",
+          "software_version",
+          "information_version",
+          "information_text",
+          "consent_text",
+          "instructions",
+          "setup_instructions",
+          "closes_at",
+          "policy_hash",
+          "visibility_policy",
+          "analysis_plan",
+          "cases",
+          "assets",
+          "schedules",
+          "tutorial",
+          "protocol_versions",
+          "workspace_scopes",
+          "resource_scope_analysis_rule",
+          "purpose",
+          "review_provenance"
+        ],
+        "title": "DevelopmentReviewDefinition"
+      },
       "EntityContextResponse": {
         "properties": {
           "artifact_type": {
@@ -4967,40 +5857,171 @@
         "title": "EntityContextResponse",
         "description": "Independent summary with bounded original-fact categories."
       },
-      "EntityRef-Input": {
+      "EntryPoint": {
         "properties": {
-          "ontology_version_id": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.:/-]+$",
-            "title": "Ontology Version Id"
+          "entity": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
           },
-          "iri": {
-            "type": "string",
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Iri"
+          "preferred_label": {
+            "$ref": "#/components/schemas/PreferredLabel"
           },
-          "kind": {
+          "entry_kind": {
             "type": "string",
             "enum": [
-              "class",
-              "object_property",
-              "data_property",
-              "individual"
+              "named_root",
+              "component_entry",
+              "entity_listing"
             ],
-            "title": "Kind",
-            "default": "class"
+            "title": "Entry Kind"
+          },
+          "component_size": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Component Size"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "ontology_version_id",
-          "iri"
+          "entity",
+          "preferred_label",
+          "entry_kind",
+          "component_size"
         ],
-        "title": "EntityRef"
+        "title": "EntryPoint"
+      },
+      "EntryPointPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntryPoint"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "navigation_contract": {
+            "type": "string",
+            "const": "exact-hierarchy/1",
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "default_entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis"
+          },
+          "completeness": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Completeness"
+          },
+          "inference": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Inference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope",
+          "basis",
+          "completeness",
+          "inference"
+        ],
+        "title": "EntryPointPage"
       },
       "Event": {
         "properties": {
@@ -5436,6 +6457,18 @@
             "maxLength": 128,
             "minLength": 32,
             "title": "Secret"
+          },
+          "client_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "study-review/1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client Contract"
           }
         },
         "additionalProperties": false,
@@ -5635,6 +6668,92 @@
         "title": "Fact",
         "description": "Ontology fact with semantic identity and explicit interpretation basis."
       },
+      "FactPacket": {
+        "properties": {
+          "task": {
+            "type": "string",
+            "enum": [
+              "entity_profile",
+              "pair_comparison"
+            ],
+            "title": "Task"
+          },
+          "entities": {
+            "items": {
+              "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 1,
+            "title": "Entities"
+          },
+          "context_hashes": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Context Hashes"
+          },
+          "policy_hash": {
+            "type": "string",
+            "title": "Policy Hash"
+          },
+          "facts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Facts"
+          },
+          "missingness": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Missingness"
+          },
+          "profile_dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Profile Dependencies"
+          },
+          "profiles": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Profiles"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "selection": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Selection"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "task",
+          "entities",
+          "context_hashes",
+          "policy_hash",
+          "facts",
+          "missingness",
+          "selection"
+        ],
+        "title": "FactPacket",
+        "description": "Candidate-blind entity input, or score-blind pair input with frozen profile dependencies."
+      },
       "FeatureDerivation": {
         "properties": {
           "provider": {
@@ -5722,6 +6841,84 @@
         ],
         "title": "FormsV2"
       },
+      "FormsV3": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "exact-study-forms/3",
+            "title": "Version"
+          },
+          "background": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionDefinitionV3"
+            },
+            "type": "array",
+            "title": "Background"
+          },
+          "consultation": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionDefinitionV3"
+            },
+            "type": "array",
+            "title": "Consultation"
+          },
+          "setup": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionDefinitionV3"
+            },
+            "type": "array",
+            "title": "Setup"
+          },
+          "final": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionDefinitionV3"
+            },
+            "type": "array",
+            "title": "Final"
+          },
+          "experience_note": {
+            "type": "string",
+            "title": "Experience Note"
+          },
+          "method_version": {
+            "type": "string",
+            "const": "study-methods/3",
+            "title": "Method Version"
+          },
+          "method_dictionary": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method"
+              ]
+            },
+            "type": "object",
+            "title": "Method Dictionary"
+          },
+          "collection_notice": {
+            "type": "string",
+            "title": "Collection Notice"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "version",
+          "background",
+          "consultation",
+          "setup",
+          "final",
+          "experience_note",
+          "method_version",
+          "method_dictionary",
+          "collection_notice"
+        ],
+        "title": "FormsV3"
+      },
       "FrozenCase": {
         "properties": {
           "case_id": {
@@ -5732,7 +6929,7 @@
             "title": "Case Id"
           },
           "source": {
-            "$ref": "#/components/schemas/EntityRef-Input"
+            "$ref": "#/components/schemas/exact_inspect__study__models__EntityRef"
           },
           "source_label": {
             "type": "string",
@@ -5756,7 +6953,7 @@
           },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/Candidate-Input"
+              "$ref": "#/components/schemas/Candidate"
             },
             "type": "array",
             "maxItems": 5,
@@ -5846,6 +7043,66 @@
             ],
             "title": "Grounding Status"
           },
+          "preparation_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "grounded_description",
+                  "fact_extract",
+                  "factual_fallback"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preparation Kind"
+          },
+          "support_status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "typed_template_support",
+                  "exact_support",
+                  "fallback",
+                  "independently_reviewed"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Support Status"
+          },
+          "independent_review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/IndependentDescriptionReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "support_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Support Reasons"
+          },
+          "support_packet": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FactPacket"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "manifest": {
             "$ref": "#/components/schemas/GenerationManifest"
           },
@@ -5880,6 +7137,30 @@
       },
       "GenerationManifest": {
         "properties": {
+          "description_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "exact-description/2"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Contract"
+          },
+          "description_review_hash": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^sha256:[a-f0-9]{64}$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Review Hash"
+          },
           "ontology_context_hashes": {
             "items": {
               "type": "string"
@@ -5993,130 +7274,105 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
-      "HierarchyPage": {
+      "IndependentDescriptionReview": {
         "properties": {
-          "items": {
-            "items": {
-              "additionalProperties": true,
-              "type": "object"
-            },
-            "type": "array",
-            "title": "Items"
+          "contract_version": {
+            "type": "string",
+            "const": "exact-description-review/1",
+            "title": "Contract Version",
+            "default": "exact-description-review/1"
           },
-          "returned_count": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Returned Count"
+          "reviewer_id": {
+            "type": "string",
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Reviewer Id"
           },
-          "total_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Count"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          },
-          "truncated": {
-            "type": "boolean",
-            "title": "Truncated",
-            "default": false
-          },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
-          },
-          "status": {
+          "reviewer_kind": {
             "type": "string",
             "enum": [
-              "available",
-              "absent_in_scope",
-              "not_exported",
-              "unavailable_source",
-              "unresolved_import",
-              "unsupported",
-              "filtered",
-              "partial",
+              "human",
+              "independent_agent"
+            ],
+            "title": "Reviewer Kind"
+          },
+          "review_provenance": {
+            "type": "string",
+            "maxLength": 2000,
+            "minLength": 20,
+            "title": "Review Provenance"
+          },
+          "source_explanation_id": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Source Explanation Id"
+          },
+          "source_manifest_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Source Manifest Hash"
+          },
+          "source_generation_status": {
+            "type": "string",
+            "enum": [
+              "validated",
               "failed",
-              "not_requested",
-              "not_run"
+              "ambiguous"
             ],
-            "title": "Status",
-            "default": "available"
+            "title": "Source Generation Status"
           },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
+          "packet_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Packet Hash"
           },
-          "order": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "pair_id_ascending",
-                  "source_id_ascending",
-                  "package_id_ascending"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Order"
+          "policy_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Policy Hash"
           },
-          "nodes": {
+          "response_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Response Hash"
+          },
+          "claims_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Claims Hash"
+          },
+          "input_hash": {
+            "type": "string",
+            "pattern": "^sha256:[a-f0-9]{64}$",
+            "title": "Input Hash"
+          },
+          "decisions": {
             "items": {
-              "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+              "$ref": "#/components/schemas/ClaimReviewDecision"
             },
             "type": "array",
-            "title": "Nodes"
-          },
-          "basis": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Basis"
-          },
-          "node_budget_reached": {
-            "type": "boolean",
-            "title": "Node Budget Reached",
-            "default": false
+            "maxItems": 24,
+            "minItems": 1,
+            "title": "Decisions"
           }
         },
         "additionalProperties": false,
         "type": "object",
         "required": [
-          "items",
-          "returned_count",
-          "scope"
+          "reviewer_id",
+          "reviewer_kind",
+          "review_provenance",
+          "source_explanation_id",
+          "source_manifest_hash",
+          "source_generation_status",
+          "packet_hash",
+          "policy_hash",
+          "response_hash",
+          "claims_hash",
+          "input_hash",
+          "decisions"
         ],
-        "title": "HierarchyPage",
-        "description": "Bounded topology preserving edges to already returned nodes."
+        "title": "IndependentDescriptionReview"
       },
       "Invitations": {
         "properties": {
@@ -6501,6 +7757,106 @@
         ],
         "title": "OwlExpression",
         "description": "Typed OWL constructor; constructor-specific fields remain lossless additive JSON."
+      },
+      "Page_EntityRef_": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "Page[EntityRef]"
       },
       "Page_ExplanationSummary_": {
         "properties": {
@@ -7148,6 +8504,160 @@
         "title": "PreferredLabel",
         "description": "Policy-visible display label or an explicit scoped absence."
       },
+      "PreparedHierarchyPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+            },
+            "type": "array",
+            "title": "Nodes"
+          },
+          "basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Basis"
+          },
+          "node_budget_reached": {
+            "type": "boolean",
+            "title": "Node Budget Reached",
+            "default": false
+          },
+          "navigation_contract": {
+            "type": "string",
+            "const": "exact-hierarchy/1",
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "inference": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference"
+          },
+          "entity_semantics": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entity Semantics"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "PreparedHierarchyPage"
+      },
       "ProtocolVersions": {
         "properties": {
           "setup": {
@@ -7221,6 +8731,85 @@
           "software"
         ],
         "title": "ProtocolVersions"
+      },
+      "ProtocolVersionsV3": {
+        "properties": {
+          "setup": {
+            "type": "string",
+            "const": "setup/3",
+            "title": "Setup"
+          },
+          "tutorial": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Tutorial"
+          },
+          "assessment": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Assessment"
+          },
+          "forms": {
+            "type": "string",
+            "const": "exact-study-forms/3",
+            "title": "Forms"
+          },
+          "consultation": {
+            "type": "string",
+            "const": "consultation/3",
+            "title": "Consultation"
+          },
+          "methods": {
+            "type": "string",
+            "const": "study-methods/3",
+            "title": "Methods"
+          },
+          "information": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Information"
+          },
+          "resource_policy": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Resource Policy"
+          },
+          "software": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Software"
+          },
+          "export": {
+            "type": "string",
+            "const": "exact-study-analysis/4",
+            "title": "Export"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "setup",
+          "tutorial",
+          "assessment",
+          "forms",
+          "consultation",
+          "methods",
+          "information",
+          "resource_policy",
+          "software",
+          "export"
+        ],
+        "title": "ProtocolVersionsV3"
       },
       "PublicAsset": {
         "properties": {
@@ -7366,6 +8955,9 @@
               },
               {
                 "$ref": "#/components/schemas/StudyDefinitionV2"
+              },
+              {
+                "$ref": "#/components/schemas/DevelopmentReviewDefinition"
               }
             ],
             "title": "Definition"
@@ -7482,6 +9074,117 @@
           "row_order"
         ],
         "title": "QuestionDefinitionV2"
+      },
+      "QuestionDefinitionV3": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Id"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "options": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Options"
+          },
+          "multiple": {
+            "type": "boolean",
+            "title": "Multiple"
+          },
+          "required": {
+            "type": "boolean",
+            "title": "Required"
+          },
+          "show_if": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Show If"
+          },
+          "matrix": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Matrix"
+          },
+          "option_order": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:/-]+$"
+            },
+            "type": "array",
+            "title": "Option Order"
+          },
+          "row_order": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:/-]+$"
+            },
+            "type": "array",
+            "title": "Row Order"
+          },
+          "text_min_length": {
+            "type": "integer",
+            "maximum": 160.0,
+            "minimum": 0.0,
+            "title": "Text Min Length"
+          },
+          "text_max_length": {
+            "type": "integer",
+            "maximum": 2000.0,
+            "minimum": 1.0,
+            "title": "Text Max Length"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "label",
+          "options",
+          "multiple",
+          "required",
+          "show_if",
+          "matrix",
+          "option_order",
+          "row_order",
+          "text_min_length",
+          "text_max_length"
+        ],
+        "title": "QuestionDefinitionV3"
       },
       "Questionnaire": {
         "properties": {
@@ -7894,6 +9597,236 @@
         ],
         "title": "Resume"
       },
+      "ReviewBundleSummary": {
+        "properties": {
+          "schema_version": {
+            "type": "string",
+            "const": "exact-review-about/1",
+            "title": "Schema Version",
+            "default": "exact-review-about/1"
+          },
+          "purpose": {
+            "type": "string",
+            "const": "development_review",
+            "title": "Purpose",
+            "default": "development_review"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 160,
+            "title": "Title"
+          },
+          "prepared_at": {
+            "type": "string",
+            "title": "Prepared At"
+          },
+          "source_run_id": {
+            "type": "string",
+            "title": "Source Run Id"
+          },
+          "run_manifest_sha256": {
+            "type": "string",
+            "title": "Run Manifest Sha256"
+          },
+          "selection_sha256": {
+            "type": "string",
+            "title": "Selection Sha256"
+          },
+          "policy_sha256": {
+            "type": "string",
+            "title": "Policy Sha256"
+          },
+          "source_count": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Source Count"
+          },
+          "presented_pairs": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Presented Pairs"
+          },
+          "correctness_metrics": {
+            "type": "string",
+            "const": "disabled",
+            "title": "Correctness Metrics",
+            "default": "disabled"
+          },
+          "coverage": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Coverage"
+          },
+          "cases": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewCaseSummary"
+            },
+            "type": "array",
+            "maxItems": 200,
+            "title": "Cases"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Limitations"
+          },
+          "ontologies": {
+            "items": {
+              "$ref": "#/components/schemas/ReviewOntology"
+            },
+            "type": "array",
+            "maxItems": 20,
+            "title": "Ontologies"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "title",
+          "prepared_at",
+          "source_run_id",
+          "run_manifest_sha256",
+          "selection_sha256",
+          "policy_sha256",
+          "source_count",
+          "presented_pairs",
+          "coverage",
+          "limitations",
+          "ontologies"
+        ],
+        "title": "ReviewBundleSummary"
+      },
+      "ReviewCaseSummary": {
+        "properties": {
+          "case_id": {
+            "type": "string",
+            "title": "Case Id"
+          },
+          "source": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+          },
+          "targets": {
+            "items": {
+              "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Targets"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "case_id",
+          "source",
+          "targets"
+        ],
+        "title": "ReviewCaseSummary"
+      },
+      "ReviewOntology": {
+        "properties": {
+          "ontology_version_id": {
+            "type": "string",
+            "title": "Ontology Version Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "context_sha256": {
+            "type": "string",
+            "title": "Context Sha256"
+          },
+          "root_sha256": {
+            "type": "string",
+            "title": "Root Sha256"
+          },
+          "scope": {
+            "type": "string",
+            "title": "Scope"
+          },
+          "imports_complete": {
+            "type": "boolean",
+            "title": "Imports Complete"
+          },
+          "entity_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Entity Count"
+          },
+          "axiom_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Axiom Count"
+          },
+          "inference_status": {
+            "type": "string",
+            "title": "Inference Status"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "ontology_version_id",
+          "name",
+          "context_sha256",
+          "root_sha256",
+          "scope",
+          "imports_complete",
+          "entity_count",
+          "axiom_count",
+          "inference_status"
+        ],
+        "title": "ReviewOntology"
+      },
+      "ReviewProvenance": {
+        "properties": {
+          "bundle_version": {
+            "type": "string",
+            "const": "exact-development-review/1",
+            "title": "Bundle Version",
+            "default": "exact-development-review/1"
+          },
+          "run_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Run Manifest Sha256"
+          },
+          "selection_manifest_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Selection Manifest Sha256"
+          },
+          "source_run_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Source Run Id"
+          },
+          "limitation": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 1,
+            "title": "Limitation"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_manifest_sha256",
+          "selection_manifest_sha256",
+          "source_run_id",
+          "limitation"
+        ],
+        "title": "ReviewProvenance"
+      },
       "RevisionPage": {
         "properties": {
           "items": {
@@ -8240,6 +10173,39 @@
             ],
             "title": "Status"
           },
+          "origin_resolution": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "resolved",
+                  "unresolved",
+                  "not_exported",
+                  "withheld"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Resolution"
+          },
+          "graph_projection": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "supported",
+                  "unsupported",
+                  "not_recorded"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graph Projection"
+          },
           "reason": {
             "anyOf": [
               {
@@ -8464,6 +10430,77 @@
         ],
         "title": "SetupReceiptV2"
       },
+      "SetupReceiptV3": {
+        "properties": {
+          "setup_version": {
+            "type": "string",
+            "const": "setup/3",
+            "title": "Setup Version"
+          },
+          "instructions_acknowledged": {
+            "type": "boolean",
+            "title": "Instructions Acknowledged"
+          },
+          "external_inspection_optional_understood": {
+            "type": "boolean",
+            "title": "External Inspection Optional Understood"
+          },
+          "resource_access": {
+            "type": "string",
+            "enum": [
+              "not_checked",
+              "available",
+              "needs_help"
+            ],
+            "title": "Resource Access"
+          },
+          "familiar_methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method",
+                "none"
+              ]
+            },
+            "type": "array",
+            "title": "Familiar Methods"
+          },
+          "familiar_other_method": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familiar Other Method"
+          },
+          "submitted": {
+            "type": "boolean",
+            "title": "Submitted"
+          },
+          "saved_at": {
+            "type": "string",
+            "title": "Saved At"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "setup_version",
+          "instructions_acknowledged",
+          "external_inspection_optional_understood",
+          "resource_access",
+          "familiar_methods",
+          "familiar_other_method",
+          "submitted",
+          "saved_at"
+        ],
+        "title": "SetupReceiptV3"
+      },
       "SetupV2": {
         "properties": {
           "idempotency_key": {
@@ -8530,6 +10567,86 @@
         ],
         "title": "SetupV2"
       },
+      "SetupV3": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Idempotency Key"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "setup_version": {
+            "type": "string",
+            "const": "setup/3",
+            "title": "Setup Version"
+          },
+          "instructions_acknowledged": {
+            "type": "boolean",
+            "title": "Instructions Acknowledged"
+          },
+          "external_inspection_optional_understood": {
+            "type": "boolean",
+            "title": "External Inspection Optional Understood"
+          },
+          "resource_access": {
+            "type": "string",
+            "enum": [
+              "not_checked",
+              "available",
+              "needs_help"
+            ],
+            "title": "Resource Access"
+          },
+          "familiar_methods": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "protege",
+                "plain_files",
+                "other_method",
+                "none"
+              ]
+            },
+            "type": "array",
+            "maxItems": 4,
+            "title": "Familiar Methods"
+          },
+          "familiar_other_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Familiar Other Method"
+          },
+          "submitted": {
+            "type": "boolean",
+            "title": "Submitted",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_revision",
+          "setup_version",
+          "instructions_acknowledged",
+          "external_inspection_optional_understood",
+          "resource_access"
+        ],
+        "title": "SetupV3"
+      },
       "StudyCase": {
         "properties": {
           "artifact_type": {
@@ -8582,7 +10699,7 @@
           },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/Candidate-Output"
+              "$ref": "#/components/schemas/Candidate"
             },
             "type": "array",
             "maxItems": 5,
@@ -8686,7 +10803,7 @@
           },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/Candidate-Output"
+              "$ref": "#/components/schemas/Candidate"
             },
             "type": "array",
             "maxItems": 5,
@@ -9073,7 +11190,15 @@
             "$ref": "#/components/schemas/TutorialDefinition"
           },
           "protocol_versions": {
-            "$ref": "#/components/schemas/ProtocolVersions"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProtocolVersions"
+              },
+              {
+                "$ref": "#/components/schemas/ProtocolVersionsV3"
+              }
+            ],
+            "title": "Protocol Versions"
           },
           "workspace_scopes": {
             "items": {
@@ -9637,6 +11762,326 @@
         ],
         "title": "StudyStateV2"
       },
+      "StudyStateV3": {
+        "properties": {
+          "artifact_type": {
+            "type": "string",
+            "const": "study_state",
+            "title": "Artifact Type",
+            "default": "study_state"
+          },
+          "contract_version": {
+            "type": "string",
+            "const": "exact-study/2.0",
+            "title": "Contract Version",
+            "default": "exact-study/2.0"
+          },
+          "study_revision": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Study Revision"
+          },
+          "session_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Session Id"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Revision"
+          },
+          "stage": {
+            "type": "string",
+            "enum": [
+              "welcome",
+              "setup",
+              "background",
+              "practice",
+              "tutorial",
+              "case",
+              "consultation",
+              "final",
+              "paused",
+              "closed",
+              "completed"
+            ],
+            "title": "Stage"
+          },
+          "assignment_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Assignment Id"
+          },
+          "current_case_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Case Id"
+          },
+          "current_presentation_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Presentation Id"
+          },
+          "completed_cases": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Completed Cases"
+          },
+          "assigned_case_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Assigned Case Count"
+          },
+          "ranking": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RankingResponseV2"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consultation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsultationReceiptV3"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "consent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsentReceipt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "setup": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SetupReceiptV3"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "questionnaires": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/QuestionnaireResponse"
+            },
+            "type": "object",
+            "title": "Questionnaires"
+          },
+          "information_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Information Version"
+          },
+          "information_text": {
+            "type": "string",
+            "title": "Information Text"
+          },
+          "consent_text": {
+            "type": "string",
+            "title": "Consent Text"
+          },
+          "instructions": {
+            "type": "string",
+            "title": "Instructions"
+          },
+          "setup_instructions": {
+            "type": "string",
+            "title": "Setup Instructions"
+          },
+          "tutorial_steps": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Tutorial Steps"
+          },
+          "practice_cases": {
+            "items": {
+              "$ref": "#/components/schemas/PracticeCase"
+            },
+            "type": "array",
+            "title": "Practice Cases"
+          },
+          "forms": {
+            "$ref": "#/components/schemas/FormsV3"
+          },
+          "ontology_resources": {
+            "items": {
+              "$ref": "#/components/schemas/PublicAssetV2"
+            },
+            "type": "array",
+            "title": "Ontology Resources"
+          },
+          "synthetic": {
+            "type": "boolean",
+            "title": "Synthetic"
+          },
+          "gap_recovery": {
+            "type": "string",
+            "title": "Gap Recovery"
+          },
+          "integration_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "study-integration/1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Integration Contract"
+          },
+          "tutorial": {
+            "$ref": "#/components/schemas/TutorialPublic"
+          },
+          "tutorial_progress": {
+            "$ref": "#/components/schemas/TutorialReceipt"
+          },
+          "consultation_draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsultationReceiptV3"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "previous_consultation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ConsultationReceiptV3"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "protocol_versions": {
+            "$ref": "#/components/schemas/ProtocolVersionsV3"
+          },
+          "telemetry": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Telemetry"
+          },
+          "review_bundle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewBundleSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "purpose": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "development_review"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Purpose"
+          },
+          "correctness_metrics": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "disabled"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Correctness Metrics"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "study_revision",
+          "session_id",
+          "revision",
+          "stage",
+          "assignment_id",
+          "current_case_id",
+          "current_presentation_id",
+          "completed_cases",
+          "assigned_case_count",
+          "ranking",
+          "consultation",
+          "consent",
+          "setup",
+          "questionnaires",
+          "information_version",
+          "information_text",
+          "consent_text",
+          "instructions",
+          "setup_instructions",
+          "tutorial_steps",
+          "forms",
+          "ontology_resources",
+          "synthetic",
+          "gap_recovery",
+          "tutorial",
+          "tutorial_progress",
+          "consultation_draft",
+          "previous_consultation",
+          "protocol_versions"
+        ],
+        "title": "StudyStateV3"
+      },
       "TimingAcknowledgement": {
         "properties": {
           "acknowledged_segment_id": {
@@ -9854,6 +12299,20 @@
       },
       "TutorialAction": {
         "properties": {
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
           "requirement_id": {
             "type": "string",
             "maxLength": 128,
@@ -10050,6 +12509,190 @@
         "title": "TutorialActionEntity",
         "description": "Action evidence must carry the recorded type; frozen publications keep v1 defaults."
       },
+      "TutorialActionV3": {
+        "properties": {
+          "evidence_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Id"
+          },
+          "requirement_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Requirement Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "inspect_other_candidate",
+              "return_to_candidate",
+              "search_entity",
+              "navigate_parent",
+              "navigate_child",
+              "return_to_compared",
+              "open_citation",
+              "open_original_axiom",
+              "locate_in_evidence_list",
+              "inspect_graph_or_list",
+              "change_graph_view",
+              "rank_with_details_open",
+              "add_rank",
+              "move_rank",
+              "remove_rank",
+              "undo_rank",
+              "keep_initial_order",
+              "check_partial_ranking",
+              "choose_none",
+              "choose_insufficient",
+              "copy_iri",
+              "locate_downloads",
+              "report_multiple_methods",
+              "report_no_methods"
+            ],
+            "title": "Action"
+          },
+          "candidate_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Candidate Id"
+          },
+          "entity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TutorialActionEntity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fact_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fact Id"
+          },
+          "ranked_candidate_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:/-]+$"
+                },
+                "type": "array",
+                "maxItems": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranked Candidate Ids"
+          },
+          "response_type": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "ranked_candidates",
+                  "none_of_these",
+                  "insufficient_evidence"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Response Type"
+          },
+          "methods": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "protege",
+                    "plain_files",
+                    "other_method"
+                  ]
+                },
+                "type": "array",
+                "maxItems": 3
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Methods"
+          },
+          "asset_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string",
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^[A-Za-z0-9_.:/-]+$"
+                },
+                "type": "array",
+                "maxItems": 10
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Asset Ids"
+          },
+          "other_method": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 160
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Other Method"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "requirement_id",
+          "action"
+        ],
+        "title": "TutorialActionV3"
+      },
       "TutorialAssessment": {
         "properties": {
           "idempotency_key": {
@@ -10101,68 +12744,7 @@
         ],
         "title": "TutorialAssessment"
       },
-      "TutorialCase-Input": {
-        "properties": {
-          "case_id": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 1,
-            "pattern": "^[A-Za-z0-9_.:/-]+$",
-            "title": "Case Id",
-            "default": "practice-case"
-          },
-          "source": {
-            "$ref": "#/components/schemas/EntityRef-Input"
-          },
-          "source_label": {
-            "type": "string",
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "Source Label"
-          },
-          "candidates": {
-            "items": {
-              "$ref": "#/components/schemas/Candidate-Input"
-            },
-            "type": "array",
-            "maxItems": 5,
-            "minItems": 5,
-            "title": "Candidates"
-          },
-          "explanation_refs": {
-            "items": {
-              "type": "string",
-              "maxLength": 128,
-              "minLength": 1,
-              "pattern": "^[A-Za-z0-9_.:/-]+$"
-            },
-            "type": "array",
-            "maxItems": 10,
-            "minItems": 1,
-            "title": "Explanation Refs"
-          },
-          "ontology_resources": {
-            "items": {
-              "$ref": "#/components/schemas/PublicAssetV2"
-            },
-            "type": "array",
-            "maxItems": 10,
-            "minItems": 2,
-            "title": "Ontology Resources"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "source",
-          "source_label",
-          "candidates",
-          "explanation_refs",
-          "ontology_resources"
-        ],
-        "title": "TutorialCase"
-      },
-      "TutorialCase-Output": {
+      "TutorialCase": {
         "properties": {
           "case_id": {
             "type": "string",
@@ -10183,7 +12765,7 @@
           },
           "candidates": {
             "items": {
-              "$ref": "#/components/schemas/Candidate-Output"
+              "$ref": "#/components/schemas/Candidate"
             },
             "type": "array",
             "maxItems": 5,
@@ -10306,7 +12888,7 @@
             "title": "Assessment"
           },
           "case": {
-            "$ref": "#/components/schemas/TutorialCase-Input"
+            "$ref": "#/components/schemas/TutorialCase"
           },
           "practice_id": {
             "type": "string",
@@ -10566,6 +13148,134 @@
         ],
         "title": "TutorialProgressMutation"
       },
+      "TutorialProgressMutationV3": {
+        "properties": {
+          "idempotency_key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Idempotency Key"
+          },
+          "expected_revision": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Expected Revision"
+          },
+          "tutorial_version": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Tutorial Version"
+          },
+          "position": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/LessonPosition"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AssessmentPosition"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "view",
+                  "mapping": {
+                    "assessment": "#/components/schemas/AssessmentPosition",
+                    "lesson": "#/components/schemas/LessonPosition"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Position"
+          },
+          "current_lesson_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Lesson Id"
+          },
+          "lesson_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:/-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lesson Id"
+          },
+          "completed_requirements": {
+            "items": {
+              "type": "string",
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_.:/-]+$"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Completed Requirements"
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/TutorialActionV3"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "title": "Actions"
+          },
+          "practice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PracticeAnswer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "assessment_draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AssessmentDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "help_opened": {
+            "type": "boolean",
+            "title": "Help Opened",
+            "default": false
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "idempotency_key",
+          "expected_revision",
+          "tutorial_version"
+        ],
+        "title": "TutorialProgressMutationV3"
+      },
       "TutorialPublic": {
         "properties": {
           "tutorial_id": {
@@ -10618,7 +13328,7 @@
             "title": "Assessment"
           },
           "case": {
-            "$ref": "#/components/schemas/TutorialCase-Output"
+            "$ref": "#/components/schemas/TutorialCase"
           }
         },
         "additionalProperties": false,
@@ -10938,7 +13648,13 @@
           },
           "reasoner": {
             "type": "string",
-            "const": "not_run",
+            "enum": [
+              "not_run",
+              "available",
+              "partial",
+              "failed",
+              "unsupported"
+            ],
             "title": "Reasoner"
           },
           "reason": {
@@ -10970,6 +13686,20 @@
           "graph_form": {
             "type": "string",
             "title": "Graph Form"
+          },
+          "navigation_contract": {
+            "type": "string",
+            "const": "exact-hierarchy/1",
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "navigation": {
+            "additionalProperties": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "type": "object",
+            "title": "Navigation"
           }
         },
         "additionalProperties": false,
@@ -10991,7 +13721,8 @@
           "coverage",
           "continuation",
           "original_format",
-          "graph_form"
+          "graph_form",
+          "navigation"
         ],
         "title": "WorkspaceCapabilitiesResponse"
       },
