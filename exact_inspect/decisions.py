@@ -19,6 +19,7 @@ from .contracts import (
     encode_cursor,
     file_hash,
 )
+from .evidence_metadata import exact_match_basis, pair_evidence_metadata
 from .sqlite_safety import DECISION_TABLES, readonly_connection
 
 _SCORE_MEANINGS = {
@@ -32,7 +33,7 @@ _SCORE_MEANINGS = {
 }
 
 
-ADAPTER_REVISION = "decision-adapter/3"
+ADAPTER_REVISION = "decision-adapter/4"
 
 
 def _score(name, value, stage):
@@ -72,8 +73,8 @@ def _summary_scores(values, events):
     return scores
 
 
-def _event(raw, key_map, dependencies):
-    return {
+def _event(raw, key_map, dependencies, *, source=None, target=None):
+    result = {
         "stage": raw["stage"],
         "status": raw["status"],
         "outcome": raw["outcome"],
@@ -88,9 +89,13 @@ def _event(raw, key_map, dependencies):
         "provenance_status": raw.get("provenance_status", "unavailable"),
     }
 
+    if raw["stage"] == "prefilter":
+        result["exact_basis"] = exact_match_basis(raw, source=source, target=target)
+    return result
+
 
 def _missing_event(stage):
-    return {
+    result = {
         "stage": stage,
         "status": "not_recorded",
         "outcome": "unknown",
@@ -101,6 +106,10 @@ def _missing_event(stage):
         "implementation_id": None,
         "provenance_status": "unavailable",
     }
+
+    if stage == "prefilter":
+        result["exact_basis"] = exact_match_basis(result)
+    return result
 
 
 def _feature_items(record):
@@ -202,6 +211,16 @@ def selected_evidence(record, source, target, *, resolver=None):
                     "derived_from_saved_artifacts" if fact_ids else "provenance_unavailable",
                 ),
                 "status": status,
+                "origin_resolution": (
+                    "resolved"
+                    if fact_ids
+                    else "unresolved" if resolver and has_identity else "not_exported"
+                ),
+                "graph_projection": (
+                    item.get("graph_projection")
+                    if item.get("graph_projection") in {"supported", "unsupported"}
+                    else "not_recorded"
+                ),
                 "reason": (
                     None
                     if fact_ids
@@ -401,14 +420,12 @@ def import_run(
         raise DomainError("artifact_conflict", "Decision package already exists.", 409)
     counts = {"pairs": 0, "selected_evidence": 0, "provenance_unavailable": 0}
     with sqlite3.connect(database) as connection:
-        connection.executescript(
-            """CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
+        connection.executescript("""CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
             source_kind TEXT NOT NULL, target TEXT NOT NULL, target_kind TEXT NOT NULL,
             candidate TEXT NOT NULL, trace TEXT NOT NULL, evidence TEXT NOT NULL);
             CREATE INDEX pair_source ON pairs(source, source_kind, id);
             CREATE TABLE sources(id TEXT PRIMARY KEY, iri TEXT, kind TEXT, payload TEXT);
-            CREATE INDEX source_order ON sources(id);"""
-        )
+            CREATE INDEX source_order ON sources(id);""")
         for key, record in records.items():
             source, target = bindings[key]
             raw = raw_decisions.get(key, record.get("candidate_decision") or {})
@@ -428,7 +445,10 @@ def import_run(
             nil_config = (selection.get("config") or {}).get("nil") or {}
             ordinal_values = {**retrieval, **(selection.get("values") or {}), **values}
             observed_stages = {item["stage"] for item in recorded}
-            events = [_event(item, key_map, dependencies.values()) for item in recorded]
+            events = [
+                _event(item, key_map, dependencies.values(), source=source, target=target)
+                for item in recorded
+            ]
             events.extend(_missing_event(stage) for stage in STAGES if stage not in observed_stages)
             events.sort(key=lambda item: STAGES.index(item["stage"]))
             member = memberships.get(key)
@@ -470,6 +490,9 @@ def import_run(
                 "fixture_provenance": "derived_from_saved_artifacts",
             }
             evidence = selected_evidence(record, source, target, resolver=evidence_resolver)
+            trace["evidence_metadata"] = pair_evidence_metadata(
+                record, evidence, source, target, dependencies.values(), recorded
+            )
             counts["pairs"] += 1
             counts["selected_evidence"] += len(evidence)
             counts["provenance_unavailable"] += sum(

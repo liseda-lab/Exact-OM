@@ -2,8 +2,15 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
+
+from .tutorial_validation import (
+    TutorialValidationError,
+    validate_reachability,
+    validate_resource_action,
+)
 
 CORE_ITEMS = [
     "score_meaning",
@@ -232,7 +239,9 @@ def validate_disjoint_definition(study):
             raise ValueError("Tutorial download metadata differs from publication asset")
 
 
-def validate_publication(store, study, admitted_ontologies, admitted_explanations):
+def validate_publication(
+    store, study, admitted_ontologies, admitted_explanations, *, check_reachability=True
+):
     """Check full tutorial fact graph after provenance/policy admission."""
     if study["contract_version"] != "exact-study/2.0":
         return
@@ -289,6 +298,15 @@ def validate_publication(store, study, admitted_ontologies, admitted_explanation
             raise ValueError("Tutorial resource graph includes scored or non-synthetic entities")
         if any(e["candidate_id"] not in candidates for e in resource["evidence"]):
             raise ValueError("Tutorial evidence includes a scored candidate")
+
+    if check_reachability:
+        validate_reachability(
+            tutorial,
+            [
+                admitted_explanations[aid].model_dump(mode="json")
+                for aid in tcase["explanation_refs"]
+            ],
+        )
 
 
 def initial_progress(tutorial):
@@ -401,6 +419,57 @@ def validate_practice(case, answer):
 
 
 def apply_progress(store, study, progress, data, interaction_state=None):
+    """Validate the whole mutation before changing acknowledged progress or interaction state."""
+    candidate_progress = copy.deepcopy(progress)
+    candidate_interaction = copy.deepcopy(interaction_state or {})
+    try:
+        _apply_progress(store, study, candidate_progress, data, candidate_interaction)
+    except TutorialValidationError:
+        raise
+    except ValueError as exc:
+        # Do not pass Pydantic/input dumps or arbitrary participant strings to HTTP errors.
+        raise TutorialValidationError(
+            "tutorial_progress_invalid",
+            (
+                str(exc)
+                if str(exc)
+                in {
+                    "Completed IDs require typed action evidence; checkbox claims do not count",
+                    "Action candidate is outside the synthetic tutorial",
+                    "Unknown or duplicate completed tutorial requirement",
+                    "Unknown tutorial lesson",
+                    "Action does not satisfy a declared tutorial requirement",
+                }
+                else "This practice change is invalid; check the current step."
+            ),
+            requirement_ids=[
+                requirement_id
+                for requirement_id in [
+                    *(a.get("requirement_id") for a in data.get("actions", [])),
+                    *data.get("completed_requirements", []),
+                ]
+                if requirement_id
+                in {
+                    r["requirement_id"]
+                    for l in study["tutorial"]["lessons"]
+                    for r in l["requirements"]
+                }
+            ],
+            action_ids=[
+                a["action"]
+                for a in data.get("actions", [])
+                if a.get("action")
+                in {action for actions in REQUIRED_ACTIONS.values() for action in actions}
+            ],
+        ) from exc
+    progress.clear()
+    progress.update(candidate_progress)
+    if interaction_state is not None:
+        interaction_state.clear()
+        interaction_state.update(candidate_interaction)
+
+
+def _apply_progress(store, study, progress, data, interaction_state):
     tutorial = study["tutorial"]
     interaction_state = interaction_state if interaction_state is not None else {}
     visited = set(
@@ -460,6 +529,7 @@ def apply_progress(store, study, progress, data, interaction_state=None):
             }
             or action.get("entity")
             or action.get("fact_id")
+            or action.get("evidence_id") is not None
         ):
             if resources is None:
                 from .resources import ExplanationResource
@@ -473,64 +543,9 @@ def apply_progress(store, study, progress, data, interaction_state=None):
                     ).model_dump(mode="json")
                     for aid in tutorial["case"]["explanation_refs"]
                 ]
-            identities = {entity_key(e) for e in walk_entities(resources)} | {
-                entity_key(e) for e in walk_entities(tutorial["case"])
-            }
-            if action.get("entity") and entity_key(action["entity"]) not in identities:
-                raise ValueError("Action entity is outside the synthetic tutorial")
-            if kind in {
-                "search_entity",
-                "navigate_parent",
-                "navigate_child",
-                "return_to_compared",
-                "copy_iri",
-            } and not action.get("entity"):
-                raise ValueError("Entity action requires its synthetic typed identity")
-            facts = {
-                f["fact_id"]
-                for resource in resources
-                for f in resource.get("facts", []) + resource.get("referenced_labels", [])
-            }
-            if action.get("fact_id") and action["fact_id"] not in facts:
-                raise ValueError("Action fact is outside the synthetic tutorial")
-            if kind in {
-                "open_citation",
-                "open_original_axiom",
-                "locate_in_evidence_list",
-                "inspect_graph_or_list",
-            } and not action.get("fact_id"):
-                raise ValueError("Evidence action requires an admitted original fact identity")
-            if kind in {"navigate_parent", "navigate_child"}:
-                endpoint = "parent" if kind == "navigate_parent" else "child"
-                if entity_key(action["entity"]) not in {
-                    entity_key(edge[endpoint])
-                    for resource in resources
-                    for edge in resource["hierarchy"]
-                }:
-                    raise ValueError(
-                        "Navigation action is not a recorded synthetic hierarchy endpoint"
-                    )
-            if kind == "return_to_compared" and entity_key(action["entity"]) not in {
-                entity_key(tutorial["case"]["source"]),
-                *(entity_key(c["entity"]) for c in tutorial["case"]["candidates"]),
-            }:
-                raise ValueError("Return must restore a compared synthetic entity")
-            if kind == "open_citation" and action["fact_id"] not in {
-                fid
-                for resource in resources
-                for claim in resource["entity_profiles"] + resource["pair_comparison"]
-                for fid in claim["fact_ids"]
-            }:
-                raise ValueError("Citation action requires a fact cited by prepared synthetic text")
-            if kind in {"locate_in_evidence_list", "inspect_graph_or_list"} and action[
-                "fact_id"
-            ] not in {
-                fid
-                for resource in resources
-                for evidence in resource["evidence"]
-                for fid in evidence["fact_ids"]
-            }:
-                raise ValueError("Evidence-list action requires a recorded synthetic evidence link")
+            validate_resource_action(
+                action, resources, tutorial["case"], interaction_state, completed
+            )
         if kind in {
             "rank_with_details_open",
             "add_rank",

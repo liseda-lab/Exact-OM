@@ -11,6 +11,11 @@ from typing import Any, Mapping
 from .artifacts import atomic_json
 from .contracts import VisibilityPolicy, canonical_hash, file_hash
 from .decisions import DecisionStore
+from .evidence_metadata import (
+    filter_evidence_items,
+    filter_exact_basis,
+    filter_pair_metadata,
+)
 
 
 def export_policy_run(
@@ -22,6 +27,7 @@ def export_policy_run(
 ) -> DecisionStore:
     """Write new SQLite pages containing only evidence linked to admitted original facts.
 
+    Every selected feature keeps a safe status, including unresolved or withheld items.
     Raw historic display strings cannot prove their own visibility. Portable clients
     render linked originals instead. Decision scores and final memberships are copied
     exactly; missing or withheld evidence does not change matcher behavior.
@@ -42,60 +48,25 @@ def export_policy_run(
             target.execute("INSERT INTO sources VALUES (?,?,?,?)", row)
         for row in original.execute("SELECT * FROM pairs"):
             candidate, trace, items = json.loads(row[5]), json.loads(row[6]), json.loads(row[7])
-            safe = []
-            for item in items:
-                ids = item.get("fact_ids", [])
-                context = contexts.get(item["entity"]["ontology_version_id"])
-                if not ids or context is None:
-                    continue
-                if (
-                    context.manifest.get("policy_filter", {}).get("policy_hash")
-                    != policy.policy_hash
-                ):
-                    raise ValueError("Portable evidence requires a physically filtered context")
-                with context._connection() as facts:
-                    marks = ",".join("?" for _ in ids)
-                    available = {
-                        r[0]
-                        for r in facts.execute(
-                            "SELECT id FROM axioms WHERE id IN (" + marks + ")", ids
-                        )
-                    }
-                if set(ids) != available:
-                    continue
-                visible = {
-                    key: item[key]
-                    for key in (
-                        "evidence_id",
-                        "channel",
-                        "side",
-                        "role",
-                        "entity",
-                        "feature_id",
-                        "fact_ids",
-                        "source_axiom_refs",
-                        "values",
-                        "interpretation",
-                        "provenance_status",
-                        "status",
-                        "reason",
-                    )
-                    if key in item
-                }
-                visible.update(
-                    {
-                        "display": {},
-                        "semantic_terms": {},
-                        "axiom_origins": [],
-                        "historical_item_alias": None,
-                    }
-                )
-                safe.append(visible)
+            safe = filter_evidence_items(items, contexts, policy, physically_filtered=True)
+            if trace.get("evidence_metadata"):
+                trace["evidence_metadata"] = filter_pair_metadata(trace["evidence_metadata"], safe)
+            trace["events"] = filter_exact_basis(
+                trace.get("events", []),
+                safe,
+                contexts=contexts,
+                policy=policy,
+                physically_filtered=True,
+            )
             candidate["evidence_counts"] = {
-                "visible_selected": len(safe),
+                "visible_selected": sum(item["status"] == "available" for item in safe),
                 "scope": "prepared_visibility_policy",
             }
-            candidate["evidence_status"] = "available" if safe else "not_exported"
+            candidate["evidence_status"] = (
+                "available"
+                if any(item["status"] == "available" for item in safe)
+                else "not_exported"
+            )
             target.execute(
                 "INSERT INTO pairs VALUES (?,?,?,?,?,?,?,?)",
                 (*row[:5], json.dumps(candidate), json.dumps(trace), json.dumps(safe)),
@@ -113,7 +84,7 @@ def export_policy_run(
             {
                 "source_revision": manifest["revision"],
                 "policy_hash": policy.policy_hash,
-                "exporter": "exact-policy-decisions/1",
+                "exporter": "exact-policy-decisions/2",
             }
         ),
         "counts": {

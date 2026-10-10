@@ -63,7 +63,13 @@ def test_portable_run_removes_unverified_display_and_preserves_decisions(tmp_pat
     content = (tmp_path / "portable-run" / "decisions.sqlite").read_bytes()
     assert b"forbidden-target" not in content
     assert b"untrusted-rendering" not in content
-    assert exported.pair(pair_id) == source.pair(pair_id)
-    assert len(exported.evidence(pair_id)) == 1
-    assert exported.evidence(pair_id)[0]["values"]["support"] == 0.73
-    assert exported.evidence(pair_id)[0]["fact_ids"] == [fact_id]
+    original_trace, exported_trace = source.pair(pair_id), exported.pair(pair_id)
+    assert {k: v for k, v in exported_trace.items() if k != "evidence_metadata"} == {
+        k: v for k, v in original_trace.items() if k != "evidence_metadata"
+    }
+    assert exported_trace["evidence_metadata"]["counts"]["selected"] == 2
+    assert exported_trace["evidence_metadata"]["counts"]["not_exported"] == 1
+    assert len(exported.evidence(pair_id)) == 2
+    available = next(item for item in exported.evidence(pair_id) if item["status"] == "available")
+    assert available["values"]["support"] == 0.73
+    assert available["fact_ids"] == [fact_id]

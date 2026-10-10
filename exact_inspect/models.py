@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from typing import Annotated, Any, Literal
 
-from pydantic import ConfigDict, Field, JsonValue, model_validator
+from pydantic import ConfigDict, Field, JsonValue, model_serializer, model_validator
 
 from .contracts import Availability, EntityRef, Page, Scope, Score, WireModel
+from .evidence_metadata import ExactMatchBasis, PairEvidenceMetadata
+from .generation import FactPacket
 
 
 class ResourceModel(WireModel):
@@ -118,6 +120,7 @@ class StageEvent(ResourceModel):
         "retained", "rejected", "abstained", "selected", "not_selected", "not_applicable", "unknown"
     ]
     reason_code: str
+    exact_basis: ExactMatchBasis | None = None
     scores: list[Score]
     competitor_pair_ids: list[str]
     artifact_refs: list[str]
@@ -146,6 +149,7 @@ class PairResponse(ResourceModel):
         "default_convention", "graph_closure_with_anchors", "recorded_other", "unavailable"
     ]
     assumption_refs: list[str]
+    evidence_metadata: PairEvidenceMetadata | None = None
     fixture_provenance: str
 
 
@@ -160,6 +164,7 @@ class HierarchyPage(Page[dict[str, Any]]):
 class GenerationManifest(ResourceModel):
     """Frozen generation dependencies and actual provider identity, excluding secrets."""
 
+    description_contract: Literal["exact-description/2"] | None = None
     ontology_context_hashes: list[str]
     visibility_policy_hash: str
     packet_hash: str
@@ -173,6 +178,13 @@ class GenerationManifest(ResourceModel):
     response_hash: str | None
     status: Literal["pending", "dispatched", "response_saved", "validated", "failed", "ambiguous"]
 
+    @model_serializer(mode="wrap")
+    def preserve_legacy_manifest_identity(self, handler):
+        value = handler(self)
+        if self.description_contract is None:
+            value.pop("description_contract", None)
+        return value
+
 
 class GeneratedExplanationResponse(ResourceModel):
     """Prepared generated artifact, with grounding and generation failure represented separately."""
@@ -184,6 +196,12 @@ class GeneratedExplanationResponse(ResourceModel):
     entities: list[EntityRef]
     claims: list[dict[str, Any]]
     grounding_status: Literal["validated", "unverified", "rejected"]
+    preparation_kind: Literal["grounded_description", "fact_extract", "factual_fallback"] | None = (
+        None
+    )
+    support_status: Literal["typed_template_support", "exact_support", "fallback"] | None = None
+    support_reasons: list[str] = Field(default_factory=list)
+    support_packet: FactPacket | None = None
     manifest: GenerationManifest
     limitations: list[str]
     fixture_provenance: str
@@ -374,10 +392,16 @@ class SelectedEvidence(WireModel):
     derivation: FeatureDerivation | None = None
     provenance_status: str
     status: Availability
+    origin_resolution: Literal["resolved", "unresolved", "not_exported", "withheld"] | None = None
+    graph_projection: Literal["supported", "unsupported", "not_recorded"] | None = None
     reason: str | None
 
     @model_validator(mode="after")
     def check_fact_links(self):
+        if self.origin_resolution == "resolved" and self.status != "available":
+            raise ValueError("Resolved evidence requires available original links")
+        if self.origin_resolution in {"unresolved", "not_exported", "withheld"} and self.fact_ids:
+            raise ValueError("Unavailable origin resolution cannot claim original fact links")
         if self.status == "available" and (not self.feature_id or not self.fact_ids):
             raise ValueError(
                 "Available selected evidence requires semantic and original-fact links"
