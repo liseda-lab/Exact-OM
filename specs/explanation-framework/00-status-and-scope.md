@@ -58,3 +58,30 @@ All new features below remain **planned**, not implemented by these specificatio
 | Render study deployment | Existing demo blueprint | Database binding, migrations, secrets, backup/recovery, isolated service and launch runbook (B3/B5/F1) |
 
 B0 defines 10–13 and study schema/locks; B3 implements all new service surfaces; B5 verifies APIs and database restart/recovery before frontend admission. F1 implements both products. Actual participant launch and subgroup-effect claims remain outside backend readiness. Authenticated researcher controls are required, but participant accounts and a generic survey builder are not.
+
+
+## Backend S1 delivery — 10 October 2026
+
+The current review assignment is [20](20-review-corrective-programme.md), with backend
+requirements in [22](22-review-backend-and-data.md) and frontend integration in
+[21](21-review-frontend-corrections.md). The accepted frontend S0 base is `ffd390f`.
+Backend runtime `a06af6e` implements the versioned B01–B07 contracts and delivers an
+interim real 24-case, 120-pair development review bundle. See the
+[backend S1 handoff](../../docs/verification/explanation-product-review-backend-s1.md),
+[receipt](../../docs/verification/explanation-product-review-backend-s1-receipt.json),
+[S2 contract](../../docs/verification/explanation-product-review-backend-s1-contracts.md)
+and [case catalogue](../../docs/verification/explanation-product-review-backend-s1/case-catalogue.md).
+
+This is not full Q05–Q07 or joint product acceptance. Original DOID/import admission,
+completed real inferred taxonomy, approved provider prose, sparse/rejected-case coverage
+and recorded exact-stage trace/graph-support coverage remain open technical work. All final typed artifacts
+passed independent support audit; failed provider outputs and native preparation retain
+separate receipts. Participant About metadata is aggregate-only, and correctness metrics
+are disabled for these unresolved development cases. Historical publications, experiments,
+receipts and research approval gates retain their original meaning.
+
+Frontend S2 must consume the new forms/method negotiation, description/support statuses,
+hierarchy entry points, evidence metadata and review discovery, then complete guided/graph
+presentation. S3 owns the fresh integrated browser and visual Q01–Q12 review. The historical
+R16 reload finding remains unresolved; first-use latency and the intermittent local Git-identity startup failure also remain open. Actual HTTPS/PostgreSQL verification completed all 24 cases and both study conditions; rendered browser acceptance remains pending certificate trust and S2 integration. Manual accessibility/usability, study-owner release,
+final matcher/case admission and deployment are separate later gates, not purported passes.
