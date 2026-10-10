@@ -13,13 +13,14 @@ from exact_inspect.artifacts import atomic_json
 from exact_inspect.contracts import canonical_hash, file_hash
 from exact_inspect.description_review import build_review_request
 from exact_inspect.descriptions import (
-    PROFILE_PROSE_PROMPT_V2,
+    PROFILE_PROSE_PROMPT_V5,
 )
 from exact_inspect.generation import (
     ExplanationOutput,
     FactPacket,
     GenerationProfile,
     comparison_packet,
+    prose_response_format,
 )
 from tools.review_generation_attempt import (
     ReviewExplanationJobs,
@@ -91,7 +92,8 @@ def batch_plan(root, attempt, source_attempt=1):
                 key, value, packet = profiles[identity]
                 updated = {
                     **value,
-                    "prompt": PROFILE_PROSE_PROMPT_V2,
+                    "provider_response_format": prose_response_format(),
+                    "prompt": PROFILE_PROSE_PROMPT_V5,
                     "schema": ExplanationOutput.model_json_schema(),
                     "implementation": contract["implementation"],
                 }
@@ -215,9 +217,9 @@ def execute_plan(plan, approved_sha256, *, preflight=False):
                     ) from error
             else:
                 atomic_json(paths["requests"] / (key + ".json"), request)
-        elif preflight:
+        else:
             raise ValueError(
-                "Real preflight has no saved provider response; no remaining jobs dispatched"
+                "Generation has no saved provider response; no remaining jobs dispatched"
             )
         atomic_json(
             root / f"generation-progress-attempt-{attempt}.json",

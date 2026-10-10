@@ -457,12 +457,15 @@ class OpenRouterClient:
         provider: Optional[Dict[str, Any]] = None,
         seed: Optional[int] = None,
         role: Optional[str] = None,
+        response_format: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
             "model": profile.model,
             "messages": messages,
             "max_tokens": max_tokens,
         }
+        if response_format is not None:
+            payload["response_format"] = response_format
         if temperature is not None:
             payload["temperature"] = temperature
         if top_p is not None:

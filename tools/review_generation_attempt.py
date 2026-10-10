@@ -112,20 +112,21 @@ def previous_attempt_summaries(root, attempt):
 
 def generation_contract(profile):
     from exact_inspect.descriptions import (
-        COMPARISON_PROSE_PROMPT_V2,
-        PROFILE_PROSE_PROMPT_V2,
+        COMPARISON_PROSE_PROMPT_V5,
+        PROFILE_PROSE_PROMPT_V5,
     )
-    from exact_inspect.generation import ExplanationOutput
+    from exact_inspect.generation import ExplanationOutput, prose_response_format
 
     return {
         "schema": "exact-review-generation-contract/1",
         "profile": profile.model_dump(),
         "prompt_hashes": {
-            "entity_profile": canonical_hash(PROFILE_PROSE_PROMPT_V2),
-            "pair_comparison": canonical_hash(COMPARISON_PROSE_PROMPT_V2),
+            "entity_profile": canonical_hash(PROFILE_PROSE_PROMPT_V5),
+            "pair_comparison": canonical_hash(COMPARISON_PROSE_PROMPT_V5),
         },
         "output_schema_hash": canonical_hash(ExplanationOutput.model_json_schema()),
-        "implementation": "grounding-prose-review/1",
+        "provider_response_format_sha256": canonical_hash(prose_response_format()),
+        "implementation": "grounding-prose-review/4",
         "max_semantic_repairs": 0,
         "max_http_retries": 0,
         "retry_unknown_delivery": False,
@@ -164,10 +165,10 @@ class ReviewExplanationJobs(ExplanationJobs):
 
     def generate(self, packet, profile, **kwargs):
         from exact_inspect.descriptions import (
-            COMPARISON_PROSE_PROMPT_V2,
-            PROFILE_PROSE_PROMPT_V2,
+            COMPARISON_PROSE_PROMPT_V5,
+            PROFILE_PROSE_PROMPT_V5,
         )
-        from exact_inspect.generation import ExplanationOutput
+        from exact_inspect.generation import ExplanationOutput, prose_response_format
 
         if (
             kwargs.get("max_repairs", 0) != 0
@@ -180,15 +181,16 @@ class ReviewExplanationJobs(ExplanationJobs):
             )
         kwargs["max_repairs"] = 0
         identity = {
+            "provider_response_format": prose_response_format(),
             "packet": packet.model_dump(mode="json"),
             "profile": profile.model_dump(),
             "prompt": (
-                PROFILE_PROSE_PROMPT_V2
+                PROFILE_PROSE_PROMPT_V5
                 if packet.task == "entity_profile"
-                else COMPARISON_PROSE_PROMPT_V2
+                else COMPARISON_PROSE_PROMPT_V5
             ),
             "schema": ExplanationOutput.model_json_schema(),
-            "implementation": "grounding-prose-review/1",
+            "implementation": "grounding-prose-review/4",
             "max_repairs": 0,
         }
         key = canonical_hash(identity)
@@ -209,6 +211,7 @@ class ReviewExplanationJobs(ExplanationJobs):
         import os
 
         from exact.llm.routing import LLMProfile, OpenRouterClient
+        from exact_inspect.generation import prose_response_format
 
         if os.getenv("EXACT_OPENROUTER_RETRY_UNKNOWN") == "1":
             raise ValueError("Review generation forbids implicit unknown-delivery retry")
@@ -231,6 +234,7 @@ class ReviewExplanationJobs(ExplanationJobs):
                 profile.max_tokens,
                 temperature=profile.temperature,
                 role="explanation_framework",
+                response_format=prose_response_format(),
             )
         finally:
             client._client.close()

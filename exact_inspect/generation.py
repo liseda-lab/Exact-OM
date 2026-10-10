@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Callable, Literal, get_args
 
 from pydantic import Field, ValidationError, model_validator
 
@@ -68,6 +68,63 @@ class ExplanationOutput(WireModel):
         Literal["equivalent", "source_narrower", "source_broader", "not_equivalent", "unresolved"]
         | None
     ) = None
+
+
+def prose_response_format():
+    """Strict provider shape; semantic approval is still a separate offline operation."""
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": "exact_description_prose_v4",
+            "strict": True,
+            "schema": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": ["claims", "limitations", "relation"],
+                "properties": {
+                    "claims": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": ["text", "fact_ids", "category"],
+                            "properties": {
+                                "text": {"type": "string"},
+                                "fact_ids": {"type": "array", "items": {"type": "string"}},
+                                "category": {
+                                    "type": "string",
+                                    "enum": list(
+                                        get_args(Claim.model_fields["category"].annotation)
+                                    ),
+                                },
+                            },
+                        },
+                    },
+                    "limitations": {"type": "array", "items": {"type": "string"}},
+                    "relation": {"type": ["string", "null"], "enum": [None, "unresolved"]},
+                },
+            },
+        },
+    }
+
+
+def prose_provider_packet(packet):
+    """Remove provenance noise from the wire, retaining every admitted fact value.
+
+    The full packet remains immutable in the request, support and review artifacts.
+    This projection adds no facts, labels, counterpart information or external knowledge.
+    """
+    raw = packet.model_dump(mode="json")
+    return {
+        "task": raw["task"],
+        "entities": raw["entities"],
+        "facts": [
+            {k: f[k] for k in ("fact_id", "subject", "category", "value") if k in f}
+            for f in raw["facts"]
+        ],
+        "missingness": raw["missingness"],
+        "profiles": raw["profiles"],
+    }
 
 
 class GenerationProfile(WireModel):
@@ -402,10 +459,14 @@ class ExplanationJobs:
             raise ValueError("At most two repair attempts are supported")
         from .descriptions import (
             COMPARISON_PROMPT_V2,
-            COMPARISON_PROSE_PROMPT_V2,
+            COMPARISON_PROSE_PROMPT_V3,
+            COMPARISON_PROSE_PROMPT_V4,
+            COMPARISON_PROSE_PROMPT_V5,
             DESCRIPTION_VERSION,
             PROFILE_PROMPT_V2,
-            PROFILE_PROSE_PROMPT_V2,
+            PROFILE_PROSE_PROMPT_V3,
+            PROFILE_PROSE_PROMPT_V4,
+            PROFILE_PROSE_PROMPT_V5,
             description_templates,
         )
 
@@ -413,27 +474,55 @@ class ExplanationJobs:
         prose = descriptive and packet.selection.get("description_prose") is True
         if prose and prompt is None:
             prompt = (
-                PROFILE_PROSE_PROMPT_V2
+                PROFILE_PROSE_PROMPT_V5
                 if packet.task == "entity_profile"
-                else COMPARISON_PROSE_PROMPT_V2
+                else COMPARISON_PROSE_PROMPT_V5
             )
         prompt = prompt or (
             (PROFILE_PROMPT_V2 if packet.task == "entity_profile" else COMPARISON_PROMPT_V2)
             if descriptive
             else (PROFILE_PROMPT if packet.task == "entity_profile" else COMPARISON_PROMPT)
         )
+        prose_synthesis = prose and prompt in (
+            PROFILE_PROSE_PROMPT_V3,
+            PROFILE_PROSE_PROMPT_V4,
+            PROFILE_PROSE_PROMPT_V5,
+            COMPARISON_PROSE_PROMPT_V3,
+            COMPARISON_PROSE_PROMPT_V4,
+            COMPARISON_PROSE_PROMPT_V5,
+        )
+        structured_prose = prose and prompt in (
+            PROFILE_PROSE_PROMPT_V4,
+            COMPARISON_PROSE_PROMPT_V4,
+            PROFILE_PROSE_PROMPT_V5,
+            COMPARISON_PROSE_PROMPT_V5,
+        )
+        concise_prose = prose and prompt in (PROFILE_PROSE_PROMPT_V5, COMPARISON_PROSE_PROMPT_V5)
         identity = {
+            **({"provider_response_format": prose_response_format()} if structured_prose else {}),
             "packet": packet.model_dump(mode="json"),
             "profile": profile.model_dump(),
             "prompt": prompt,
             "schema": ExplanationOutput.model_json_schema(),
             "implementation": (
-                "grounding-prose-review/1"
-                if prose
+                (
+                    "grounding-prose-review/4"
+                    if concise_prose
+                    else (
+                        "grounding-prose-review/3"
+                        if structured_prose
+                        else "grounding-prose-review/2"
+                    )
+                )
+                if prose_synthesis
                 else (
-                    "grounding-descriptions/2"
-                    if descriptive
-                    else "grounding-excerpts-and-comparisons/5"
+                    "grounding-prose-review/1"
+                    if prose
+                    else (
+                        "grounding-descriptions/2"
+                        if descriptive
+                        else "grounding-excerpts-and-comparisons/5"
+                    )
                 )
             ),
             "max_repairs": max_repairs,
@@ -524,7 +613,11 @@ class ExplanationJobs:
                         "role": "user",
                         "content": canonical_json(
                             {
-                                **packet.model_dump(mode="json"),
+                                **(
+                                    prose_provider_packet(packet)
+                                    if concise_prose
+                                    else packet.model_dump(mode="json")
+                                ),
                                 **(
                                     {
                                         "supported_description_templates": [
@@ -532,13 +625,19 @@ class ExplanationJobs:
                                             for c in description_templates(packet)
                                         ]
                                     }
-                                    if descriptive
+                                    if descriptive and not prose_synthesis
                                     else {}
                                 ),
-                                "supported_comparison_templates": [
-                                    c.model_dump(exclude={"claim_id"})
-                                    for c in comparison_templates(packet)
-                                ],
+                                **(
+                                    {
+                                        "supported_comparison_templates": [
+                                            c.model_dump(exclude={"claim_id"})
+                                            for c in comparison_templates(packet)
+                                        ]
+                                    }
+                                    if not prose_synthesis
+                                    else {}
+                                ),
                             }
                         ).decode(),
                     },
@@ -692,6 +791,13 @@ class ExplanationJobs:
         """Use Exact's existing OpenRouter transport and durable wire-attempt/cost ledger."""
         from exact.llm.routing import LLMProfile, OpenRouterClient
 
+        from .descriptions import (
+            COMPARISON_PROSE_PROMPT_V4,
+            COMPARISON_PROSE_PROMPT_V5,
+            PROFILE_PROSE_PROMPT_V4,
+            PROFILE_PROSE_PROMPT_V5,
+        )
+
         client = OpenRouterClient()
         client.ledger_dir = self.root / "provider-ledger"
         binding = LLMProfile(
@@ -709,6 +815,17 @@ class ExplanationJobs:
                 profile.max_tokens,
                 temperature=profile.temperature,
                 role="explanation_framework",
+                **(
+                    {"response_format": prose_response_format()}
+                    if messages[0]["content"]
+                    in (
+                        PROFILE_PROSE_PROMPT_V4,
+                        PROFILE_PROSE_PROMPT_V5,
+                        COMPARISON_PROSE_PROMPT_V4,
+                        COMPARISON_PROSE_PROMPT_V5,
+                    )
+                    else {}
+                ),
             )
         finally:
             client._client.close()

@@ -117,7 +117,8 @@ def test_prose_remains_fallback_until_separate_review_and_cache_is_immutable(
 ):
     context, policy, packet, source, raw, request, receipt, calls = reviewed_fixture
     assert len(calls) == 1
-    assert "separate reviewer" in calls[0][0]["content"]
+    assert "unapproved draft" in calls[0][0]["content"]
+    assert "separate independent review" in calls[0][0]["content"]
     assert source["preparation_kind"] == "factual_fallback"
     before = canonical_json(source)
     saved = tmp_path / "jobs" / source["explanation_id"][7:] / "explanation.json"

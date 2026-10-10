@@ -334,3 +334,29 @@ def test_invalid_elapsed_time_cannot_finalize_pending_attempt(tmp_path, elapsed,
     summary = ledger.summary()["roles"]["decision"]
     assert summary["completed"] == 0
     assert summary["unmeasured_attempts"] == summary["unknown"] == 1
+
+
+def test_response_schema_is_sent_and_bound_to_durable_request_identity(tmp_path, monkeypatch):
+    from exact_inspect.generation import prose_response_format
+
+    client, profile = setup_client(tmp_path, monkeypatch)
+    sent = []
+    monkeypatch.setattr(
+        client._client,
+        "request",
+        lambda **kw: sent.append(json.loads(kw["content"])) or response({"choices": []}),
+    )
+    schema = prose_response_format()
+    call(client, profile)
+    call(client, profile, response_format=schema)
+    call(client, profile, response_format=schema)
+    assert len(sent) == 2
+    assert "response_format" not in sent[0]
+    assert sent[1]["response_format"] == schema
+    with sqlite3.connect(client.ledger_dir / "requests.sqlite3") as db:
+        payloads = [
+            json.loads(r[0])["payload"] for r in db.execute("SELECT identity FROM requests")
+        ]
+    assert len(payloads) == 2
+    assert sum(p.get("response_format") == schema for p in payloads) == 1
+    client._client.close()

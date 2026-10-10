@@ -8,10 +8,10 @@ from pydantic import ValidationError
 
 from exact_inspect.contracts import EntityRef, canonical_hash, file_hash
 from exact_inspect.descriptions import (
-    COMPARISON_PROSE_PROMPT_V1,
     COMPARISON_PROSE_PROMPT_V2,
-    PROFILE_PROSE_PROMPT_V1,
+    COMPARISON_PROSE_PROMPT_V5,
     PROFILE_PROSE_PROMPT_V2,
+    PROFILE_PROSE_PROMPT_V5,
 )
 from exact_inspect.generation import (
     Claim,
@@ -20,6 +20,7 @@ from exact_inspect.generation import (
     FactPacket,
     GenerationProfile,
     parse_provider_output,
+    prose_response_format,
 )
 
 
@@ -29,7 +30,7 @@ def test_versioned_output_shape_reaches_outbound_transport_without_reusing_old_c
 ):
     import exact.llm.routing as routing
 
-    calls, closes = [], []
+    calls, closes, wire_options = [], [], []
 
     class Transport:
         def __init__(self):
@@ -40,6 +41,7 @@ def test_versioned_output_shape_reaches_outbound_transport_without_reusing_old_c
 
         def chat_completion(self, binding, messages, max_tokens, **kwargs):
             calls.append(messages)
+            wire_options.append(kwargs)
             return {"choices": [{"message": {"content": json.dumps(output)}}]}
 
     monkeypatch.setattr(routing, "OpenRouterClient", Transport)
@@ -48,6 +50,7 @@ def test_versioned_output_shape_reaches_outbound_transport_without_reusing_old_c
         "fact_id": "fact:recorded-definition",
         "subject": entity.model_dump(),
         "category": "definitions",
+        "origins": [{"document_sha256": "frozen-original-document"}],
         "value": {"term_type": "literal", "lexical_form": "Recorded original meaning."},
     }
     packet = FactPacket(
@@ -72,9 +75,9 @@ def test_versioned_output_shape_reaches_outbound_transport_without_reusing_old_c
         "relation": None,
     }
     old_prompt, new_prompt = (
-        (PROFILE_PROSE_PROMPT_V1, PROFILE_PROSE_PROMPT_V2)
+        (PROFILE_PROSE_PROMPT_V2, PROFILE_PROSE_PROMPT_V5)
         if task == "entity_profile"
-        else (COMPARISON_PROSE_PROMPT_V1, COMPARISON_PROSE_PROMPT_V2)
+        else (COMPARISON_PROSE_PROMPT_V2, COMPARISON_PROSE_PROMPT_V5)
     )
     jobs = ExplanationJobs(tmp_path / "jobs")
     profile = GenerationProfile(name="synthetic-transport", model="synthetic-model")
@@ -88,22 +91,33 @@ def test_versioned_output_shape_reaches_outbound_transport_without_reusing_old_c
     assert previous["manifest"]["prompt_hash"] == canonical_hash(old_prompt)
     assert calls[0][0]["content"] == old_prompt
     sent = calls[1][0]["content"]
-    assert sent == new_prompt and "exact-description-prose/2" in sent
-    example = json.loads(next(line for line in sent.splitlines() if line.startswith('{"claims"')))
-    ExplanationOutput.model_validate(example)
-    assert set(example) == {"claims", "limitations", "relation"}
-    assert set(example["claims"][0]) == {"text", "fact_ids", "category"}
-    for category in get_args(Claim.model_fields["category"].annotation):
-        assert category in sent
-    for instruction in (
-        "Each claim must be an object",
-        "never a scalar",
-        "Do not use claim instead of text",
-        "Inline\ncitations cannot replace fact_ids",
-        "Do not return claim_id or any additional fields",
-    ):
-        assert instruction in sent
-    assert json.loads(calls[1][1]["content"])["facts"] == packet.facts
+    assert sent == new_prompt
+    assert "response_format" not in wire_options[0]
+    assert wire_options[1]["response_format"] == prose_response_format()
+    wire_claim = prose_response_format()["json_schema"]["schema"]["properties"]["claims"]["items"]
+    assert set(wire_claim["required"]) == {"text", "fact_ids", "category"}
+    assert wire_claim["additionalProperties"] is False
+    assert set(wire_claim["properties"]["category"]["enum"]) == set(
+        get_args(Claim.model_fields["category"].annotation)
+    )
+    assert "definition" not in wire_claim["properties"]["category"]["enum"]
+    assert "ONLY the provided" in sent
+    assert "label citation cannot support details" in sent
+    assert "ONLY in fact_ids" in sent
+    sent_packet = json.loads(calls[1][1]["content"])
+    assert sent_packet["facts"] == [
+        {k: v for k, v in f.items() if k in {"fact_id", "subject", "category", "value"}}
+        for f in packet.facts
+    ]
+    assert "origins" in json.loads(calls[0][1]["content"])["facts"][0]
+    saved_request = json.loads(
+        (jobs.root / result["explanation_id"][7:] / "request.json").read_bytes()
+    )
+    assert saved_request["packet"]["facts"] == packet.facts
+    assert "supported_description_templates" not in sent_packet
+    assert "supported_comparison_templates" not in sent_packet
+    assert "supported_description_templates" in json.loads(calls[0][1]["content"])
+    assert "Labels/synonyms alone support only recorded naming" in sent
     assert jobs.generate(packet, profile, prompt=old_prompt, max_repairs=0) == previous
     assert jobs.generate(packet, profile, max_repairs=0) == result
     assert len(calls) == 2

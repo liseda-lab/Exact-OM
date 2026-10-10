@@ -148,3 +148,32 @@ def test_admission_hash_reuse_is_stat_bound_and_detects_mid_read_change(tmp_path
     monkeypatch.setattr(review, "file_hash", changing)
     with pytest.raises(review.ReviewError, match="changed during admission"):
         review.AdmissionHashes()(path)
+
+
+def test_full_batch_stops_on_transport_failure_after_valid_response(tmp_path, monkeypatch):
+    from tests.explanation_review_generation_batch_test import batch_fixture
+
+    batch_fixture(tmp_path)
+    plan = batch.batch_plan(tmp_path, 3)
+    calls = []
+
+    def provider(self, *args):
+        calls.append(True)
+        if len(calls) == 2:
+            raise RuntimeError("Credential expired after first response")
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps({"claims": [], "limitations": [], "relation": None})
+                    }
+                }
+            ]
+        }
+
+    monkeypatch.setattr(ReviewExplanationJobs, "_provider", provider)
+    for _ in range(2):
+        with pytest.raises(ValueError, match="no remaining jobs dispatched"):
+            batch.execute_plan(plan, canonical_hash(plan))
+        assert len(calls) == 2
+    assert not (tmp_path / "generation-dispatch-complete-attempt-3.json").exists()
