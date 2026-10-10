@@ -1027,6 +1027,7 @@ def train_cases(
     sampled_assignments: int = 32,
     active_round_every_epochs: int = 1,
     fidelity_labels: Mapping[str, Sequence[tuple[Any, Any]]] | None = None,
+    fidelity_rating_contexts: Mapping[str, Any] | None = None,
     fidelity_loss_weight: float = 1.0,
     max_collection_rounds: int = 3,
     collection_cases_per_round: int | None = None,
@@ -1105,6 +1106,8 @@ def train_cases(
     ):
         raise ValueError("Separated phases require closed data, checkpoints and frozen DEV epochs")
     identity_options = dict(locals())
+    if fidelity_rating_contexts is None:
+        identity_options.pop("fidelity_rating_contexts")
     identity_options.pop("execution_phase")
     if execution_phase is not None:
         identity_options["phase_contract"] = "owned-fit-development/v1"
@@ -1222,6 +1225,7 @@ def train_cases(
                     ),
                     rating_aggregation=plan_rating_aggregation,
                     aggregate_receipts=fidelity_plan_aggregates,
+                    rating_context_packets=fidelity_rating_contexts if case.split == "train" else None,
                 )
         identity_options["fidelity_plan_aggregate_hash"] = canonical_hash(fidelity_plan_aggregates)
         if checkpoint_path is not None:
@@ -2015,6 +2019,7 @@ def train_cases(
                     (fidelity_labels or {}).get(case.case_id, ()),
                     role="teacher",
                     rating_aggregation=plan_rating_aggregation,
+                    rating_context_packets=fidelity_rating_contexts,
                 )
                 if weak is not None and weak.usable:
                     weak_labels.append(weak)

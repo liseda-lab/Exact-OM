@@ -229,6 +229,11 @@ def run_phase(manifest_path, phase, output):
             seed=manifest["seed"],
             profile=train._protocol_profile(protocol),
             fidelity_labels=labels if config["target_basis"] == "symbolic_plus_llm" else {},
+            fidelity_rating_contexts=(
+                bound(manifest["rating_contexts"])
+                if config["target_basis"] == "symbolic_plus_llm" and manifest.get("rating_contexts")
+                else None
+            ),
         )
         fitting = [
             (c, caches[c.case_id]) for c in cases if c.split == "train" and c.case_id in caches
@@ -283,10 +288,10 @@ def run_phase(manifest_path, phase, output):
         return result
 
 
-def qualify(prepared_path, output, seconds=600):
-    """One disposable symbolic epoch on the actual frozen TRAIN inventories.
+def qualify(prepared_path, output, seconds=600, *, shared_weak_labels=None, rating_contexts=None):
+    """One disposable epoch on actual frozen TRAIN inventories.
 
-    No teacher selection, DEV outcomes, weak labels or selectable model. Incomplete
+    A bound shared artifact enables the declared combined loss. No selectable model. Incomplete
     qualification is a bounded engineering result and does not justify replay.
     """
     import torch
@@ -301,6 +306,15 @@ def qualify(prepared_path, output, seconds=600):
     protocol = training_projection_v3(load_protocol_v3(authenticate(prep["protocol"])))
     cases, caches, _ = load_preparation(prepared_path)
     config = train._protocol_arguments(protocol)
+    if config["target_basis"] == "symbolic_plus_llm":
+        from exact.repair.semantic_fidelity import read_fidelity_training_artifact
+
+        if shared_weak_labels is None:
+            raise ValueError("Combined qualification requires frozen shared weak labels")
+        config["fidelity_labels"] = read_fidelity_training_artifact(
+            authenticate(shared_weak_labels), "train"
+        )
+        config["fidelity_rating_contexts"] = bound(rating_contexts) if rating_contexts else None
     started = time.time()
     remaining = min(seconds, float(os.environ["EXACT_REPAIR_DEADLINE_EPOCH"]) - started - 10)
     if remaining <= 0:
@@ -331,12 +345,17 @@ def qualify(prepared_path, output, seconds=600):
         result = boundary.receipt
     except TimeoutError as error:
         result = dict(status="resource_limited", detail=str(error), retryable=False)
-    saved = torch.load(output / "engineering-state.pt", weights_only=True, map_location="cpu")
+    except ValueError as error:
+        if not str(error).startswith("No eligible development checkpoint"):
+            raise
+        result = dict(status="resource_limited", detail=str(error), retryable=False)
+    state_path = output / "engineering-state.pt"
+    saved = torch.load(state_path, weights_only=True, map_location="cpu") if state_path.exists() else {}
     result.update(
         schema="exact-repair/current-inventory-throughput/v1",
         prepared=binding(Path(prepared_path)),
         gpu_uuid=actual,
-        optimizer_updates=saved["optimizer_updates"],
+        optimizer_updates=saved.get("optimizer_updates", 0),
         expected_train_cases=128,
         committed_caches=len(fitting),
         cases=[
@@ -356,14 +375,19 @@ def qualify(prepared_path, output, seconds=600):
             if c.split == "train"
         ],
         update_seconds=saved.get("optimizer_update_seconds", []),
-        full_epoch_completed=saved["optimizer_updates"] == len(fitting),
+        loss_eligibility=saved.get("loss_eligibility", {}),
+        head_updates=saved.get("head_updates", {}),
+        epoch_order=saved.get("epoch_order", ()),
+        condition=config["target_basis"],
+        shared_weak_labels=shared_weak_labels,
+        full_epoch_completed=saved.get("optimizer_updates", 0) == len(fitting),
         elapsed_seconds=time.time() - started,
         peak_cuda_bytes=torch.cuda.max_memory_allocated(),
-        phase_state=binding(output / "engineering-state.pt"),
+        phase_state=binding(state_path) if state_path.exists() else None,
         trained_model=False,
         heldout_outcomes_opened=False,
         hosted_calls=0,
-        scope="symbolic engineering only; combined-loss/concurrent-load admission still required",
+        scope="disposable actual-inventory engineering; endpoint/concurrent-load admission requires review",
     )
     immutable(output / "report.json", result)
     return result
