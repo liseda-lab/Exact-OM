@@ -40,11 +40,11 @@ from ..models import (
     Fact,
     GeneratedExplanationResponse,
     GenerationManifest,
-    HierarchyPage,
     LabelsResponse,
     SelectedEvidence,
 )
 from ..sqlite_safety import readonly_connection
+from ..navigation import EntryPointPage, PreparedHierarchyPage, NAVIGATION_CONTRACT
 from .models import Identifier, StrictModel
 
 
@@ -115,13 +115,15 @@ class WorkspaceCapabilitiesResponse(StrictModel):
     iri_limit: int
     ontology_versions: list[Identifier]
     bases: list[Literal["literal_asserted", "structural_navigation", "reasoner_inferred"]]
-    reasoner: Literal["not_run"]
+    reasoner: Literal["not_run", "available", "partial", "failed", "unsupported"]
     reason: str
     completeness: dict[str, dict[str, Any]]
     coverage: Literal["complete_declared_context_scope"]
     continuation: Literal["query_bound_keyset"]
     original_format: str
     graph_form: str
+    navigation_contract: Literal["exact-hierarchy/1"] = NAVIGATION_CONTRACT
+    navigation: dict[str, dict[str, Any]]
 
 
 def _digest(path: Path) -> str:
@@ -181,6 +183,10 @@ def _admit_explanation(value, case, policy, contexts):
                     pass
             else:
                 raise ValueError("Workspace citation has no permitted typed subject")
+    if result["manifest"].get("description_contract") == "exact-description/2":
+        from ..descriptions import validate_prepared_support
+
+        validate_prepared_support(result, contexts, policy)
     return result
 
 
@@ -211,6 +217,7 @@ def build_workspace_scope(
     explanations=(),
     evidence=None,
     components: list[Component] | None = None,
+    reuse_prepared_contexts: bool = False,
 ) -> WorkspaceScope:
     """Prepare complete declared context coverage and indexed active-case records.
 
@@ -228,15 +235,39 @@ def build_workspace_scope(
     required = {e["ontology_version_id"] for e in _focal(case)}
     for version in sorted(required):
         source = contexts[version]
-        destination = base / hashlib.sha256(version.encode()).hexdigest()
-        context = export_policy_context(source, destination, policy)
+        if reuse_prepared_contexts:
+            from ..artifacts import read_metadata, relative_path
+
+            destination = source.path.resolve(strict=True)
+            if destination == root or not destination.is_relative_to(root):
+                raise ValueError(
+                    "Shared prepared context must be strictly inside the resource root"
+                )
+            original_path = source.path.absolute()
+            if not original_path.is_relative_to(root):
+                raise ValueError("Shared prepared context cannot use an outside locator")
+            relative_path(root, original_path.relative_to(root).as_posix())
+            if source.manifest.get("policy_filter", {}).get("policy_hash") != policy.policy_hash:
+                raise ValueError("Shared context requires the exact prepared visibility policy")
+            source._effective_policy(policy)
+            if read_metadata(destination / "manifest.json") != source.manifest:
+                raise ValueError("Shared context manifest changed after verification")
+            with source._connection():
+                pass
+            source.navigation_metadata(policy)
+            context = source
+        else:
+            destination = base / hashlib.sha256(version.encode()).hexdigest()
+            context = export_policy_context(source, destination, policy)
         prepared[version] = context
         references.append(
             WorkspaceContextRef(
                 ontology_version_id=version,
                 path=destination.relative_to(root).as_posix(),
                 manifest_sha256=_digest(destination / "manifest.json"),
-                database_sha256=_digest(destination / "context.sqlite"),
+                database_sha256=context.manifest["artifacts"]["context.sqlite"].removeprefix(
+                    "sha256:"
+                ),
             )
         )
     database = base / "workspace.sqlite"
@@ -710,6 +741,11 @@ def install_workspace_routes(router, store, participant_dependency):
     @router.get(prefix + "/scope", response_model=WorkspaceCapabilitiesResponse)
     def capabilities(scope_id: str, identity=Depends(participant_dependency)):
         def result(w):
+            navigation = {
+                version: c.navigation_metadata(w.policy) for version, c in w.contexts.items()
+            }
+            statuses = {n["inference"]["status"] for n in navigation.values()}
+            reasoner = next(iter(statuses)) if len(statuses) == 1 else "partial"
             return {
                 "contract_version": "exact-explain/1.0",
                 "scope_id": w.scope.scope_id,
@@ -721,9 +757,16 @@ def install_workspace_routes(router, store, participant_dependency):
                 "page_limit": 100,
                 "iri_limit": 2048,
                 "ontology_versions": list(w.contexts),
-                "bases": ["literal_asserted", "structural_navigation"],
-                "reasoner": "not_run",
-                "reason": "No recorded inference artifact was prepared",
+                "bases": ["literal_asserted", "structural_navigation"]
+                + (["reasoner_inferred"] if "available" in statuses else []),
+                "reasoner": reasoner,
+                "reason": (
+                    "Prepared inference is available"
+                    if reasoner == "available"
+                    else "See each ontology's prepared navigation status"
+                ),
+                "navigation_contract": NAVIGATION_CONTRACT,
+                "navigation": navigation,
                 "completeness": {
                     version: {
                         "scope": context.manifest["scope"],
@@ -813,7 +856,72 @@ def install_workspace_routes(router, store, participant_dependency):
             ),
         )
 
-    @router.get(prefix + "/hierarchy", response_model=HierarchyPage)
+    @router.get(prefix + "/entry-points", response_model=EntryPointPage)
+    def entry_points(
+        scope_id: str,
+        ontology_version_id: str,
+        kind: EntityKind = "class",
+        basis: Literal[
+            "literal_asserted", "structural_navigation", "reasoner_inferred"
+        ] = "literal_asserted",
+        language: str | None = None,
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+        identity=Depends(participant_dependency),
+    ):
+        query = {
+            "ontology_version_id": ontology_version_id,
+            "kind": kind,
+            "basis": basis,
+            "language": language,
+        }
+        return read(
+            scope_id,
+            identity,
+            lambda w: w.page(
+                "entry_points",
+                query,
+                lambda c: w.context(ontology_version_id).entry_points(
+                    kind=kind,
+                    basis=basis,
+                    language=language,
+                    limit=limit,
+                    cursor=c,
+                    policy=w.policy,
+                ),
+                cursor,
+            ),
+        )
+
+    @router.get(prefix + "/equivalents", response_model=Page[EntityRef])
+    def equivalents(
+        scope_id: str,
+        ontology_version_id: str,
+        iri: str = Query(..., min_length=1, max_length=2048),
+        kind: EntityKind = "class",
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+        identity=Depends(participant_dependency),
+    ):
+        ref = entity(ontology_version_id, iri, kind)
+        return read(
+            scope_id,
+            identity,
+            lambda w: w.page(
+                "equivalents",
+                {"entity": ref},
+                lambda c: w.context(ontology_version_id).equivalent_entities(
+                    ref, limit=limit, cursor=c, policy=w.policy
+                ),
+                cursor,
+            ),
+        )
+
+    @router.get(
+        prefix + "/hierarchy",
+        response_model=PreparedHierarchyPage,
+        response_model_exclude_unset=True,
+    )
     def hierarchy(
         scope_id: str,
         ontology_version_id: str,
@@ -961,7 +1069,9 @@ def install_workspace_routes(router, store, participant_dependency):
                 "profiles" if value["task"] == "entity_profile" else "comparison"
             ) not in w.scope.components:
                 raise _error(403, "Explanation component is outside the admitted workspace")
-            return value
+            from ..descriptions import preparation_metadata
+
+            return {**value, **preparation_metadata(value)}
 
         return read(scope_id, identity, result)
 

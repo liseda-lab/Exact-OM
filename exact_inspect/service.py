@@ -44,12 +44,12 @@ from .models import (
     ExplanationSummary,
     Fact,
     GeneratedExplanationResponse,
-    HierarchyPage,
     LabelsResponse,
     PairResponse,
     RunSummary,
     SelectedEvidence,
 )
+from .navigation import EntryPointPage, PreparedHierarchyPage
 
 
 class Health(WireModel):
@@ -165,6 +165,7 @@ class PreparedService:
                     "source_spans",
                     "typed_expressions",
                     "reasoner_inferred",
+                    "navigation",
                 }
             },
             "completeness": {
@@ -570,7 +571,50 @@ def create_prepared_app(
             )
         )
 
-    @app.get("/api/v1/hierarchy", response_model=HierarchyPage)
+    @app.get("/api/v1/ontologies/{ontology_id}/entry-points", response_model=EntryPointPage)
+    def entry_points(
+        ontology_id: str,
+        kind: EntityKind = "class",
+        basis: Literal[
+            "literal_asserted", "structural_navigation", "reasoner_inferred"
+        ] = "literal_asserted",
+        language: str | None = None,
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+    ):
+        active = service()
+        return bounded(
+            active.context(ontology_id).entry_points(
+                kind=kind,
+                basis=basis,
+                language=language,
+                limit=limit,
+                cursor=cursor,
+                policy=active.policy,
+            )
+        )
+
+    @app.get("/api/v1/ontologies/{ontology_id}/equivalents", response_model=Page[EntityRef])
+    def equivalents(
+        ontology_id: str,
+        iri: str = Query(..., min_length=1, max_length=2048),
+        kind: EntityKind = "class",
+        limit: int = Query(20, ge=1, le=100),
+        cursor: str | None = None,
+    ):
+        active = service()
+        return bounded(
+            active.context(ontology_id).equivalent_entities(
+                EntityRef(ontology_version_id=ontology_id, iri=iri, kind=kind),
+                limit=limit,
+                cursor=cursor,
+                policy=active.policy,
+            )
+        )
+
+    @app.get(
+        "/api/v1/hierarchy", response_model=PreparedHierarchyPage, response_model_exclude_unset=True
+    )
     def hierarchy(
         ontology_version_id: str,
         iri: str,
@@ -642,9 +686,42 @@ def create_prepared_app(
             )
         )
 
+    def visible_evidence(active, run, pair_id, trace=None):
+        from .evidence_metadata import filter_evidence_items
+
+        items = run.evidence(pair_id)
+        ontology_ids = {item["entity"]["ontology_version_id"] for item in items}
+        for event in (trace or {}).get("events", []):
+            basis = event.get("exact_basis") or {}
+            for side in ("source", "target"):
+                entity = (basis.get(side) or {}).get("entity")
+                if entity:
+                    ontology_ids.add(entity["ontology_version_id"])
+        contexts = {}
+        for ontology_id in sorted(ontology_ids):
+            try:
+                contexts[ontology_id] = active.context(ontology_id)
+            except DomainError as exc:
+                if exc.status_code != 404:
+                    raise
+        return filter_evidence_items(items, contexts, active.policy), contexts
+
     @app.get("/api/v1/runs/{run_id}/pair", response_model=PairResponse)
     def pair(run_id: str, pair_id: str):
-        return bounded(service().run(run_id).pair(pair_id))
+        from .evidence_metadata import filter_exact_basis, filter_pair_metadata
+
+        active = service()
+        run = active.run(run_id)
+        trace = run.pair(pair_id)
+        safe_items, contexts = visible_evidence(active, run, pair_id, trace)
+        trace["events"] = filter_exact_basis(
+            trace["events"], safe_items, contexts=contexts, policy=active.policy
+        )
+        if trace.get("evidence_metadata") is not None:
+            trace["evidence_metadata"] = filter_pair_metadata(
+                trace["evidence_metadata"], safe_items
+            )
+        return bounded(trace)
 
     @app.get("/api/v1/runs/{run_id}/pair-evidence", response_model=Page[SelectedEvidence])
     def evidence(
@@ -664,23 +741,7 @@ def create_prepared_app(
             after = ""
         if not isinstance(after, str):
             raise DomainError("invalid_cursor", "Invalid collection cursor")
-        allowed = []
-        for row in run.evidence(pair_id):
-            # Every original supporting fact must be visible before exposing raw selected text.
-            fact_ids = row.get("fact_ids") or []
-            if not fact_ids:
-                continue
-            try:
-                context = active.context(row["entity"]["ontology_version_id"])
-                for fact_id in fact_ids:
-                    context.axiom(fact_id, policy=active.policy)
-            except KeyError:
-                continue
-            except DomainError as exc:
-                if exc.status_code == 404:
-                    continue
-                raise
-            allowed.append(row)
+        allowed, _ = visible_evidence(active, run, pair_id)
         rows = sorted(allowed, key=lambda x: x["evidence_id"])
         eligible = [r for r in rows if r["evidence_id"] > after]
         more = len(eligible) > limit
@@ -764,7 +825,25 @@ def create_prepared_app(
 
     @app.get("/api/v1/explanations/{explanation_id}", response_model=GeneratedExplanationResponse)
     def explanation(explanation_id: str):
-        return bounded(service().resource(explanation_id, "explanations"))
+        from .descriptions import preparation_metadata, validate_prepared_support
+
+        active = service()
+        result = active.resource(explanation_id, "explanations")
+        try:
+            if result["manifest"].get("description_contract") == "exact-description/2":
+                contexts = {
+                    entity["ontology_version_id"]: active.context(entity["ontology_version_id"])
+                    for entity in result["entities"]
+                }
+                validate_prepared_support(result, contexts, active.policy)
+            preparation = preparation_metadata(result)
+        except (ValueError, KeyError, TypeError) as exc:
+            raise DomainError(
+                "explanation_invalid_support",
+                "Prepared explanation support could not be verified",
+                409,
+            ) from exc
+        return bounded({**result, **preparation})
 
     @app.get("/api/v1/jobs/{job_id}")
     def job(job_id: str):

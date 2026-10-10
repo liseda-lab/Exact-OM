@@ -65,6 +65,34 @@ def export_policy_context(
         }
     )
     destination = Path(destination)
+    if (
+        previous
+        and source_policy.policy_hash == policy.policy_hash
+        and context.manifest.get("navigation")
+    ):
+        # An exactly identical admitted scope can reuse native inference. A
+        # narrower policy must prepare again from its own retained premises.
+        from .navigation_prepare import copy_immutable
+
+        if destination.exists():
+            existing = OntologyContext(destination)
+            if existing.manifest != context.manifest:
+                raise DomainError(
+                    "export_conflict", "Existing portable context has different inputs", 409
+                )
+            return existing
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=".policy-context-", dir=destination.parent
+        ) as temporary:
+            staging = Path(temporary)
+            for name in ("manifest.json", *context.manifest["artifacts"]):
+                if name not in {"manifest.json", "context.sqlite", "navigation.sqlite"}:
+                    raise ValueError("Unsupported prepared context artifact")
+                copy_immutable(context.path / name, staging / name)
+            OntologyContext(staging)
+            os.replace(staging, destination)
+        return OntologyContext(destination)
     if destination.exists():
         existing = OntologyContext(destination)
         if existing.manifest.get("preparation_key") != identity:
@@ -244,6 +272,14 @@ def export_policy_context(
                 },
                 "capabilities": {
                     **context.manifest["capabilities"],
+                    "navigation": {
+                        "contract_version": "exact-hierarchy/1",
+                        "entry_points": "not_run",
+                    },
+                    "reasoner_inferred": {
+                        "status": "not_run",
+                        "reason": "Prepare inference from this policy's admitted inputs",
+                    },
                     "categories": sorted(counts),
                     "source_spans": bool(source_spans),
                 },

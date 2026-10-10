@@ -101,6 +101,26 @@ class OntologyContext:
                 != self.ontology_version_id
             ):
                 raise ValueError("Ontology index identity mismatch")
+        self._navigation = None
+        if self.manifest.get("navigation"):
+            from .navigation import PreparedNavigation
+
+            self._navigation = PreparedNavigation(self)
+
+    def navigation_metadata(self, policy=None):
+        from .navigation import metadata
+
+        return metadata(self, policy)
+
+    def entry_points(self, **query):
+        from .navigation import entry_points
+
+        return entry_points(self, **query)
+
+    def equivalent_entities(self, entity, **query):
+        from .navigation import equivalent_entities
+
+        return equivalent_entities(self, entity, **query)
 
     def _effective_policy(self, policy: Any) -> Any:
         if self._prepared_policy is None:
@@ -502,7 +522,8 @@ class OntologyContext:
             "capabilities": {
                 "typed_expressions": "available",
                 "asserted_browsing": "available",
-                "reasoner_inferred": "not_run",
+                "reasoner_inferred": self.navigation_metadata(policy)["inference"]["status"],
+                "navigation": self.navigation_metadata(policy),
                 "source_spans": (
                     "available" if self.manifest["capabilities"]["source_spans"] else "not_exported"
                 ),
@@ -619,8 +640,10 @@ class OntologyContext:
         if not _allowed(policy, self.ontology_version_id, "hierarchy"):
             return self._page([], None, scope, status="not_exported")
         if basis == "reasoner_inferred":
-            return self._page(
-                [], None, scope, status="not_run", reason="No inference artifact was prepared"
+            from .navigation import inferred_hierarchy
+
+            return inferred_hierarchy(
+                self, ref, direction=direction, limit=limit, cursor=cursor, policy=policy
             )
         last = decode_cursor(cursor, scope) if cursor else ""
         if not isinstance(last, str):
