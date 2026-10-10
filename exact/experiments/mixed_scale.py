@@ -354,6 +354,35 @@ def _population_identity(record):
             "source_documents": sorted(row["source_sha256"] for row in core["closure"]["source_documents"])}
 
 
+def _validate_deployed_recipe(config, manifest, recipe, cell):
+    """A self-consistent inference manifest must still implement its selected recipe."""
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.experiments.public_inference import _inference_config
+    from exact.utils.frozen_inference import inject_runtime_fitted_artifacts
+
+    selected = verified(recipe["selected_config"])
+    source, target = verified(manifest["source"]), verified(manifest["target"])
+    expected = _inference_config(selected, source, target)
+    if recipe.get("runtime_fitted_artifacts"):
+        inject_runtime_fitted_artifacts(expected, verified(recipe["runtime_fitted_artifacts"]),
+                                       selected_config=selected, source=source, target=target)
+    local = cell["mode"] == "local_ranking"
+    expected["run"]["seed"] = cell["seed"]
+    expected["data"].update(
+        execution_mode=cell["mode"], candidate_source="track" if local else "generated",
+        candidate_provenance="benchmark_supplied" if local else "generated",
+        # The caller independently verifies these against the exact full/cohort
+        # population and every original query. Output directories live in runs.
+        source_universe=config.data.source_universe, candidates=config.data.candidates,
+    )
+    expected["supervision"]["inference_artifact"] = config.supervision.inference_artifact
+    expected = ConfigModel.from_mapping(expected, warn_v1=False).model_dump(mode="json", by_alias=True)
+    actual = config.model_dump(mode="json", by_alias=True)
+    changed = sorted(key for key in actual if actual[key] != expected[key])
+    if changed:
+        raise ValueError("Deployment changed its frozen selected recipe: " + ", ".join(changed))
+
+
 def _validate_case_deployment(manifest, case, cell, *, cohort=None):
     from exact.experiments.public_inference import validate_population
     from exact.experiments.submission import _pools
@@ -478,6 +507,7 @@ def prepare_successor_bundle(destination, *, registry, public_inputs, selection_
                     raise ValueError("Deployment fitted artifact lineage differs from the frozen recipe")
                 if config.seed != cell["seed"] or config.data.execution_mode != cell["mode"]:
                     raise ValueError("Deployment seed/mode differs from corrected logical cell")
+                _validate_deployed_recipe(config, manifest, recipe, cell)
                 for side in ("source", "target"):
                     if binding(getattr(config.data, side))["sha256"] != manifest[side]["sha256"]:
                         raise ValueError("Deployment config ontology differs from its declared case")

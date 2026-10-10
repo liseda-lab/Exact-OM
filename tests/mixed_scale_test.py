@@ -313,6 +313,80 @@ def test_successor_deployment_cannot_substitute_an_unselected_recipe(tmp_path, m
             selection_freeze=frozen, deployments={cell: mixed.binding(manifest)})
 
 
+@pytest.mark.parametrize("change", ["threshold", "retrieval", "evidence"])
+def test_successor_rejects_self_consistent_inference_with_changed_selected_recipe(tmp_path, monkeypatch, change):
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.core.entities.configs.yaml_io import dump_yaml_document
+    from exact.utils.frozen_inference import freeze_inference_manifest, validate_inference_config
+
+    case, source, target, queries = native_case(tmp_path)
+    config = ConfigModel.from_mapping({"config_version": 2, "run": {"seed": 17},
+        "supervision": {"mode": "label_free"}, "dataset": {"filter_ignored_alignment_classes": False}})
+    selected = tmp_path / "selected.json"
+    selected.write_text(json.dumps(config.model_dump(mode="json")))
+    manifest_path = prepare_public_inference(selected, tmp_path / "inference", source=source,
+        target=target, track="bioml-local", public_candidates=queries)
+    cell = "primary/H0/stack_all/local_ranking/seed-17"
+    frozen = deployment_selection(tmp_path / "freeze", monkeypatch, manifest_path, cell)
+    manifest = json.loads(manifest_path.read_text())
+    for index, run in enumerate(manifest["runs"]):
+        changed = ConfigModel.load_config(mixed.verified(run["config"]))
+        if change == "threshold":
+            changed.matching.threshold = 0.987
+        elif change == "retrieval":
+            changed.candidates.top_k += 1
+        else:
+            changed.matching.channels.similarity_per_relation_cap += 1
+        changed.supervision.inference_artifact = None
+        artifact = tmp_path / f"changed-{index}.frozen.json"
+        freeze_inference_manifest(changed, artifact)
+        changed.supervision.inference_artifact = artifact
+        output = tmp_path / f"changed-{index}.yaml"
+        output.write_text(dump_yaml_document(changed.model_dump(mode="json", by_alias=True)))
+        run["config"] = mixed.binding(output)
+        # The previous admission accepted this internally valid but unselected recipe.
+        assert validate_inference_config(ConfigModel.load_config(output)) is not None
+    changed_manifest = saved(tmp_path / "changed-inference.json", manifest)
+    registry = tmp_path / "registry.json"
+    registry.write_text('{"pending": []}')
+    inputs = saved(tmp_path / "inputs.json", {name: case for name in ("H0", "H1", "H2")})
+    with pytest.raises(ValueError, match="changed its frozen selected recipe"):
+        mixed.prepare_successor_bundle(tmp_path / "successor", registry=registry, public_inputs=inputs["path"],
+            selection_freeze=frozen, deployments={cell: changed_manifest})
+
+
+def test_successor_recipe_check_accepts_actual_runtime_fits_and_public_bindings(tmp_path, monkeypatch):
+    from exact.core.entities.configs.config import ConfigModel
+    from exact.utils.provenance import dataset_signature_for_paths
+
+    case, source, target, queries = native_case(tmp_path)
+    signature = dataset_signature_for_paths(source, target)
+    head = saved(tmp_path / "runtime-head.json", {"dataset_signature": signature, "kind": "fitted_fusion"})
+    config = ConfigModel.from_mapping({"config_version": 2, "run": {"seed": 17, "source_cap": 2},
+        "supervision": {"mode": "label_free"}, "dataset": {"filter_ignored_alignment_classes": False},
+        "matching": {"fusion": {"mode": "analytic_fitted"}}})
+    selected = tmp_path / "selected.json"
+    selected.write_text(json.dumps(config.model_dump(mode="json")))
+    receipt = saved(tmp_path / "actual-runtime-fits.json", {
+        "kind": "runtime_fitted_deployment_artifacts", "selected_config": mixed.binding(selected),
+        "dataset_signature": signature, "artifacts": {"matching.fusion.artifact": head},
+    })
+    registry = tmp_path / "registry.json"
+    registry.write_text('{"pending": []}')
+    inputs = saved(tmp_path / "inputs.json", {name: case for name in ("H0", "H1", "H2")})
+    for mode in mixed.MODES:
+        manifest = prepare_public_inference(selected, tmp_path / mode, source=source, target=target,
+            track="bioml-global" if mode == "global_alignment" else "bioml-local",
+            public_candidates=queries if mode == "local_ranking" else None,
+            fitted_artifacts=Path(receipt["path"]))
+        cell = f"primary/H0/stack_all/{mode}/seed-17"
+        frozen = deployment_selection(tmp_path / (mode + "-freeze"), monkeypatch, manifest, cell)
+        bundle = mixed.prepare_successor_bundle(tmp_path / (mode + "-successor"), registry=registry,
+            public_inputs=inputs["path"], selection_freeze=frozen, deployments={cell: mixed.binding(manifest)})
+        row = next(row for row in bundle["logical_to_physical"] if row["id"] == cell)
+        assert row["status"] == "bound_not_admitted" and row["worker"]
+
+
 def test_h2_cohort_is_fixed_report_only_and_retains_duplicate_source_queries(tmp_path, monkeypatch):
     frozen = selection_freeze(tmp_path / "freeze", monkeypatch)
     case, source, _, queries = native_case(tmp_path)
