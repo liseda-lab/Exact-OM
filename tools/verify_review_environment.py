@@ -13,6 +13,7 @@ import copy
 import hashlib
 import io
 import json
+import re
 import ssl
 import time
 import zipfile
@@ -41,6 +42,49 @@ def fingerprint(value):
     if not isinstance(value, bytes):
         value = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(value).hexdigest()
+
+
+def validate_response_csp(response, *, study_origin, label):
+    """Require promised study/document policies without inventing an exploration API policy."""
+    url = urlsplit(str(response.url))
+    study = f"{url.scheme}://{url.netloc}" == study_origin.rstrip("/")
+    document = response.headers.get("content-type", "").split(";", 1)[0] == "text/html"
+    if not (study or document):
+        return "not_promised_by_exploration_api"
+    raw = response.headers.get("content-security-policy", "")
+    require(bool(raw.strip()), label + ":csp_present")
+    directives = {}
+    for part in raw.split(";"):
+        tokens = part.split()
+        if not tokens:
+            continue
+        require(tokens[0] not in directives, label + ":csp_unique_directives")
+        directives[tokens[0]] = tokens[1:]
+    for name, expected in (
+        ("default-src", ["'self'"]),
+        ("frame-ancestors", ["'none'"]),
+        ("object-src", ["'none'"]),
+        ("base-uri", ["'none'"]),
+    ):
+        require(directives.get(name) == expected, label + ":csp_" + name)
+    require("unsafe-eval" not in raw, label + ":csp_no_unsafe_eval")
+    if document:
+        scripts = directives.get("script-src", [])
+        require(
+            "'self'" in scripts
+            and all(
+                token == "'self'" or re.fullmatch(r"'sha256-[A-Za-z0-9+/]{43}='", token)
+                for token in scripts
+            ),
+            label + ":csp_document_scripts",
+        )
+        for name in ("connect-src", "font-src", "form-action"):
+            require(directives.get(name) == ["'self'"], label + ":csp_" + name)
+        require(
+            directives.get("style-src") == (["'self'"] if study else ["'self'", "'unsafe-inline'"]),
+            label + ":csp_document_styles",
+        )
+    return "strict_document" if document else "study_response"
 
 
 def answers_for(form):
@@ -222,6 +266,40 @@ def validate_pair_metadata(study, main, source, candidate, run, rows):
         )
 
 
+def inventory(request_page):
+    """Exhaust one frozen entity index with bounded, non-repeating cursor traversal."""
+    digest, seen, cursors, samples = hashlib.sha256(), set(), set(), []
+    cursor, total, pages = None, None, 0
+    while True:
+        page = request_page(cursor)
+        require(type(page.get("total_count")) is int, "inventory_exact_total_available")
+        require(total is None or page["total_count"] == total, "inventory_total_stable")
+        total = page["total_count"]
+        require(0 <= total <= 1_000_000, "inventory_verification_bound")
+        require(page["returned_count"] == len(page["items"]), "inventory_page_count")
+        for row in page["items"]:
+            key = canonical_hash(row["entity"])
+            require(key not in seen, "inventory_unique_typed_entities")
+            seen.add(key)
+            digest.update(canonical_hash(row).encode() + b"\n")
+        if page["items"]:
+            if not samples:
+                samples.append(page["items"][0]["entity"])
+            if len(samples) == 1:
+                samples.append(page["items"][-1]["entity"])
+            else:
+                samples[-1] = page["items"][-1]["entity"]
+        pages += 1
+        cursor = page.get("next_cursor")
+        if cursor is None:
+            break
+        require(bool(page["items"]) and cursor not in cursors, "inventory_cursor_progress")
+        require(pages <= total, "inventory_page_bound")
+        cursors.add(cursor)
+    require(len(seen) == total, "inventory_exhaustive_count")
+    return {"entities": total, "pages": pages, "sha256": digest.hexdigest()}, samples
+
+
 class Journey:
     def __init__(self, config, *, receipt, expected_cases=24, scope="real_bundle"):
         require(not Path(receipt).exists(), "receipt_must_be_new")
@@ -278,13 +356,14 @@ class Journey:
         response = self.client.request(method, path, **kwargs)
         length = response.headers.get("content-length")
         require(length is None or int(length) == len(response.content), label + ":body_length")
-        require(
-            "unsafe-eval" not in response.headers.get("content-security-policy", ""), label + ":csp"
+        csp = validate_response_csp(
+            response, study_origin=str(self.client.base_url).rstrip("/"), label=label
         )
         self.report["checks"].append(
             {
                 "check": label,
                 "status": response.status_code,
+                "csp_contract": csp,
                 "bytes": len(response.content),
                 "sha256": fingerprint(response.content),
                 "seconds": round(time.monotonic() - start, 3),
@@ -394,6 +473,142 @@ class Journey:
             expected=403,
         )
 
+    def complete_read_surfaces(self, prefix, capabilities):
+        """Check full indexed data and graph inputs; this does not render a graph."""
+        record = environment.processes(self.config).get("exploration")
+        require(
+            record and environment.owned(self.config, "exploration", record),
+            "owned_exploration_process",
+        )
+        main = f"https://127.0.0.1:{self.config['ports']['exploration']}/api/v1"
+        summaries = []
+        focal_entities = [
+            entity
+            for case in self.definition["cases"]
+            for entity in [case["source"], *[c["entity"] for c in case["candidates"]]]
+        ]
+        focal = {canonical_hash(entity) for entity in focal_entities}
+        for version in capabilities["ontology_versions"]:
+            started = time.monotonic()
+            query = {"ontology_version_id": version, "limit": 100}
+
+            def pages(path, label):
+                return inventory(
+                    lambda cursor: self.request(
+                        "GET",
+                        path,
+                        params={**query, **({"cursor": cursor} if cursor else {})},
+                        label=label,
+                    ).json()
+                )
+
+            study, samples = pages(prefix + "/entities", "study_full_index_page")
+            exploration, _ = pages(main + "/entities", "main_full_index_page")
+            require(study == exploration, "same_full_typed_entity_inventory")
+            require(bool(samples), "full_ontology_inventory_nonempty")
+            probe = next((e for e in samples if canonical_hash(e) not in focal), samples[0])
+            for path, label in (
+                (prefix + "/entities", "study_exact_iri_search"),
+                (main + "/entities", "main_exact_iri_search"),
+            ):
+                found = self.request(
+                    "GET",
+                    path,
+                    params={**query, "term": probe["iri"], "kind": probe["kind"]},
+                    label=label,
+                ).json()
+                require(probe in [r["entity"] for r in found["items"]], "exact_iri_search_identity")
+            hierarchy_probe = next(
+                (
+                    entity
+                    for entity in focal_entities
+                    if entity["ontology_version_id"] == version and entity["kind"] == "class"
+                ),
+                probe,
+            )
+            entity_query = {**hierarchy_probe, "limit": 100, "basis": "literal_asserted"}
+            hierarchy_counts = {}
+            for direction in ("parents", "children"):
+                responses, continuations = [], []
+                for path, label in (
+                    (prefix + "/hierarchy", "study_hierarchy_page"),
+                    (main + "/hierarchy", "main_hierarchy_page"),
+                ):
+                    page = self.request(
+                        "GET", path, params={**entity_query, "direction": direction}, label=label
+                    ).json()
+                    require(page["returned_count"] == len(page["items"]), "hierarchy_page_count")
+                    responses.append(page)
+                    if page.get("next_cursor"):
+                        continuation = self.request(
+                            "GET",
+                            path,
+                            params={
+                                **entity_query,
+                                "direction": direction,
+                                "cursor": page["next_cursor"],
+                            },
+                            label=label + "2",
+                        ).json()
+                        require(
+                            continuation["returned_count"] == len(continuation["items"]),
+                            "hierarchy_continuation_count",
+                        )
+                        continuations.append(continuation["items"])
+                        require(
+                            not (
+                                {canonical_hash(r) for r in page["items"]}
+                                & {canonical_hash(r) for r in continuation["items"]}
+                            ),
+                            "hierarchy_page_continuation",
+                        )
+                    else:
+                        continuations.append([])
+                require(
+                    bool(responses[0].get("next_cursor")) == bool(responses[1].get("next_cursor")),
+                    "same_hierarchy_continuation_presence",
+                )
+                require(responses[0]["items"] == responses[1]["items"], "same_hierarchy_edges")
+                require(continuations[0] == continuations[1], "same_hierarchy_continuation")
+                hierarchy_counts[direction] = {
+                    "first_page_edges": len(responses[0]["items"]),
+                    "continuation_edges": len(continuations[0]),
+                    "continuation_exercised": bool(responses[0].get("next_cursor")),
+                }
+            require(
+                any(value["first_page_edges"] for value in hierarchy_counts.values()),
+                "nonempty_class_hierarchy_exercised",
+            )
+            graph = self.request(
+                "GET",
+                main + "/hierarchy",
+                params={**entity_query, "direction": "ancestors"},
+                label="main_bounded_ancestor_graph",
+            ).json()
+            require(
+                len(graph["nodes"]) <= 100 and hierarchy_probe in graph["nodes"],
+                "ancestor_graph_node_bound",
+            )
+            summaries.append(
+                {
+                    "ontology_sha256": fingerprint(version),
+                    **study,
+                    "same_study_and_exploration_inventory": True,
+                    "search_probe_outside_focal_cases": canonical_hash(probe) not in focal,
+                    "ancestor_graph_nodes": len(graph["nodes"]),
+                    "ancestor_graph_edges": len(graph["items"]),
+                    "hierarchy": hierarchy_counts,
+                    "seconds": round(time.monotonic() - started, 3),
+                }
+            )
+        require(
+            environment.owned(self.config, "exploration", record), "exploration_identity_preserved"
+        )
+        self.report["complete_read_surfaces"] = {
+            "ontologies": summaries,
+            "scope": "Full entity-index pagination, exact-IRI search, hierarchy and bounded ancestor graph API inputs; no frontend graph rendering claim",
+        }
+
     def workspace(self, scope_id, case, *, interrupt=False):
         source = case["source"]
         prefix = "/api/v1/study/workspace/" + quote(scope_id, safe="")
@@ -402,6 +617,8 @@ class Journey:
         ).json()
         require(capabilities["scope_id"] == scope_id, "workspace_scope_binding")
         self.pair_metadata(prefix, case, capabilities)
+        if interrupt and self.scope == "real_bundle":
+            self.complete_read_surfaces(prefix, capabilities)
         for version in capabilities["ontology_versions"]:
             query = {"ontology_version_id": version, "kind": "class", "limit": 1}
             first = self.request(
@@ -460,6 +677,9 @@ class Journey:
                 start = time.monotonic()
                 with self.client.stream("GET", target, params=query) as response:
                     require(response.status_code == 200, "interrupted_response_status")
+                    validate_response_csp(
+                        response, study_origin=self.origin, label="interrupted_response"
+                    )
                     declared = int(response.headers.get("content-length", "0"))
                     chunk = next(response.iter_raw(chunk_size=128))
                     require(len(chunk) < declared, "partial_response_probe_required")

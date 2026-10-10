@@ -43,7 +43,12 @@ def preparation_fixture(tmp_path, monkeypatch):
                 {
                     "Src": case["source"]["iri"],
                     "candidates": [
-                        {"target": c["entity"]["iri"], "S_final": c["score"]}
+                        {
+                            "target": c["entity"]["iri"],
+                            "S_final": c["score"],
+                            "threshold_positive": True,
+                            "emitted": True,
+                        }
                         for c in case["candidates"]
                     ],
                 }
@@ -55,7 +60,13 @@ def preparation_fixture(tmp_path, monkeypatch):
     # adapter is stubbed; all description/resource/workspace preparation is real.
     reader = SimpleNamespace(iter_explanations=lambda: [], explanations_for=lambda _: [])
     monkeypatch.setattr(preparation.RunReader, "open", lambda _: reader)
-    monkeypatch.setattr(preparation, "prepared_private_run", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        preparation,
+        "prepared_private_run",
+        lambda *args, **kwargs: SimpleNamespace(
+            manifest=lambda: {"counts": {"selected_evidence": 10, "provenance_unavailable": 9}}
+        ),
+    )
     from exact_inspect.contracts import canonical_hash
     from exact_inspect.evidence_metadata import pair_evidence_metadata
 
@@ -106,6 +117,10 @@ def test_typed_only_prepares_real_artifacts_without_provider_jobs(tmp_path, monk
     assert any(
         "not performed" in reason for reason in publication.definition.review_bundle.limitations
     )
+    limitations = publication.definition.review_bundle.limitations
+    assert any("selected typed review entities" in text for text in limitations)
+    assert any("Most run-wide" in text for text in limitations)
+    assert any("Rejected candidates and differing final decisions" in text for text in limitations)
     catalogue = json.loads((tmp_path / "catalogue.json").read_bytes())
     assert catalogue["generation_mode"] == "typed-only"
     assert catalogue["provider_batch_status"] == "not_performed"
@@ -124,3 +139,25 @@ def test_typed_only_prepares_real_artifacts_without_provider_jobs(tmp_path, monk
             tmp_path, run, count=4, revision="typed-only-test", generation_mode="provider"
         )
     assert {p: file_hash(p) for p in before} == before
+
+
+def test_review_decision_limitation_requires_explicit_recorded_flags():
+    def limitations(rows, counts=None):
+        return preparation.review_scope_limitations(
+            {"cases": [{"recorded_candidates": rows}]}, counts or {}
+        )
+
+    assert not any("threshold-positive" in text for text in limitations([{"S_final": 1.0}]))
+    assert not any(
+        "threshold-positive" in text
+        for text in limitations(
+            [
+                {"threshold_positive": True, "emitted": True},
+                {"threshold_positive": False, "emitted": False},
+            ]
+        )
+    )
+    assert not any(
+        "Most run-wide" in text
+        for text in limitations([], {"selected_evidence": 10, "provenance_unavailable": 4})
+    )

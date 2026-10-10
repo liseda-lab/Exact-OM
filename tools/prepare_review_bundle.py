@@ -61,6 +61,28 @@ CATEGORIES = (
 )
 
 
+def review_scope_limitations(plan, private_counts):
+    """Describe the actual preparation and recorded decision coverage without score inference."""
+    limitations = [
+        "Matcher-to-original evidence resolution was prepared only for the selected typed review entities. "
+        "All recorded candidates remain browsable; this preparation does not resolve evidence origins outside that selected set."
+    ]
+    selected = private_counts.get("selected_evidence", 0)
+    if selected and private_counts.get("provenance_unavailable", 0) > selected / 2:
+        limitations.append(
+            "Most run-wide selected-evidence origins remain unresolved; exact counts are retained in the preparation receipt."
+        )
+    displayed = [row for case in plan["cases"] for row in case["recorded_candidates"]]
+    if displayed and all(
+        row.get("threshold_positive") is True and row.get("emitted") is True for row in displayed
+    ):
+        limitations.append(
+            "All displayed candidate pairs have recorded threshold-positive and emitted decisions. "
+            "Rejected candidates and differing final decisions are not represented in the review cases."
+        )
+    return limitations
+
+
 def packet_for(entity, contexts, policy):
     context = contexts[entity.ontology_version_id]
     facts = {}
@@ -798,6 +820,7 @@ def prepare(
             "Development-run candidate selection is for interface review, not effectiveness evaluation.",
             "Correctness is unresolved and correctness metrics are disabled.",
             *generation_limitations(preparation_summary),
+            *review_scope_limitations(plan, private_run.manifest().get("counts", {})),
             "DOID uses a declared derivative and root-only context; the ignored ext.owl import is not admitted.",
             *[
                 f"Prepared inference is {c.manifest["capabilities"]["reasoner_inferred"]["status"]} for {c.manifest["name"]}; asserted navigation remains available."

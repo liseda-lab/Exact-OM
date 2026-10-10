@@ -52,7 +52,14 @@ def test_failure_receipt_records_status_without_private_response_or_request():
     journey.client = httpx.Client(
         base_url="https://127.0.0.1",
         transport=httpx.MockTransport(
-            lambda request: httpx.Response(422, json={"detail": marker}, request=request)
+            lambda request: httpx.Response(
+                422,
+                json={"detail": marker},
+                request=request,
+                headers={
+                    "Content-Security-Policy": "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
+                },
+            )
         ),
     )
     try:
