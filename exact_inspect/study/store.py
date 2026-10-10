@@ -692,6 +692,51 @@ class StudyStore:
         if not state["consent"] or not state["consent"]["accepted"]:
             raise StudyError(403, "Consent is required")
         v2 = study["contract_version"] == "exact-study/2.0"
+        forms3 = study.get("protocol_versions", {}).get("methods") == "study-methods/3"
+        if forms3 and operation in {
+            "setup",
+            "tutorial_progress",
+            "consultation",
+            "consultation_draft",
+        }:
+            from .v2_models import (
+                ConsultationDraftV3,
+                ConsultationV3,
+                SetupV3,
+                TutorialProgressMutationV3,
+            )
+
+            validator = {
+                "setup": SetupV3,
+                "tutorial_progress": TutorialProgressMutationV3,
+                "consultation": ConsultationV3,
+                "consultation_draft": ConsultationDraftV3,
+            }[operation]
+            try:
+                normalized = validator.model_validate(
+                    {**data, "expected_revision": 0, "idempotency_key": "validation"}
+                ).model_dump(mode="json")
+            except ValueError as exc:
+                raise StudyError(
+                    422, "Answer does not match the frozen study-methods/3 contract"
+                ) from exc
+            normalized.pop("expected_revision")
+            normalized.pop("idempotency_key")
+            if operation == "tutorial_progress" and "position" not in data:
+                normalized.pop("position", None)
+            data.clear()
+            data.update(normalized)
+        elif v2 and operation == "tutorial_progress":
+            from .v2_models import TutorialProgressMutation
+
+            try:
+                TutorialProgressMutation.model_validate(
+                    {**data, "expected_revision": 0, "idempotency_key": "validation"}
+                )
+            except ValueError as exc:
+                raise StudyError(
+                    422, "Answer does not match the historical tutorial contract"
+                ) from exc
         if operation.startswith("tutorial_"):
             if not v2:
                 raise StudyError(409, "Tutorial assessment requires exact-study/2.0")
@@ -789,7 +834,10 @@ class StudyStore:
             if data["form_version"] != study["form_version"]:
                 raise StudyError(409, "Questionnaire version changed")
             answers, answer_states = validate_answers(
-                study["questionnaires"][form_id], data["answers"], submitted=data["submitted"]
+                study["questionnaires"][form_id],
+                data["answers"],
+                submitted=data["submitted"],
+                version=study["form_version"],
             )
             state["questionnaires"][form_id] = {
                 **data,
@@ -898,7 +946,12 @@ class StudyStore:
                 raise StudyError(409, "Consultation version or presentation does not match")
             from .v2_models import ConsultationDraftV2, ConsultationV2
 
-            model = ConsultationDraftV2 if operation == "consultation_draft" else ConsultationV2
+            if forms3:
+                from .v2_models import ConsultationDraftV3, ConsultationV3
+
+                model = ConsultationDraftV3 if operation == "consultation_draft" else ConsultationV3
+            else:
+                model = ConsultationDraftV2 if operation == "consultation_draft" else ConsultationV2
             try:
                 model.model_validate(
                     {**data, "expected_revision": 0, "idempotency_key": "validation"}
@@ -1183,9 +1236,22 @@ class StudyStore:
                 counts[key] = counts.get(key, 0) + 1
             return {"study_revision": revision, "counts": counts}
 
-    def export(self, revision, *, include_test=False, include_keys=False, analysis_schema=None):
+    def export(
+        self,
+        revision,
+        *,
+        include_test=False,
+        include_keys=False,
+        analysis_schema=None,
+        include_named_methods=False,
+    ):
         """Freeze a reproducible anonymous analysis export; credentials never enter it."""
-        from .exports import analysis3_dictionary, observation_summary
+        from .exports import (
+            analysis3_dictionary,
+            analysis4_dictionary,
+            method_response_rows,
+            observation_summary,
+        )
 
         with self.transaction() as db:
             study_row, study = self._study(db, revision)
@@ -1193,14 +1259,27 @@ class StudyStore:
                 "export", "exact-study-analysis/1"
             )
             schema = source_schema if analysis_schema is None else analysis_schema
+            forms3 = study.get("protocol_versions", {}).get("methods") == "study-methods/3"
             supported = (
-                {"exact-study-analysis/2", "exact-study-analysis/3"}
-                if study["contract_version"] == "exact-study/2.0"
-                else {"exact-study-analysis/1"}
+                {"exact-study-analysis/4"}
+                if forms3
+                else (
+                    {"exact-study-analysis/2", "exact-study-analysis/3"}
+                    if study["contract_version"] == "exact-study/2.0"
+                    else {"exact-study-analysis/1"}
+                )
             )
             if schema not in supported:
                 raise StudyError(422, "Analysis schema is unsupported for this study contract")
-            corrected_timing = schema == "exact-study-analysis/3"
+            if include_named_methods and (not forms3 or schema != "exact-study-analysis/4"):
+                raise StudyError(
+                    422, "Named-method export requires study-methods/3 and exact-study-analysis/4"
+                )
+            corrected_timing = schema in {"exact-study-analysis/3", "exact-study-analysis/4"}
+            private_method_fields = {"other_editor", "other_resource", "other_method"} - (
+                {"other_method"} if include_named_methods else set()
+            )
+            method_responses = []
             keys = json.loads(
                 db.execute(
                     "SELECT payload FROM researcher_case_keys WHERE study_revision = ?",
@@ -1215,6 +1294,12 @@ class StudyStore:
                 if row["test"] and not include_test:
                     continue
                 state = json.loads(row["state"])
+                if forms3:
+                    method_responses.extend(
+                        method_response_rows(
+                            state, study, row["id"], include_named_methods=include_named_methods
+                        )
+                    )
                 events = self._records(db, "events", row["id"])
                 segments = self._records(db, "timing_segments", row["id"])
                 forms = json.loads(canonical(state["questionnaires"]))
@@ -1226,11 +1311,7 @@ class StudyStore:
                         k: v for k, v in form["answers"].items() if k not in text_ids
                     }
                 consultations = {
-                    cid: {
-                        k: v
-                        for k, v in value.items()
-                        if k not in {"other_editor", "other_resource", "other_method"}
-                    }
+                    cid: {k: v for k, v in value.items() if k not in private_method_fields}
                     for cid, value in state["consultations"].items()
                 }
                 rows = []
@@ -1362,7 +1443,16 @@ class StudyStore:
                         "setup": {
                             k: v
                             for k, v in (state["setup"] or {}).items()
-                            if k not in {"protege_version", "familiar_methods"}
+                            if k
+                            not in (
+                                {"protege_version", "familiar_methods"}
+                                if not forms3
+                                else (
+                                    {"familiar_other_method"}
+                                    if not include_named_methods
+                                    else set()
+                                )
+                            )
                         },
                         "cases": rows,
                         "events": events,
@@ -1412,8 +1502,7 @@ class StudyStore:
                                     cid: {
                                         k: v
                                         for k, v in draft.items()
-                                        if k
-                                        not in {"other_editor", "other_resource", "other_method"}
+                                        if k not in private_method_fields
                                     }
                                     for cid, draft in state["consultation_drafts"].items()
                                 },
@@ -1483,6 +1572,9 @@ class StudyStore:
                             "consultation_timing"
                         ]["page_observation_seconds"]
                 content["data_dictionary"].update(analysis3_dictionary())
+            if forms3:
+                content["method_responses"] = method_responses
+                content["data_dictionary"].update(analysis4_dictionary())
             if include_keys:
                 content["researcher_case_keys"] = keys
             export_id, now = str(uuid4()), utcnow()
@@ -1495,6 +1587,7 @@ class StudyStore:
                 "content_sha256": digest(canonical(content)),
                 "include_test": include_test,
                 "includes_private_key_join": include_keys,
+                **({"includes_named_method_details": include_named_methods} if forms3 else {}),
                 "schema": schema,
                 **(
                     {"source_protocol_versions": study["protocol_versions"]}

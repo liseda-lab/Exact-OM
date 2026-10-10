@@ -1346,8 +1346,10 @@ def test_study_openapi_has_strict_participant_outputs(service):
         assert response["anyOf"] == [
             {"$ref": "#/components/schemas/StudyState"},
             {"$ref": "#/components/schemas/StudyStateV2"},
+            {"$ref": "#/components/schemas/StudyStateV3"},
         ]
     assert schema["components"]["schemas"]["StudyStateV2"]["additionalProperties"] is False
+    assert schema["components"]["schemas"]["StudyStateV3"]["additionalProperties"] is False
     case = schema["components"]["schemas"]["StudyCase"]
     assert case["additionalProperties"] is False
     assert (

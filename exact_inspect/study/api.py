@@ -57,13 +57,18 @@ from .telemetry import (
 )
 from .v2_models import (
     ConsultationDraftV2,
+    ConsultationDraftV3,
     ConsultationV2,
+    ConsultationV3,
     SetupV2,
+    SetupV3,
     StudyCaseV2,
     StudyStateV2,
+    StudyStateV3,
     TutorialAssessment,
     TutorialComplete,
     TutorialProgressMutation,
+    TutorialProgressMutationV3,
 )
 
 COOKIE = "exact_study_session"
@@ -259,7 +264,7 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     @router.post(
         "/study/session",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def exchange(body: Exchange, response: Response):
@@ -281,46 +286,59 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         return state
 
     @router.get(
-        "/study/state", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+        "/study/state",
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
     def state(identity=Depends(auth.participant)):
         return store.state(*identity)
 
     @router.put(
         "/study/consent",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def consent(body: Consent, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "consent", body)
 
     @router.put(
-        "/study/setup", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+        "/study/setup",
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
-    def setup(body: Setup | SetupV2, identity=Depends(auth.participant_write)):
+    def setup(body: Setup | SetupV2 | SetupV3, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "setup", body)
 
     @router.put(
-        "/study/tutorial/progress", response_model=StudyStateV2, response_model_exclude_unset=True
+        "/study/tutorial/progress",
+        response_model=StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
-    def tutorial_progress(body: TutorialProgressMutation, identity=Depends(auth.tutorial_write)):
+    def tutorial_progress(
+        body: TutorialProgressMutation | TutorialProgressMutationV3,
+        identity=Depends(auth.tutorial_write),
+    ):
         return store.mutate(*identity, "tutorial_progress", body)
 
     @router.post(
-        "/study/tutorial/assessment", response_model=StudyStateV2, response_model_exclude_unset=True
+        "/study/tutorial/assessment",
+        response_model=StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
     def tutorial_assessment(body: TutorialAssessment, identity=Depends(auth.tutorial_write)):
         return store.mutate(*identity, "tutorial_assessment", body)
 
     @router.post(
-        "/study/tutorial/complete", response_model=StudyStateV2, response_model_exclude_unset=True
+        "/study/tutorial/complete",
+        response_model=StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
     def tutorial_complete(body: TutorialComplete, identity=Depends(auth.tutorial_write)):
         return store.mutate(*identity, "tutorial_complete", body)
 
     @router.put(
         "/study/questionnaires/{form_id}",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def questionnaire(form_id: str, body: Questionnaire, identity=Depends(auth.participant_write)):
@@ -332,17 +350,19 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     @router.put(
         "/study/cases/{case_id:path}/consultation/draft",
-        response_model=StudyStateV2,
+        response_model=StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def consultation_draft(
-        case_id: str, body: ConsultationDraftV2, identity=Depends(auth.participant_write)
+        case_id: str,
+        body: ConsultationDraftV2 | ConsultationDraftV3,
+        identity=Depends(auth.participant_write),
     ):
         return store.mutate(*identity, "consultation_draft", body, case_id)
 
     @router.put(
         "/study/cases/{case_id:path}/draft",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def draft(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
@@ -350,7 +370,7 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     @router.post(
         "/study/cases/{case_id:path}/submit",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def submit(case_id: str, body: Ranking, identity=Depends(auth.participant_write)):
@@ -358,11 +378,13 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
 
     @router.put(
         "/study/cases/{case_id:path}/consultation",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def consultation(
-        case_id: str, body: Consultation | ConsultationV2, identity=Depends(auth.participant_write)
+        case_id: str,
+        body: Consultation | ConsultationV2 | ConsultationV3,
+        identity=Depends(auth.participant_write),
     ):
         return store.mutate(*identity, "consultation", body, case_id)
 
@@ -375,20 +397,24 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         return save_timing(store, *identity, body)
 
     @router.post(
-        "/study/pause", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+        "/study/pause",
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
     def pause(body: Mutation, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "pause", body)
 
     @router.post(
-        "/study/resume", response_model=StudyState | StudyStateV2, response_model_exclude_unset=True
+        "/study/resume",
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
+        response_model_exclude_unset=True,
     )
     def resume(body: Resume, identity=Depends(auth.participant_write)):
         return store.mutate(*identity, "resume", body)
 
     @router.post(
         "/study/complete",
-        response_model=StudyState | StudyStateV2,
+        response_model=StudyState | StudyStateV2 | StudyStateV3,
         response_model_exclude_unset=True,
     )
     def complete(body: Mutation, identity=Depends(auth.participant_write)):
@@ -447,15 +473,22 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         include_keys: bool = False,
         format: Literal["json", "csv"] = "json",
         analysis_schema: (
-            Literal["exact-study-analysis/1", "exact-study-analysis/2", "exact-study-analysis/3"]
+            Literal[
+                "exact-study-analysis/1",
+                "exact-study-analysis/2",
+                "exact-study-analysis/3",
+                "exact-study-analysis/4",
+            ]
             | None
         ) = None,
+        include_named_methods: bool = False,
     ):
         result = store.export(
             revision,
             include_test=include_test,
             include_keys=include_keys,
             analysis_schema=analysis_schema,
+            include_named_methods=include_named_methods,
         )
         if format == "csv":
             return Response(

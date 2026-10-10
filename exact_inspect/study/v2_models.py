@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from .models import (
     Asset,
@@ -391,6 +391,27 @@ class ProtocolVersions(StrictModel):
     software: Identifier
     export: Literal["exact-study-analysis/2", "exact-study-analysis/3"] = "exact-study-analysis/2"
 
+    @model_validator(mode="after")
+    def reserve_review_versions(self):
+        if self.forms == "exact-study-forms/3" or self.setup == "setup/3":
+            raise ValueError(
+                "New form versions require the complete study-methods/3 publication contract"
+            )
+        return self
+
+
+class ProtocolVersionsV3(StrictModel):
+    setup: Literal["setup/3"]
+    tutorial: Identifier
+    assessment: Identifier
+    forms: Literal["exact-study-forms/3"]
+    consultation: Literal["consultation/3"]
+    methods: Literal["study-methods/3"]
+    information: Identifier
+    resource_policy: Identifier
+    software: Identifier
+    export: Literal["exact-study-analysis/4"]
+
 
 class StudyDefinitionV2(StudyDefinition):
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
@@ -398,7 +419,7 @@ class StudyDefinitionV2(StudyDefinition):
     tutorial_steps: list[str] = Field(default_factory=list)
     assets: list[AssetV2]
     tutorial: TutorialDefinition
-    protocol_versions: ProtocolVersions
+    protocol_versions: ProtocolVersions | ProtocolVersionsV3
     # Validated by the workspace admission facade before publication freezes.
     workspace_scopes: Annotated[list[WorkspaceScope], Field(min_length=1)]
     resource_scope_analysis_rule: Annotated[str, Field(min_length=1, max_length=4000)]
@@ -491,3 +512,173 @@ class StudyStateV2(StudyState):
     previous_consultation: ConsultationReceiptV2 | None
     protocol_versions: ProtocolVersions
     telemetry: dict = Field(default_factory=dict)
+
+
+MethodV3 = Literal["protege", "plain_files", "other_method"]
+FamiliarMethodV3 = Literal["protege", "plain_files", "other_method", "none"]
+
+
+class SetupV3(Mutation):
+    setup_version: Literal["setup/3"]
+    instructions_acknowledged: bool
+    external_inspection_optional_understood: bool
+    resource_access: Literal["not_checked", "available", "needs_help"]
+    familiar_methods: Annotated[list[FamiliarMethodV3], Field(max_length=4)] = Field(
+        default_factory=list
+    )
+    familiar_other_method: Annotated[str | None, Field(max_length=160)] = None
+    submitted: bool = False
+
+    @model_validator(mode="before")
+    @classmethod
+    def clear_hidden_name(cls, value):
+        if isinstance(value, dict) and "other_method" not in (value.get("familiar_methods") or []):
+            return {**value, "familiar_other_method": None}
+        return value
+
+    @field_validator("familiar_other_method", mode="before")
+    @classmethod
+    def trimmed_name(cls, value):
+        return (value.strip() or None) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def valid_familiarity(self):
+        if len(self.familiar_methods) != len(set(self.familiar_methods)):
+            raise ValueError("Duplicate familiarity method")
+        if "none" in self.familiar_methods and len(self.familiar_methods) != 1:
+            raise ValueError("None of these must be exclusive")
+        if "other_method" not in self.familiar_methods:
+            self.familiar_other_method = None
+        if self.submitted:
+            if "other_method" in self.familiar_methods and not self.familiar_other_method:
+                raise ValueError("Name the other familiar methods")
+            if not (
+                self.instructions_acknowledged
+                and self.external_inspection_optional_understood
+                and self.resource_access == "available"
+            ):
+                raise ValueError("Submit requires both acknowledgements and available resources")
+        return self
+
+
+class SetupReceiptV3(StrictModel):
+    setup_version: Literal["setup/3"]
+    instructions_acknowledged: bool
+    external_inspection_optional_understood: bool
+    resource_access: Literal["not_checked", "available", "needs_help"]
+    familiar_methods: list[FamiliarMethodV3]
+    familiar_other_method: str | None
+    submitted: bool
+    saved_at: str
+
+
+class ConsultationDraftV3(Mutation):
+    presentation_id: Identifier
+    form_version: Literal["exact-study-forms/3"]
+    consultation_version: Literal["consultation/3"]
+    consulted_external_ontologies: bool | None = None
+    methods: Annotated[list[MethodV3], Field(max_length=3)] = Field(default_factory=list)
+    other_method: Annotated[str | None, Field(max_length=160)] = None
+    resource_scope: ResourceScope | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def clear_hidden_input(cls, value):
+        if isinstance(value, dict):
+            value = dict(value)
+            if value.get("consulted_external_ontologies") is not True:
+                value.update(methods=[], other_method=None, resource_scope=None)
+            elif "other_method" not in (value.get("methods") or []):
+                value["other_method"] = None
+        return value
+
+    @field_validator("other_method", mode="before")
+    @classmethod
+    def trimmed_name(cls, value):
+        return (value.strip() or None) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def clear_hidden_details(self):
+        if len(self.methods) != len(set(self.methods)):
+            raise ValueError("Duplicate consultation method")
+        if self.consulted_external_ontologies is not True:
+            self.methods = []
+            self.resource_scope = None
+        if "other_method" not in self.methods:
+            self.other_method = None
+        return self
+
+
+class ConsultationV3(ConsultationDraftV3):
+    @model_validator(mode="after")
+    def complete_answer(self):
+        if self.consulted_external_ontologies is None or (
+            self.consulted_external_ontologies and not self.methods
+        ):
+            raise ValueError("Final consultation requires Yes with methods or No with none")
+        if "other_method" in self.methods and not self.other_method:
+            raise ValueError("Name the other methods used")
+        return self
+
+
+class ConsultationReceiptV3(StrictModel):
+    presentation_id: Identifier
+    form_version: Literal["exact-study-forms/3"]
+    consultation_version: Literal["consultation/3"]
+    consulted_external_ontologies: bool | None
+    methods: list[MethodV3]
+    other_method: str | None
+    resource_scope: ResourceScope | None
+    saved_at: str
+    case_id: Identifier | None = None
+    submitted_at: str | None = None
+
+
+class TutorialActionV3(TutorialAction):
+    methods: Annotated[list[MethodV3] | None, Field(max_length=3)] = None
+    other_method: Annotated[str | None, Field(max_length=160)] = None
+
+    @field_validator("other_method", mode="before")
+    @classmethod
+    def trimmed_name(cls, value):
+        return (value.strip() or None) if isinstance(value, str) else value
+
+    @model_validator(mode="after")
+    def valid_method_report(self):
+        if self.methods is not None and len(self.methods) != len(set(self.methods)):
+            raise ValueError("Duplicate practice method")
+        if "other_method" not in (self.methods or []):
+            self.other_method = None
+        elif not self.other_method:
+            raise ValueError("Name the other methods in this practice report")
+        return self
+
+
+class TutorialProgressMutationV3(TutorialProgressMutation):
+    actions: Annotated[list[TutorialActionV3], Field(max_length=100)] = Field(default_factory=list)
+
+
+class QuestionDefinitionV3(QuestionDefinitionV2):
+    text_min_length: Annotated[int, Field(ge=0, le=160)]
+    text_max_length: Annotated[int, Field(ge=1, le=2000)]
+
+
+class FormsV3(StrictModel):
+    version: Literal["exact-study-forms/3"]
+    background: list[QuestionDefinitionV3]
+    consultation: list[QuestionDefinitionV3]
+    setup: list[QuestionDefinitionV3]
+    final: list[QuestionDefinitionV3]
+    experience_note: str
+    method_version: Literal["study-methods/3"]
+    method_dictionary: dict[MethodV3, str]
+    collection_notice: str
+
+
+class StudyStateV3(StudyStateV2):
+    protocol_versions: ProtocolVersionsV3
+    forms: FormsV3
+    setup: SetupReceiptV3 | None
+    consultation: ConsultationReceiptV3 | None
+    consultation_draft: ConsultationReceiptV3 | None
+    previous_consultation: ConsultationReceiptV3 | None

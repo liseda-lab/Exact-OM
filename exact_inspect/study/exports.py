@@ -89,10 +89,11 @@ def csv_archive(export):
         "exact-study-analysis/1": "exact-study-csv/1",
         "exact-study-analysis/2": "exact-study-csv/2",
         "exact-study-analysis/3": "exact-study-csv/3",
+        "exact-study-analysis/4": "exact-study-csv/4",
     }
     if schema not in archive_schemas:
         raise ValueError("Unsupported saved analysis export schema")
-    corrected_timing = schema == "exact-study-analysis/3"
+    corrected_timing = schema in {"exact-study-analysis/3", "exact-study-analysis/4"}
     sessions, cases, questionnaires, events, segments = [], [], [], [], []
     for session in export["data"]["sessions"]:
         sid = session["session_id"]
@@ -128,7 +129,7 @@ def csv_archive(export):
         "timing_segments.csv": segments,
         "summary.csv": [export["data"]["summary"]],
     }
-    if schema in {"exact-study-analysis/2", "exact-study-analysis/3"}:
+    if schema in {"exact-study-analysis/2", "exact-study-analysis/3", "exact-study-analysis/4"}:
         tables["tutorial_attempts.csv"] = [
             {"session_id": s["session_id"], **attempt}
             for s in export["data"]["sessions"]
@@ -151,6 +152,8 @@ def csv_archive(export):
             for s in export["data"]["sessions"]
             for cid, draft in sorted(s["consultation_drafts"].items())
         ]
+    if schema == "exact-study-analysis/4":
+        tables["method_responses.csv"] = export["data"]["method_responses"]
     files, columns = {}, {}
     for name, rows in tables.items():
         fields = sorted({key for row in rows for key in row})
@@ -190,3 +193,77 @@ def csv_archive(export):
             info.compress_type = zipfile.ZIP_DEFLATED
             zipped.writestr(info, files[name])
     return archive.getvalue()
+
+
+def analysis4_dictionary():
+    """Restricted method-name derivation, retaining all analysis-3 timing semantics."""
+    return {
+        "analysis_schema": "manifest.schema=exact-study-analysis/4 and archive_schema=exact-study-csv/4 add study-methods/3 codebooks and explicit named-method opt-in. Analysis-3 page-clock uncertainty, null coverage and quality denominators are unchanged.",
+        "method_responses": "One setup-familiarity record per session plus each saved consultation draft/final record, associated with source versions, stable codes, labels, session, case, presentation and assigned condition. Familiarity and practice are never treated as actual case use.",
+        "method_codes": "study-methods/3: protege=Protégé; plain_files=Text editor; other_method=Other method; none=None of these in setup familiarity only. plain_files now means text-editor use only; historical direct-file/query/reasoner/viewer answers are not recoded.",
+        "experience_codes": "Forms/3 completed-year bands: none=None; less_than_1=Less than 1 year; 1_3=1–3 years; 4_5=4–5 years; 6_9=6–9 years; 10_plus=10+ years. Zero is none; a positive duration below one year is less_than_1. Historical 1_2/3_4/5_9 codes cannot be mapped losslessly and remain unchanged.",
+        "method_answer_state": "unanswered means no explicit choice; none_of_these is exclusive stated unfamiliarity; no means explicitly no external consultation for that case; yes means reported external use; answered means one or more selected familiarity codes. Empty optional familiarity is unanswered, not None.",
+        "named_detail_state": "hidden means Other is not selected and no current detail is retained; unanswered means selected Other in an incomplete draft with no name; redacted means a recorded name is omitted by the default export; included means explicitly requested restricted named-method detail.",
+        "includes_named_method_details": "Only an authenticated researcher may request include_named_methods=true on analysis/4. It includes current selected method names from setup and consultation drafts/finals, never general background/specialty/role/comment free text, hidden previous details, invitation credentials or tutorial action names. Names are absent from the manifest and normal exports.",
+        "other_method": "A participant's short plain-text list of method names, not an institutional identifier. Unicode and punctuation are retained; CSV formula-leading scalars are prefixed with an apostrophe. Null in an opted-in record means no current named detail; the named_detail_state supplies its meaning.",
+        "source_method_versions": "form_version, setup_version, consultation_version and method_version are copied from the frozen source publication. Labels come from its frozen dictionary, never a reinterpreted historical codebook.",
+    }
+
+
+def method_response_rows(state, study, session_id, *, include_named_methods):
+    """Project only explicitly collected methods, with no inference or broad free text."""
+    versions = study["protocol_versions"]
+    labels = {**study["questionnaires"]["method_dictionary"], "none": "None of these"}
+    presentations = {
+        p["case_id"]: p for p in (state.get("assignment") or {}).get("presentations", [])
+    }
+    common = {
+        "session_id": session_id,
+        "form_version": versions["forms"],
+        "setup_version": versions["setup"],
+        "consultation_version": versions["consultation"],
+        "method_version": versions["methods"],
+    }
+
+    def record(stage, value, case_id=None):
+        setup = stage == "setup_familiarity"
+        methods = value.get("familiar_methods" if setup else "methods", [])
+        selected = "other_method" in methods
+        name = value.get("familiar_other_method" if setup else "other_method") if selected else None
+        if setup:
+            answer_state = (
+                "unanswered"
+                if not methods
+                else "none_of_these" if methods == ["none"] else "answered"
+            )
+        else:
+            answer = value.get("consulted_external_ontologies")
+            answer_state = "unanswered" if answer is None else "yes" if answer else "no"
+        detail_state = (
+            "hidden"
+            if not selected
+            else "unanswered" if not name else "included" if include_named_methods else "redacted"
+        )
+        presentation = presentations.get(case_id, {})
+        return {
+            **common,
+            "stage": stage,
+            "case_id": case_id,
+            "presentation_id": presentation.get("presentation_id"),
+            "condition": presentation.get("condition"),
+            "method_answer_state": answer_state,
+            "method_codes": methods,
+            "method_labels": [labels[m] for m in methods],
+            "named_detail_state": detail_state,
+            **({"other_method": name} if include_named_methods else {}),
+        }
+
+    rows = [record("setup_familiarity", state.get("setup") or {})]
+    for field, stage in (
+        ("consultations", "consultation"),
+        ("consultation_drafts", "consultation_draft"),
+    ):
+        rows.extend(
+            record(stage, value, case_id) for case_id, value in sorted(state.get(field, {}).items())
+        )
+    return rows

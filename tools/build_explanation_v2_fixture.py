@@ -92,10 +92,23 @@ def _base_publication():
 
 
 def publication_v2(
-    root, *, navigation_size=0, export_version="exact-study-analysis/2", paged_facts=0
+    root,
+    *,
+    navigation_size=0,
+    export_version=None,
+    paged_facts=0,
+    forms_version="exact-study-forms/2",
+    visibility_policy=None,
 ):
     import pyowl_core as core
 
+    if forms_version not in {"exact-study-forms/2", "exact-study-forms/3"}:
+        raise ValueError("Unsupported fixture form version")
+    forms3 = forms_version == "exact-study-forms/3"
+    if export_version is None:
+        export_version = "exact-study-analysis/4" if forms3 else "exact-study-analysis/2"
+    if forms3 and export_version != "exact-study-analysis/4":
+        raise ValueError("Forms/3 fixtures require analysis/4")
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
     legacy = _base_publication()
@@ -163,7 +176,7 @@ def publication_v2(
             root / f"{name}-context",
         )
         replacement[old_version] = contexts[name].ontology_version_id
-    policy = VisibilityPolicy(
+    policy = visibility_policy or VisibilityPolicy(
         policy_id="synthetic-study-v2",
         ontology_ids=tuple(c.ontology_version_id for c in contexts.values()),
     )
@@ -389,11 +402,17 @@ def publication_v2(
             components=["context", "hierarchy", "profiles", "comparison", "evidence"],
         )
         scopes.append(scope.model_dump(mode="json"))
+    if forms3:
+        tutorial["version"] += "-forms3"
+        tutorial["hash"] = ""
+        tutorial["lessons"][-1]["steps"].append(
+            "For this version, report Protégé, Text editor, or Other method; you may combine them. Other method needs a short name. Outside inspection remains optional."
+        )
     tutorial = TutorialDefinition.model_validate(tutorial).model_dump(mode="json")
     study.update(
         contract_version="exact-study/2.0",
         software_version="exact-explain-ui-1.2",
-        form_version="exact-study-forms/2",
+        form_version=forms_version,
         information_version="synthetic-information-v2",
         policy_hash=policy_hash,
         visibility_policy=policy.model_dump(mode="json"),
@@ -402,12 +421,13 @@ def publication_v2(
         workspace_scopes=scopes,
         resource_scope_analysis_rule="Describe supplied-only, different/additional, unsure and unanswered separately; no outcome-dependent exclusion.",
         protocol_versions=dict(
-            setup="setup/2",
+            setup="setup/3" if forms3 else "setup/2",
             tutorial=tutorial["version"],
             assessment="assessment/2",
-            forms="exact-study-forms/2",
+            forms=forms_version,
+            **({"consultation": "consultation/3", "methods": "study-methods/3"} if forms3 else {}),
             information="synthetic-information-v2",
-            resource_policy="synthetic-study-v2",
+            resource_policy=policy.policy_id,
             software="exact-explain-ui-1.2",
             export=export_version,
         ),
@@ -487,9 +507,14 @@ def main():
     )
     parser.add_argument(
         "--export-version",
-        choices=["exact-study-analysis/2", "exact-study-analysis/3"],
-        default="exact-study-analysis/3",
+        choices=["exact-study-analysis/2", "exact-study-analysis/3", "exact-study-analysis/4"],
+        default=None,
         help="Freeze the export default explicitly; /2 retains historical compatibility semantics",
+    )
+    parser.add_argument(
+        "--forms-version",
+        choices=["exact-study-forms/2", "exact-study-forms/3"],
+        default="exact-study-forms/2",
     )
     args = parser.parse_args()
     if not 0 <= args.navigation_size <= 200:
@@ -501,7 +526,13 @@ def main():
     frozen = publication_v2(
         args.destination,
         navigation_size=args.navigation_size,
-        export_version=args.export_version,
+        export_version=args.export_version
+        or (
+            "exact-study-analysis/4"
+            if args.forms_version == "exact-study-forms/3"
+            else "exact-study-analysis/3"
+        ),
+        forms_version=args.forms_version,
         paged_facts=args.paged_facts,
     )
     path = args.destination / "publication.json"

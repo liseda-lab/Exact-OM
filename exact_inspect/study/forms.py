@@ -176,6 +176,8 @@ BACKGROUND = [
 
 def definitions(components=None, version="exact-study-forms/1", *, ordered=False):
     """Return a detached, ordered definition; historical versions are frozen in the DB."""
+    if version == "exact-study-forms/3":
+        return definitions3(components)
     selected = {k: COMPONENTS[k] for k in (components if components is not None else COMPONENTS)}
     final = [
         question(
@@ -312,7 +314,7 @@ def definitions(components=None, version="exact-study-forms/1", *, ordered=False
 
 def validate_ordered_forms(forms):
     """Require explicit exact permutations; canonical object-key sorting is irrelevant."""
-    for name in ("background", "consultation", "final"):
+    for name in ("background", "consultation", "final", *(("setup",) if "setup" in forms else ())):
         for question in forms[name]:
             for values, order in (("options", "option_order"), ("matrix", "row_order")):
                 codes = set(question[values] or {})
@@ -325,25 +327,29 @@ def validate_ordered_forms(forms):
                     raise ValueError(f"Invalid explicit {order} for {question['id']}")
 
 
-def validate_answers(form, answers, *, submitted):
+def validate_answers(form, answers, *, submitted, version=None):
     """Validate visible answers and clear hidden current values without erasing history."""
     if set(answers) - {q["id"] for q in form}:
         raise ValueError("Unknown questionnaire field")
     result = {}
     states = {}
+    corrected = version == "exact-study-forms/3"
     for q in form:
+        visible_answers = result if corrected else answers
         key = q["id"]
         if q["show_if"] and any(
             (
-                (v["contains"] not in (answers.get(k) or []))
+                (v["contains"] not in (visible_answers.get(k) or []))
                 if isinstance(v, dict) and "contains" in v
-                else answers.get(k) != v
+                else visible_answers.get(k) != v
             )
             for k, v in q["show_if"].items()
         ):
             states[key] = "skipped"
             continue
         value = answers.get(key)
+        if corrected and q["options"] is None and isinstance(value, str):
+            value = value.strip()
         if value is None or value == "" or value == []:
             if submitted and q["required"]:
                 raise ValueError(f"Required answer: {key}")
@@ -351,8 +357,16 @@ def validate_answers(form, answers, *, submitted):
             continue
         options = q["options"]
         if options is None:
-            if not isinstance(value, str) or len(value) > 2000:
-                raise ValueError(f"Invalid optional text: {key}")
+            maximum = q.get("text_max_length", 2000) if corrected else 2000
+            minimum = q.get("text_min_length", 0) if corrected else 0
+            if (
+                not isinstance(value, str)
+                or len(value) > maximum
+                or (submitted and len(value) < minimum)
+            ):
+                raise ValueError(
+                    f"Invalid text: {key}" if corrected else f"Invalid optional text: {key}"
+                )
         elif q["matrix"]:
             if not isinstance(value, dict) or set(value) - set(q["matrix"]):
                 raise ValueError(f"Invalid matrix: {key}")
@@ -375,3 +389,110 @@ def validate_answers(form, answers, *, submitted):
         result[key] = value
         states[key] = "answered"
     return result, states
+
+
+METHODS3 = {"protege": "Protégé", "plain_files": "Text editor", "other_method": "Other method"}
+YEARS3 = {
+    "none": "None",
+    "less_than_1": "Less than 1 year",
+    "1_3": "1–3 years",
+    "4_5": "4–5 years",
+    "6_9": "6–9 years",
+    "10_plus": "10+ years",
+}
+METHOD_COLLECTION_NOTICE = (
+    "We record your selected methods and any short method names you enter. "
+    "Default de-identified analysis exports omit method names. An authorized researcher can explicitly "
+    "include those names in a restricted analysis export. Do not enter personal names, institutions, "
+    "file paths or URLs. Familiarity is optional and does not require you to use or install a tool."
+)
+
+
+def definitions3(components=None):
+    """Author a new codebook without modifying either historical definition."""
+    result = definitions(components, version="exact-study-forms/2")
+    result["version"] = "exact-study-forms/3"
+    result["method_version"] = "study-methods/3"
+    result["method_dictionary"] = dict(METHODS3)
+    result["collection_notice"] = METHOD_COLLECTION_NOTICE
+    result["experience_note"] = (
+        "Count completed years, counting overlapping study/work years once. Zero experience is None; a positive duration under one year is Less than 1 year."
+    )
+    background = []
+    other_fields = {
+        "roles": "What other role describes your work or study?",
+        "ontology_activities": "What other ontology activity have you done?",
+        "doid_contexts": "In what other context have you used DOID?",
+        "ncit_contexts": "In what other context have you used NCIT?",
+    }
+    for q in result["background"]:
+        if q["options"] is not None:
+            q["options"].pop("prefer_not_to_say", None)
+        if q["id"] in {"cs_experience_years", "health_bio_experience_years"}:
+            q["options"] = dict(YEARS3)
+        if q["id"] == "domain_specialty":
+            q["label"] = "What is your main health or bioscience field, if any?"
+        background.append(q)
+        if q["id"] in other_fields:
+            background.append(
+                question(
+                    q["id"] + "_other", other_fields[q["id"]], when={q["id"]: {"contains": "other"}}
+                )
+            )
+    result["background"] = background
+    result["setup"] = [
+        question(
+            "familiar_methods",
+            "Which of these methods are familiar to you? (Optional)",
+            {**METHODS3, "none": "None of these"},
+            multiple=True,
+            required=False,
+        ),
+        question(
+            "familiar_other_method",
+            "Which other methods are familiar to you?",
+            when={"familiar_methods": {"contains": "other_method"}},
+        ),
+    ]
+    result["consultation"] = [
+        question(
+            "consulted_external_ontologies",
+            "For the source and candidates you just ranked, did you inspect ontology information outside this study interface?",
+            {"true": "Yes", "false": "No"},
+        ),
+        question(
+            "methods",
+            "Select all methods you actually used for this case. You may combine methods and change them between cases.",
+            dict(METHODS3),
+            multiple=True,
+            when={"consulted_external_ontologies": True},
+        ),
+        question(
+            "other_method",
+            "Which other methods did you use?",
+            when={"methods": {"contains": "other_method"}},
+        ),
+        question(
+            "resource_scope",
+            "Which ontology resources did you inspect? (Optional)",
+            {
+                "supplied_only": "Only the supplied ontology versions",
+                "different_or_additional": "Different or additional resources",
+                "unsure": "Unsure",
+            },
+            required=False,
+            when={"consulted_external_ontologies": True},
+        ),
+    ]
+    for name in ("background", "setup", "consultation", "final"):
+        for q in result[name]:
+            q["option_order"] = list(q["options"] or {})
+            q["row_order"] = list(q["matrix"] or {})
+            if q["options"] is None:
+                q["text_min_length"] = 1 if q["required"] else 0
+                q["text_max_length"] = 160 if q["required"] else 2000
+            else:
+                q["text_min_length"] = 0
+                q["text_max_length"] = 2000
+    validate_ordered_forms(result)
+    return result
