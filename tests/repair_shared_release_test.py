@@ -120,3 +120,24 @@ def test_deadline_prevents_opening_dependencies(tmp_path, monkeypatch):
     monkeypatch.setenv("EXACT_REPAIR_DEADLINE_EPOCH", "1")
     with pytest.raises(TimeoutError, match="deadline"):
         release.authenticate(dict(path=str(tmp_path / "absent"), sha256="unused"))
+
+
+def test_final_union_preserves_unknowns_and_counts_reused_labels_once():
+    from tools.repair.shared_refinement_release import union_caches
+
+    old = TeacherCache(
+        (2, 2),
+        (RepairLabel((0, 0), True, 1, 0), RepairLabel((1, 0), None, None, 0)),
+        False,
+        "old",
+        (("input", "same"),),
+        3,
+    )
+    new = replace(old, labels=(old.labels[0], RepairLabel((0, 1), True, 2, 0)), elapsed_seconds=2)
+    merged = union_caches(old, new)
+    assert len(merged.labels) == 3 and merged.labels[1].feasible is None
+    assert merged.elapsed_seconds == 5
+    with pytest.raises(ValueError, match="prior committed label"):
+        union_caches(old, replace(new, labels=(RepairLabel((1, 0), True, 3, 0),)))
+    with pytest.raises(ValueError, match="dependencies"):
+        union_caches(old, replace(new, hashes=(("input", "different"),)))
