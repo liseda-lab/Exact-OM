@@ -263,9 +263,13 @@ def remaining(deadline, reserve=5):
     )
 
 
-def native_plan(case, assignment, directory, deadline, case_seconds):
+def native_plan(case, assignment, directory, deadline, case_seconds, *, rejection_precheck=True):
     directory = Path(directory)
     context = canonical_hash((case_to_dict(case), assignment))
+    if type(rejection_precheck) is not bool:
+        raise ValueError("rejection_precheck must be boolean")
+    if not rejection_precheck:
+        context = canonical_hash((context, "full-native-without-rejection-precheck/v1"))
     saved = directory / (context + ".json")
     if saved.exists():
         value = read(saved)
@@ -277,12 +281,14 @@ def native_plan(case, assignment, directory, deadline, case_seconds):
     left = remaining(deadline)
     if left < 3:
         return None, None
+    options = {} if rejection_precheck is True else {"rejection_precheck": rejection_precheck}
     result = bounded_call(
         _verified_plan,
         case_to_dict(case),
         assignment,
         timeout=min(case_seconds, left),
         memory_mb=8192,
+        **options,
     )
     value = dict(
         context=context,

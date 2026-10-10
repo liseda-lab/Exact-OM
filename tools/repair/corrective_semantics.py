@@ -1113,14 +1113,15 @@ def annotate_packet(
         router.hosted.close()
 
 
-def _verified_plan(case_record, assignment):
+def _verified_plan(case_record, assignment, *, rejection_precheck=True):
     from exact.repair.kernel import materialize, verify_assignment
     from exact.repair.learning import OwlTeacherOracle
     from exact.repair.owl import OwlVerifier, snapshot_from_axioms
     from tools.repair.prepare import case_from_dict
 
     case = case_from_dict(case_record)
-    report = verify_assignment(case.problem, tuple(assignment))
+    options = {} if rejection_precheck is True else {"rejection_precheck": rejection_precheck}
+    report = verify_assignment(case.problem, tuple(assignment), **options)
     if not report.authorizes:
         return None
     axioms, _ = materialize(case.problem, tuple(assignment))

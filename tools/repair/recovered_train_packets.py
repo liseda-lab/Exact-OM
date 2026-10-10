@@ -130,7 +130,8 @@ def run(plan_path, output):
         plans = []
         for assignment in declaration["pair"]["assignments"]:
             native, receipt = native_plan(case, assignment, output / "native",
-                                          read(pair_clock)["deadline_epoch"], plan["plan_seconds"])
+                                          read(pair_clock)["deadline_epoch"], plan["plan_seconds"],
+                                          rejection_precheck=plan.get("rejection_precheck", True))
             plans.append(native)
             if receipt:
                 row["native_receipts"].append(receipt)
@@ -152,10 +153,32 @@ def run(plan_path, output):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--qualify-precheck", action="store_true")
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    run(args.plan, args.output)
+    if args.qualify_precheck:
+        from tools.repair.prepare import case_from_dict, case_to_dict
+
+        plan = read(args.plan)
+        old = bound(plan["old_timeout"])
+        if old["status"] != "timeout" or not old["cleanup_complete"]:
+            raise ValueError("Qualification requires the retained fixed timeout")
+        case = case_from_dict(bound(plan["generated"])["case"])
+        if case.split != "train":
+            raise ValueError("Qualification requires a fixed TRAIN case")
+        if old["context"] != canonical_hash((case_to_dict(case), plan["assignment"])):
+            raise ValueError("Qualification changed the failed native assignment")
+        started = time.time()
+        native, receipt = native_plan(case, plan["assignment"], args.output / "native",
+                                      min(plan["deadline_epoch"], started + 35), 30,
+                                      rejection_precheck=False)
+        immutable(args.output / "report.json", dict(
+            plan=binding(args.plan), status="complete", native_receipt=receipt,
+            eligible=bool(native and native.eligible), elapsed_seconds=time.time()-started,
+            old_timeout_preserved=True, hosted_calls=0, full_native_policy_required=True))
+    else:
+        run(args.plan, args.output)
 
 
 if __name__ == "__main__":
