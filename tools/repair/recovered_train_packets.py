@@ -11,12 +11,12 @@ from itertools import combinations
 from pathlib import Path
 import time
 
-from exact.repair.records import canonical_hash
+from exact.repair.records import canonical_hash, read_record
 from tools.repair.batch import read
 from tools.repair.common_training import load_release
 from tools.repair.grounded_supervision import native_plan, packet_for
 from tools.repair.historical_regression import binding
-from tools.repair.shared_release import authenticate, bound, check_time, immutable
+from tools.repair.shared_release import authenticate, bound, check_time, immutable, validate_completion
 
 TASK_REVISION = "authored-retained-meaning-task/20261010-v2"
 TASK = (
@@ -78,6 +78,63 @@ def select_pairs(case, cache, old_rows):
     return result
 
 
+def reuse_native(receipt):
+    """Only a retained timeout gets one technical pass; no scientific replay."""
+    value = bound(receipt)
+    if not value["cleanup_complete"] or value["status"] == "error":
+        raise ValueError("Unresolved predecessor native implementation/cleanup failure")
+    if value["status"] == "timeout":
+        return False, None
+    return True, read_record(value["plan"]) if value.get("plan") else None
+
+
+def recovery_history(plan):
+    if "technical_recovery" not in plan:
+        return None
+    amendment = bound(plan["technical_recovery"])
+    if (plan.get("rejection_precheck") is not False
+            or amendment["same_cause_prior_attempts"] != 1
+            or amendment["maximum_attempts"] != 2 or amendment["costs_reset"]
+            or amendment["retry_completed_native"]):
+        raise ValueError("Invalid one-pass native precheck recovery")
+    qualification, qoutputs, _, _ = validate_completion(amendment["qualification"])
+    qualified = bound(dict(path=str(Path(qualification["work"]) / "report.json"),
+                           sha256=qoutputs["report.json"]))
+    if not qualified["eligible"] or not qualified["full_native_policy_required"]:
+        raise ValueError("Native correction has not qualified")
+    qualified_native = qualified["native_receipt"]
+    if qoutputs.get(str(Path(qualified_native["path"]).relative_to(qualification["work"]))) != qualified_native["sha256"]:
+        raise ValueError("Qualified native receipt lacks terminal provenance")
+    bound(qualified_native)
+    previous_plan = bound(amendment["previous_plan"])
+    if previous_plan.get("technical_recovery") or previous_plan.get("rejection_precheck") is False:
+        raise ValueError("Same-cause technical pass already used")
+    if {k: v for k, v in plan.items() if k not in {"technical_recovery", "rejection_precheck"}} != previous_plan:
+        raise ValueError("Native recovery changed frozen rows or budgets")
+    registered = amendment["prior_run"]
+    attempt = Path(registered["completion_path"]).parent
+    receipt = {key: binding(attempt / (key + ".json")) for key in ("completion", "step", "outputs")}
+    receipt.update(batch=amendment["previous_batch"], dispatch_nonce=registered["dispatch_nonce"],
+                   step_id=registered["step_id"], expected_status="complete")
+    terminal, outputs, batch, _ = validate_completion(receipt)
+    if batch["frozen_files"].get(amendment["previous_plan"]["path"]) != amendment["previous_plan"]["sha256"]:
+        raise ValueError("Previous native plan was not frozen")
+    work = Path(terminal["work"])
+    report = bound(dict(path=str(work / "report.json"), sha256=outputs["report.json"]))
+    if report["plan"] != amendment["previous_plan"]:
+        raise ValueError("Previous native report changed")
+    rows = {}
+    for ref in report["rows"]:
+        if outputs.get(str(Path(ref["path"]).relative_to(work))) != ref["sha256"]:
+            raise ValueError("Previous row lacks terminal provenance")
+        row = bound(ref)
+        rows[row["id"]] = row
+    if set(rows) != {row["id"] for row in bound(plan["rows"])["rows"]}:
+        raise ValueError("Previous native denominator changed")
+    return dict(receipt=receipt, work=work, outputs=outputs, rows=rows,
+                qualified_native=qualified_native)
+
+
 def run(plan_path, output):
     plan, output = read(plan_path), Path(output)
     amendment = bound(plan["task_amendment"])
@@ -88,6 +145,7 @@ def run(plan_path, output):
     by_id = {c.case_id: c for c in cases if c.split == "train"}
     template = bound(plan["annotation_template"])
     declarations = bound(plan["rows"])["rows"]
+    history = recovery_history(plan)
     expected = []
     for case_id in sorted({r["case_id"] for r in declarations}):
         original_rows = bound(plan["original_rows"])["rows"]
@@ -124,13 +182,42 @@ def run(plan_path, output):
                    prior_native_row=plan["original_row_refs"][declaration["id"]],
                    task_amendment=plan["task_amendment"], packet=None, native_receipts=[],
                    case_clock=binding(case_clock), pair_clock=binding(pair_clock))
+        if history:
+            prior = history["rows"][declaration["id"]]
+            row.update(prior_native_attempt=history["receipt"], attempt_index=2,
+                       prior_case_clock=prior["case_clock"], prior_pair_clock=prior["pair_clock"],
+                       cumulative_case_allowance_seconds=2 * plan["case_seconds"],
+                       cumulative_pair_allowance_seconds=2 * plan["pair_seconds"],
+                       costs_reset=False)
         old = bound(row["prior_native_row"])
         if old["pair"] is not None or old["packet"] is not None:
             raise ValueError("A previously bound pair cannot be replayed")
         plans = []
         for assignment in declaration["pair"]["assignments"]:
+            if history:
+                from tools.repair.prepare import case_to_dict
+
+                old_context = canonical_hash((case_to_dict(case), assignment))
+                qualified = bound(history["qualified_native"])
+                context = canonical_hash((old_context, "full-native-without-rejection-precheck/v1"))
+                if qualified["context"] == context:
+                    saved = output / "native" / (context + ".json")
+                    immutable(saved, qualified)
+                    plans.append(read_record(qualified["plan"]))
+                    row["native_receipts"].append(binding(saved))
+                    continue
+                prior_path = history["work"] / "native" / (old_context + ".json")
+                digest = history["outputs"].get(str(prior_path.relative_to(history["work"])))
+                if digest:
+                    previous = dict(path=str(prior_path), sha256=digest)
+                    reuse, native = reuse_native(previous)
+                    if reuse:
+                        plans.append(native)
+                        row["native_receipts"].append(previous)
+                        continue
             native, receipt = native_plan(case, assignment, output / "native",
-                                          read(pair_clock)["deadline_epoch"], plan["plan_seconds"])
+                                          read(pair_clock)["deadline_epoch"], plan["plan_seconds"],
+                                          rejection_precheck=plan.get("rejection_precheck", True))
             plans.append(native)
             if receipt:
                 row["native_receipts"].append(receipt)
@@ -147,15 +234,38 @@ def run(plan_path, output):
     immutable(output / "report.json", dict(status="complete", plan=binding(plan_path),
               rows=[binding(output / "rows" / (canonical_hash(r["id"]) + ".json")) for r in rows],
               statuses=dict(Counter(r["status"] for r in rows)), hosted_calls=0,
+              prior_native_receipt=history["receipt"] if history else None,
               primary_training_admitted=False, test_opened=False))
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--qualify-precheck", action="store_true")
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
-    run(args.plan, args.output)
+    if args.qualify_precheck:
+        from tools.repair.prepare import case_from_dict, case_to_dict
+
+        plan = read(args.plan)
+        old = bound(plan["old_timeout"])
+        if old["status"] != "timeout" or not old["cleanup_complete"]:
+            raise ValueError("Qualification requires the retained fixed timeout")
+        case = case_from_dict(bound(plan["generated"])["case"])
+        if case.split != "train":
+            raise ValueError("Qualification requires a fixed TRAIN case")
+        if old["context"] != canonical_hash((case_to_dict(case), plan["assignment"])):
+            raise ValueError("Qualification changed the failed native assignment")
+        started = time.time()
+        native, receipt = native_plan(case, plan["assignment"], args.output / "native",
+                                      min(plan["deadline_epoch"], started + 35), 30,
+                                      rejection_precheck=False)
+        immutable(args.output / "report.json", dict(
+            plan=binding(args.plan), status="complete", native_receipt=receipt,
+            eligible=bool(native and native.eligible), elapsed_seconds=time.time()-started,
+            old_timeout_preserved=True, hosted_calls=0, full_native_policy_required=True))
+    else:
+        run(args.plan, args.output)
 
 
 if __name__ == "__main__":

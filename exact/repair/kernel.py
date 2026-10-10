@@ -102,6 +102,7 @@ def verify_theory(
     assignment_hash: str,
     *,
     backend: str = "auto",
+    rejection_precheck: bool = True,
 ) -> VerificationReportV3:
     """Run sound rejection first, then full capability-qualified acceptance."""
     import pyowl_core as owl
@@ -114,7 +115,12 @@ def verify_theory(
     events: list[VerificationEventV3] = []
     buffer: list[VerificationEventV3] = []
     sequence = 0
-    proofs = detect_violations(axioms, active, policy)
+    if type(rejection_precheck) is not bool:
+        raise ValueError("rejection_precheck must be boolean")
+    # This incomplete detector only supplies early negative proofs. Disabling
+    # it never grants acceptance: every native full-policy obligation below is
+    # still checked, including fresh entities, exceptions and activations.
+    proofs = detect_violations(axioms, active, policy) if rejection_precheck else ()
     for proof in proofs:
         name = f"{proof.kind}:{'consistency' if proof.kind == 'consistency' else _query_id(proof.query)}"
         event = VerificationEventV3(
@@ -215,7 +221,9 @@ def verify_theory(
     )
 
 
-def verify_assignment(problem: RepairInputV2, assignment: tuple[int, ...]) -> VerificationReportV2:
+def verify_assignment(
+    problem: RepairInputV2, assignment: tuple[int, ...], *, rejection_precheck: bool = True
+) -> VerificationReportV2:
     """Fresh full-theory check before incumbent promotion."""
     if set(freeze_public_policy(problem).monitored_classes) != set(
         problem.policy.monitored_classes
@@ -234,7 +242,8 @@ def verify_assignment(problem: RepairInputV2, assignment: tuple[int, ...]) -> Ve
             exception_checks,
             detail="a frozen source exception could not be proved",
         )
-    report = verify_theory(axioms, active, problem.policy, canonical_hash(assignment))
+    options = {} if rejection_precheck is True else {"rejection_precheck": rejection_precheck}
+    report = verify_theory(axioms, active, problem.policy, canonical_hash(assignment), **options)
     return _compose_exceptions(problem, assignment, report, exception_checks, artifact)
 
 
