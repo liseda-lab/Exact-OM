@@ -9,10 +9,45 @@ from pathlib import Path
 
 from exact.runs.store import _atomic_json
 from exact.utils.provenance import sha256_file
+from tools.storage_guard import tree_bytes
 
 
 def binding(path):
     return {"path": str(Path(path).resolve()), "sha256": sha256_file(path)}
+
+
+def read_hosted_history(ledger):
+    """Keep incomplete token/cost receipts out of their measured denominators."""
+    with sqlite3.connect(f"file:{ledger.resolve()}?mode=ro", uri=True) as conn:
+        conn.row_factory = sqlite3.Row
+        return [dict(row) for row in conn.execute("""
+            SELECT json_extract(r.identity,'$.role') role,a.state,count(*) attempts,
+              count(a.elapsed_seconds) measured_attempts,sum(a.elapsed_seconds) service_seconds,
+              sum(json_extract(a.usage,'$.prompt_tokens')) prompt_tokens,
+              sum(json_extract(a.usage,'$.completion_tokens')) completion_tokens,
+              sum(json_extract(a.usage,'$.cost')) reported_usd,sum(a.usage IS NULL) usage_missing,
+              count(json_extract(a.usage,'$.cost')) priced_attempts,
+              sum(json_extract(a.usage,'$.prompt_tokens') IS NOT NULL
+                  AND json_extract(a.usage,'$.completion_tokens') IS NOT NULL) token_attempts,
+              sum(CASE WHEN json_extract(a.usage,'$.prompt_tokens') IS NOT NULL
+                  AND json_extract(a.usage,'$.completion_tokens') IS NOT NULL
+                  THEN json_extract(a.usage,'$.prompt_tokens') + json_extract(a.usage,'$.completion_tokens') END) measured_tokens
+            FROM attempts a JOIN requests r USING(request_id) GROUP BY role,a.state
+        """)]
+
+
+def decision_sensitivities(primary_cap, decision):
+    def scaled(requests, total, observed):
+        return requests * total / observed if total is not None and observed else None
+
+    return [{"route_fraction_assumption": fraction, "primary_decision_requests": primary_cap * fraction,
+             "primary_decision_tokens": scaled(primary_cap * fraction, decision.get("measured_tokens"), decision.get("token_attempts", 0)),
+             "primary_decision_usd": scaled(primary_cap * fraction, decision.get("reported_usd"), decision.get("priced_attempts", 0)),
+             "primary_decision_service_seconds": scaled(primary_cap * fraction, decision.get("service_seconds"), decision.get("measured_attempts", 0)),
+             "unknown_token_attempts": decision.get("attempts", 0) - decision.get("token_attempts", 0),
+             "unpriced_attempts": decision.get("attempts", 0) - decision.get("priced_attempts", 0),
+             "observed_averages_do_not_bound_unknown_exposure": True}
+            for fraction in (.001, .01, .1)]
 
 
 def build(work_counts, measurements, g4, spending_snapshot, storage_snapshot):
@@ -35,7 +70,7 @@ def build(work_counts, measurements, g4, spending_snapshot, storage_snapshot):
         data = json.loads(path.read_text())
         cold = data["cold"]
         root = path.parent / "cold/ordinary-evidence"
-        physical = sum(max(p.stat().st_size, p.stat().st_blocks * 512) for p in root.rglob("*") if p.is_file())
+        physical = tree_bytes(root)
         rows = sum(c["rows"] for c in cold["chunks"])
         rate = cold["pairs_per_second"]
         samples.append({"receipt": binding(path), "gpu": data["gpu"],
@@ -63,29 +98,15 @@ def build(work_counts, measurements, g4, spending_snapshot, storage_snapshot):
                 timing_rows.append({"binding": binding(path), "cell": str(path.parent.parent.relative_to(g4)),
                                     "stages": session["stages"], "scope": "historical inclusive stages, not cold qualification"})
     ledger = g4 / "runtime/exact-om-focused-v2/openrouter/requests.sqlite3"
-    with sqlite3.connect(f"file:{ledger.resolve()}?mode=ro", uri=True) as conn:
-        conn.row_factory = sqlite3.Row
-        hosted = [dict(row) for row in conn.execute("""
-            SELECT json_extract(r.identity,'$.role') role,a.state,count(*) attempts,
-              count(a.elapsed_seconds) measured_attempts,sum(a.elapsed_seconds) service_seconds,
-              sum(json_extract(a.usage,'$.prompt_tokens')) prompt_tokens,
-              sum(json_extract(a.usage,'$.completion_tokens')) completion_tokens,
-              sum(json_extract(a.usage,'$.cost')) reported_usd,sum(a.usage IS NULL) usage_missing
-            FROM attempts a JOIN requests r USING(request_id) GROUP BY role,a.state
-        """)]
+    hosted = read_hosted_history(ledger)
     spending = json.loads(spending_snapshot.read_text())
     bootstrap = spending["metadata"]["bootstrap"]
     known_tokens = bootstrap["accounted_tokens"] + sum(row["accounted_tokens"] for row in spending["grants_by_family"])
     known_usd = bootstrap["reported_usd"] + sum(row["reported_usd"] or 0 for row in spending["grants_by_family"])
     # Service-time and token sensitivities use actual historical observations;
     # current routes/seed-specific requests must still be counted before admission.
-    decision = next(row for row in hosted if row["role"] == "decision" and row["state"] == "completed")
-    tokens_per_request = (decision["prompt_tokens"] + decision["completion_tokens"]) / decision["attempts"]
-    sensitivities = [{"route_fraction_assumption": fraction, "primary_decision_requests": primary_cap * fraction,
-                      "primary_decision_tokens": primary_cap * fraction * tokens_per_request,
-                      "primary_decision_usd": primary_cap * fraction * decision["reported_usd"] / decision["attempts"],
-                      "primary_decision_service_seconds": primary_cap * fraction * decision["service_seconds"] / decision["measured_attempts"]}
-                     for fraction in (.001, .01, .1)]
+    decision = next((row for row in hosted if row["role"] == "decision" and row["state"] == "completed"), {})
+    sensitivities = decision_sensitivities(primary_cap, decision)
     return {"schema_version": 1, "kind": "conditional_resource_forecast_not_execution_admission",
             "count_binding": binding(work_counts), "recipe_bindings": [binding(path) for path in configs],
             "logical_design": {"primary": 12, "label_free_maximum": 2, "published": 3,
