@@ -36,6 +36,27 @@ if no database directory already exists. Its new publication revision has a new 
 publication is not edited. Repeating `prepare` validates and reuses the existing configuration.
 Changing paths or ports requires a separate root.
 
+Preparation also records the backend Git commit and a SHA-256 fingerprint of the service Python
+modules, service schemas and migrations, dependency configuration and lifecycle helper. Every
+preflight and worker startup verifies those source bytes without importing matcher or native
+modules. A changed backend requires `prepare` in a separate durable root; a later documentation-only
+commit is allowed when those source bytes are identical, while the original recorded commit stays
+unchanged. Status includes this identity without listing private files or configuration values.
+An older environment with no fingerprint reports that limitation and requires a separate prepared
+root; it is never silently upgraded. Its owned processes can still be stopped and its data preserved.
+
+`prepare`, `status` and `fresh-session` show the publication's `closes_at` date to the
+owner. `status` checks the owned database's closure flag before offering a study link;
+an expired or closed revision reports `fresh-session --new-revision` as the recovery
+action. If PostgreSQL is stopped, closure is explicitly unknown until that owned database
+is available. Startup checks again after bringing up its database, before starting HTTPS.
+Closed revisions and their saved participation data remain intact.
+
+Each HTTPS readiness probe has a five-second timeout. Initial study startup and explicit
+publication requests allow up to ten minutes for admission of large immutable ontology bundles;
+exploration startup allows 90 seconds. These are bounded waits, not permission to skip input
+validation. Invitation and other HTTPS requests retain the five-second timeout.
+
 The certificate is at `REVIEW_ROOT/tls/localhost.pem`. Inspect its SHA-256 fingerprint with
 `openssl x509 -in "$REVIEW_ROOT/tls/localhost.pem" -noout -fingerprint -sha256`. To trust it in a
 local browser on macOS, import that certificate into the login Keychain, inspect its name and

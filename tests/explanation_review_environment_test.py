@@ -16,6 +16,133 @@ import pytest
 from tools import review_environment as review
 
 
+@pytest.fixture
+def backend_checkout(tmp_path):
+    """A small real Git checkout isolates source identity from ontology data."""
+    root = tmp_path / "backend"
+    for name in (
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "exact_inspect/study/owl_ast_schema.json",
+        "exact_inspect/study/migrations/001_initial.sql",
+        "tools/review_environment.py",
+        "pyproject.toml",
+        "deploy/render/exact_study_requirements.txt",
+    ):
+        path = root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("frozen " + name)
+    review.command(["git", "init", "--quiet", str(root)])
+    review.command(["git", "-C", str(root), "add", "."])
+    review.command(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Review Test",
+            "-c",
+            "user.email=review@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-m",
+            "Frozen runtime fixture",
+        ]
+    )
+    return root
+
+
+def test_backend_identity_is_path_independent_and_ignores_private_data(backend_checkout, tmp_path):
+    import shutil
+
+    first = review.backend_identity(backend_checkout)
+    relocated = tmp_path / "relocated"
+    shutil.copytree(backend_checkout, relocated)
+    assert review.backend_identity(relocated) == first
+    for name in ("data/secret.json", "environment.json", "exact_inspect/static/app.json"):
+        path = relocated / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("private-marker-must-not-affect-runtime")
+    assert review.backend_identity(relocated) == first
+    assert first["file_count"] == 7
+    assert set(first) == {"schema", "git_commit", "source_sha256", "file_count"}
+
+
+def test_documentation_commit_keeps_recorded_backend_provenance(backend_checkout):
+    config = {"repo": str(backend_checkout), "backend": review.backend_identity(backend_checkout)}
+    recorded = copy.deepcopy(config)
+    (backend_checkout / "README.md").write_text("Documentation-only change")
+    review.command(["git", "-C", str(backend_checkout), "add", "README.md"])
+    review.command(
+        [
+            "git",
+            "-C",
+            str(backend_checkout),
+            "-c",
+            "user.name=Review Test",
+            "-c",
+            "user.email=review@example.invalid",
+            "-c",
+            "commit.gpgsign=false",
+            "commit",
+            "--quiet",
+            "-m",
+            "Documentation-only fixture",
+        ]
+    )
+    current = review.verify_backend(config)
+    assert current["git_commit"] != config["backend"]["git_commit"]
+    assert current["source_sha256"] == config["backend"]["source_sha256"]
+    assert config == recorded
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "exact_inspect/study/owl_ast_schema.json",
+        "exact_inspect/study/migrations/001_initial.sql",
+        "exact_inspect/study/new_runtime.py",
+        "tools/review_environment.py",
+        "pyproject.toml",
+        "deploy/render/exact_study_requirements.txt",
+    ],
+)
+def test_backend_source_drift_refuses_restart_without_rewriting_identity(backend_checkout, name):
+    config = {"repo": str(backend_checkout), "backend": review.backend_identity(backend_checkout)}
+    recorded = copy.deepcopy(config)
+    (backend_checkout / name).write_text("changed runtime bytes")
+    with pytest.raises(
+        review.ReviewError, match="Backend source bytes changed.*separate durable root"
+    ):
+        review.preflight(config)
+    assert config == recorded
+    with pytest.raises(review.ReviewError, match="Backend source bytes changed"):
+        review.serve(config, "study", "a" * 32)
+
+
+def test_legacy_backend_identity_is_actionable_and_never_migrated():
+    legacy = {"repo": "/private-legacy-checkout"}
+    with pytest.raises(review.ReviewError, match="no backend fingerprint.*separate durable root"):
+        review.preflight(legacy)
+    assert legacy == {"repo": "/private-legacy-checkout"}
+
+
+def test_backend_identity_refuses_missing_sources_or_outside_symlinks(backend_checkout, tmp_path):
+    service = backend_checkout / "exact_inspect/service.py"
+    service.unlink()
+    with pytest.raises(review.ReviewError, match="Backend source files are missing"):
+        review.backend_identity(backend_checkout)
+    outside = tmp_path / "outside-service.py"
+    outside.write_text("not part of the checkout")
+    service.symlink_to(outside)
+    with pytest.raises(review.ReviewError, match="outside its checkout"):
+        review.backend_identity(backend_checkout)
+
+
 def publication():
     return {
         "definition": {
@@ -213,7 +340,9 @@ def test_new_session_is_test_only_with_private_token_receipt(tmp_path, monkeypat
     monkeypatch.setattr(
         review,
         "status",
-        lambda c: {"services": {r: {"state": "owned", "ready": True} for r in review.ROLES}},
+        lambda c, **kwargs: {
+            "services": {r: {"state": "owned", "ready": True} for r in review.ROLES}
+        },
     )
     calls = []
 
@@ -230,6 +359,7 @@ def test_new_session_is_test_only_with_private_token_receipt(tmp_path, monkeypat
 
     monkeypatch.setattr(review, "http", request)
     result = review.fresh_session(config)
+    assert calls[0][2]["timeout"] == 600
     assert calls[-1][2] == {"body": {"count": 1, "test": True}, "authenticated": True}
     assert "private-test-token" not in json.dumps(result)
     receipt = Path(result["private_invitation_file"])
@@ -242,6 +372,7 @@ def test_start_failure_rolls_back_only_newly_started_owned_processes(tmp_path, m
     config = {"root": str(tmp_path), "database_name": "review"}
     old = {"pid": 3, "nonce": "old", "identity": "previously-owned"}
     monkeypatch.setattr(review, "preflight", lambda config: None)
+    monkeypatch.setattr(review, "require_open_publication", lambda config: None)
     monkeypatch.setattr(review, "processes", lambda config: {"postgres": old})
     monkeypatch.setattr(review, "owned", lambda *args: True)
     monkeypatch.setattr(review, "pg_ready", lambda *args: True)
@@ -318,6 +449,58 @@ def test_real_postgresql_restart_preserves_database_and_owned_identity(tmp_path)
         with review.database(config) as db:
             assert db.execute("SELECT value FROM durable_review").fetchone() == ("preserved",)
         assert (tmp_path / "pgdata" / "PG_VERSION").read_bytes() == before
+        # Exercise closure through the real authenticated API and owned PostgreSQL,
+        # using invented ontology content solely for publication mechanics.
+        from fastapi.testclient import TestClient
+        from exact_inspect.study.api import create_study_app
+        from tests.explanation_review_publication_test import review_fixture
+
+        assets = tmp_path / "closure-assets"
+        raw = review_fixture(assets)
+        source = tmp_path / "source-publication.json"
+        review.private_json(source, raw)
+        frozen_bytes = source.read_bytes()
+        config.update(
+            publication=str(source),
+            source_publication=str(source),
+            study_revision=raw["definition"]["study_revision"],
+            hashes={},
+        )
+        app = create_study_app(
+            f"postgresql://review:test-only-password@127.0.0.1:{port}/postgres",
+            "s" * 48,
+            "r" * 48,
+            "https://localhost",
+            assets,
+        )
+        with TestClient(app, base_url="https://localhost") as client:
+            headers = {"Authorization": "Bearer " + "r" * 48}
+            assert (
+                client.post("/api/v1/admin/studies", json=raw, headers=headers).status_code == 200
+            )
+            assert review.require_open_publication(config)["available_for_test_sessions"]
+            old_revision = config["study_revision"]
+            assert (
+                client.post(
+                    f"/api/v1/admin/studies/{old_revision}/close", headers=headers
+                ).status_code
+                == 200
+            )
+            state = review.publication_state(config)
+            assert state["closed"] is True and not state["available_for_test_sessions"]
+            assert state["closes_at"] == raw["definition"]["closes_at"]
+            with pytest.raises(review.ReviewError, match="fresh-session --new-revision"):
+                review.require_open_publication(config)
+            new = review.new_publication(config)
+            assert (
+                client.post("/api/v1/admin/studies", json=new, headers=headers).status_code == 200
+            )
+            assert review.require_open_publication(config)["available_for_test_sessions"]
+            with review.database(config) as db:
+                assert db.execute(
+                    "SELECT closed FROM studies WHERE revision=%s", (old_revision,)
+                ).fetchone() == (1,)
+            assert source.read_bytes() == frozen_bytes
     finally:
         review.stop_role(config, "postgres")
 
@@ -379,7 +562,7 @@ def test_certificate_renewal_preserves_old_files_and_database(tmp_path, monkeypa
     calls = []
     monkeypatch.setattr(review, "preflight", lambda config, **kwargs: calls.append(kwargs))
     result = review.renew_certificate(config)
-    assert calls == [{"allow_expired": True, "check_tls": False}]
+    assert calls == [{"allow_expired": True, "allow_closed": True, "check_tls": False}]
     assert result["database_preserved"] is True
     assert (cert.read_bytes(), key.read_bytes()) == previous
     assert database.read_bytes() == b"saved session"
@@ -403,7 +586,9 @@ def test_new_revision_recovers_after_interrupted_admission(tmp_path, monkeypatch
     monkeypatch.setattr(
         review,
         "status",
-        lambda config: {"services": {r: {"state": "owned", "ready": True} for r in review.ROLES}},
+        lambda config, **kwargs: {
+            "services": {r: {"state": "owned", "ready": True} for r in review.ROLES}
+        },
     )
 
     def interrupted(*args, **kwargs):
@@ -468,3 +653,89 @@ def test_macos_python_exec_keeps_start_time_and_complete_owned_arguments():
     assert review.stable_worker_identity(before) != review.stable_worker_identity(
         after.replace("--role study", "--role exploration")
     )
+
+
+def test_http_health_timeout_stays_short_while_publication_can_wait(monkeypatch):
+    import io
+
+    calls = []
+    trusted = object()
+    monkeypatch.setattr(review.ssl, "create_default_context", lambda **kwargs: trusted)
+
+    def open_request(request, **kwargs):
+        calls.append((request.full_url, kwargs))
+        return io.BytesIO(b'{"ok": true}')
+
+    monkeypatch.setattr(review.urllib.request, "urlopen", open_request)
+    config = {"ports": {"study": 19284}, "certificate": "local-only.pem"}
+    assert review.http(config, "study", "/api/ready") == {"ok": True}
+    assert review.http(config, "study", "/api/v1/admin/studies", body={}, timeout=600) == {
+        "ok": True
+    }
+    assert [kwargs["timeout"] for _, kwargs in calls] == [5, 600]
+    assert all(kwargs["context"] is trusted for _, kwargs in calls)
+
+
+@pytest.mark.parametrize("expired,closed", [(True, False), (False, True), (False, False)])
+def test_status_exposes_closure_before_showing_study_link(tmp_path, monkeypatch, expired, closed):
+    raw = publication()
+    if expired:
+        raw["definition"]["closes_at"] = "2020-01-01T00:00:00+00:00"
+    path = tmp_path / "publication.json"
+    review.private_json(path, raw)
+    config = {
+        "root": str(tmp_path),
+        "publication": str(path),
+        "study_revision": "source-review",
+        "ports": dict(postgres=19393, study=19394, exploration=19395),
+        "database_password": "private-password-marker",
+    }
+    records = {role: {"pid": index + 2} for index, role in enumerate(review.ROLES)}
+    monkeypatch.setattr(review, "processes", lambda _: records)
+    monkeypatch.setattr(review, "owned", lambda *args: True)
+    monkeypatch.setattr(review, "process_identity", lambda _: "owned")
+    monkeypatch.setattr(review, "pg_ready", lambda *args: True)
+    monkeypatch.setattr(review, "service_ready", lambda *args: True)
+    preflights = []
+    monkeypatch.setattr(review, "preflight", lambda config, **kw: preflights.append(kw))
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            pass
+
+        def execute(self, query, args):
+            assert args == ("source-review",)
+            return self
+
+        def fetchone(self):
+            return (int(closed), json.dumps(raw["definition"]))
+
+    monkeypatch.setattr(review, "database", lambda config: Connection())
+    result = review.status(config)
+    assert preflights == [{"allow_expired": True, "allow_closed": True, "check_ports": False}]
+    assert result["closes_at"] == raw["definition"]["closes_at"]
+    assert result["publication"]["closed"] is closed
+    assert result["publication"]["expired"] is expired
+    assert ("study_url" in result) is (not expired and not closed)
+    assert "private-password-marker" not in json.dumps(result)
+    if expired or closed:
+        assert result["publication"]["next_action"] == "fresh-session --new-revision"
+        with pytest.raises(review.ReviewError, match="fresh-session --new-revision"):
+            review.require_open_publication(config)
+    assert path.read_text() == json.dumps(raw, sort_keys=True, indent=2) + "\n"
+
+
+def test_publication_status_does_not_inspect_an_unowned_database(tmp_path, monkeypatch):
+    raw = publication()
+    path = tmp_path / "publication.json"
+    review.private_json(path, raw)
+    config = {"root": str(tmp_path), "publication": str(path), "study_revision": "source-review"}
+    monkeypatch.setattr(review, "processes", lambda _: {"postgres": {"pid": 5}})
+    monkeypatch.setattr(review, "owned", lambda *args: False)
+    monkeypatch.setattr(review, "database", lambda *args: pytest.fail("Foreign database queried"))
+    state = review.publication_state(config)
+    assert state["published"] is None and state["closed"] is None
+    assert state["available_for_test_sessions"] is False

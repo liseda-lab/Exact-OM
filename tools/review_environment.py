@@ -12,12 +12,12 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import secrets
 import signal
 import socket
 import ssl
 import subprocess
-import sys
 import time
 import urllib.error
 import urllib.parse
@@ -96,6 +96,67 @@ def command(args, *, env=None, timeout=60):
 def runtime_versions(python):
     script = "import importlib.metadata,json,sys; print(json.dumps({'python':sys.version.split()[0],**{x:importlib.metadata.version(x) for x in ('fastapi','uvicorn','pydantic','psycopg','pyowl-core')}}))"
     return json.loads(command([str(python), "-c", script]))
+
+
+def backend_identity(repo):
+    """Hash service code/schema/config without importing native or matcher modules."""
+    root = Path(repo).resolve()
+    required = (
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "tools/review_environment.py",
+        "pyproject.toml",
+        "deploy/render/exact_study_requirements.txt",
+    )
+    if any(not (root / name).is_file() for name in required):
+        raise ReviewError("Backend source files are missing; use the complete durable checkout")
+    paths = {root / name for name in required}
+    paths.update(
+        path
+        for path in (root / "exact_inspect").rglob("*")
+        if path.is_file()
+        and path.suffix in {".py", ".json", ".sql"}
+        and "__pycache__" not in path.relative_to(root).parts
+        and "static" not in path.relative_to(root).parts
+    )
+    digest = hashlib.sha256()
+    for path in sorted(paths):
+        if path.is_symlink() or not path.resolve().is_relative_to(root):
+            raise ReviewError("Backend source fingerprint cannot follow files outside its checkout")
+        digest.update(str(path.relative_to(root)).encode() + b"\0")
+        digest.update(file_hash(path).encode() + b"\n")
+    try:
+        commit = command(["git", "-C", str(root), "rev-parse", "--verify", "HEAD"], timeout=5)
+    except ReviewError as exc:
+        raise ReviewError(
+            "Backend Git identity is unavailable; use a durable committed checkout"
+        ) from exc
+    if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
+        raise ReviewError("Backend Git identity is invalid")
+    return {
+        "schema": "exact-review-backend-source/1",
+        "git_commit": commit,
+        "source_sha256": digest.hexdigest(),
+        "file_count": len(paths),
+    }
+
+
+def verify_backend(config):
+    recorded = config.get("backend")
+    if not recorded or recorded.get("schema") != "exact-review-backend-source/1":
+        raise ReviewError(
+            "This legacy environment has no backend fingerprint; preserve it and run prepare "
+            "with a separate durable root using this checkout"
+        )
+    current = backend_identity(config["repo"])
+    if any(current[key] != recorded.get(key) for key in ("source_sha256", "file_count")):
+        raise ReviewError(
+            "Backend source bytes changed; preserve this environment and run prepare "
+            "with a separate durable root"
+        )
+    # A later documentation-only commit does not change the verified runtime bytes.
+    # Keep the original commit as provenance; never silently rewrite private config.
+    return current
 
 
 def validate_ports(ports):
@@ -250,7 +311,7 @@ def generate_tls(directory):
 
 def renew_certificate(config):
     """Retain DB/TLS history, stop owned HTTPS workers and install a fresh local cert."""
-    preflight(config, allow_expired=True, check_tls=False)
+    preflight(config, allow_expired=True, allow_closed=True, check_tls=False)
     records = processes(config)
     for role in ("study", "exploration"):
         record = records.get(role)
@@ -354,8 +415,72 @@ def owned(config, role, record):
     )
 
 
-def preflight(config, *, allow_expired=False, check_ports=True, check_tls=True):
+def publication_state(config, raw=None):
+    """Read owner-safe closure metadata only from this environment's owned database."""
+    raw = raw if raw is not None else read_json(config["publication"])
+    definition = validate_publication(raw, allow_expired=True)
+    if definition["study_revision"] != config["study_revision"]:
+        raise ReviewError("The configured publication revision does not match its immutable file")
+    result = {
+        "study_revision": definition["study_revision"],
+        "closes_at": definition["closes_at"],
+        "expired": datetime.fromisoformat(definition["closes_at"].replace("Z", "+00:00"))
+        <= datetime.now(timezone.utc),
+        "published": None,
+        "closed": None,
+        "database_status": "not_checked_owned_database_unavailable",
+    }
+    record = processes(config).get("postgres")
+    if record and owned(config, "postgres", record) and pg_ready(config, record):
+        import psycopg
+
+        try:
+            with database(config) as db:
+                row = db.execute(
+                    "SELECT closed, payload FROM studies WHERE revision = %s",
+                    (config["study_revision"],),
+                ).fetchone()
+        except (psycopg.errors.InvalidCatalogName, psycopg.errors.UndefinedTable):
+            row = None  # First startup has not yet created/admitted this publication.
+        except psycopg.Error as exc:
+            raise ReviewError(
+                "The owned review database could not report publication closure"
+            ) from exc
+        if not owned(config, "postgres", record):
+            raise ReviewError("PostgreSQL ownership changed while checking publication closure")
+        if row and datetime.fromisoformat(
+            json.loads(row[1])["closes_at"].replace("Z", "+00:00")
+        ) != datetime.fromisoformat(result["closes_at"].replace("Z", "+00:00")):
+            raise ReviewError("The database publication expiry differs from the immutable input")
+        result.update(
+            published=row is not None,
+            closed=bool(row[0]) if row else False,
+            database_status="checked",
+        )
+    result["available_for_test_sessions"] = (
+        result["published"] is True and result["closed"] is False and not result["expired"]
+    )
+    result["next_action"] = (
+        "fresh-session --new-revision"
+        if result["expired"] or result["closed"]
+        else "fresh-session" if result["available_for_test_sessions"] else "start"
+    )
+    return result
+
+
+def require_open_publication(config, raw=None, *, allow_expired=False, allow_closed=False):
+    state = publication_state(config, raw)
+    if (state["expired"] and not allow_expired) or (state["closed"] and not allow_closed):
+        raise ReviewError(
+            "The review publication is closed or expired; use fresh-session --new-revision "
+            "to preserve it and create a fresh test revision"
+        )
+    return state
+
+
+def preflight(config, *, allow_expired=False, allow_closed=False, check_ports=True, check_tls=True):
     """Fail closed on changed inputs, versions, TLS, ports and publication expiry."""
+    verify_backend(config)
     validate_ports(config["ports"])
     for key in (
         "root",
@@ -405,6 +530,7 @@ def preflight(config, *, allow_expired=False, check_ports=True, check_tls=True):
     from exact_inspect.artifacts import validate_bundle
 
     validate_bundle(Path(config["package"]), verify_hashes=True)
+    require_open_publication(config, raw, allow_expired=allow_expired, allow_closed=allow_closed)
     if check_ports:
         records = processes(config)
         for role, port in config["ports"].items():
@@ -435,8 +561,15 @@ def prepare(args):
                 raise ReviewError(
                     "Existing configured ports differ; choose another root instead of replacing them"
                 )
-        preflight(config)
-        return {"prepared": True, "reused_existing_data": True, "root": str(root)}
+        raw = preflight(config)
+        return {
+            "prepared": True,
+            "reused_existing_data": True,
+            "root": str(root),
+            "study_revision": config["study_revision"],
+            "closes_at": raw["definition"]["closes_at"],
+            "backend": config["backend"],
+        }
     required = ("publication", "assets", "package", "frontend", "python", "pgbin")
     if any(getattr(args, key, None) is None for key in required):
         raise ReviewError(
@@ -486,6 +619,7 @@ def prepare(args):
         "researcher_token": secrets.token_urlsafe(32),
         "database_name": "exact_review",
         "runtime_versions": runtime_versions(values["python"]),
+        "backend": backend_identity(Path(__file__).resolve().parents[1]),
         "postgres_version": command([str(Path(values["pgbin"]) / "postgres"), "--version"]),
     }
     config["postgres_major"] = config["postgres_version"].split()[-1].split(".")[0]
@@ -524,8 +658,10 @@ def prepare(args):
         "prepared": True,
         "root": str(root),
         "study_revision": config["study_revision"],
+        "closes_at": read_json(config["publication"])["definition"]["closes_at"],
         "certificate": str(cert),
         "client_contract": CLIENT_CONTRACT,
+        "backend": config["backend"],
     }
 
 
@@ -544,7 +680,7 @@ def database(config, name=None):
     )
 
 
-def http(config, role, path, *, body=None, authenticated=False):
+def http(config, role, path, *, body=None, authenticated=False, timeout=5):
     headers = {"Content-Type": "application/json"}
     if authenticated:
         headers["Authorization"] = "Bearer " + config["researcher_token"]
@@ -554,7 +690,7 @@ def http(config, role, path, *, body=None, authenticated=False):
         headers=headers,
     )
     context = ssl.create_default_context(cafile=config["certificate"])
-    with urllib.request.urlopen(request, context=context, timeout=5) as response:
+    with urllib.request.urlopen(request, context=context, timeout=timeout) as response:
         return json.load(response)
 
 
@@ -703,9 +839,15 @@ def start(config):
                                 sql.Identifier(config["database_name"])
                             )
                         )
+                require_open_publication(config)
             else:
-                wait_for(lambda: service_ready(config, role, record))
-        result = status(config)
+                # Study admission runs before its listener binds; large frozen ontology
+                # bundles need the same bounded budget as an explicit publication POST.
+                wait_for(
+                    lambda: service_ready(config, role, record),
+                    timeout=600 if role == "study" else 90,
+                )
+        result = status(config, preflight_checked=True)
         if not all(
             value["state"] == "owned" and value.get("ready")
             for value in result["services"].values()
@@ -726,14 +868,18 @@ def start(config):
     return result
 
 
-def status(config):
+def status(config, *, preflight_checked=False):
+    if not preflight_checked:
+        preflight(config, allow_expired=True, allow_closed=True, check_ports=False)
+    publication = publication_state(config)
     records = processes(config)
     report = {
         "root": config["root"],
         "study_revision": config["study_revision"],
         "client_contract": CLIENT_CONTRACT,
-        "study_url": f"https://127.0.0.1:{config['ports']['study']}/participate/",
-        "exploration_url": f"https://127.0.0.1:{config['ports']['exploration']}/",
+        "closes_at": publication["closes_at"],
+        "publication": publication,
+        "backend": config.get("backend"),
         "services": {},
     }
     for role in ROLES:
@@ -750,17 +896,24 @@ def status(config):
             except (OSError, ValueError, urllib.error.URLError):
                 ready = False
             report["services"][role]["ready"] = ready
+    if publication["available_for_test_sessions"] and all(
+        value["state"] == "owned" and value.get("ready") for value in report["services"].values()
+    ):
+        report["study_url"] = f"https://127.0.0.1:{config['ports']['study']}/participate/"
+    exploration = report["services"]["exploration"]
+    if exploration["state"] == "owned" and exploration.get("ready"):
+        report["exploration_url"] = f"https://127.0.0.1:{config['ports']['exploration']}/"
     return report
 
 
 def fresh_session(config, *, renew=False, days=30):
-    preflight(config, allow_expired=renew)
+    preflight(config, allow_expired=renew, allow_closed=renew)
     if renew:
-        raw = new_publication(config, days=days)
+        new_publication(config, days=days)
         private_json(Path(config["root"]) / "environment.json", config)
     if not all(
         value["state"] == "owned" and value.get("ready")
-        for value in status(config)["services"].values()
+        for value in status(config, preflight_checked=True)["services"].values()
     ):
         if not renew:
             raise ReviewError("Start this environment before creating a fresh test session")
@@ -773,6 +926,7 @@ def fresh_session(config, *, renew=False, days=30):
         "/api/v1/admin/studies",
         body=read_json(config["publication"]),
         authenticated=True,
+        timeout=600,
     )
     result = http(
         config,
@@ -797,6 +951,7 @@ def fresh_session(config, *, renew=False, days=30):
     return {
         "created_test_session": True,
         "study_revision": config["study_revision"],
+        "closes_at": read_json(config["publication"])["definition"]["closes_at"],
         "private_invitation_file": str(target),
         "client_contract": CLIENT_CONTRACT,
     }
@@ -805,6 +960,7 @@ def fresh_session(config, *, renew=False, days=30):
 def serve(config, role, nonce):
     if role not in {"study", "exploration"} or not nonce or len(nonce) != 32:
         raise ReviewError("Invalid managed review worker")
+    verify_backend(config)
     if role == "study":
         from urllib.parse import quote
 
@@ -906,7 +1062,7 @@ def main():
                 elif args.action == "stop":
                     for role in reversed(ROLES):
                         stop_role(config, role)
-                    result = status(config)
+                    result = status(config, preflight_checked=True)
                 else:
                     result = fresh_session(config, renew=args.new_revision, days=args.days)
         print(json.dumps(result, indent=2, sort_keys=True))
