@@ -75,6 +75,7 @@ def prepare(campaign, development, output):
             development_epochs=[5, 6],
             sampled_assignments=0,
             patience_enabled=False,
+            patience=6,
             max_full_development_evaluations=2,
             development_case_seconds={r["slot_id"]: r["case_seconds"] for r in own},
             final_development_reserve_seconds=sum(
