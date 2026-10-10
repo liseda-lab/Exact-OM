@@ -144,7 +144,7 @@ def observable_graph(problem, protocol, directory):
     return preparation, graph
 
 
-def freeze_inventory(problem, arm, protocol, directory):
+def freeze_inventory(problem, arm, protocol, directory, *, device="cpu"):
     from exact.repair.pipeline import FrozenNeuralRound, FrozenPlanRisk, model_digest
 
     original_inventory = canonical_hash(problem.objects)
@@ -166,6 +166,7 @@ def freeze_inventory(problem, arm, protocol, directory):
             raise ValueError("Native v3 frozen model required")
         model = RepairModel(state["metadata"], **state["config"])
         model.load_state_dict(state["state_dict"], strict=True)
+        model.to(device)
         model.eval()
         digest = model_digest(model)
         if digest != arm["model_hash"]:

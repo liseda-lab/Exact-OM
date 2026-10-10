@@ -392,8 +392,11 @@ def _coordinate(
     kwargs: dict,
     handler: Callable[[Any], bool] | None,
     directory: str,
+    deadline_epoch: float | None = None,
 ) -> None:
     """Killable event validation/storage owner; controller never runs callbacks."""
+    if deadline_epoch is not None:
+        os.environ["EXACT_REPAIR_DEADLINE_EPOCH"] = str(deadline_epoch)
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=True)
     process = context.Process(
@@ -502,11 +505,13 @@ def _coordinate(
         control.close()
 
 
-def _spawn_coordinate(control, function, args, kwargs, handler, directory, own_group):
+def _spawn_coordinate(
+    control, function, args, kwargs, handler, directory, own_group, deadline_epoch=None
+):
     """Fresh interpreter broker for a CUDA-owning caller; no parent-context fork."""
     if own_group:
         os.setsid()
-    _coordinate(control, function, args, kwargs, handler, directory)
+    _coordinate(control, function, args, kwargs, handler, directory, deadline_epoch)
 
 
 def _cuda_context_is_live() -> bool:
@@ -551,6 +556,14 @@ def bounded_call(
         return CallResult("unsupported", detail="independent supervision requires POSIX")
     if (cpu_seconds is not None or memory_mb is not None) and not Path("/proc/self/stat").exists():
         return CallResult("unsupported", detail="worker CPU/RSS supervision requires Linux procfs")
+    # The campaign owner supplies an absolute wall deadline. Descendants inherit
+    # it, including internal reasoner/compiler calls with larger local defaults.
+    inherited = os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH")
+    if inherited is not None:
+        absolute = float(inherited)
+        if not isfinite(absolute):
+            raise ValueError("inherited repair deadline must be finite")
+        timeout = min(timeout, absolute - time.time() - SUPERVISION_GRACE_SECONDS)
     if timeout <= 0:
         return CallResult("timeout", detail="stage deadline exhausted")
     record_phase(
@@ -563,6 +576,7 @@ def bounded_call(
     )
     started = time.monotonic()
     deadline = started + timeout
+    child_deadline = time.time() + timeout if inherited is not None else None
     context = multiprocessing.get_context("spawn")
     parent, child = context.Pipe(duplex=True)
     directory = str(
@@ -575,7 +589,16 @@ def bounded_call(
     if _cuda_context_is_live():
         broker = context.Process(
             target=_spawn_coordinate,
-            args=(child, function, args, kwargs, event_handler, directory, own_group),
+            args=(
+                child,
+                function,
+                args,
+                kwargs,
+                event_handler,
+                directory,
+                own_group,
+                child_deadline,
+            ),
             daemon=False,
         )
         broker.start()
@@ -588,7 +611,7 @@ def bounded_call(
                 parent.close()
                 if own_group:
                     os.setsid()
-                _coordinate(child, function, args, kwargs, event_handler, directory)
+                _coordinate(child, function, args, kwargs, event_handler, directory, child_deadline)
             finally:
                 os._exit(0)
     child.close()

@@ -32,7 +32,7 @@ from exact.repair.records import (
     make_objective,
     candidate_cost,
 )
-from exact.repair.workers import bounded_call, record_phase, SUPERVISION_GRACE_SECONDS
+from exact.repair.workers import bounded_call, SUPERVISION_GRACE_SECONDS
 from tools.repair.prepare import case_from_dict, _probe
 
 SCHEMA = "exact-repair/corrective-study/v1"
@@ -88,6 +88,7 @@ def _whole_plan_search(problem, probes, profile, directory, seconds):
     started = time.monotonic()
     best = None
     attempted = qualified = scored = 0
+    first_verified = None
     exhaustive = True
     pool_size = 1
     for obj in problem.objects:
@@ -128,6 +129,8 @@ def _whole_plan_search(problem, probes, profile, directory, seconds):
             exhaustive = False
             continue
         qualified += 1
+        if first_verified is None:
+            first_verified = time.monotonic() - started
         left = seconds - (time.monotonic() - started)
         label = bounded_call(
             _query_value,
@@ -164,6 +167,7 @@ def _whole_plan_search(problem, probes, profile, directory, seconds):
             write_artifact(Path(directory) / "observable-incumbent.json", best)
     return dict(
         best=best,
+        first_verified_seconds=first_verified,
         attempted=attempted,
         qualified=qualified,
         scored=scored,
@@ -206,6 +210,12 @@ def evaluate_row(case_record, settings, directory):
     protocol = bound(settings["protocol"])
     resources = protocol["resources"]
     seconds = float(settings.get("seconds", resources["case_wall_seconds"]))
+    if os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH"):
+        seconds = min(seconds, float(os.environ["EXACT_REPAIR_DEADLINE_EPOCH"]) - time.time())
+    if seconds <= 0:
+        return dict(
+            status="resource_limited", logical_status="UNKNOWN", detail="case deadline exhausted"
+        )
     started = time.monotonic()
     problem = dataclasses.replace(
         problem,
@@ -234,6 +244,8 @@ def evaluate_row(case_record, settings, directory):
         hardware=dict(host=platform.node(), machine=platform.machine()),
     )
     result = selected_problem = objective = None
+    selection_offset = 0.0
+    staged_first_verified = None
     if settings.get("frozen_inventory"):
         shared = read_record(bound(settings["frozen_inventory"]))
         if (
@@ -250,6 +262,7 @@ def evaluate_row(case_record, settings, directory):
         objective = make_objective(
             selected_problem.objects, profile=profile, scale=protocol["objective"]["integer_scale"]
         )
+        selection_offset = time.monotonic() - started
         result = repair(selected_problem, objective, diagnose=True)
         summary["generation_status"] = "ELEMENTARY_DIRECT_NO_RICH_GENERATION"
     elif arm == "learned":
@@ -266,6 +279,7 @@ def evaluate_row(case_record, settings, directory):
         )
         reserve = min(problem.budgets.verification_seconds, seconds / 5)
         if schedule == "staged_verified_repair":
+            stage_offset = time.monotonic() - started
             outcome = staged_verified_repair(
                 problem,
                 checkpoint_path=checkpoint["path"],
@@ -276,6 +290,12 @@ def evaluate_row(case_record, settings, directory):
                 repair_options=repair_settings,
             )
             summary.update(generation_status=outcome.generation_status, stages=list(outcome.stages))
+            staged_times = [
+                r["first_verified_seconds"]
+                for r in outcome.stages
+                if r.get("first_verified_seconds") is not None
+            ]
+            staged_first_verified = stage_offset + min(staged_times) if staged_times else None
             if outcome.frozen is not None:
                 selected_problem, objective = outcome.frozen.problem, outcome.frozen.objective
                 result = outcome.result
@@ -302,6 +322,7 @@ def evaluate_row(case_record, settings, directory):
                             budgets=dataclasses.replace(frozen.problem.budgets, total_seconds=left),
                         ),
                     )
+                    selection_offset = time.monotonic() - started
                     result = repair_neural_round(frozen, **repair_settings)
                     selected_problem, objective = frozen.problem, frozen.objective
         else:
@@ -329,7 +350,13 @@ def evaluate_row(case_record, settings, directory):
             problem = generated.value.problem
         left = seconds - (time.monotonic() - started)
         if arm == "complete_plan_observable_query":
+            selection_offset = time.monotonic() - started
             search = _whole_plan_search(problem, probes, profile, directory, max(0.001, left * 0.8))
+            staged_first_verified = (
+                selection_offset + search["first_verified_seconds"]
+                if search.get("first_verified_seconds") is not None
+                else None
+            )
             summary["observable_search"] = {k: v for k, v in search.items() if k != "best"}
             if search["best"] is not None:
                 selected_problem = read_record(search["best"]["input"])
@@ -355,6 +382,7 @@ def evaluate_row(case_record, settings, directory):
                 problem,
                 budgets=dataclasses.replace(problem.budgets, total_seconds=max(0.001, left * 0.8)),
             )
+            selection_offset = time.monotonic() - started
             result = repair(selected_problem, objective, diagnose=True)
             summary["surrogate_contract"] = "local_asserted_query_support/v1"
     else:
@@ -373,6 +401,20 @@ def evaluate_row(case_record, settings, directory):
             logical_status=result.logical_status,
             search_status=result.search_status,
             selected_ids=[c.candidate_id for c in result.selected],
+            first_verified_seconds=(
+                staged_first_verified
+                if staged_first_verified is not None
+                else (
+                    selection_offset + result.first_verified_seconds
+                    if result.first_verified_seconds is not None
+                    else None
+                )
+            ),
+            first_verified_timing_scope="row_worker_including_generation",
+            checks=result.checks,
+            master_solves=result.solves,
+            stage_seconds=dict(result.stage_seconds),
+            verification_scope=result.verification_scope,
             selected_input_hash=selected_problem.content_hash,
             initial_status=next(
                 (r.verdict for name, r in result.baseline if name == "alignment"), "UNKNOWN"
