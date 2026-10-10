@@ -3,6 +3,7 @@
 import csv
 import io
 import json
+import os
 import zipfile
 from uuid import uuid4
 
@@ -35,7 +36,9 @@ def ok(response):
 @pytest.fixture
 def review(tmp_path):
     frozen = publication_v2(tmp_path, forms_version=FORMS)
-    database = f"sqlite:///{tmp_path / 'forms.sqlite'}"
+    database = os.environ.get(
+        "EXACT_STUDY_TEST_DATABASE_URL", f"sqlite:///{tmp_path / 'forms.sqlite'}"
+    )
     app = create_study_app(database, SECRET, ADMIN, ORIGIN, tmp_path, allow_test_sqlite=True)
     store = app.state.study_store
     store.publish(frozen)
@@ -236,7 +239,16 @@ def test_frozen_old_codebooks_and_explicit_new_protocol(review):
 def test_optional_familiarity_and_background_hidden_clearing_over_http(review):
     client, store, frozen = review
     consent(client, frozen)
-    for methods in (["none", "protege"], ["protege", "protege"], ["queries_scripts"]):
+    for methods in (
+        ["none", "protege"],
+        ["protege", "protege"],
+        ["queries_scripts"],
+        None,
+        3,
+        True,
+        "protege",
+        {},
+    ):
         assert setup(client, familiar_methods=methods).status_code == 422
     for value in ("", "  ", "x" * 161):
         assert (
@@ -322,6 +334,18 @@ def test_actual_consultation_export_opt_in_and_immutable_restart(review):
     state = submit_ranking(client)
     assert state["consultation_draft"] is None
     assert state["consultation"] is None
+    for malformed in (None, 3, True, "protege", {}):
+        for draft in (True, False):
+            assert (
+                consultation(
+                    client,
+                    state,
+                    draft=draft,
+                    consulted_external_ontologies=True,
+                    methods=malformed,
+                ).status_code
+                == 422
+            )
     for values in (
         {},
         {"consulted_external_ontologies": True},

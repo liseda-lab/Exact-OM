@@ -532,7 +532,11 @@ class SetupV3(Mutation):
     @model_validator(mode="before")
     @classmethod
     def clear_hidden_name(cls, value):
-        if isinstance(value, dict) and "other_method" not in (value.get("familiar_methods") or []):
+        if (
+            isinstance(value, dict)
+            and isinstance(value.get("familiar_methods", []), list)
+            and "other_method" not in value.get("familiar_methods", [])
+        ):
             return {**value, "familiar_other_method": None}
         return value
 
@@ -588,7 +592,9 @@ class ConsultationDraftV3(Mutation):
             value = dict(value)
             if value.get("consulted_external_ontologies") is not True:
                 value.update(methods=[], other_method=None, resource_scope=None)
-            elif "other_method" not in (value.get("methods") or []):
+            elif isinstance(value.get("methods", []), list) and "other_method" not in value.get(
+                "methods", []
+            ):
                 value["other_method"] = None
         return value
 
