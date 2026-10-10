@@ -7,7 +7,7 @@ import pytest
 from exact.repair.learning import RepairLabel, TeacherCache
 from exact.repair.semantic_fidelity import validate_comparison
 from tests.repair_semantic_fidelity_test import packet, judgment
-from tools.repair.recovered_train_packets import clarify, select_pairs, reuse_native
+from tools.repair.recovered_train_packets import clarify, select_pairs, reuse_native, recovery_history
 
 
 def test_task_clarification_preserves_full_evidence_plans_and_rubric():
@@ -67,3 +67,50 @@ def test_recovery_never_replays_a_completed_or_scientifically_unsupported_plan(t
     reuse, actual = reuse_native(binding(path))
     assert reuse is not retry
     assert actual == plan
+
+
+def test_recovery_requires_terminal_nonce_frozen_denominator_and_unused_retry(tmp_path):
+    from tools.repair.shared_release import immutable
+    from tools.repair.historical_regression import binding
+
+    def save(name, value):
+        path = tmp_path / name
+        immutable(path, value)
+        return binding(path)
+
+    def terminal(name, work, batch, outputs):
+        step = dict(dispatch_nonce=name, step_id="14451.99")
+        receipt = dict(completion=save(name + "/completion.json", dict(
+            **step, status="complete", exit_code=0, batch=batch["path"], job_id=name, work=str(work))),
+            step=save(name + "/step.json", step), outputs=save(name + "/outputs.json", outputs),
+            batch=batch, **step, expected_status="complete")
+        return receipt
+
+    native = save("qualified/native.json", dict(status="complete", cleanup_complete=True))
+    qreport = save("qualified/report.json", dict(eligible=True, full_native_policy_required=True,
+                                                native_receipt=native))
+    qbatch = save("qbatch.json", dict(jobs=[dict(id="q")]))
+    qreceipt = terminal("q", tmp_path / "qualified", qbatch,
+                        {"report.json": qreport["sha256"], "native.json": native["sha256"]})
+    row = save("old-work/row.json", dict(id="fixed"))
+    original = dict(rows=save("rows.json", dict(rows=[dict(id="fixed")])), test_opened=False)
+    original_ref = save("old-plan.json", original)
+    report = save("old-work/report.json", dict(plan=original_ref, rows=[row]))
+    batch = save("old-batch.json", dict(jobs=[dict(id="old")],
+        frozen_files={original_ref["path"]: original_ref["sha256"]}))
+    receipt = terminal("old", tmp_path / "old-work", batch,
+                       {"report.json": report["sha256"], "row.json": row["sha256"]})
+    amendment = dict(same_cause_prior_attempts=1, maximum_attempts=2, costs_reset=False,
+        retry_completed_native=False, qualification=qreceipt, previous_plan=original_ref,
+        previous_batch=batch, prior_run=dict(completion_path=receipt["completion"]["path"],
+            dispatch_nonce="old", step_id="14451.99"))
+    plan = dict(original, rejection_precheck=False, technical_recovery=save("amendment.json", amendment))
+    assert set(recovery_history(plan)["rows"]) == {"fixed"}
+    with pytest.raises(ValueError, match="changed frozen"):
+        recovery_history(dict(plan, test_opened=True))
+    invalid = dict(amendment, same_cause_prior_attempts=2)
+    with pytest.raises(ValueError, match="one-pass"):
+        recovery_history(dict(plan, technical_recovery=save("second-retry.json", invalid)))
+    invalid = dict(amendment, prior_run=dict(amendment["prior_run"], dispatch_nonce="other"))
+    with pytest.raises(ValueError, match="nonce"):
+        recovery_history(dict(plan, technical_recovery=save("wrong-nonce.json", invalid)))
