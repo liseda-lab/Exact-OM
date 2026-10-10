@@ -16,7 +16,7 @@ from pathlib import Path, PurePosixPath
 from threading import Lock
 from typing import Annotated, Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from ..context import OntologyContext
 from ..context_semantics import decode_payload
@@ -33,6 +33,7 @@ from ..contracts import (
     file_hash,
 )
 from ..generation import Claim
+from ..evidence_metadata import PairEvidenceMetadata
 from ..models import (
     AxiomResponse,
     EntityContextResponse,
@@ -65,6 +66,14 @@ _TABLES = {
 }
 
 
+def _scope_tables(scope):
+    return (
+        {**_TABLES, "pair_metadata": ("candidate_id", "payload")}
+        if scope.index_version == "exact-workspace-index/2"
+        else _TABLES
+    )
+
+
 def _locator(value: str) -> str:
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts or "\\" in value or str(path) == ".":
@@ -92,6 +101,14 @@ class WorkspaceScope(StrictModel):
     index_path: Annotated[str, Field(min_length=1, max_length=512)]
     index_sha256: Digest
     components: list[Component] = Field(default_factory=lambda: ["context", "hierarchy"])
+    index_version: Literal["exact-workspace-index/2"] | None = None
+
+    @model_serializer(mode="wrap")
+    def historical_shape(self, handler):
+        value = handler(self)
+        if self.index_version is None:
+            value.pop("index_version", None)
+        return value
 
     @model_validator(mode="after")
     def unique_resources(self):
@@ -124,6 +141,17 @@ class WorkspaceCapabilitiesResponse(StrictModel):
     graph_form: str
     navigation_contract: Literal["exact-hierarchy/1"] = NAVIGATION_CONTRACT
     navigation: dict[str, dict[str, Any]]
+    evidence_metadata_contract: Literal["exact-evidence-metadata/1"] | None = None
+
+
+class WorkspacePairMetadata(StrictModel):
+    source: EntityRef
+    target: EntityRef
+    evidence_metadata: PairEvidenceMetadata
+
+
+class WorkspaceEvidenceMetadataResponse(WorkspacePairMetadata):
+    candidate_id: Identifier
 
 
 def _digest(path: Path) -> str:
@@ -209,6 +237,26 @@ def _admit_evidence(value, candidate, case, policy, contexts):
     return _strict_projection(SelectedEvidence, result)
 
 
+def _admit_pair_metadata(value, candidate, case, rows):
+    from ..evidence_metadata import filter_pair_metadata, recorded_bridges
+
+    value = WorkspacePairMetadata.model_validate(value).model_dump(mode="json")
+    if value["source"] != case["source"] or value["target"] != candidate["entity"]:
+        raise ValueError("Evidence comparison differs from its active typed pair")
+    metadata = value["evidence_metadata"]
+    if metadata["counts"]["selected"] != len(rows):
+        raise ValueError("Evidence comparison does not cover the selected feature inventory")
+    recorded_bridges(
+        {"evidence_bridges": metadata["bridges"]},
+        rows,
+        value["source"],
+        value["target"],
+        (),
+    )
+    value["evidence_metadata"] = filter_pair_metadata(metadata, rows)
+    return value
+
+
 def build_workspace_scope(
     root: str | Path,
     *,
@@ -219,6 +267,7 @@ def build_workspace_scope(
     policy: VisibilityPolicy,
     explanations=(),
     evidence=None,
+    pair_metadata=None,
     components: list[Component] | None = None,
     reuse_prepared_contexts: bool = False,
 ) -> WorkspaceScope:
@@ -284,6 +333,10 @@ def build_workspace_scope(
                 "CREATE TABLE subjects(explanation_id TEXT,entity TEXT,PRIMARY KEY(entity,explanation_id));"
                 "CREATE TABLE evidence(candidate_id TEXT,id TEXT,payload TEXT,PRIMARY KEY(candidate_id,id));"
             )
+            if pair_metadata is not None:
+                output.execute(
+                    "CREATE TABLE pair_metadata(candidate_id TEXT PRIMARY KEY,payload TEXT NOT NULL)"
+                )
             for value in explanations:
                 result = _admit_explanation(value, case, policy, prepared)
                 summary = {
@@ -314,6 +367,19 @@ def build_workspace_scope(
                         "INSERT INTO evidence VALUES (?,?,?)",
                         (cid, result["evidence_id"], canonical_json(result).decode()),
                     )
+            for cid, value in (pair_metadata or {}).items():
+                if cid not in candidates:
+                    raise ValueError("Evidence comparison belongs to another case")
+                rows = [
+                    json.loads(row[0])
+                    for row in output.execute(
+                        "SELECT payload FROM evidence WHERE candidate_id=? ORDER BY id", (cid,)
+                    )
+                ]
+                result = _admit_pair_metadata(value, candidates[cid], case, rows)
+                output.execute(
+                    "INSERT INTO pair_metadata VALUES (?,?)", (cid, canonical_json(result).decode())
+                )
     except Exception:
         database.unlink(missing_ok=True)
         raise
@@ -325,6 +391,7 @@ def build_workspace_scope(
         index_path=database.relative_to(root).as_posix(),
         index_sha256=_digest(database),
         components=components or ["context", "hierarchy"],
+        index_version="exact-workspace-index/2" if pair_metadata is not None else None,
     )
 
 
@@ -472,7 +539,7 @@ def validate_publication_workspaces(store, study, admitted_explanations):
             ):
                 raise ValueError("Study promises a component outside the admitted workspace")
         counts = {"entity_profile": 0, "pair_comparison": 0, "evidence": 0}
-        with readonly_connection(index, _TABLES) as db:
+        with readonly_connection(index, _scope_tables(scope)) as db:
             for row in db.execute("SELECT id,task,entities,summary,payload FROM explanations"):
                 value = _admit_explanation(json.loads(row[4]), case, policy, contexts)
                 expected_summary = {
@@ -537,6 +604,18 @@ def validate_publication_workspaces(store, study, admitted_explanations):
                     raise ValueError("Workspace evidence index identity differs")
                 store._check_safe_json(value)
                 counts["evidence"] += 1
+            if scope.index_version is not None:
+                for cid, payload in db.execute("SELECT candidate_id,payload FROM pair_metadata"):
+                    if cid not in candidates:
+                        raise ValueError("Workspace comparison belongs to another case")
+                    rows = [
+                        _admit_evidence(json.loads(r[0]), candidates[cid], case, policy, contexts)
+                        for r in db.execute(
+                            "SELECT payload FROM evidence WHERE candidate_id=? ORDER BY id", (cid,)
+                        )
+                    ]
+                    value = _admit_pair_metadata(json.loads(payload), candidates[cid], case, rows)
+                    store._check_safe_json(value)
         for component, task in (
             ("profiles", "entity_profile"),
             ("comparison", "pair_comparison"),
@@ -635,7 +714,7 @@ class ParticipantWorkspace:
         if not isinstance(after, str):
             raise DomainError("invalid_cursor", "Invalid workspace cursor")
         column = "summary" if table == "explanations" else "payload"
-        with readonly_connection(self.index, _TABLES) as db:
+        with readonly_connection(self.index, _scope_tables(self.scope)) as db:
             total = db.execute(f"SELECT count(*) FROM {table} WHERE {where}", args).fetchone()[0]
             rows = db.execute(
                 f"SELECT id,{column} FROM {table} WHERE {where} AND id>? ORDER BY id LIMIT ?",
@@ -782,6 +861,11 @@ def install_workspace_routes(router, store, participant_dependency):
                 "continuation": "query_bound_keyset",
                 "original_format": "typed_ast_and_canonical_bytes_base64; base64 is not human-readable syntax",
                 "graph_form": "recorded_features_only; channel bridges do not imply feature pairing",
+                "evidence_metadata_contract": (
+                    "exact-evidence-metadata/1"
+                    if w.scope.index_version is not None and "evidence" in w.scope.components
+                    else None
+                ),
             }
 
         return read(scope_id, identity, result)
@@ -1061,7 +1145,7 @@ def install_workspace_routes(router, store, participant_dependency):
     )
     def explanation(scope_id: str, explanation_id: str, identity=Depends(participant_dependency)):
         def result(w):
-            with readonly_connection(w.index, _TABLES) as db:
+            with readonly_connection(w.index, _scope_tables(w.scope)) as db:
                 row = db.execute(
                     "SELECT payload FROM explanations WHERE id=?", (explanation_id,)
                 ).fetchone()
@@ -1075,6 +1159,44 @@ def install_workspace_routes(router, store, participant_dependency):
             from ..descriptions import preparation_metadata
 
             return {**value, **preparation_metadata(value)}
+
+        return read(scope_id, identity, result)
+
+    @router.get(prefix + "/evidence-metadata", response_model=WorkspaceEvidenceMetadataResponse)
+    def evidence_metadata(
+        scope_id: str, candidate_id: str, identity=Depends(participant_dependency)
+    ):
+        def result(w):
+            if "evidence" not in w.scope.components:
+                raise _error(403, "Evidence component is outside the admitted workspace")
+            candidate = next(
+                (c for c in w.case["candidates"] if c["candidate_id"] == candidate_id), None
+            )
+            if candidate is None:
+                raise _error(403, "Evidence is outside the current case")
+            if w.scope.index_version is None:
+                raise _error(
+                    404, "Evidence comparison metadata was not exported for this workspace"
+                )
+            with readonly_connection(w.index, _scope_tables(w.scope)) as db:
+                row = db.execute(
+                    "SELECT payload FROM pair_metadata WHERE candidate_id=?", (candidate_id,)
+                ).fetchone()
+                if row is None:
+                    raise _error(
+                        404, "Evidence comparison metadata was not exported for this candidate"
+                    )
+                rows = [
+                    _admit_evidence(json.loads(r[0]), candidate, w.case, w.policy, w.contexts)
+                    for r in db.execute(
+                        "SELECT payload FROM evidence WHERE candidate_id=? ORDER BY id",
+                        (candidate_id,),
+                    )
+                ]
+            return {
+                "candidate_id": candidate_id,
+                **_admit_pair_metadata(json.loads(row[0]), candidate, w.case, rows),
+            }
 
         return read(scope_id, identity, result)
 

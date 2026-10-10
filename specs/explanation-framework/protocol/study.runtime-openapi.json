@@ -1718,6 +1718,72 @@
         }
       }
     },
+    "/api/v1/study/workspace/{scope_id}/evidence-metadata": {
+      "get": {
+        "summary": "Evidence Metadata",
+        "operationId": "evidence_metadata_api_v1_study_workspace__scope_id__evidence_metadata_get",
+        "parameters": [
+          {
+            "name": "scope_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Scope Id"
+            }
+          },
+          {
+            "name": "candidate_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Candidate Id"
+            }
+          },
+          {
+            "name": "X-Study-Session",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Expected session ID; a cookie switch returns 409 before mutation.",
+              "title": "X-Study-Session"
+            },
+            "description": "Expected session ID; a cookie switch returns 409 before mutation."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceEvidenceMetadataResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/study/workspace/{scope_id}/evidence": {
       "get": {
         "summary": "Evidence",
@@ -4634,6 +4700,45 @@
         ],
         "title": "ClaimReviewDecision"
       },
+      "ComparisonResolutionCounts": {
+        "properties": {
+          "recorded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Recorded"
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved"
+          },
+          "unresolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unresolved"
+          },
+          "ambiguous": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ambiguous"
+          },
+          "unsupported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unsupported"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "recorded",
+          "resolved",
+          "unresolved",
+          "ambiguous",
+          "unsupported"
+        ],
+        "title": "ComparisonResolutionCounts"
+      },
       "Consent": {
         "properties": {
           "idempotency_key": {
@@ -6450,6 +6555,225 @@
         "title": "EventV2",
         "description": "Tutorial/help observations carry synthetic identities instead of fake cases."
       },
+      "EvidenceBridge": {
+        "properties": {
+          "bridge_id": {
+            "type": "string",
+            "title": "Bridge Id"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "channel_comparison",
+              "feature_correspondence"
+            ],
+            "title": "Level"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "withheld"
+            ],
+            "title": "Status",
+            "default": "recorded"
+          },
+          "channel": {
+            "type": "string",
+            "title": "Channel"
+          },
+          "source_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Channel"
+          },
+          "target_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Channel"
+          },
+          "source_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Family"
+          },
+          "target_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Family"
+          },
+          "comparison_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "matrix_support",
+                  "attribute_anchor",
+                  "difference_endpoint",
+                  "lexical_score"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Basis"
+          },
+          "recorded_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded Score",
+            "description": "Saved matcher comparison metric; not semantic equivalence or calibrated probability."
+          },
+          "source": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+          },
+          "target": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+          },
+          "source_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Evidence Ids"
+          },
+          "target_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Evidence Ids"
+          },
+          "source_fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Source Fact Ids"
+          },
+          "target_fact_ids": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Target Fact Ids"
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Artifact Refs"
+          },
+          "interpretation": {
+            "type": "string",
+            "const": "matcher_comparison",
+            "title": "Interpretation",
+            "default": "matcher_comparison"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "bridge_id",
+          "level",
+          "channel",
+          "source",
+          "target",
+          "artifact_refs"
+        ],
+        "title": "EvidenceBridge",
+        "description": "Matcher comparison metadata, never an original ontology relationship."
+      },
+      "EvidenceCompleteness": {
+        "properties": {
+          "selected": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Selected"
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved"
+          },
+          "unresolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unresolved"
+          },
+          "not_exported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Not Exported"
+          },
+          "withheld": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Withheld"
+          },
+          "graph_supported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Supported"
+          },
+          "graph_unsupported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Unsupported"
+          },
+          "graph_not_recorded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Graph Not Recorded"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "selected",
+          "resolved",
+          "unresolved",
+          "not_exported",
+          "withheld",
+          "graph_supported",
+          "graph_unsupported",
+          "graph_not_recorded"
+        ],
+        "title": "EvidenceCompleteness"
+      },
       "Exchange": {
         "properties": {
           "secret": {
@@ -8259,6 +8583,79 @@
         ],
         "title": "Page[dict[str, Any]]"
       },
+      "PairEvidenceMetadata": {
+        "properties": {
+          "version": {
+            "type": "string",
+            "const": "exact-evidence-metadata/1",
+            "title": "Version",
+            "default": "exact-evidence-metadata/1"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "selected",
+              "none_selected",
+              "not_exported",
+              "request_failed"
+            ],
+            "title": "Status"
+          },
+          "counts": {
+            "$ref": "#/components/schemas/EvidenceCompleteness"
+          },
+          "bridge_status": {
+            "type": "string",
+            "enum": [
+              "recorded",
+              "not_recorded",
+              "withheld"
+            ],
+            "title": "Bridge Status"
+          },
+          "bridges": {
+            "items": {
+              "$ref": "#/components/schemas/EvidenceBridge"
+            },
+            "type": "array",
+            "title": "Bridges"
+          },
+          "comparison_records": {
+            "items": {
+              "$ref": "#/components/schemas/RecordedComparisonResolution"
+            },
+            "type": "array",
+            "title": "Comparison Records"
+          },
+          "comparison_resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonResolutionCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "scope": {
+            "type": "string",
+            "enum": [
+              "saved_run",
+              "prepared_visibility_policy"
+            ],
+            "title": "Scope",
+            "default": "saved_run"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "status",
+          "counts",
+          "bridge_status"
+        ],
+        "title": "PairEvidenceMetadata"
+      },
       "PracticeAnswer": {
         "properties": {
           "key": {
@@ -9564,6 +9961,68 @@
         ],
         "title": "RankingResponseV2"
       },
+      "RecordedComparisonResolution": {
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "title": "Record Id"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "lexical",
+              "hierarchy",
+              "similarity",
+              "attributes",
+              "difference",
+              "unknown"
+            ],
+            "title": "Channel"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "unresolved",
+              "ambiguous",
+              "unsupported"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "bridge_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bridge Id"
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifact Refs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "record_id",
+          "channel",
+          "status",
+          "reason_code"
+        ],
+        "title": "RecordedComparisonResolution",
+        "description": "A saved comparison's identity resolution, without exposing raw legacy aliases."
+      },
       "Resume": {
         "properties": {
           "idempotency_key": {
@@ -10047,6 +10506,17 @@
           "channel": {
             "type": "string",
             "title": "Channel"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
           },
           "side": {
             "type": "string",
@@ -13700,6 +14170,18 @@
             },
             "type": "object",
             "title": "Navigation"
+          },
+          "evidence_metadata_contract": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "exact-evidence-metadata/1"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Evidence Metadata Contract"
           }
         },
         "additionalProperties": false,
@@ -13779,6 +14261,35 @@
         ],
         "title": "WorkspaceDescriptor"
       },
+      "WorkspaceEvidenceMetadataResponse": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+          },
+          "target": {
+            "$ref": "#/components/schemas/exact_inspect__contracts__EntityRef"
+          },
+          "evidence_metadata": {
+            "$ref": "#/components/schemas/PairEvidenceMetadata"
+          },
+          "candidate_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "title": "Candidate Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "evidence_metadata",
+          "candidate_id"
+        ],
+        "title": "WorkspaceEvidenceMetadataResponse"
+      },
       "WorkspaceScope": {
         "properties": {
           "scope_id": {
@@ -13836,6 +14347,18 @@
             },
             "type": "array",
             "title": "Components"
+          },
+          "index_version": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "exact-workspace-index/2"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Index Version"
           }
         },
         "additionalProperties": false,

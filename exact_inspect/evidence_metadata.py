@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections import Counter
+import math
+from collections import Counter, defaultdict
 from typing import Any, Literal, Mapping
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -68,6 +69,17 @@ class EvidenceBridge(MetadataModel):
     level: Literal["channel_comparison", "feature_correspondence"]
     status: Literal["recorded", "withheld"] = "recorded"
     channel: str
+    source_channel: str | None = None
+    target_channel: str | None = None
+    source_family: str | None = None
+    target_family: str | None = None
+    comparison_basis: (
+        Literal["matrix_support", "attribute_anchor", "difference_endpoint", "lexical_score"] | None
+    ) = None
+    recorded_score: float | None = Field(
+        default=None,
+        description="Saved matcher comparison metric; not semantic equivalence or calibrated probability.",
+    )
     source: EntityRef
     target: EntityRef
     source_evidence_ids: list[str] = Field(default_factory=list)
@@ -83,6 +95,31 @@ class EvidenceBridge(MetadataModel):
             self.source_evidence_ids and self.target_evidence_ids
         ):
             raise ValueError("Feature correspondence requires recorded evidence on both sides")
+        return self
+
+
+class RecordedComparisonResolution(MetadataModel):
+    """A saved comparison's identity resolution, without exposing raw legacy aliases."""
+
+    record_id: str
+    channel: Literal["lexical", "hierarchy", "similarity", "attributes", "difference", "unknown"]
+    status: Literal["resolved", "unresolved", "ambiguous", "unsupported"]
+    reason_code: str
+    bridge_id: str | None = None
+    artifact_refs: list[str] = Field(default_factory=list)
+
+
+class ComparisonResolutionCounts(MetadataModel):
+    recorded: int = Field(ge=0)
+    resolved: int = Field(ge=0)
+    unresolved: int = Field(ge=0)
+    ambiguous: int = Field(ge=0)
+    unsupported: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def conserved(self):
+        if self.recorded != self.resolved + self.unresolved + self.ambiguous + self.unsupported:
+            raise ValueError("Every saved comparison needs one identity resolution")
         return self
 
 
@@ -111,7 +148,36 @@ class PairEvidenceMetadata(MetadataModel):
     counts: EvidenceCompleteness
     bridge_status: Literal["recorded", "not_recorded", "withheld"]
     bridges: list[EvidenceBridge] = Field(default_factory=list)
+    comparison_records: list[RecordedComparisonResolution] = Field(default_factory=list)
+    comparison_resolution: ComparisonResolutionCounts | None = None
     scope: Literal["saved_run", "prepared_visibility_policy"] = "saved_run"
+
+    @model_validator(mode="after")
+    def comparison_inventory(self):
+        bridge_ids = [bridge.bridge_id for bridge in self.bridges]
+        if len(set(bridge_ids)) != len(bridge_ids):
+            raise ValueError("Duplicate recorded bridge identity")
+        if self.bridge_status == "not_recorded" and (self.bridges or self.comparison_records):
+            raise ValueError("Saved comparisons cannot be reported as not recorded")
+        if self.comparison_resolution is None:
+            if self.comparison_records:
+                raise ValueError("Saved comparison inventory requires resolution counts")
+            return self
+        counts = Counter(row.status for row in self.comparison_records)
+        expected = {
+            key: counts[key] for key in ("resolved", "unresolved", "ambiguous", "unsupported")
+        }
+        expected["recorded"] = len(self.comparison_records)
+        if self.comparison_resolution.model_dump() != expected or len(
+            {row.record_id for row in self.comparison_records}
+        ) != len(self.comparison_records):
+            raise ValueError("Saved comparison resolution inventory differs from its counts")
+        for row in self.comparison_records:
+            if (row.status == "resolved" and row.bridge_id not in bridge_ids) or (
+                row.status != "resolved" and row.bridge_id is not None
+            ):
+                raise ValueError("Comparison resolution differs from its recorded bridge")
+        return self
 
 
 def exact_match_basis(raw, *, source=None, target=None):
@@ -206,7 +272,11 @@ def recorded_bridges(record, items, source, target, artifact_refs):
                 eid not in by_id
                 or by_id[eid]["side"] != side
                 or by_id[eid]["entity"] != (source if side == "source" else target)
-                or by_id[eid]["channel"] != bridge.channel
+                or by_id[eid]["channel"] != (getattr(bridge, side + "_channel") or bridge.channel)
+                or (
+                    getattr(bridge, side + "_family") is not None
+                    and by_id[eid].get("family") != getattr(bridge, side + "_family")
+                )
                 for eid in ids
             ):
                 raise DomainError(
@@ -225,8 +295,197 @@ def recorded_bridges(record, items, source, target, artifact_refs):
     return bridges
 
 
+def legacy_recorded_bridges(record, items, source, target, artifact_refs):
+    """Adapt saved producer links only; never rerun scoring or infer correspondence.
+
+    PairAdaptiveEvidenceMixin records matrix links for hierarchy/similarity,
+    attribute-to-opposing-bank anchors, and difference-to-opposing-endpoint links.
+    An attribute hierarchy anchor omits family: it is admissible only if exactly
+    one selected feature across that opposite channel has the recorded alias.
+    """
+    provenance = record.get("cross_side_provenance")
+    if provenance is None:
+        return [], []
+    scopes = defaultdict(list)
+    for item in items:
+        scopes[
+            (item["side"], item["channel"], item.get("family"), item.get("historical_item_alias"))
+        ].append(item)
+    bridges, resolutions = [], []
+    artifacts = list(artifact_refs)
+
+    def resolve(side, channel, family, alias, *, family_unknown=False):
+        if not isinstance(alias, str) or not alias:
+            return None, "unresolved", "saved_item_alias_missing"
+        alias = "legacy:" + alias
+        if family_unknown:
+            matches = [
+                item
+                for (s, c, _, a), rows in scopes.items()
+                if (s, c, a) == (side, channel, alias)
+                for item in rows
+            ]
+        else:
+            matches = scopes.get((side, channel, family, alias), [])
+        if not matches:
+            return None, "unresolved", "saved_item_not_selected_in_scope"
+        if len(matches) != 1:
+            return None, "ambiguous", "saved_item_alias_not_unique_in_scope"
+        item = matches[0]
+        if item["entity"] != (source if side == "source" else target):
+            return None, "unresolved", "saved_item_typed_entity_mismatch"
+        return item, "resolved", "saved_item_identity_resolved"
+
+    def adapt(channel, location, raw, *, family=None, side=None, malformed=False):
+        record_id = canonical_hash({"pair": [source, target], "location": location, "record": raw})
+        result = dict(record_id=record_id, channel=channel, artifact_refs=artifacts)
+
+        def unavailable(status, reason):
+            resolutions.append(
+                RecordedComparisonResolution(
+                    **result, status=status, reason_code=reason
+                ).model_dump(mode="json")
+            )
+
+        if malformed or not isinstance(raw, dict):
+            unavailable("unsupported", "saved_comparison_shape_unsupported")
+            return
+        score = raw.get("score")
+        if type(score) not in (int, float) or not math.isfinite(score):
+            unavailable("unsupported", "saved_comparison_score_invalid")
+            return
+        if not artifacts:
+            unavailable("unresolved", "saved_comparison_artifact_unavailable")
+            return
+        resolved = {"source": None, "target": None}
+        failures = []
+        basis = None
+
+        def feature(which, chan, fam, alias, family_unknown=False):
+            value, status, reason = resolve(which, chan, fam, alias, family_unknown=family_unknown)
+            if status != "resolved":
+                failures.append((status, reason))
+            resolved[which] = value
+
+        if channel in {"hierarchy", "similarity"}:
+            if set(raw) != {"source_item_id", "target_item_id", "score"}:
+                unavailable("unsupported", "saved_matrix_link_shape_unsupported")
+                return
+            feature("source", channel, family, raw["source_item_id"])
+            feature("target", channel, family, raw["target_item_id"])
+            basis = "matrix_support"
+        elif channel == "lexical":
+            if set(raw) != {"source_ref", "target_ref", "score"} or (
+                raw["source_ref"],
+                raw["target_ref"],
+            ) != ("__source__", "__target__"):
+                unavailable("unsupported", "saved_lexical_endpoints_unsupported")
+                return
+            basis = "lexical_score"
+        elif channel in {"attributes", "difference"}:
+            if side not in {"source", "target"} or set(raw) != {
+                "item_id",
+                "anchor_kind",
+                "anchor_ref",
+                "score",
+            }:
+                unavailable("unsupported", "saved_anchor_shape_unsupported")
+                return
+            other = "target" if side == "source" else "source"
+            feature(side, channel, None, raw["item_id"])
+            anchor = raw["anchor_kind"]
+            if (channel == "difference" and anchor == "endpoint") or (
+                channel == "attributes" and anchor == "label"
+            ):
+                if raw["anchor_ref"] != "__" + other + "__":
+                    unavailable("unsupported", "saved_anchor_endpoint_differs")
+                    return
+            elif channel == "attributes" and anchor in {"hierarchy", "similarity", "attribute"}:
+                feature(
+                    other,
+                    "attributes" if anchor == "attribute" else anchor,
+                    None,
+                    raw["anchor_ref"],
+                    family_unknown=anchor == "hierarchy",
+                )
+            else:
+                unavailable("unsupported", "saved_anchor_kind_unsupported")
+                return
+            basis = "attribute_anchor" if channel == "attributes" else "difference_endpoint"
+        else:
+            unavailable("unsupported", "saved_comparison_channel_unsupported")
+            return
+        if failures:
+            status, reason = next((f for f in failures if f[0] == "ambiguous"), failures[0])
+            unavailable(status, reason)
+            return
+        values = {}
+        for which, item in resolved.items():
+            values.update(
+                {
+                    which + "_channel": item["channel"] if item else None,
+                    which + "_family": item.get("family") if item else None,
+                    which + "_evidence_ids": [item["evidence_id"]] if item else [],
+                    which + "_fact_ids": list(item["fact_ids"]) if item else [],
+                }
+            )
+        bridge = EvidenceBridge(
+            bridge_id=canonical_hash({"saved_comparison": record_id}),
+            level="feature_correspondence" if all(resolved.values()) else "channel_comparison",
+            channel=channel,
+            source=source,
+            target=target,
+            artifact_refs=artifacts,
+            comparison_basis=basis,
+            recorded_score=score,
+            **values,
+        ).model_dump(mode="json")
+        bridges.append(bridge)
+        resolutions.append(
+            RecordedComparisonResolution(
+                **result,
+                status="resolved",
+                reason_code="saved_comparison_identity_resolved",
+                bridge_id=bridge["bridge_id"],
+            ).model_dump(mode="json")
+        )
+
+    def rows(channel, payload, location, **scope):
+        if not isinstance(payload, list):
+            adapt(channel, location, payload, malformed=True)
+            return
+        for ordinal, raw in enumerate(payload):
+            adapt(channel, [*location, ordinal], raw, **scope)
+
+    if not isinstance(provenance, dict):
+        adapt("unknown", ["cross_side_provenance"], provenance, malformed=True)
+        return bridges, resolutions
+    for channel, payload in provenance.items():
+        location = ["cross_side_provenance", channel]
+        if channel in {"lexical", "similarity"}:
+            rows(channel, payload, location)
+        elif channel == "hierarchy" and isinstance(payload, dict):
+            for family, entries in payload.items():
+                rows(channel, entries, [*location, family], family=family)
+        elif channel in {"attributes", "difference"} and isinstance(payload, dict):
+            for side, entries in payload.items():
+                rows(channel, entries, [*location, side], side=side)
+        else:
+            adapt(
+                channel if channel in {"hierarchy", "attributes", "difference"} else "unknown",
+                location,
+                payload,
+                malformed=True,
+            )
+    return bridges, resolutions
+
+
 def pair_evidence_metadata(record, items, source, target, artifact_refs, events=()):
+    artifact_refs = list(artifact_refs)
     bridges = recorded_bridges(record, items, source, target, artifact_refs)
+    legacy, resolutions = legacy_recorded_bridges(record, items, source, target, artifact_refs)
+    bridges.extend(legacy)
+    resolved_counts = Counter(item["status"] for item in resolutions)
     explicit_empty = any(key in record for key in ("triple_attributions", "attributes"))
     protected = any(
         e.get("stage") == "prefilter" and e.get("reason_code") == "exact_match_protected"
@@ -244,8 +503,20 @@ def pair_evidence_metadata(record, items, source, target, artifact_refs, events=
     return PairEvidenceMetadata(
         status=status,
         counts=evidence_completeness(items),
-        bridge_status="recorded" if bridges else "not_recorded",
+        bridge_status="recorded" if bridges or resolutions else "not_recorded",
         bridges=bridges,
+        comparison_records=resolutions,
+        comparison_resolution=(
+            ComparisonResolutionCounts(
+                recorded=len(resolutions),
+                **{
+                    key: resolved_counts[key]
+                    for key in ("resolved", "unresolved", "ambiguous", "unsupported")
+                },
+            )
+            if "cross_side_provenance" in record
+            else None
+        ),
     ).model_dump(mode="json")
 
 
@@ -292,6 +563,7 @@ def filter_evidence_items(
             for key in (
                 "evidence_id",
                 "channel",
+                "family",
                 "side",
                 "role",
                 "entity",

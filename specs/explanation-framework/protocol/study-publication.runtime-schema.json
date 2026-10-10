@@ -2551,6 +2551,19 @@
           },
           "title": "Components",
           "type": "array"
+        },
+        "index_version": {
+          "anyOf": [
+            {
+              "const": "exact-workspace-index/2",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Index Version"
         }
       },
       "required": [

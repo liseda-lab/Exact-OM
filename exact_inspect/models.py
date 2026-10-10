@@ -385,6 +385,7 @@ class SelectedEvidence(WireModel):
 
     evidence_id: str
     channel: str
+    family: str | None = None
     side: Literal["source", "target"]
     role: str
     entity: EntityRef

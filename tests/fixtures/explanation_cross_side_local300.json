@@ -1,0 +1,671 @@
+{
+  "provenance": {
+    "description": "Unmodified selected evidence and cross-side provenance subset of the retained local300 matcher record; not newly scored or reconstructed.",
+    "run_manifest_sha256": "sha256:85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2",
+    "original_record_hash": "sha256:00b85022f9b522bd982d220ee3e0fc7da23de6d9cb00ccff77feaa4dbabbac48",
+    "retained_record_hash": "sha256:ade8d1fb97422b34825fe38a9cb8170ad0ea0e7b88798a2b3425bda892693bd4"
+  },
+  "record": {
+    "src_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+    "tgt_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+    "src_kind": "class",
+    "tgt_kind": "class",
+    "explanation_schema_version": 4,
+    "triple_attributions": {
+      "hierarchy": {
+        "is_a": {
+          "source": [
+            {
+              "triple": [
+                "Malignant Jejunal Neoplasm",
+                "is_a",
+                "Malignant Small Intestinal Neoplasm"
+              ],
+              "specificity": 1.0,
+              "subject_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+              "object_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7523",
+              "support": 0.9716796875,
+              "importance": 0.13996342664228442,
+              "item_id": "hierarchy-source-9bcca4229fba963c",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "Malignant Small Intestinal Neoplasm",
+                "is_a",
+                "Malignant Intestinal Neoplasm"
+              ],
+              "specificity": 0.5,
+              "subject_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7523",
+              "object_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4572",
+              "support": 0.9619140625,
+              "importance": 0.13855675903783937,
+              "item_id": "hierarchy-source-a7a30054696ec610",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "Malignant Small Intestinal Neoplasm",
+                "is_a",
+                "Small Intestinal Neoplasm"
+              ],
+              "specificity": 0.5,
+              "subject_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C7523",
+              "object_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C4432",
+              "support": 0.912109375,
+              "importance": 0.13138275425516951,
+              "item_id": "hierarchy-source-0a338334cf1f966b",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "Malignant Jejunal Neoplasm",
+                "is_a",
+                "Jejunal Neoplasm"
+              ],
+              "specificity": 1.0,
+              "subject_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+              "object_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C8401",
+              "support": 0.767578125,
+              "importance": 0.11056407370938247,
+              "item_id": "hierarchy-source-a0ac29f0b919377d",
+              "family": "is_a"
+            }
+          ],
+          "target": [
+            {
+              "triple": [
+                "small intestine carcinoid neuroendocrine tumor",
+                "is_a",
+                "small intestine cancer"
+              ],
+              "specificity": 1.0,
+              "subject_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+              "object_iri": "http://purl.obolibrary.org/obo/DOID_10154",
+              "support": 0.9716796875,
+              "importance": 0.13996342664228442,
+              "item_id": "hierarchy-target-ae63f9e449706434",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "small intestine cancer",
+                "is_a",
+                "intestinal cancer"
+              ],
+              "specificity": 0.5,
+              "subject_iri": "http://purl.obolibrary.org/obo/DOID_10154",
+              "object_iri": "http://purl.obolibrary.org/obo/DOID_10155",
+              "support": 0.9619140625,
+              "importance": 0.13855675903783937,
+              "item_id": "hierarchy-target-2edb565cde3f603a",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "small intestine carcinoid neuroendocrine tumor",
+                "is_a",
+                "neuroendocrine tumor"
+              ],
+              "specificity": 1.0,
+              "subject_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+              "object_iri": "http://purl.obolibrary.org/obo/DOID_169",
+              "support": 0.70703125,
+              "importance": 0.10184273456182304,
+              "item_id": "hierarchy-target-e92b4e6ac41252e9",
+              "family": "is_a"
+            },
+            {
+              "triple": [
+                "neuroendocrine tumor",
+                "is_a",
+                "endocrine gland cancer"
+              ],
+              "specificity": 0.5,
+              "subject_iri": "http://purl.obolibrary.org/obo/DOID_169",
+              "object_iri": "http://purl.obolibrary.org/obo/DOID_170",
+              "support": 0.6884765625,
+              "importance": 0.0991700661133774,
+              "item_id": "hierarchy-target-0bce2257b48b0448",
+              "family": "is_a"
+            }
+          ]
+        },
+        "part_of": {
+          "source": [],
+          "target": []
+        },
+        "has_part": {
+          "source": [],
+          "target": []
+        }
+      },
+      "similarity": {
+        "source": [],
+        "target": []
+      },
+      "difference": {
+        "source": [],
+        "target": [
+          {
+            "triple": [
+              "small intestine carcinoid neuroendocrine tumor",
+              "database_cross_reference",
+              "114900"
+            ],
+            "edge_ic": 1.0,
+            "subject_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+            "object_iri": "MIM:114900",
+            "rel_iri": "http://www.geneontology.org/formats/oboInOwl#hasDbXref",
+            "unsupported_mass": 1.0,
+            "importance": 0.45635082221613504,
+            "item_id": "difference-target-8533fb13e3972a8d"
+          },
+          {
+            "triple": [
+              "small intestine carcinoid neuroendocrine tumor",
+              "disease has location",
+              "small intestine"
+            ],
+            "edge_ic": 0.5956482943799585,
+            "subject_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+            "object_iri": "http://purl.obolibrary.org/obo/UBERON_0002108",
+            "rel_iri": "http://purl.obolibrary.org/obo/RO_0004026",
+            "unsupported_mass": 0.5956482943799585,
+            "importance": 0.2718245888919325,
+            "item_id": "difference-target-24cc6acbec8eb0f5"
+          },
+          {
+            "triple": [
+              "small intestine cancer",
+              "disease has location",
+              "small intestine"
+            ],
+            "edge_ic": 0.5956482943799585,
+            "subject_iri": "http://purl.obolibrary.org/obo/DOID_10154",
+            "object_iri": "http://purl.obolibrary.org/obo/UBERON_0002108",
+            "rel_iri": "http://purl.obolibrary.org/obo/RO_0004026",
+            "unsupported_mass": 0.5956482943799585,
+            "importance": 0.2718245888919325,
+            "item_id": "difference-target-673f70c93845e1eb"
+          }
+        ]
+      }
+    },
+    "attributes": {
+      "source": [
+        {
+          "item_id": "attribute-source-1234124119f560fb",
+          "property": "DEFINITION",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P97",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "A primary or metastatic malignant neoplasm that affects the jejunum.",
+          "text": "DEFINITION: A primary or metastatic malignant neoplasm that affects the jejunum.",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.880859375,
+          "weight": 0.7876096554855484,
+          "importance": 0.1683772893709814
+        },
+        {
+          "item_id": "attribute-source-c2d7e23160a07c2a",
+          "property": "Maps_To",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P375",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant neoplasm of jejunum",
+          "text": "Maps_To: Malignant neoplasm of jejunum",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.86767578125,
+          "weight": 0.2643169708683548,
+          "importance": 0.05566066942895382
+        },
+        {
+          "item_id": "attribute-source-27c61e55c9de8bba",
+          "property": "FULL_SYN",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant neoplasm of jejunum",
+          "text": "FULL_SYN: Malignant neoplasm of jejunum",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.8740234375,
+          "weight": 0.2643169708683548,
+          "importance": 0.05606786622275033
+        },
+        {
+          "item_id": "attribute-source-014f7f8f1cca8050",
+          "property": "Preferred_Name",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P108",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant Jejunal Neoplasm",
+          "text": "Preferred_Name: Malignant Jejunal Neoplasm",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.876953125,
+          "weight": 0.22767024287973997,
+          "importance": 0.048456110619332755
+        },
+        {
+          "item_id": "attribute-source-9f7f14c49729d55b",
+          "property": "FULL_SYN",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P90",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant Jejunal Neoplasm",
+          "text": "FULL_SYN: Malignant Jejunal Neoplasm",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.87451171875,
+          "weight": 0.22767024287973997,
+          "importance": 0.04832121053408962
+        },
+        {
+          "item_id": "attribute-source-4c48cc515a117ee2",
+          "property": "label",
+          "property_iri": "rdfs:label",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant Jejunal Neoplasm",
+          "text": "label: Malignant Jejunal Neoplasm",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.9189453125,
+          "weight": 0.22767024287973997,
+          "importance": 0.050776392085514606
+        },
+        {
+          "item_id": "attribute-source-18eebd41b7eea0e8",
+          "property": "Semantic_Type",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P106",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Neoplastic Process",
+          "text": "Semantic_Type: Neoplastic Process",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.83984375,
+          "weight": 0.1804244015087959,
+          "importance": 0.036775591713050074
+        },
+        {
+          "item_id": "attribute-source-7abef52e8289400b",
+          "property": "code",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#NHC0",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "C170919",
+          "text": "code: C170919",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.869140625,
+          "weight": 0.182136194303792,
+          "importance": 0.03841954427724379
+        },
+        {
+          "item_id": "attribute-source-fbee7813125595a7",
+          "property": "NCI_META_CUI",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P208",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "CL1383062",
+          "text": "NCI_META_CUI: CL1383062",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.87109375,
+          "weight": 0.11383512143986999,
+          "importance": 0.02406617520737462
+        },
+        {
+          "item_id": "attribute-source-30d4dcf917dfb5db",
+          "property": "Contributing_Source",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P322",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "mCode",
+          "text": "Contributing_Source: mCode",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.828125,
+          "weight": 0.11383512143986999,
+          "importance": 0.022879054457235065
+        },
+        {
+          "item_id": "attribute-source-ccd8a61b471f4d3f",
+          "property": "Neoplastic_Status",
+          "property_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P363",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "Malignant",
+          "text": "Neoplastic_Status: Malignant",
+          "entity_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C170919",
+          "provenance_items": [],
+          "support": 0.8271484375,
+          "weight": 0.11383512143986999,
+          "importance": 0.022852074440186436
+        }
+      ],
+      "target": [
+        {
+          "item_id": "attribute-target-ac12470a0d027cb4",
+          "property": "definition",
+          "property_iri": "http://purl.obolibrary.org/obo/IAO_0000115",
+          "datatype": null,
+          "language": "en",
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "A neuroendocrine tumor that has_material_basis_in cells of the neuroendocrine system and that is located in the small intestine.",
+          "text": "definition: A neuroendocrine tumor that has_material_basis_in cells of the neuroendocrine system and that is located in the small intestine.",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.876953125,
+          "weight": 0.9671266713355484,
+          "importance": 0.20583804179405427
+        },
+        {
+          "item_id": "attribute-target-e9596307001e9399",
+          "property": "label",
+          "property_iri": "rdfs:label",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "small intestine carcinoid neuroendocrine tumor",
+          "text": "label: small intestine carcinoid neuroendocrine tumor",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.9189453125,
+          "weight": 0.29425952294866586,
+          "importance": 0.06562753534738536
+        },
+        {
+          "item_id": "attribute-target-4d5750b2465ee9a6",
+          "property": "has_broad_synonym",
+          "property_iri": "http://www.geneontology.org/formats/oboInOwl#hasBroadSynonym",
+          "datatype": null,
+          "language": "en",
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "intestinal carcinoid tumour",
+          "text": "has_broad_synonym: intestinal carcinoid tumour",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.876953125,
+          "weight": 0.22767024287973997,
+          "importance": 0.048456110619332755
+        },
+        {
+          "item_id": "attribute-target-da7232211dc9c778",
+          "property": "creation_date",
+          "property_iri": "http://www.geneontology.org/formats/oboInOwl#creation_date",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "2014-10-21T12:58:08Z",
+          "text": "creation_date: 2014-10-21T12:58:08Z",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.80224609375,
+          "weight": 0.11383512143986999,
+          "importance": 0.022164084005446467
+        },
+        {
+          "item_id": "attribute-target-f1a53a3ae41a10d8",
+          "property": "database_cross_reference",
+          "property_iri": "http://www.geneontology.org/formats/oboInOwl#hasDbXref",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "MIM:114900",
+          "text": "database_cross_reference: MIM:114900",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.859375,
+          "weight": 0.11383512143986999,
+          "importance": 0.0237424150027911
+        },
+        {
+          "item_id": "attribute-target-ad5b27a63efce666",
+          "property": "has_obo_namespace",
+          "property_iri": "http://www.geneontology.org/formats/oboInOwl#hasOBONamespace",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "disease_ontology",
+          "text": "has_obo_namespace: disease_ontology",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.8330078125,
+          "weight": 0.11383512143986999,
+          "importance": 0.023013954542478194
+        },
+        {
+          "item_id": "attribute-target-bd4405062d903153",
+          "property": "id",
+          "property_iri": "http://www.geneontology.org/formats/oboInOwl#id",
+          "datatype": null,
+          "language": null,
+          "identifier_namespace": "",
+          "identifier_normalized": "",
+          "value": "DOID:0050925",
+          "text": "id: DOID:0050925",
+          "entity_iri": "http://purl.obolibrary.org/obo/DOID_0050925",
+          "provenance_items": [],
+          "support": 0.87109375,
+          "weight": 0.182136194303792,
+          "importance": 0.038505880331799386
+        }
+      ]
+    },
+    "cross_side_provenance": {
+      "lexical": [
+        {
+          "source_ref": "__source__",
+          "target_ref": "__target__",
+          "score": 0.71923828125
+        }
+      ],
+      "hierarchy": {
+        "is_a": [
+          {
+            "source_item_id": "hierarchy-source-9bcca4229fba963c",
+            "target_item_id": "hierarchy-target-ae63f9e449706434",
+            "score": 0.9716796875
+          },
+          {
+            "source_item_id": "hierarchy-source-a7a30054696ec610",
+            "target_item_id": "hierarchy-target-2edb565cde3f603a",
+            "score": 0.9619140625
+          },
+          {
+            "source_item_id": "hierarchy-source-0a338334cf1f966b",
+            "target_item_id": "hierarchy-target-ae63f9e449706434",
+            "score": 0.912109375
+          },
+          {
+            "source_item_id": "hierarchy-source-a0ac29f0b919377d",
+            "target_item_id": "hierarchy-target-ae63f9e449706434",
+            "score": 0.767578125
+          },
+          {
+            "source_item_id": "hierarchy-source-0a338334cf1f966b",
+            "target_item_id": "hierarchy-target-e92b4e6ac41252e9",
+            "score": 0.70703125
+          },
+          {
+            "source_item_id": "hierarchy-source-a7a30054696ec610",
+            "target_item_id": "hierarchy-target-0bce2257b48b0448",
+            "score": 0.6884765625
+          }
+        ]
+      },
+      "similarity": [],
+      "attributes": {
+        "source": [
+          {
+            "item_id": "attribute-source-1234124119f560fb",
+            "anchor_kind": "hierarchy",
+            "anchor_ref": "hierarchy-target-2edb565cde3f603a",
+            "score": 0.880859375
+          },
+          {
+            "item_id": "attribute-source-c2d7e23160a07c2a",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-e9596307001e9399",
+            "score": 0.86767578125
+          },
+          {
+            "item_id": "attribute-source-27c61e55c9de8bba",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-4d5750b2465ee9a6",
+            "score": 0.8740234375
+          },
+          {
+            "item_id": "attribute-source-014f7f8f1cca8050",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-4d5750b2465ee9a6",
+            "score": 0.876953125
+          },
+          {
+            "item_id": "attribute-source-9f7f14c49729d55b",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-4d5750b2465ee9a6",
+            "score": 0.87451171875
+          },
+          {
+            "item_id": "attribute-source-4c48cc515a117ee2",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-e9596307001e9399",
+            "score": 0.9189453125
+          },
+          {
+            "item_id": "attribute-source-18eebd41b7eea0e8",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-4d5750b2465ee9a6",
+            "score": 0.83984375
+          },
+          {
+            "item_id": "attribute-source-7abef52e8289400b",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-bd4405062d903153",
+            "score": 0.869140625
+          },
+          {
+            "item_id": "attribute-source-fbee7813125595a7",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-bd4405062d903153",
+            "score": 0.87109375
+          },
+          {
+            "item_id": "attribute-source-30d4dcf917dfb5db",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-f1a53a3ae41a10d8",
+            "score": 0.828125
+          },
+          {
+            "item_id": "attribute-source-ccd8a61b471f4d3f",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-target-4d5750b2465ee9a6",
+            "score": 0.8271484375
+          }
+        ],
+        "target": [
+          {
+            "item_id": "attribute-target-ac12470a0d027cb4",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-1234124119f560fb",
+            "score": 0.876953125
+          },
+          {
+            "item_id": "attribute-target-e9596307001e9399",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-4c48cc515a117ee2",
+            "score": 0.9189453125
+          },
+          {
+            "item_id": "attribute-target-4d5750b2465ee9a6",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-014f7f8f1cca8050",
+            "score": 0.876953125
+          },
+          {
+            "item_id": "attribute-target-da7232211dc9c778",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-30d4dcf917dfb5db",
+            "score": 0.80224609375
+          },
+          {
+            "item_id": "attribute-target-f1a53a3ae41a10d8",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-fbee7813125595a7",
+            "score": 0.859375
+          },
+          {
+            "item_id": "attribute-target-ad5b27a63efce666",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-18eebd41b7eea0e8",
+            "score": 0.8330078125
+          },
+          {
+            "item_id": "attribute-target-bd4405062d903153",
+            "anchor_kind": "attribute",
+            "anchor_ref": "attribute-source-fbee7813125595a7",
+            "score": 0.87109375
+          }
+        ]
+      },
+      "difference": {
+        "source": [],
+        "target": [
+          {
+            "item_id": "difference-target-8533fb13e3972a8d",
+            "anchor_kind": "endpoint",
+            "anchor_ref": "__source__",
+            "score": 1.0
+          },
+          {
+            "item_id": "difference-target-24cc6acbec8eb0f5",
+            "anchor_kind": "endpoint",
+            "anchor_ref": "__source__",
+            "score": 0.5956482943799585
+          },
+          {
+            "item_id": "difference-target-673f70c93845e1eb",
+            "anchor_kind": "endpoint",
+            "anchor_ref": "__source__",
+            "score": 0.5956482943799585
+          }
+        ]
+      }
+    }
+  }
+}

@@ -17,6 +17,8 @@ from .evidence_metadata import (
     filter_pair_metadata,
 )
 
+POLICY_EXPORTER_REVISION = "exact-policy-decisions/4"
+
 
 def export_policy_run(
     source: DecisionStore,
@@ -84,7 +86,7 @@ def export_policy_run(
             {
                 "source_revision": manifest["revision"],
                 "policy_hash": policy.policy_hash,
-                "exporter": "exact-policy-decisions/2",
+                "exporter": POLICY_EXPORTER_REVISION,
             }
         ),
         "counts": {

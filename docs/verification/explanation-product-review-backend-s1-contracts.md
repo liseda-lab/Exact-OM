@@ -178,6 +178,36 @@ recorded IDs/provenance. A frontend must not fabricate a bridge from matching ch
 including source-only channels. Original records remain inspectable when graph projection is
 unsupported. Preserve list/graph identity and distinguish added context from matcher evidence.
 
+### Recorded comparison metadata in both workspaces
+
+The main `/api/v1/runs/{run_id}/pair` response and authorised study
+`/api/v1/study/workspace/{scope_id}/evidence-metadata?candidate_id=...` expose the same
+`exact-evidence-metadata/1` value. The study response contains `candidate_id`, typed `source`,
+typed `target`, and `evidence_metadata`. It repeats the current stage/condition/session/
+presentation checks; a baseline or alien-candidate request receives 403.
+
+Check the study scope capability `evidence_metadata_contract` before requesting this route.
+A legacy index reports null and the route returns 404, meaning not exported. New metadata
+indexes use `exact-workspace-index/2`; the optional index version is omitted when serializing
+old scopes, preserving historical publication hashes. Neither absence nor failure creates a
+comparison bridge in the client.
+
+The importer now reads the producer's retained `cross_side_provenance`. Matrix feature links
+resolve by side, typed entity, channel, hierarchy family and exact saved alias. Attribute anchors
+may cross channels; an omitted hierarchy family is resolved only when one selected feature
+matches. Lexical entity-to-entity and difference feature-to-entity links remain
+`channel_comparison`, not paired original facts. `source_channel`, `target_channel` and their
+family fields describe each side. `comparison_basis` distinguishes `matrix_support`,
+`attribute_anchor`, `difference_endpoint`, and `lexical_score`. `recorded_score` is a matcher
+metric, not equivalence or a calibrated correctness probability.
+
+Every retained legacy comparison gets a `comparison_records` entry with a hashed identity and
+`resolved`, `unresolved`, `ambiguous`, or `unsupported` status; `comparison_resolution` conserves
+that inventory. Missing mappings cannot become `not_recorded`. Unavailable originals cause
+withheld bridge support while retaining the recorded comparison identity. S2 must inspect both
+identity-resolution status and bridge visibility, and must not draw an unsupported feature
+correspondence from shared channel names.
+
 ## Forms/3 and restricted analysis
 
 Use server-ordered definitions, conditional question IDs, new dictionaries and validation.
@@ -249,3 +279,11 @@ Consume actual frozen tutorial/evidence identities, preserve the accepted assess
 and finish F02/F08/F09 presentation work against the real bundle. Then perform the complete
 browser journey and side-by-side rendered Q01–Q12 checks. Backend HTTP/regression results are
 not frontend accessibility, usability or joint acceptance. Protégé remains a recommendation.
+
+Decision adapter `decision-adapter/6` retains the complete verified `dependencies` map in the
+run manifest and declares its canonical `dependency_inventory_hash` under
+`exact-decision-dependency-inventory/1`. Legacy/default bridge and comparison-resolution
+`artifact_refs` contain that inventory hash; resolve it against the same verified run manifest
+to obtain the original dependency hashes. It denotes an inventory reference, not a newly
+recorded producer file. Explicit producer artifact references remain unchanged. Admission checks
+the declared inventory schema and recomputed hash, so missing or altered inventories fail closed.

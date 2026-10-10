@@ -2240,6 +2240,45 @@
         ],
         "title": "ClaimReviewDecision"
       },
+      "ComparisonResolutionCounts": {
+        "properties": {
+          "recorded": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Recorded"
+          },
+          "resolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Resolved"
+          },
+          "unresolved": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unresolved"
+          },
+          "ambiguous": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ambiguous"
+          },
+          "unsupported": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Unsupported"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "recorded",
+          "resolved",
+          "unresolved",
+          "ambiguous",
+          "unsupported"
+        ],
+        "title": "ComparisonResolutionCounts"
+      },
       "EntityContextResponse": {
         "properties": {
           "artifact_type": {
@@ -2547,6 +2586,79 @@
           "channel": {
             "type": "string",
             "title": "Channel"
+          },
+          "source_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Channel"
+          },
+          "target_channel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Channel"
+          },
+          "source_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Family"
+          },
+          "target_family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Family"
+          },
+          "comparison_basis": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "matrix_support",
+                  "attribute_anchor",
+                  "difference_endpoint",
+                  "lexical_score"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparison Basis"
+          },
+          "recorded_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded Score",
+            "description": "Saved matcher comparison metric; not semantic equivalence or calibrated probability."
           },
           "source": {
             "$ref": "#/components/schemas/EntityRef"
@@ -4727,6 +4839,23 @@
             "type": "array",
             "title": "Bridges"
           },
+          "comparison_records": {
+            "items": {
+              "$ref": "#/components/schemas/RecordedComparisonResolution"
+            },
+            "type": "array",
+            "title": "Comparison Records"
+          },
+          "comparison_resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ComparisonResolutionCounts"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "scope": {
             "type": "string",
             "enum": [
@@ -5096,6 +5225,68 @@
           "scope"
         ],
         "title": "PreparedHierarchyPage"
+      },
+      "RecordedComparisonResolution": {
+        "properties": {
+          "record_id": {
+            "type": "string",
+            "title": "Record Id"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "lexical",
+              "hierarchy",
+              "similarity",
+              "attributes",
+              "difference",
+              "unknown"
+            ],
+            "title": "Channel"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "resolved",
+              "unresolved",
+              "ambiguous",
+              "unsupported"
+            ],
+            "title": "Status"
+          },
+          "reason_code": {
+            "type": "string",
+            "title": "Reason Code"
+          },
+          "bridge_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bridge Id"
+          },
+          "artifact_refs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Artifact Refs"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "record_id",
+          "channel",
+          "status",
+          "reason_code"
+        ],
+        "title": "RecordedComparisonResolution",
+        "description": "A saved comparison's identity resolution, without exposing raw legacy aliases."
       },
       "ReviewBundleSummary": {
         "properties": {
@@ -5472,6 +5663,17 @@
           "channel": {
             "type": "string",
             "title": "Channel"
+          },
+          "family": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Family"
           },
           "side": {
             "type": "string",

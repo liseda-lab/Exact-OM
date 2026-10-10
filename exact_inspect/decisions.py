@@ -33,7 +33,13 @@ _SCORE_MEANINGS = {
 }
 
 
-ADAPTER_REVISION = "decision-adapter/4"
+ADAPTER_REVISION = "decision-adapter/6"
+DEPENDENCY_INVENTORY_SCHEMA = "exact-decision-dependency-inventory/1"
+
+
+def dependency_inventory_hash(dependencies):
+    """Content address the complete verified run dependency map, without repeating it."""
+    return canonical_hash({"schema": DEPENDENCY_INVENTORY_SCHEMA, "dependencies": dependencies})
 
 
 def _score(name, value, stage):
@@ -185,6 +191,7 @@ def selected_evidence(record, source, target, *, resolver=None):
                     }
                 ),
                 "channel": channel,
+                "family": family,
                 "side": side,
                 "role": semantic.get("role", family or channel),
                 "entity": entity,
@@ -419,6 +426,7 @@ def import_run(
     if database.exists():
         raise DomainError("artifact_conflict", "Decision package already exists.", 409)
     counts = {"pairs": 0, "selected_evidence": 0, "provenance_unavailable": 0}
+    inventory_hash = dependency_inventory_hash(dependencies)
     with sqlite3.connect(database) as connection:
         connection.executescript("""CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
             source_kind TEXT NOT NULL, target TEXT NOT NULL, target_kind TEXT NOT NULL,
@@ -491,7 +499,7 @@ def import_run(
             }
             evidence = selected_evidence(record, source, target, resolver=evidence_resolver)
             trace["evidence_metadata"] = pair_evidence_metadata(
-                record, evidence, source, target, dependencies.values(), recorded
+                record, evidence, source, target, [inventory_hash], recorded
             )
             counts["pairs"] += 1
             counts["selected_evidence"] += len(evidence)
@@ -616,6 +624,13 @@ def import_run(
             canonical_hash(anchor): anchor for anchor in producer.get("relation_anchors", [])
         },
         "dependencies": dependencies,
+        "dependency_inventory_schema": DEPENDENCY_INVENTORY_SCHEMA,
+        "dependency_inventory_hash": inventory_hash,
+        "comparison_artifact_ref_semantics": {
+            "legacy_and_default": "dependency_inventory_hash",
+            "explicit_producer_refs": "as_recorded",
+            "inventory": "Complete verified dependencies map in this manifest; not a new producer file.",
+        },
         "counts": counts,
         "database": "decisions.sqlite",
         "database_hash": file_hash(database),
@@ -634,6 +649,15 @@ class DecisionStore:
     def __init__(self, directory: Path):
         self.directory = Path(directory)
         self._manifest = read_metadata(self.directory / "decisions.manifest.json")
+        if (
+            self._manifest.get("implementation") == "decision-adapter/6"
+            or "dependency_inventory_hash" in self._manifest
+        ) and (
+            self._manifest.get("dependency_inventory_schema") != DEPENDENCY_INVENTORY_SCHEMA
+            or self._manifest.get("dependency_inventory_hash")
+            != dependency_inventory_hash(self._manifest.get("dependencies"))
+        ):
+            raise DomainError("artifact_conflict", "Decision dependency inventory changed.", 409)
         if self._manifest.get("database") != "decisions.sqlite":
             raise DomainError("invalid_manifest", "Unsupported decision database locator", 422)
         self.database = relative_path(self.directory, self._manifest["database"])
