@@ -1,13 +1,17 @@
 # Exact-OM experiment programme v2
 
-**Implementation and design specification, 2026-10-09 — not deployed:**
-[200-pair/s scoring contract](SCORING-THROUGHPUT-200.md) specifies the implementation,
-parity, throughput, storage and recovery work. [Final-study correction](FINAL-STUDY-CORRECTION-20261009.md)
-specifies 12 full primary Exact-OM cells, up to two primary-pair label-free controls,
-three unique published comparisons and separately bounded diagnostics. The
-[machine-readable plan](throughput-final-plan-20261009.yaml) records dependencies and
-unmet acceptance gates. These are prospective specifications: active G4, historical locks,
-live final successors and spending allowances have not been changed by this documentation.
+**Implementation update, 2026-10-10 — not deployed:**
+[Implementation handoff and measured evidence](THROUGHPUT-IMPLEMENTATION-20261009.md)
+records cache/scoring/storage changes, fitted-artifact deployment and corrected
+successor preparation. 748 CPU regression tests passed on the final frozen source.
+Experimental batching
+measured 12.103 cold unique pairs/s on RTX 2060 SUPER but failed exact evidence
+parity and is blocked from scientific use. RTX 4090 qualification is deferred
+until G4 finishes. [The 200-pair/s contract](SCORING-THROUGHPUT-200.md),
+[corrected 12 + up-to-2 + 3 full-run design](FINAL-STUDY-CORRECTION-20261009.md) and
+[machine-readable status](throughput-final-plan-20261009.yaml) retain their
+acceptance gates. Active G4, historical locks, live successors and allowances
+were preserved. Actual selection/fits, H2 validation and rollout are pending.
 
 **Current hosted spending amendment, 2026-10-05:**
 [Prompt and spending safety](HOSTED-SPENDING-SAFETY.md) supersedes the historical

@@ -1,0 +1,759 @@
+{
+  "G4_fusion_replay": {
+    "counts": {
+      "double_fail": 84066,
+      "float32_fail": 84115,
+      "mixed_fail": 0,
+      "remaining": 0,
+      "rows": 202212
+    },
+    "max_error": {
+      "double": 2.0943445775856162e-05,
+      "float32": 2.092123031616211e-05,
+      "mixed": 2.384185791015625e-07
+    },
+    "receipt": {
+      "path": "data/experiments-v2/throughput-20261009-01/G4-fusion-replay-audit.json",
+      "sha256": "47ba1cc2bc53adf0aac5f9b831e1a60f3c00ded37013e6436bda37cec537a198"
+    },
+    "scope": {
+      "aggregate_role": "public_development_training",
+      "columns_used": [
+        "fusion_channels",
+        "S_base"
+      ],
+      "fit_performed": false,
+      "gpu_work": false,
+      "hosted_requests": 0,
+      "label_values_used": false,
+      "live_state_mutated": false,
+      "other_aggregate_fields_discarded": true,
+      "reference_files_read": false
+    }
+  },
+  "forecast": {
+    "conditional_top20_work": {
+      "actual_reuse_fraction": null,
+      "actual_unique_numerical_pairs": null,
+      "conditions": "unchanged top20 recipe; before exact prefilter, overlap and reuse; excludes fitting/bounded/component/LogMap work",
+      "per_case": {
+        "H0": {
+          "global_cap_per_arm": 4127580,
+          "local_occurrences_per_arm": 181900,
+          "local_unique_pairs_per_arm": 179223
+        },
+        "H1": {
+          "global_cap_per_arm": 7719460,
+          "local_occurrences_per_arm": 341400,
+          "local_unique_pairs_per_arm": 321391
+        },
+        "H2": {
+          "global_cap_per_arm": 7719460,
+          "local_occurrences_per_arm": 1091100,
+          "local_unique_pairs_per_arm": 1068036
+        }
+      },
+      "primary_occurrences_cap": 42361800,
+      "with_H0_label_free_cap": 46671280
+    },
+    "hosted_sensitivities": [
+      {
+        "observed_averages_do_not_bound_unknown_exposure": true,
+        "primary_decision_requests": 42361.8,
+        "primary_decision_service_seconds": 28914.836012146734,
+        "primary_decision_tokens": 101753658.43327643,
+        "primary_decision_usd": 15.282111574991463,
+        "route_fraction_assumption": 0.001,
+        "unknown_token_attempts": 0,
+        "unpriced_attempts": 0
+      },
+      {
+        "observed_averages_do_not_bound_unknown_exposure": true,
+        "primary_decision_requests": 423618.0,
+        "primary_decision_service_seconds": 289148.3601214673,
+        "primary_decision_tokens": 1017536584.3327641,
+        "primary_decision_usd": 152.8211157499146,
+        "route_fraction_assumption": 0.01,
+        "unknown_token_attempts": 0,
+        "unpriced_attempts": 0
+      },
+      {
+        "observed_averages_do_not_bound_unknown_exposure": true,
+        "primary_decision_requests": 4236180.0,
+        "primary_decision_service_seconds": 2891483.6012146734,
+        "primary_decision_tokens": 10175365843.327642,
+        "primary_decision_usd": 1528.2111574991463,
+        "route_fraction_assumption": 0.1,
+        "unknown_token_attempts": 0,
+        "unpriced_attempts": 0
+      }
+    ],
+    "not_execution_admission": true,
+    "receipt": {
+      "path": "data/experiments-v2/throughput-20261009-01/forecast-05.json",
+      "sha256": "7089797c738019108b1123e53372fa00d5500469bfa5eb6e23ae39599b71d89b"
+    },
+    "remaining_whole_program": {
+      "gpu_hours": null,
+      "physical_bytes": null,
+      "tokens": null,
+      "usd": null,
+      "wall_seconds": null
+    },
+    "scoring_storage_scenarios": [
+      {
+        "cold_pairs_per_second": 1.9176691287735244,
+        "cold_unique_pairs": 198,
+        "conditional_primary_cap_evidence_bytes": 241887589587.87878,
+        "conditional_primary_cap_scoring_days": 255.67424732163747,
+        "conditional_with_control_cap_evidence_bytes": 266494894508.28284,
+        "conditional_with_control_cap_scoring_days": 281.6840735175888,
+        "durable_physical_bytes_per_row": 5710.040404040404,
+        "execution_flags": {
+          "EXACT_PAIR_CONTEXT_BATCHING": "0",
+          "EXACT_PAIR_CONTEXT_BLOCK_PAIRS": null,
+          "EXACT_PAIR_CONTEXT_TEXT_BATCH": null
+        },
+        "extrapolation_scope": "measured sample rate applied to conditional occurrence cap; not whole-program ETA or bound on slower unseen work",
+        "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+        "minimum_contract_met": false,
+        "model_loading_seconds": 16.777175437193364,
+        "native_preparation_seconds": 555.3244085470214,
+        "observed_parity_status": "passed_exact_198_pair_default_prefix_only_final_source_fitted_recipes_pending",
+        "parity_receipt": {
+          "path": "data/experiments-v2/throughput-20261009-01/H0-default-parity-01.json",
+          "sha256": "5e0f490d8e9557f5871e4ef9c7ba21a567a01f943fca98ce7648597fb8e651e9"
+        },
+        "rate_is_approved_deployment_forecast": false,
+        "receipt": {
+          "path": "/home/pgcotovio/Exact-OM/data/experiments-v2/throughput-20261009-01/legacy-H0-t2/measurement.json",
+          "sha256": "64018b98d384f21de92d287f66b7c5108e1afcc0194d7bfc4ab2c3e6311737fd"
+        },
+        "replay_rows_per_second": 36.902425494023376,
+        "scientific_acceptance": "requires_separate_exact_parity_receipt",
+        "source_revision": "5cd906b210696b06dc204cb126861450aec087f2",
+        "warm_rows_per_second": 12.15694004407536
+      },
+      {
+        "cold_pairs_per_second": 12.103116920224899,
+        "cold_unique_pairs": 5997,
+        "conditional_primary_cap_evidence_bytes": 177232557560.85022,
+        "conditional_primary_cap_scoring_days": 40.51011110136417,
+        "conditional_with_control_cap_evidence_bytes": 195262484574.27582,
+        "conditional_with_control_cap_scoring_days": 44.63121817398872,
+        "durable_physical_bytes_per_row": 4183.782501235788,
+        "execution_flags": {
+          "EXACT_PAIR_CONTEXT_BATCHING": "1",
+          "EXACT_PAIR_CONTEXT_BLOCK_PAIRS": null,
+          "EXACT_PAIR_CONTEXT_TEXT_BATCH": null
+        },
+        "extrapolation_scope": "measured sample rate applied to conditional occurrence cap; not whole-program ETA or bound on slower unseen work",
+        "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+        "minimum_contract_met": true,
+        "model_loading_seconds": 0.845901754219085,
+        "native_preparation_seconds": 557.1216605291702,
+        "observed_parity_status": "failed_evidence_parity_scientific_use_rejected",
+        "parity_receipt": {
+          "path": "data/experiments-v2/throughput-20261009-01/H0-parity-prefix-01.json",
+          "sha256": "8d3a503620071ed96b95a9046cdf60214e82fcf3aa1219cfdef8b9f596676a39"
+        },
+        "rate_is_approved_deployment_forecast": false,
+        "receipt": {
+          "path": "/home/pgcotovio/Exact-OM/data/experiments-v2/throughput-20261009-01/candidate-H0-t2/measurement.json",
+          "sha256": "d4b0bae1255a2ef59594199eb009e5236275acfb890a5b8dc1e31e89ea227488"
+        },
+        "replay_rows_per_second": 39.08372662526805,
+        "scientific_acceptance": "requires_separate_exact_parity_receipt",
+        "source_revision": "5cd906b210696b06dc204cb126861450aec087f2",
+        "warm_rows_per_second": 42.63373941608914
+      }
+    ],
+    "unresolved_dependencies": [
+      "corrected G4 selection and seed-specific fitted artifact freeze",
+      "actual full global retrieval, exact prefilter and cross-mode reuse identities",
+      "unique fits, missing texts and bounded/component physical executions",
+      "per-case/per-path GPU parity and measured rates",
+      "current-recipe hosted route fractions, tokens, rate limits and retries",
+      "native preparation, retrieval, fitting, global extraction, output, recovery and LogMap rates",
+      "complete all-root storage growth including atomic replacements"
+    ]
+  },
+  "implementation_commits": [
+    {
+      "commit": "9044d1b41626968c505c2e18634bd6f3b2b5c836",
+      "subject": "fix(experiments): reconcile reviewed G4 public input freeze contracts"
+    },
+    {
+      "commit": "a22e211e1f02a0ce59987833940a82475c8f62a9",
+      "subject": "feat(benchmarks): freeze public workloads and count complete numerical scoring"
+    },
+    {
+      "commit": "0ea59624fe8e4cfc812673e5823e6967a49cea83",
+      "subject": "fix(storage): verify durable evidence frames and guard all output roots"
+    },
+    {
+      "commit": "3f702001ba847394622ec130e3326c3c52091860",
+      "subject": "fix(inference): preserve complete query routing and compact resident evidence"
+    },
+    {
+      "commit": "0eb61e8f5454d32f1ff250360f2e43c9ad6c30d6",
+      "subject": "fix(benchmarks): enforce offline loading before model imports"
+    },
+    {
+      "commit": "ce5658fd3abf81c04be5f11fdff4e203bb14930e",
+      "subject": "perf(extraction): reduce global competition in bounded disk indexes"
+    },
+    {
+      "commit": "260795861387411d15f75f3c1b48c96e6183de7c",
+      "subject": "perf(cache): batch hosted scopes and retain verified encoder stores"
+    },
+    {
+      "commit": "858cf84fba3e075bfec6fe04ab8127876ac04d40",
+      "subject": "perf(scoring): stage pair evidence and batch selected context encoding"
+    },
+    {
+      "commit": "5cd906b210696b06dc204cb126861450aec087f2",
+      "subject": "feat(benchmarks): separate warm vectors and replay with cache counters"
+    },
+    {
+      "commit": "e56ebb524d08f95410072b0d32cfd4d1d3e837b6",
+      "subject": "fix(deployment): freeze actual fitted heads and retain empty query membership"
+    },
+    {
+      "commit": "87eb8d9028e3afdaac6a0452d9e49538b3bb007c",
+      "subject": "feat(experiments): prepare corrected mixed-scale successor with scientific admission gates"
+    },
+    {
+      "commit": "e5c611b0068d61d5d967951492f50a5fedebf39b",
+      "subject": "fix(storage): stream replacements and retain published recovery payloads"
+    },
+    {
+      "commit": "f4dfbdf8979f93f5274d7aac4bae9284d106a55f",
+      "subject": "test(scoring): enforce complete work counts and per-query decision parity"
+    },
+    {
+      "commit": "06b41079b50e50db74662d58d897780dd91f2c64",
+      "subject": "fix(experiments): require complete G4 parity before quality reuse"
+    },
+    {
+      "commit": "b90ecf8b9b50a150bf248194049f6227cf86ede3",
+      "subject": "test(fitting): use structured train-only exemplar evidence fixture"
+    },
+    {
+      "commit": "f4bb9e77424581ba595accd65356887d3e6e1c5e",
+      "subject": "feat(benchmarks): record natural stress coverage and routing counters"
+    },
+    {
+      "commit": "50e3f81b29ed08ae4424ee5248e175621f943c63",
+      "subject": "fix(cache): bind training reuse to real dependencies and bound physical cache writes"
+    },
+    {
+      "commit": "9ef275e57313b90950ffb7c4a859d86cfd22866e",
+      "subject": "fix(experiments): bind successor deployments to corrected fitting recipes"
+    },
+    {
+      "commit": "7dedbbc54c852f7b966bae459def344c87316fb1",
+      "subject": "perf(audit): index source mapping decisions once before durable output"
+    },
+    {
+      "commit": "9fc44447d7d9853bd4f7c06e38b48e1286d8a0f6",
+      "subject": "test(cache): verify label-independent encoder reuse across reporting roles"
+    },
+    {
+      "commit": "d05a89b32e18b68c9539ab775b512d46f2b0cf75",
+      "subject": "fix(storage): bound new frame readers and isolate read-only inspection"
+    },
+    {
+      "commit": "9a7495e4a89b2ef0f161c153691afc0aa58dc816",
+      "subject": "feat(verification): bind complete anchor pools and count resource scenarios"
+    },
+    {
+      "commit": "a7c38c1a3d2ab32354dd14f69115b52e60f958ba",
+      "subject": "fix(scoring): reject unqualified pair batching in scientific runs"
+    },
+    {
+      "commit": "be329bed1015d181aef48ddb73d594875ed08f0f",
+      "subject": "fix(forecast): distinguish measured rates from scientific admission"
+    },
+    {
+      "commit": "4a23c799029c91e81e3738a3ecd38c0a051d4114",
+      "subject": "Preserve supplied local pools during cross-encoder reranking"
+    },
+    {
+      "commit": "8c8753ef9cf0757003e9f7eb934a156982106290",
+      "subject": "test(fusion): verify G4 training precision replay evidence"
+    },
+    {
+      "commit": "db6a7da286f4e7048b325e410e13824ec7c49781",
+      "subject": "fix(forecast): count physical storage and incomplete usage correctly"
+    },
+    {
+      "commit": "9fd61fe7136fa3b7600674b080ce183beab32511",
+      "subject": "Reserve SQLite page and WAL overhead for encoder cache writes"
+    },
+    {
+      "commit": "e0fad852e4d4f04f2849e70d7cf0bd8216e090ef",
+      "subject": "feat(experiments): compile guarded corrected workers and offline queue proposals"
+    },
+    {
+      "commit": "c8f15fc370ceb38e938f0ad9a249419c29245f68",
+      "subject": "fix(experiments): preserve corrected worker recovery and admission boundaries"
+    },
+    {
+      "commit": "09e8722db5f88e9d9b0ea5ac6e1895f34d54605b",
+      "subject": "fix(experiments): resolve actual worker cache and temporary write roots"
+    }
+  ],
+  "kind": "implementation_evidence_not_rollout_admission",
+  "launchable": false,
+  "live_work": {
+    "G4_dispatch": {
+      "G4-run-once-followup": {
+        "descriptor_sha256": "cf464eec6bda7587120c7415573a901ef51e9649b1ab9925966ca1b4c7e431b5",
+        "detached_session": "exact-dispatch-0d708e3527ac4cb6949ea9261e5a5d0a",
+        "launcher_exit_path": "/home/pgcotovio/Exact-OM/data/experiments-v2/g4-comparison-20261008-03/launcher-approved.log.exit",
+        "may_have_started": true,
+        "nonce": "0d708e3527ac4cb6949ea9261e5a5d0a",
+        "reserved_epoch": 1791463651.8744502,
+        "resources": {
+          "cpus": 6,
+          "gpus": 1,
+          "memory_gib": 112
+        },
+        "status": "registered",
+        "step_id": "14372.270",
+        "tmux_server_pid": 2851694,
+        "wrapper_path": "/home/pgcotovio/Exact-OM/data/experiments-v2/g4-comparison-20261008-03/launcher-approved.log.dispatch.sh",
+        "wrapper_sha256": "6a7f7bee4f0a58607d03ea240f9974c58240f54d43aa97ff90f9e3a3a4b3c602"
+      }
+    },
+    "G4_prior_cell_failures": {
+      "core/D0_E03-global_alignment": "Neutral fitted fusion does not replay the shipped training scores",
+      "core/D0_E03-local_ranking": "Frozen cross-encoder pool exceeds its declared top_k bound"
+    },
+    "G4_source_preserved": true,
+    "G4_step": "14372.270",
+    "liseda_05_exclusive_for_other_work": true,
+    "live_queue_changes": false,
+    "observed_at": "2026-10-10T00:37:50.502236+00:00",
+    "policy_sha256": "ffe02f319196b4227ebfa9e874d574248741f7a26df3600b2d4b78f699701ae0",
+    "receipt": {
+      "path": "data/experiments-v2/throughput-20261009-01/live-state-handoff.json",
+      "sha256": "b2ec78ecbfaeb5f635cc4caca13504c3c71ea27b52ab4ad927c5c5474a544e6b"
+    },
+    "registry_sha256": "fd7e1190355ff383a6042409e7e39187c99e24ece53b1fa80762e2faebaa6e17",
+    "supervisor_restarts": 0,
+    "supervisor_step": "14372.269",
+    "verification_allocation_release": {
+      "G4_allocation_preserved": "14372",
+      "at": "2026-10-10T00:09:08.665824+00:00",
+      "completed_workers_exit_code": 0,
+      "node": "liseda-t2",
+      "only_extern_remained": true,
+      "other_allocations_changed": false,
+      "released_allocation": "14452",
+      "user_other_work_allocation_preserved": "14451"
+    }
+  },
+  "measurements": [
+    {
+      "cold": {
+        "chunks": 1,
+        "distinct_computed_pairs": 198,
+        "elapsed_seconds": 103.25034544756636,
+        "median_chunk_pairs_per_second": 1.9176691287735244,
+        "pairs_per_second": 1.9176691287735244,
+        "processed_rows_per_second": 1.9176691287735244,
+        "rows": 198,
+        "size_time_chunk_thresholds_met": false,
+        "throughput_target_status": "unqualified",
+        "worst_chunk_pairs_per_second": 1.9176691287735244
+      },
+      "end_to_end_scientific_time": null,
+      "execution_flags": {
+        "EXACT_PAIR_CONTEXT_BATCHING": "0",
+        "EXACT_PAIR_CONTEXT_BLOCK_PAIRS": null,
+        "EXACT_PAIR_CONTEXT_TEXT_BATCH": null
+      },
+      "fixture_outputs_promotable": false,
+      "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+      "host": "liseda-t2",
+      "hosted_service_time": null,
+      "model_loading_seconds": 16.777175437193364,
+      "native_preparation_seconds": 555.3244085470214,
+      "paid_calls": 0,
+      "peak_rss_kib": 12408808,
+      "peak_vram_bytes": 2505249280,
+      "receipt": {
+        "path": "data/experiments-v2/throughput-20261009-01/legacy-H0-t2/measurement.json",
+        "sha256": "64018b98d384f21de92d287f66b7c5108e1afcc0194d7bfc4ab2c3e6311737fd"
+      },
+      "replay": {
+        "chunks": 1,
+        "distinct_computed_pairs": 0,
+        "elapsed_seconds": 5.365500975865871,
+        "median_chunk_pairs_per_second": 0.0,
+        "pairs_per_second": 0.0,
+        "processed_rows_per_second": 36.902425494023376,
+        "rows": 198,
+        "size_time_chunk_thresholds_met": false,
+        "throughput_target_status": "unqualified",
+        "worst_chunk_pairs_per_second": 0.0
+      },
+      "scientific_deployment_acceptance": false,
+      "slurm_job": "14452",
+      "slurm_step": "1",
+      "source_revision": "5cd906b210696b06dc204cb126861450aec087f2",
+      "warm": {
+        "chunks": 1,
+        "distinct_computed_pairs": 0,
+        "elapsed_seconds": 16.286993213929236,
+        "median_chunk_pairs_per_second": 0.0,
+        "pairs_per_second": 0.0,
+        "processed_rows_per_second": 12.15694004407536,
+        "rows": 198,
+        "size_time_chunk_thresholds_met": false,
+        "throughput_target_status": "unqualified",
+        "worst_chunk_pairs_per_second": 0.0
+      }
+    },
+    {
+      "cold": {
+        "chunks": 13,
+        "distinct_computed_pairs": 5997,
+        "elapsed_seconds": 495.49219754943624,
+        "median_chunk_pairs_per_second": 13.146381138803395,
+        "pairs_per_second": 12.103116920224899,
+        "processed_rows_per_second": 12.248426978296633,
+        "rows": 6069,
+        "size_time_chunk_thresholds_met": true,
+        "throughput_target_status": "missed",
+        "worst_chunk_pairs_per_second": 4.392380590377844
+      },
+      "end_to_end_scientific_time": null,
+      "execution_flags": {
+        "EXACT_PAIR_CONTEXT_BATCHING": "1",
+        "EXACT_PAIR_CONTEXT_BLOCK_PAIRS": null,
+        "EXACT_PAIR_CONTEXT_TEXT_BATCH": null
+      },
+      "fixture_outputs_promotable": false,
+      "gpu": "NVIDIA GeForce RTX 2060 SUPER",
+      "host": "liseda-t2",
+      "hosted_service_time": null,
+      "model_loading_seconds": 0.845901754219085,
+      "native_preparation_seconds": 557.1216605291702,
+      "paid_calls": 0,
+      "peak_rss_kib": 12404568,
+      "peak_vram_bytes": 2963368960,
+      "receipt": {
+        "path": "data/experiments-v2/throughput-20261009-01/candidate-H0-t2/measurement.json",
+        "sha256": "d4b0bae1255a2ef59594199eb009e5236275acfb890a5b8dc1e31e89ea227488"
+      },
+      "replay": {
+        "chunks": 13,
+        "distinct_computed_pairs": 0,
+        "elapsed_seconds": 155.28201950108632,
+        "median_chunk_pairs_per_second": 0.0,
+        "pairs_per_second": 0.0,
+        "processed_rows_per_second": 39.08372662526805,
+        "rows": 6069,
+        "size_time_chunk_thresholds_met": false,
+        "throughput_target_status": "unqualified",
+        "worst_chunk_pairs_per_second": 0.0
+      },
+      "scientific_deployment_acceptance": false,
+      "slurm_job": "14452",
+      "slurm_step": "1",
+      "source_revision": "5cd906b210696b06dc204cb126861450aec087f2",
+      "warm": {
+        "chunks": 13,
+        "distinct_computed_pairs": 0,
+        "elapsed_seconds": 142.35204519052058,
+        "median_chunk_pairs_per_second": 0.0,
+        "pairs_per_second": 0.0,
+        "processed_rows_per_second": 42.63373941608914,
+        "rows": 6069,
+        "size_time_chunk_thresholds_met": false,
+        "throughput_target_status": "unqualified",
+        "worst_chunk_pairs_per_second": 0.0
+      }
+    }
+  ],
+  "no_new_paid_requests": true,
+  "no_package_updates": true,
+  "no_push_by_this_task": true,
+  "parity": {
+    "default_prefix": {
+      "absolute_tolerance": 1e-05,
+      "baseline": {
+        "cold_sha256": "3c4debbb9d3287f04a996ce56ce7c465b2e74fe784b2af17fb8e8be6fc4cc0e4",
+        "path": "data/experiments-v2/throughput-20261009-01/reference-H0-t2"
+      },
+      "candidate": {
+        "cold_sha256": "a0f322e0eaa5e33ef107f0619ceb03e0e0057208ca2d98f0b75e547b5a638a58",
+        "path": "data/experiments-v2/throughput-20261009-01/legacy-H0-t2"
+      },
+      "compared_floats": 60826,
+      "compared_rows": 198,
+      "discrete_mismatch_count": 0,
+      "fitted_selector_mapping_parity": "pending",
+      "hosted_quality_established": false,
+      "max_absolute_error": 0.0,
+      "namespace": "qualification_only",
+      "natural_decisions_equal": true,
+      "numeric_mismatch_count": 0,
+      "query_boundaries_equal": true,
+      "receipt": {
+        "path": "data/experiments-v2/throughput-20261009-01/H0-default-parity-01.json",
+        "sha256": "5e0f490d8e9557f5871e4ef9c7ba21a567a01f943fca98ce7648597fb8e651e9"
+      },
+      "schema_version": 1,
+      "status": "passed"
+    },
+    "experimental_batching": {
+      "absolute_tolerance": 1e-05,
+      "baseline": {
+        "cold_sha256": "a0f322e0eaa5e33ef107f0619ceb03e0e0057208ca2d98f0b75e547b5a638a58",
+        "path": "data/experiments-v2/throughput-20261009-01/legacy-H0-t2"
+      },
+      "candidate": {
+        "cold_sha256": "d796ef9c33874ddaedb4cb88011033d74a72f498ab0439c7d6732d0e150b0ec6",
+        "path": "data/experiments-v2/throughput-20261009-01/candidate-H0-t2"
+      },
+      "compared_floats": 60826,
+      "compared_rows": 198,
+      "discrete_mismatch_count": 1174,
+      "fitted_selector_mapping_parity": "pending",
+      "hosted_quality_established": false,
+      "max_absolute_error": 0.5,
+      "namespace": "qualification_only",
+      "natural_decisions_equal": false,
+      "numeric_mismatch_count": 7441,
+      "query_boundaries_equal": true,
+      "receipt": {
+        "path": "data/experiments-v2/throughput-20261009-01/H0-parity-prefix-01.json",
+        "sha256": "8d3a503620071ed96b95a9046cdf60214e82fcf3aa1219cfdef8b9f596676a39"
+      },
+      "schema_version": 1,
+      "status": "failed"
+    }
+  },
+  "pending_acceptance": [
+    "T04 exact GPU evidence/decision parity",
+    "Final source and actual fitted per-case/per-recipe GPU parity/performance on RTX4090 after G4",
+    "Actual corrected G4 selection and fitted artifact freeze",
+    "Post-freeze H2 validation cohort and report-only runs",
+    "Hosted and full end-to-end rates; feasible counted campaign resource/spending/storage admission",
+    "Explicit rollout authorization and pending-only queue replacement",
+    "Actual complete scientific outputs, submissions and organizer results"
+  ],
+  "physical_storage": {
+    "NFS_inode_counts": "not exposed by df",
+    "all_root_admission": "pending_final_placement_and_growth",
+    "growth_reserve_bytes": 17179869184,
+    "headroom_after_reserve_bytes": 231487879526,
+    "policy_cap_bytes": 1099511627776,
+    "receipt": {
+      "path": "data/experiments-v2/throughput-20261009-01/storage-after.json",
+      "sha256": "7c77ea8a61e8559bfa7c8ffcb12b31e3a123ed3721e5f11e38c001b4ae92ce36"
+    },
+    "roots_actual_bytes": {
+      "/home/pgcotovio/Exact-OM/data/experiments-v2": 850843879066,
+      "/mnt/datasets/pgcotovio": 12
+    },
+    "server_quota_tool": "unavailable"
+  },
+  "preserved_existing_fusion_correction": "fd8a6b11",
+  "preserved_frozen_G4_source": "035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f",
+  "receipts": [
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/cpu-regression-final.json",
+      "sha256": "f8cf3eb4a0b3374a9a47fb88f1962415464a4cf00413709161e648ca3981c7bb"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/H0-anchor-inventory-review.json",
+      "sha256": "6bb325df91c7ac4c02a6e3002a5b5637bda82ee66f54746151e4f399393d7877"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/H0-legacy-stress-coverage.json",
+      "sha256": "0c7e1a206aa0d7d0172ce7a86903d6dfe45c7f8a93d7650864eb496870292706"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/forecast-05.json",
+      "sha256": "7089797c738019108b1123e53372fa00d5500469bfa5eb6e23ae39599b71d89b"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/workloads/work-counts.json",
+      "sha256": "4bdb4e2cbc7644360f0f966bab0ed018bfef88aaf4313c28d67e05b4709ae818"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/environment-bindings.json",
+      "sha256": "c7f97d1059756e8b05a6295dbea71cd2d2686b496f39519ab7fb69edf9ba0b90"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/storage-after.json",
+      "sha256": "7c77ea8a61e8559bfa7c8ffcb12b31e3a123ed3721e5f11e38c001b4ae92ce36"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/spending-after.json",
+      "sha256": "64676196ec1884f42bd867b4961d5ec192b7e0f7a2b00bed612117bf732a8e3d"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/live-state-after.json",
+      "sha256": "129be2cab2366c81c3a30b49ce32c584e94c9d595004ae76e7200f2d728caa82"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/verification-allocation-release.json",
+      "sha256": "40e553dbf6685f8e54f9a8dc5e8b0b094fdc035fe48f2f805f6bf15faa1e52a2"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/G4-fusion-replay-audit.json",
+      "sha256": "47ba1cc2bc53adf0aac5f9b831e1a60f3c00ded37013e6436bda37cec537a198"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/G4-fusion-replay-audit.py",
+      "sha256": "f19afeefcab08099407a606d950763cbb9b1f96f6ed7d76673885e0399c52e8d"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/cpu-regression-handoff.json",
+      "sha256": "b1b28dc4d772e0551e06f510b8e654d75e70ba844be8c2f99c39b8c0dac0aa99"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/successor-03/successor-bundle.json",
+      "sha256": "bf780df0b8d42e3d16c538f13655f0c43abd01dd357220664fb7d74b7c848d7b"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/queue-03/queue-proposal.json",
+      "sha256": "63deee9d44ceb1a200acd91651cb6ec1ee120c1a3bc4c8041bb0108b52021e60"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/successor-environment-proposal-02.json",
+      "sha256": "99291f95293224201c7716ae9cbdf045639a2f5e77bec33c6928c7d64da67cc1"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/live-state-handoff.json",
+      "sha256": "b2ec78ecbfaeb5f635cc4caca13504c3c71ea27b52ab4ad927c5c5474a544e6b"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/spending-handoff.json",
+      "sha256": "dd594c3d9895cca29defcc8398a25f542eafcf34ef337d9f13d043144e3bcbe9"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/cpu-regression-source03.json",
+      "sha256": "804a1521d8f0bd3d73da1d9c6b853f80a37b0376ae9365c00ddd6cc37dc12732"
+    },
+    {
+      "path": "data/experiments-v2/throughput-20261009-01/independent-review-handoff.json",
+      "sha256": "3c4180dcafeb8b13b2ddb7d2743f9c62501be19d27542f88c47a0c76498a5694"
+    }
+  ],
+  "regression": {
+    "command": [
+      "/home/pgcotovio/Exact-OM/.venv/bin/python",
+      "-m",
+      "pytest",
+      "-q",
+      "-m",
+      "not requires_data and not requires_llm and not requires_cuda and not requires_openrouter and not slow",
+      "tests/throughput_store_test.py",
+      "tests/explanation_recovery_test.py",
+      "tests/explanation_framework_test.py",
+      "tests/explanation_read_models_test.py",
+      "tests/run_artifacts_test.py",
+      "tests/run_artifacts_acceptance_test.py",
+      "tests/run_cli_test.py",
+      "tests/decision_audit_recovery_test.py",
+      "tests/cached_batch_recovery_test.py",
+      "tests/ontology_relation_examples_test.py",
+      "tests/relation_head_test.py",
+      "tests/relation_typer_test.py",
+      "tests/experiment_numerical_controls_test.py",
+      "tests/experiment_runtime_test.py",
+      "tests/experiment_recovery_test.py",
+      "tests/frozen_inference_test.py",
+      "tests/public_inference_test.py",
+      "tests/runtime_fitted_deployment_test.py",
+      "tests/mixed_scale_test.py",
+      "tests/scoring_parity_receipt_test.py",
+      "tests/hosted_cache_only_test.py",
+      "tests/hosted_budget_scope_test.py",
+      "tests/hosted_spending_policy_test.py",
+      "tests/hosted_spending_admission_test.py",
+      "tests/hosted_spending_recovery_test.py",
+      "tests/hosted_budget_supervisor_test.py",
+      "tests/experiments_supervision_test.py",
+      "tests/experiments_supervisor_cli_test.py",
+      "tests/experiments_supervisor_notifications_test.py",
+      "tests/experiments_supervisor_email_test.py",
+      "tests/corrected_worker_test.py",
+      "tests/published_matcher_test.py",
+      "tests/retrieval_training_test.py",
+      "tests/retrieval_experiments_test.py",
+      "tests/fusion_precision_replay_test.py",
+      "tests/e19_precision_recovery_test.py",
+      "tests/scoring_forecast_test.py",
+      "tests/scoring_cache_throughput_test.py",
+      "tests/numerical_cache_test.py",
+      "tests/encoder_cache_migration_test.py",
+      "tests/scorer_device_cache_test.py",
+      "tests/throughput_contract_test.py",
+      "tests/grouped_fitting_test.py",
+      "tests/fitting_recipes_test.py",
+      "tests/fitting_storage_retention_test.py",
+      "tests/hosted_prompt_launch_guard_test.py",
+      "tests/storage_guard_receipt_test.py",
+      "tests/experiments_dispatch_test.py"
+    ],
+    "completed_at_utc": "2026-10-10T00:38:05.973043+00:00",
+    "counts": {
+      "passed": 748
+    },
+    "exit_code": 0,
+    "gpu_jobs_launched": 0,
+    "kind": "offline_cpu_regression",
+    "live_queue_changes": false,
+    "log": "/home/pgcotovio/Exact-OM/data/experiments-v2/throughput-20261009-01/cpu-regression-source03.log",
+    "paid_calls": 0,
+    "result": "passed",
+    "schema_version": 1,
+    "source_commit": "09e8722db5f88e9d9b0ea5ac6e1895f34d54605b",
+    "started_at_utc": "2026-10-10T00:36:10.864481+00:00",
+    "summary": "748 passed, 11 warnings in 112.00s (0:01:51)",
+    "test_files": 48,
+    "working_directory": "/home/pgcotovio/Exact-OM/data/experiments-v2/throughput-20261009-01/successor-source-03"
+  },
+  "schema_version": 1,
+  "source_commit_at_recording": "09e8722db5f88e9d9b0ea5ac6e1895f34d54605b",
+  "spending": {
+    "E17_tokens_remaining_at_snapshot": 20393643,
+    "accounted_tokens": 101946432,
+    "campaign_tokens_remaining_at_snapshot": 98053568,
+    "limits_raised": false,
+    "new_paid_requests_for_implementation": 0,
+    "reported_usd": 15.4178172,
+    "snapshot": {
+      "path": "/home/pgcotovio/Exact-OM/data/experiments-v2/throughput-20261009-01/spending-after.json",
+      "sha256": "64676196ec1884f42bd867b4961d5ec192b7e0f7a2b00bed612117bf732a8e3d"
+    },
+    "unpriced_historical_attempts": 31
+  },
+  "status": "partial_acceptance_experimental_batching_rejected_not_deployed",
+  "updated_at": "2026-10-10T00:38:58.118930+00:00",
+  "work_package_status": {
+    "C01": "preparatory_implementation_fixture_verified_actual_bindings_pending",
+    "C02": "preparatory_implementation_fixture_verified_post_freeze_cohort_pending",
+    "C03": "preparatory_implementation_fixture_verified_live_G4_selection_pending",
+    "C04": "preparatory_implementation_fixture_verified_actual_fits_freeze_pending",
+    "C05": "preparatory_implementation_fixture_verified_actual_admissions_pending_live_queue_unchanged",
+    "C06": "preparatory_implementation_fixture_verified_real_outputs_pending",
+    "T01": "implemented_counted_scenarios_final_freeze_dependent_work_pending",
+    "T02": "implemented_fixture_verified_final_recipe_gpu_pending",
+    "T03": "implemented_fixture_verified_final_recipe_gpu_pending",
+    "T04": "implemented_experimental_gpu_parity_failed_scientific_use_rejected",
+    "T05": "implemented_fixture_verified_legacy_unproven_identity_misses",
+    "T06": "implemented_fixture_verified_native_packages_unchanged",
+    "T07": "implemented_fixture_verified_ordinary_diagnostics_separated",
+    "T08": "implemented_fixture_verified_full_scale_storage_ram_admission_pending",
+    "T09": "verification_partial_acceptance_not_met"
+  }
+}

@@ -1,5 +1,15 @@
 # Agent handoff: implement and execute v2
 
+**2026-10-10 scoring/corrected-study continuation:** use the current
+[implementation handoff](THROUGHPUT-IMPLEMENTATION-20261009.md) and
+[machine-readable status](throughput-final-plan-20261009.yaml) first. The older
+assignment below is historical context. Keep liseda-05 exclusive for the user's
+other work. RTX 4090 verification may be performed by the next agent after G4
+finishes. Scientific batching is currently rejected for failed evidence parity;
+no corrected campaign/queue replacement/supervisor restart is authorized. The
+current [spending safeguards](HOSTED-SPENDING-SAFETY.md), including lifetime caps,
+supersede the notification-only policy mentioned in the historical assignment.
+
 Use this document when assigning the implementation/execution task. It supersedes the previous
 instruction that real runs were reserved for the user. This specification edit itself does not
 launch experiments or claim the missing implementation is finished.

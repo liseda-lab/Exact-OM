@@ -2,22 +2,26 @@ schema_version: 1
 kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
-status: specified_not_implemented_not_deployed
+updated_at: '2026-10-10'
+status: implemented_with_failed_gpu_batching_acceptance_not_deployed
 authority:
-  requested_deliverable: Exhaustive implementation and experiment correction specification
+  requested_deliverable: Implementation, verification and offline successor preparation; no live rollout
   specification_preparation_authorized: true
-  implementation_evidence: null
+  implementation_evidence: specs/experiments/throughput-implementation-evidence-20261009.json
   execution_admission: not_granted_by_this_file
   changes_live_queue: false
   changes_historical_locks: false
 documents:
   implementation: specs/experiments/SCORING-THROUGHPUT-200.md
+  implementation_handoff: specs/experiments/THROUGHPUT-IMPLEMENTATION-20261009.md
   scientific_correction: specs/experiments/FINAL-STUDY-CORRECTION-20261009.md
   recovery: specs/experiments/CHECKPOINT-RECOVERY.md
   reference_boundary: specs/experiments/LABELS-AND-SUBMISSIONS.md
   spending: specs/experiments/HOSTED-SPENDING-SAFETY.md
 inspected_sources:
-  repository_commit: 328b9c5a
+  specification_inspection_commit: 328b9c5a
+  final_implementation_commit: 09e8722db5f88e9d9b0ea5ac6e1895f34d54605b
+  final_frozen_worktree: data/experiments-v2/throughput-20261009-01/successor-source-03
   frozen_G4_commit: 035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f
   current_G4_lock: data/experiments-v2/g4-comparison-20261008-03/campaign.lock.yaml
   current_registry: data/experiments-v2/hourly-supervisor-01/registry.json
@@ -201,63 +205,63 @@ scientific_matrix:
 work_packages:
   T01:
     title: Workload identity inventory and complete timing instrumentation
-    status: not_implemented
+    status: implemented_counted_scenarios_final_freeze_dependent_work_pending
     depends_on: []
   T02:
     title: Batch numerical-cache context without hosted-response replay bypass
-    status: not_implemented
+    status: implemented_fixture_verified_final_recipe_gpu_pending
     depends_on: [T01]
   T03:
     title: Retained encoder-cache connections and bounded bulk input/output
-    status: not_implemented
+    status: implemented_fixture_verified_final_recipe_gpu_pending
     depends_on: [T01]
   T04:
     title: Two-phase context batching and vectorized numerical reductions
-    status: not_implemented
+    status: implemented_experimental_gpu_parity_failed_scientific_use_rejected
     depends_on: [T01, T02, T03]
   T05:
     title: Dependency-scoped primitive reuse and durable training-aggregate references
-    status: not_implemented
+    status: implemented_fixture_verified_legacy_unproven_identity_misses
     depends_on: [T01, T02]
   T06:
     title: One-pass index over native-produced relation examples
-    status: not_implemented
+    status: implemented_fixture_verified_native_packages_unchanged
     depends_on: [T01]
   T07:
     title: Scope synthetic perturbations to their declared development diagnostics
-    status: not_implemented
+    status: implemented_fixture_verified_ordinary_diagnostics_separated
     depends_on: [T01]
   T08:
     title: Compact streaming artifacts, resumable chunks and correct global extraction
-    status: not_implemented
+    status: implemented_fixture_verified_full_scale_storage_ram_admission_pending
     depends_on: [T03, T05]
   T09:
     title: Numerical, decision, operational and throughput acceptance plus migration
-    status: not_implemented
+    status: verification_partial_acceptance_not_met
     depends_on: [T02, T03, T04, T05, T06, T07, T08]
   C01:
     title: Materialize corrected full and bounded design with all claim boundaries
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_actual_bindings_pending
     depends_on: [T01]
   C02:
     title: Bind public D_H2_valid inputs and fixed source cohorts without test exposure
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_post_freeze_cohort_pending
     depends_on: [C01, C03]
   C03:
     title: Reconcile G4 quality reuse and fairly measured prospective deployment costs
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_live_G4_selection_pending
     depends_on: [T07, T09]
   C04:
     title: Freeze final seed-specific deployment artifacts and revised matrix
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_actual_fits_freeze_pending
     depends_on: [T05, C01, C02, C03]
   C05:
     title: Rebind supervisor successors and publish verified execution descriptors
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_actual_admissions_pending_live_queue_unchanged
     depends_on: [T09, C04]
   C06:
     title: Validate mapping/query coverage, submission files and reporting handoff
-    status: not_implemented
+    status: preparatory_implementation_fixture_verified_real_outputs_pending
     depends_on: [C05]
 work_package_ids_are_not_experiment_family_ids: true
 acceptance:
@@ -323,7 +327,11 @@ rollout:
   old_E17_pending_rows_require_atomic_replacement_before_dispatch: true
   supervisor_policy_cannot_be_self_approved_by_repair_worker: true
   existing_completed_rows_and_accounting_remain: true
-  no_allocation_cancellation_or_new_cluster_required: true
+  preserve_preexisting_allocations: true
+  verification_allocation: '14452'
+  verification_node: liseda-t2
+  user_reserved_node_excluded_from_further_verification: liseda-05
+  RTX4090_verification_deferred_until_G4_finishes: true
   no_package_or_repository_push_authorized_here: true
   T09_acceptance_does_not_require_C05_deployment: true
   sequence:
@@ -350,7 +358,7 @@ handoff_requirements:
 evidence:
   specification_validation:
     status: passed
-    scope: documentation_only
+    scope: documentation_and_implementation_evidence
     checks:
       - YAML_parsing_with_duplicate_key_rejection
       - all_relative_document_links_and_plan_document_paths
@@ -359,13 +367,35 @@ evidence:
       - implementation_work_package_ID_alignment
       - G4_freeze_before_D_H2_valid_binding
       - no_deployment_prerequisite_cycle
-      - specification_only_states_and_historical_counts_preserved
+      - acceptance_states_and_historical_counts_preserved
       - whitespace_and_owned_file_review
     independent_scientific_and_operational_review: completed_findings_resolved
-  implementation_tests: not_run
-  gpu_parity: not_run
-  target_200_pairs_per_second: unmeasured
-  corrected_matrix_prepared: false
+  implementation_tests:
+    status: passed
+    tests: 748
+    seconds: 112.00
+    files: 48
+    source: 09e8722db5f88e9d9b0ea5ac6e1895f34d54605b
+    receipt: data/experiments-v2/throughput-20261009-01/cpu-regression-source03.json
+    prior_failed_fixture_receipt_retained: data/experiments-v2/throughput-20261009-01/cpu-regression-handoff.json
+  gpu_parity:
+    experimental_batching: failed
+    default_unbatched_vs_original: passed_exact_198_pairs_on_RTX2060_SUPER
+    default_receipt: data/experiments-v2/throughput-20261009-01/H0-default-parity-01.json
+    final_fitted_recipes_and_RTX4090: pending_after_G4_user_authorized_deferral
+    receipt: data/experiments-v2/throughput-20261009-01/H0-parity-prefix-01.json
+  target_200_pairs_per_second:
+    RTX2060_SUPER_H0_experimental: missed
+    measured_cold_unique_pairs_per_second: 12.103116920224899
+    distinct_pairs: 5997
+    chunks: 13
+    scientific_parity_passed: false
+    RTX4090_and_all_actual_recipes: unmeasured
+    receipt: data/experiments-v2/throughput-20261009-01/candidate-H0-t2/measurement.json
+  corrected_matrix_prepared: offline_71_cell_bundle_actual_fitted_bindings_pending
+  successor_bundle: data/experiments-v2/throughput-20261009-01/successor-03/successor-bundle.json
+  disabled_queue_proposal: data/experiments-v2/throughput-20261009-01/queue-03/queue-proposal.json
+  live_state: data/experiments-v2/throughput-20261009-01/live-state-handoff.json
   deployment: not_done
   final_mappings: not_generated
   official_test_results: not_obtained

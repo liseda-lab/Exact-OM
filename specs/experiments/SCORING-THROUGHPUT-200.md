@@ -1,6 +1,13 @@
 # Exact-OM scoring throughput contract: 200 cold unique pairs/second
 
-Recorded: 2026-10-09. Status: **specified_not_implemented_not_deployed**.
+Recorded: 2026-10-09. Status: **implemented_with_failed_gpu_batching_acceptance_not_deployed**.
+
+Implementation evidence (updated 2026-10-10): [handoff](THROUGHPUT-IMPLEMENTATION-20261009.md).
+748 CPU regression tests passed on the final frozen source. Experimental H0
+batching measured 12.103 cold unique pairs/s on an RTX 2060 SUPER and failed discrete evidence parity; it is
+blocked from scientific use. Final fitted recipes and RTX 4090 verification remain
+pending, with 4090 checks deferred by the user until active G4 finishes. The
+acceptance criteria below are unchanged.
 
 Inspected checkout: `328b9c5a`. Running G4 source:
 `035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f`, frozen under
@@ -557,8 +564,10 @@ vectors alone is not an acceptance result or a proof for every possible input.
 
 ## 6. Evidence, forecast and completion record
 
-Write the eventual evidence under a new immutable throughput-work directory;
-this specification creates no such runtime directory. At minimum retain:
+Implementation evidence is retained under
+`data/experiments-v2/throughput-20261009-01/`, with versioned immutable source and
+measurement artifacts described in the handoff. Future verification uses fresh
+artifact paths and preserves prior failures. At minimum retain:
 
 - Source/configuration/environment identities and a work-package implementation
   status table linked to logical commits.

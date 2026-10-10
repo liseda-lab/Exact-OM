@@ -2,9 +2,14 @@
 
 **Design:** `exact-om-final-mixed-scale-20261009-v1`
 
-**Status:** `specified_not_applied`
+**Status:** `preparatory_implementation_fixture_verified_not_applied`
 
-**Recorded:** 2026-10-09
+**Recorded:** 2026-10-09. Implementation update: 2026-10-10.
+
+The [implementation handoff](THROUGHPUT-IMPLEMENTATION-20261009.md) records the
+corrected logical compiler, actual fitted-artifact deployment contract and offline
+successor preparation. Actual G4 selection/fits, post-freeze H2 validation, final
+outputs and rollout remain pending. No completed scientific result is implied.
 
 **Execution authorization:** none conferred by this document.
 
