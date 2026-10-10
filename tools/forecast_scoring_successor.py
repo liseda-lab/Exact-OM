@@ -39,6 +39,10 @@ def build(work_counts, measurements, g4, spending_snapshot, storage_snapshot):
         rows = sum(c["rows"] for c in cold["chunks"])
         rate = cold["pairs_per_second"]
         samples.append({"receipt": binding(path), "gpu": data["gpu"],
+                        "source_revision": data.get("source_revision"),
+                        "execution_flags": data.get("execution_flags", {}),
+                        "scientific_acceptance": "requires_separate_exact_parity_receipt",
+                        "rate_is_approved_deployment_forecast": False,
                         "cold_unique_pairs": cold["distinct_computed_pairs"], "cold_pairs_per_second": rate,
                         "minimum_contract_met": cold["minimum_measurement_contract_met"],
                         "warm_rows_per_second": data["warm"]["processed_rows_per_second"],
