@@ -83,3 +83,64 @@ test("the layout separates the two sides and never overlaps nodes in a column", 
     assert.ok(positions[below.id].y - size(below).height / 2 >= positions[above.id].y + size(above).height / 2, "no overlap");
   }
 });
+
+test("every selected record reports where it is: drawn, grouped, no graph form or unavailable (S0-R3)", () => {
+  const literals = Array.from({ length: 5 }, (_, index) => `l${index}`);
+  const axioms: Record<string, { ast: unknown } | null> = Object.fromEntries(literals.map((id, index) => [id, label(source.iri, `name ${index}`)]));
+  axioms.p1 = sub(source.iri, named("https://s#P"));
+  axioms.eq = { ast: { type: "EquivalentClasses", operands: [] } };
+  const items = [
+    item("h", "source", "hierarchy", ["p1", "eq"]),
+    ...literals.map((id, index) => item(`lex-${index}`, "source", "lexical", [id])),
+    { ...item("gone", "source", "lexical", []), status: "unresolved" },
+    item("missing", "target", "relational", ["absent"]),
+  ];
+  const model = buildGraphModel(source, target, items as never, axioms);
+  const status = (evidence: string) => model.records.filter((record: { evidenceId: string }) => record.evidenceId === evidence).map((record: { status: string }) => record.status);
+  assert.deepEqual(status("h"), ["drawn", "no_graph_form"], "one feature can rest on a drawn and an undrawn record");
+  assert.deepEqual(literals.map((_, index) => status(`lex-${index}`)[0]), ["drawn", "drawn", "grouped", "grouped", "grouped"]);
+  assert.deepEqual(status("gone"), ["unavailable"]);
+  assert.deepEqual(status("missing"), ["no_graph_form"]);
+  const grouped = model.records.find((record: { evidenceId: string }) => record.evidenceId === "lex-4") as { edgeId?: string };
+  const expanded = buildGraphModel(source, target, items as never, axioms, { expandLiterals: new Set(["source"]) });
+  assert.ok(expanded.edges.some((edge: { id: string }) => edge.id === grouped.edgeId), "a grouped record's line appears with the same identity when its group is shown");
+});
+
+test("relationships sharing a target keep their own line, relation and record (S0-R1)", () => {
+  const holds = named("https://s#holds", "ObjectProperty", "object_property");
+  const filler = named("https://s#Syndrome");
+  const axioms = {
+    some: sub(source.iri, { type: "ObjectSomeValuesFrom", property: holds, filler }),
+    only: sub(source.iri, { type: "ObjectAllValuesFrom", property: holds, filler }),
+    min: sub(source.iri, { type: "ObjectMinCardinality", cardinality: 2, property: named("https://s#part", "ObjectProperty"), filler }),
+    parent: sub(source.iri, filler),
+  };
+  const model = buildGraphModel(source, target, [item("e", "source", "relational", ["some", "only", "min", "parent"])] as never, axioms);
+  const fillerId = entityNodeId("source", { ontology_version_id: S, kind: "class", iri: "https://s#Syndrome" });
+  const into = model.edges.filter((edge: { target: string }) => edge.target === fillerId);
+  assert.equal(model.nodes.filter((node: { id: string }) => node.id === fillerId).length, 1, "one typed node for the shared entity");
+  assert.deepEqual(into.map((edge: { factId?: string; relation: { text?: string; property?: string; quantifier?: string } }) => [edge.factId, edge.relation.text ?? `${edge.relation.property} ${edge.relation.quantifier}`]), [
+    ["some", "https://s#holds some"],
+    ["only", "https://s#holds only"],
+    ["min", "https://s#part at least 2"],
+    ["parent", "subclass of"],
+  ]);
+});
+
+test("layout distances scale with the reader's text size", () => {
+  const model = buildGraphModel(source, target, [item("e", "source", "hierarchy", ["p"])] as never, { p: sub(source.iri, named("https://s#P")) });
+  const at = (scale: number) => layoutGraph(model.nodes, () => ({ width: 200 * scale, height: 50 * scale }), 18, scale);
+  const one = at(1);
+  const two = at(2);
+  for (const node of model.nodes as { id: string }[]) assert.equal(two[node.id].x, one[node.id].x * 2);
+});
+
+test("a dense side (60 features) stays in one overlap-free column", () => {
+  const facts = Array.from({ length: 60 }, (_, index) => `d${index}`);
+  const axioms = Object.fromEntries(facts.map((id, index) => [id, sub(source.iri, named(`https://s#Dense${index}`))]));
+  const model = buildGraphModel(source, target, [item("e", "source", "hierarchy", facts)] as never, axioms);
+  const positions = layoutGraph(model.nodes, () => ({ width: 200, height: 60 }));
+  const ys = model.nodes.filter((node: { depth: number }) => node.depth === 1).map((node: { id: string }) => positions[node.id].y).sort((a: number, b: number) => a - b);
+  assert.equal(ys.length, 60);
+  for (let index = 1; index < ys.length; index += 1) assert.ok(ys[index] - ys[index - 1] >= 60 + 18 - 0.001);
+});

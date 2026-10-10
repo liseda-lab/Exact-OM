@@ -158,7 +158,7 @@ export function axiomRelation(ast: OwlNode, subjectIri: string): { relation: str
     if (iriOf(ast.super_class) === subjectIri) return { relation: "Has subclass", other: ast.sub_class };
   }
   if (type === "EquivalentClasses") {
-    const others = (ast.expressions as unknown[]).filter((item) => iriOf(item) !== subjectIri);
+    const others = ((ast.expressions as unknown[] | undefined) ?? []).filter((item) => iriOf(item) !== subjectIri);
     if (others.length === 1) return { relation: "Equivalent to", other: others[0] };
     return { relation: "Equivalent to", other: { type: "ObjectIntersectionOf", operands: others, _list: true } };
   }

@@ -1344,6 +1344,23 @@
   overflow-wrap: anywhere;
 }
 
+.graph-records {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9375rem;
+}
+
+.graph-records li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.5rem;
+}
+
 .graph-inspector-actions {
   display: flex;
   flex-wrap: wrap;

@@ -2,20 +2,24 @@
 
 // Optional evidence graph (21 F08). The model (lib/evidenceGraphModel) keeps typed identities,
 // draws one line per selected original record, and draws a comparison line only for a channel
-// recorded on both sides. Source sits left, target right, each side's features in a column;
-// relations are written inside the nodes, so no text sits on crossing lines. Beside the canvas,
-// an inspector explains the current selection and a complete item list gives the same items to
-// keyboard and screen-reader users. Geometry changes only on explicit actions; the view (zoom,
-// pan, expansions, selection) belongs to the compared pair and survives re-renders, answer
-// saves, tab switches and theme or text-size changes.
+// recorded on both sides. Source sits left, target right, each side's features in a column.
+// Every feature line carries its own relation (predicate and qualifier); entity nodes show only
+// the entity, so relationships that share a target keep their own meaning (S0-R1). Below the
+// canvas, an inspector explains the current selection and a complete item list gives the same
+// items to keyboard and screen-reader users. A selection from the evidence list resolves to the
+// exact record, revealing a grouped record or saying why it is not drawn (S0-R3). De-emphasis
+// fades lines and borders only; labels keep at least 4.5:1 contrast in both themes (S0-R4).
+// Sizes follow the reader's text size. Geometry changes only on explicit actions; the view
+// (zoom, pan, expansions, selection) belongs to the compared pair and survives re-renders,
+// answer saves, tab switches and theme or text-size changes.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { IconZoomIn, IconZoomOut } from "@/components/common/Icons";
 import { channelName, type EvidenceBundle } from "@/components/explore/evidenceData";
 import { useFactInspector } from "@/components/workspace/FactInspector";
-import { buildGraphModel, entityNodeId, layoutGraph, type GraphSide, type ModelEdge, type ModelNode } from "@/lib/evidenceGraphModel";
-import { curie, KIND_NAMES, predicateName } from "@/lib/iri";
+import { buildGraphModel, entityNodeId, layoutGraph, type GraphSide, type ModelEdge, type ModelNode, type ModelRecord } from "@/lib/evidenceGraphModel";
+import { curie, KIND_NAMES, localName, predicateName } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import type { EntityRef } from "@/lib/types";
 import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
@@ -27,19 +31,33 @@ interface Expansion {
 interface GraphView {
   zoom: number;
   pan: { x: number; y: number };
+  /** The text scale the layout had and the canvas size, so a changed one keeps the same centre. */
+  scale: number;
+  size: { w: number; h: number };
   expansions: Expansion[];
   literals: GraphSide[];
   focusNode: string | null;
   focusEdge: string | null;
+  focusEvidence: string | null;
 }
 
 const MAX_NODES = 150;
 const READABLE_ZOOM = 0.7;
-const NODE_WIDTH = 220;
-const FOCAL_WIDTH = 220;
-const CHARS_PER_LINE = 26;
+const NODE_WIDTH = 200;
+const FOCAL_WIDTH = 210;
+const CHARS_PER_LINE = 25;
+const LABEL_WIDTH = 132;
+// About how many characters of a relation label fit on one line of LABEL_WIDTH, and the longest
+// property name drawn on a line (its qualifier is always added in full).
+const LABEL_CHARS = 19;
+const LABEL_PITCH = 24;
+const LINE_LABEL_MAX = 48;
 // The view of each compared pair, kept for this page's lifetime (bounded).
 const views = new Map<string, GraphView>();
+type Point = { x: number; y: number };
+type Size = { w: number; h: number };
+/** The graph point at the middle of a canvas of `size`. */
+const centreOf = (pan: Point, zoom: number, size: Size): Point => ({ x: (size.w / 2 - pan.x) / zoom, y: (size.h / 2 - pan.y) / zoom });
 function remember(key: string, view: GraphView) {
   views.delete(key);
   views.set(key, view);
@@ -58,6 +76,12 @@ export const EDGE_MEANING: Record<EdgeKind, string> = {
 
 function cssVar(name: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || "#888";
+}
+
+/** The reader's text-size setting (1–2); the graph's fonts and spacing follow it. */
+function textScale(): number {
+  const value = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--text-scale"));
+  return Number.isFinite(value) && value > 0 ? value : 1;
 }
 
 function useThemeVersion() {
@@ -102,6 +126,13 @@ function clip(text: string, max = 80): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
+const RECORD_STATE: Record<ModelRecord["status"], string> = {
+  drawn: "shown in the graph",
+  grouped: "grouped in the graph",
+  no_graph_form: "has no graph form; read it as the original record",
+  unavailable: "its original record is not available in this view",
+};
+
 export function EvidenceGraph({
   source,
   target,
@@ -117,6 +148,7 @@ export function EvidenceGraph({
   bundle: EvidenceBundle;
   /** Identity of the compared pair in its product and scope; a new key starts a new view. */
   viewKey: string;
+  /** Evidence chosen elsewhere (the evidence list); the graph shows exactly its records. */
   selected: string | null;
   onSelect: (evidenceId: string | null) => void;
   /** Reveal a feature in the evidence list. */
@@ -134,8 +166,19 @@ export function EvidenceGraph({
   const [literals, setLiterals] = useState<GraphSide[]>(() => stored?.literals ?? []);
   const [focusNodeId, setFocusNodeId] = useState<string | null>(() => stored?.focusNode ?? null);
   const [focusEdgeId, setFocusEdgeId] = useState<string | null>(() => stored?.focusEdge ?? null);
+  // A feature chosen in the list that has no drawn line (no graph form, or unavailable).
+  const [focusEvidence, setFocusEvidence] = useState<string | null>(() => stored?.focusEvidence ?? null);
+  const [revealEdge, setRevealEdge] = useState<string | null>(null);
   const [expandError, setExpandError] = useState<string | null>(null);
+  // Bumped once the canvas exists, so restored selections and reveals are applied to it.
+  const [ready, setReady] = useState(0);
   const themeVersion = useThemeVersion();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const scale = useMemo(() => textScale(), [themeVersion]);
+  const scaleRef = useRef(scale);
+  scaleRef.current = scale;
+  // The text scale of the positions currently drawn.
+  const drawnScale = useRef(scale);
   const expansionAllowed = canExpand && workspace.capabilities.graphExpansion;
 
   // A different pair is a different view: never carry nodes or selections across.
@@ -148,10 +191,13 @@ export function EvidenceGraph({
     setLiterals(next?.literals ?? []);
     setFocusNodeId(next?.focusNode ?? null);
     setFocusEdgeId(next?.focusEdge ?? null);
+    setFocusEvidence(next?.focusEvidence ?? null);
     setExpandError(null);
   }, [viewKey]);
 
   const base = useMemo(() => buildGraphModel(source, target, bundle.items, bundle.axioms as never, { expandLiterals: new Set(literals) }), [source, target, bundle, literals]);
+  const baseRef = useRef(base);
+  baseRef.current = base;
   const model = useMemo(() => {
     const nodes = new Map(base.nodes.map((node) => [node.id, node]));
     const edges = [...base.edges];
@@ -169,15 +215,17 @@ export function EvidenceGraph({
   modelRef.current = model;
   const focusNode = model.nodes.find((node) => node.id === focusNodeId) ?? null;
   const focusEdge = model.edges.find((edge) => edge.id === focusEdgeId) ?? null;
+  const focusEdgeRef = useRef(focusEdgeId);
+  focusEdgeRef.current = focusEdgeId;
 
   const save = useCallback(
     (changes: Partial<GraphView>) => {
-      const current = views.get(viewKey) ?? { zoom: 0, pan: { x: 0, y: 0 }, expansions: [], literals: [], focusNode: null, focusEdge: null };
+      const current = views.get(viewKey) ?? { zoom: 0, pan: { x: 0, y: 0 }, scale: 1, size: { w: 0, h: 0 }, expansions: [], literals: [], focusNode: null, focusEdge: null, focusEvidence: null };
       remember(viewKey, { ...current, ...changes });
     },
     [viewKey],
   );
-  useEffect(() => save({ expansions, literals, focusNode: focusNodeId, focusEdge: focusEdgeId }), [expansions, literals, focusNodeId, focusEdgeId, save]);
+  useEffect(() => save({ expansions, literals, focusNode: focusNodeId, focusEdge: focusEdgeId, focusEvidence }), [expansions, literals, focusNodeId, focusEdgeId, focusEvidence, save]);
 
   // Labels, per ontology, for entities and the properties named in restrictions.
   const propertyIris = model.edges.map((edge) => edge.relation.property).filter((iri): iri is string => Boolean(iri));
@@ -186,52 +234,117 @@ export function EvidenceGraph({
   const lookup = useCallback((ontology: string) => (ontology === source.ontology_version_id ? sourceLabel : targetLabel), [source, sourceLabel, targetLabel]);
   const entityName = useCallback((node: ModelNode) => (node.iri ? lookup(node.ontology)(node.iri)?.value ?? curie(node.iri) : ""), [lookup]);
 
+  /**
+   * A relation's text. `drawn` is the short form on a line: an unlabelled property outside a known
+   * prefix by its local name, clipped; the list, inspector and original record keep the full IRI.
+   */
   const relationText = useCallback(
-    (edge: ModelEdge, side: GraphSide | undefined = edge.side) => {
+    (edge: ModelEdge, drawn = false) => {
       if (edge.kind === "bridge") return `${channelName(edge.channel ?? "")} compared`;
       if (edge.relation.text) return edge.relation.text;
-      const ontology = side === "target" ? target.ontology_version_id : source.ontology_version_id;
-      if (edge.relation.property && edge.relation.quantifier) return `${lookup(ontology)(edge.relation.property)?.value ?? curie(edge.relation.property)} ${edge.relation.quantifier}`;
-      if (edge.relation.property) return predicateName(edge.relation.property);
+      const ontology = edge.side === "target" ? target.ontology_version_id : source.ontology_version_id;
+      const property = edge.relation.property;
+      if (property && edge.relation.quantifier) {
+        const name = lookup(ontology)(property)?.value ?? (drawn && curie(property) === property ? localName(property) : curie(property));
+        // Only the name is clipped: the qualifier is the meaning and is always drawn (S0-R1).
+        return `${drawn ? clip(name, LINE_LABEL_MAX) : name} ${edge.relation.quantifier}`;
+      }
+      if (property) {
+        const name = predicateName(property);
+        return drawn && name === property ? localName(property) : name;
+      }
       return "";
     },
     [lookup, source, target],
   );
-  const incoming = useMemo(() => {
-    const map = new Map<string, ModelEdge>();
-    for (const edge of model.edges) if (edge.kind === "feature" && !map.has(edge.target)) map.set(edge.target, edge);
+  const nodeById = useCallback((id: string) => model.nodes.find((node) => node.id === id), [model.nodes]);
+  /** A feature line into an entity carries its relation as a visible label; a literal record names its predicate itself. */
+  const labelledLine = useCallback((edge: ModelEdge) => edge.kind === "feature" && nodeById(edge.target)?.role === "context", [nodeById]);
+  const literalPredicate = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const edge of model.edges) if (edge.kind === "feature" && edge.target.startsWith("lit:")) map.set(edge.target, relationText(edge, true));
     return map;
-  }, [model.edges]);
+  }, [model.edges, relationText]);
 
-  /** Drawn label: a relation line where the node is a feature's object, then the name. */
+  /** Drawn node text: the compared entity with its side and kind, an entity's name, or a literal record. */
   const nodeLabel = useCallback(
     (node: ModelNode) => {
       if (node.role === "focal") return `${node.side === "source" ? "Source" : "Target"} ${KIND_NAMES[node.kind]}\n${clip(entityName(node), 70)}`;
       if (node.role === "group") return `+${node.count} more records\nselect to show all`;
-      const edge = incoming.get(node.id);
-      const relation = edge ? relationText(edge) : "";
-      const name = node.role === "literal" ? `“${clip(node.text ?? "", 66)}”` : clip(entityName(node), 66);
-      return relation ? `${relation}\n${name}` : name;
+      if (node.role === "literal") {
+        const predicate = literalPredicate.get(node.id);
+        const quote = `“${clip(node.text ?? "", 66)}”`;
+        return predicate ? `${predicate}\n${quote}` : quote;
+      }
+      return clip(entityName(node), 66);
     },
-    [entityName, incoming, relationText],
+    [entityName, literalPredicate],
   );
   const sizeOf = useCallback(
     (node: ModelNode) => {
       const lines = nodeLabel(node).split("\n").reduce((sum, line) => sum + wrapLines(line), 0);
-      return { width: node.role === "focal" ? FOCAL_WIDTH : NODE_WIDTH, height: 20 + lines * 19 };
+      return { width: (node.role === "focal" ? FOCAL_WIDTH : NODE_WIDTH) * scale, height: (20 + lines * 19) * scale };
     },
-    [nodeLabel],
+    [nodeLabel, scale],
   );
-  const positions = useMemo(() => layoutGraph(model.nodes, sizeOf), [model.nodes, sizeOf]);
+  // What each line draws. Parallel lines are spread for their wrapped labels, and a node keeps
+  // vertical room for the labels at the middle of its incoming lines, so labels never collide.
+  const drawn = useMemo(() => {
+    const labels = new Map(model.edges.map((edge) => [edge.id, edge.target.startsWith("lit:") || edge.kind === "group" ? "" : relationText(edge, true)]));
+    const pair = (edge: ModelEdge) => [edge.source, edge.target].sort().join("|");
+    const bundles = new Map<string, { target: string; count: number; lines: number }>();
+    for (const edge of model.edges) {
+      if (!labelledLine(edge)) continue;
+      const bundle = bundles.get(pair(edge)) ?? { target: edge.target, count: 0, lines: 1 };
+      bundle.count += 1;
+      bundle.lines = Math.max(bundle.lines, Math.ceil(labels.get(edge.id)!.length / LABEL_CHARS));
+      bundles.set(pair(edge), bundle);
+    }
+    // Parallel labels are stacked LABEL_PITCH apart per text line; a label sits halfway along its
+    // line, so a node needs twice its bundle's extent.
+    const room = new Map<string, number>();
+    for (const bundle of bundles.values()) room.set(bundle.target, (room.get(bundle.target) ?? 0) + 2 * ((bundle.count - 1) * LABEL_PITCH * bundle.lines + 16 * bundle.lines + 4) * scale);
+    return { labels, room, bundle: (edge: ModelEdge) => bundles.get(pair(edge)) };
+  }, [model.edges, relationText, labelledLine, scale]);
+  const positions = useMemo(
+    () =>
+      layoutGraph(
+        model.nodes,
+        (node) => {
+          const size = sizeOf(node);
+          return { width: size.width, height: Math.max(size.height, drawn.room.get(node.id) ?? 0) };
+        },
+        18,
+        scale,
+      ),
+    [model.nodes, sizeOf, scale, drawn],
+  );
   const positionsRef = useRef(positions);
   positionsRef.current = positions;
+  /**
+   * The distance between parallel lines. Their labels are offset across the line, so a steep line
+   * needs more distance to stack its labels LABEL_PITCH apart vertically.
+   */
+  const stepOf = useCallback(
+    (edge: ModelEdge) => {
+      const bundle = drawn.bundle(edge);
+      const [from, to] = [positions[edge.source], positions[edge.target]];
+      if (!bundle || !from || !to) return 44 * scale;
+      const cos = Math.abs(to.x - from.x) / Math.max(1, Math.hypot(to.x - from.x, to.y - from.y));
+      return (2 * LABEL_PITCH * bundle.lines * scale) / Math.max(0.35, cos);
+    },
+    [drawn, positions, scale],
+  );
 
   const styles = useCallback(() => {
     const ink = cssVar("--ink");
+    const ink2 = cssVar("--ink-2");
     const ink3 = cssVar("--ink-3");
     const surface = cssVar("--surface");
     const surface2 = cssVar("--surface-2");
+    const lineStrong = cssVar("--line-strong");
     const focus = cssVar("--focus");
+    const font = "IBM Plex Sans, Segoe UI, sans-serif";
     return [
       {
         selector: "node",
@@ -242,8 +355,8 @@ export function EvidenceGraph({
           "border-width": 1.5,
           "border-color": "data(line)",
           color: ink,
-          "font-family": "IBM Plex Sans, Segoe UI, sans-serif",
-          "font-size": 14,
+          "font-family": font,
+          "font-size": 14 * scale,
           "line-height": 1.3,
           "text-wrap": "wrap",
           "text-max-width": "data(textWidth)",
@@ -254,10 +367,9 @@ export function EvidenceGraph({
         },
       },
       { selector: "node[side = 'target']", style: { shape: "cut-rectangle" } },
-      { selector: "node[role = 'focal']", style: { "background-color": surface2, "border-width": 3, "font-weight": 600, "font-size": 15 } },
+      { selector: "node[role = 'focal']", style: { "background-color": surface2, "border-width": 3, "font-weight": 600, "font-size": 15 * scale } },
       { selector: "node[role = 'literal']", style: { "font-style": "italic", "border-style": "dashed" } },
       { selector: "node[role = 'group']", style: { "border-style": "dotted", "border-width": 2, color: ink3 } },
-      { selector: "node:selected", style: { "border-width": 4, "border-color": focus } },
       {
         selector: "edge",
         style: {
@@ -267,30 +379,37 @@ export function EvidenceGraph({
           "target-arrow-shape": "triangle",
           "arrow-scale": 0.9,
           "curve-style": "bezier",
-          "control-point-step-size": 60,
-          "font-size": 13,
-          "font-family": "IBM Plex Sans, Segoe UI, sans-serif",
-          color: ink,
+          "control-point-step-size": "data(step)",
+          "font-size": 12.5 * scale,
+          "font-family": font,
+          color: ink2,
+          "text-wrap": "wrap",
+          "text-max-width": LABEL_WIDTH * scale,
           "text-background-color": surface,
           "text-background-opacity": 1,
-          "text-background-padding": 3,
+          "text-background-padding": 2 * scale,
+          "text-background-shape": "round-rectangle",
         },
       },
+      // Each feature line into an entity says its own relation, always (S0-R1).
+      { selector: "edge[?labelled]", style: { label: "data(label)" } },
       { selector: "edge[kind = 'feature']", style: { "line-style": "dashed", "line-dash-pattern": [9, 4, 2, 4] } },
       { selector: "edge[kind = 'group']", style: { "line-style": "dotted", "target-arrow-shape": "none" } },
       { selector: "edge[kind = 'structural']", style: { "line-style": "dashed", "line-dash-pattern": [7, 5] } },
       { selector: "edge[kind = 'inferred']", style: { "line-style": "dotted" } },
       {
-        // A channel-level comparison: a line of round dots, no arrow, labelled with the channel.
+        // A channel-level comparison: a line of round dots, no arrow.
         selector: "edge[kind = 'bridge']",
-        style: { "line-style": "dashed", "line-cap": "round", "line-dash-pattern": [0.1, 8], width: 4, "line-color": cssVar("--bridge"), "target-arrow-shape": "none", color: ink, "control-point-step-size": 26 },
+        style: { "line-style": "dashed", "line-cap": "round", "line-dash-pattern": [0.1, 8], width: 4, "line-color": cssVar("--bridge"), "target-arrow-shape": "none", "control-point-step-size": 26 * scale },
       },
-      { selector: ".faded", style: { opacity: 0.35 } },
-      // Feature relations are written in their nodes; only selected comparison and context lines get a label.
-      { selector: "edge:selected", style: { width: 4, "line-color": focus, "target-arrow-color": focus, opacity: 1 } },
-      { selector: "edge[kind != 'feature'][kind != 'group']:selected", style: { label: "data(label)" } },
+      // De-emphasis fades geometry only; every label keeps at least 4.5:1 (S0-R4).
+      { selector: "node.faded", style: { "border-opacity": 0.4, color: ink2 } },
+      { selector: "node[role = 'focal'].faded", style: { color: ink, "border-opacity": 0.55 } },
+      { selector: "edge.faded", style: { "line-opacity": 0.3, "target-arrow-color": lineStrong, color: ink2 } },
+      { selector: "node:selected", style: { "border-width": 4, "border-color": focus, "border-opacity": 1 } },
+      { selector: "edge:selected", style: { width: 4, "line-color": focus, "target-arrow-color": focus, "line-opacity": 1, label: "data(label)", color: ink, "font-weight": 600 } },
     ];
-  }, []);
+  }, [scale]);
 
   const elements = useCallback(() => {
     const els: unknown[] = [];
@@ -298,15 +417,15 @@ export function EvidenceGraph({
       const size = sizeOf(node);
       els.push({
         group: "nodes",
-        data: { id: node.id, label: nodeLabel(node), side: node.side, role: node.role, line: node.side === "source" ? cssVar("--source") : cssVar("--target"), width: size.width, height: size.height, textWidth: size.width - 22 },
+        data: { id: node.id, label: nodeLabel(node), side: node.side, role: node.role, line: node.side === "source" ? cssVar("--source") : cssVar("--target"), width: size.width, height: size.height, textWidth: size.width - 22 * scale },
         position: positions[node.id],
       });
     }
     for (const edge of model.edges) {
-      els.push({ group: "edges", data: { id: edge.id, source: edge.source, target: edge.target, label: relationText(edge), kind: edge.kind } });
+      els.push({ group: "edges", data: { id: edge.id, source: edge.source, target: edge.target, label: drawn.labels.get(edge.id), labelled: labelledLine(edge), kind: edge.kind, step: stepOf(edge) } });
     }
     return els;
-  }, [model, nodeLabel, relationText, positions, sizeOf]);
+  }, [model, nodeLabel, positions, sizeOf, labelledLine, scale, drawn, stepOf]);
   const elementsRef = useRef(elements);
   elementsRef.current = elements;
 
@@ -321,19 +440,46 @@ export function EvidenceGraph({
     const level = Math.max(READABLE_ZOOM, Math.min(1.1, (cy.width() - 48) / Math.max(1, box.w)));
     cy.zoom(level);
     const focal = cy.nodes("[role = 'focal']").boundingBox();
-    cy.pan({ x: cy.width() / 2 - ((box.x1 + box.x2) / 2) * level, y: cy.height() / 2 - ((focal.y1 + focal.y2) / 2) * level });
+    // Centre the whole width when it fits (one side may have deeper columns), else the pair.
+    const across = box.w * level <= cy.width() - 48 ? box : focal;
+    cy.pan({ x: cy.width() / 2 - ((across.x1 + across.x2) / 2) * level, y: cy.height() / 2 - ((focal.y1 + focal.y2) / 2) * level });
   }, []);
 
+  /**
+   * Pan (never zoom) so a selected line and both its ends are on the canvas, with both compared
+   * concepts too when they fit; otherwise as close to them as the selection allows.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const keepInView = useCallback((cy: any, edgeId: string | null) => {
+    const edge = edgeId ? cy.getElementById(edgeId) : null;
+    if (!edge || edge.empty()) return;
+    const selection = edge.union(edge.connectedNodes());
+    const own = selection.renderedBoundingBox();
+    const wanted = selection.union(cy.nodes("[role = 'focal']")).renderedBoundingBox();
+    const margin = 24;
+    const shift = (lo: number, hi: number, wantLo: number, wantHi: number, size: number) => {
+      const ideal = wantHi - wantLo <= size - 2 * margin ? (wantLo < margin ? margin - wantLo : wantHi > size - margin ? size - margin - wantHi : 0) : size / 2 - (wantLo + wantHi) / 2;
+      const [min, max] = [margin - lo, size - margin - hi];
+      return min > max ? min : Math.min(max, Math.max(min, ideal));
+    };
+    const dx = shift(own.x1, own.x2, wanted.x1, wanted.x2, cy.width());
+    const dy = shift(own.y1, own.y2, wanted.y1, wanted.y2, cy.height());
+    if (dx || dy) cy.panBy({ x: dx, y: dy });
+  }, []);
+
+  /** Select a line or node. Choosing it from a list (`reveal`) pans it into view if needed; a tap never moves the view. */
   const choose = useCallback(
-    (edge: ModelEdge | null, node: ModelNode | null) => {
+    (edge: ModelEdge | null, node: ModelNode | null, reveal = false) => {
       setFocusEdgeId(edge?.id ?? null);
       setFocusNodeId(node?.id ?? null);
+      setFocusEvidence(null);
       const group = edge?.kind === "group" ? edge.side : node?.role === "group" ? node.side : null;
       if (group) {
         setLiterals((current) => Array.from(new Set([...current, group])));
         return;
       }
       if (!edge) return;
+      if (reveal) setRevealEdge(edge.id);
       onSelect(edge.evidenceId ?? null);
       // Only a feature line is evidence; bridges and context lines are inspection only (21 F01).
       report({ type: "graph_edge", edgeKind: edge.kind as Exclude<ModelEdge["kind"], "group">, evidenceId: edge.evidenceId ?? null, factId: edge.factId ?? null });
@@ -342,6 +488,27 @@ export function EvidenceGraph({
   );
   const chooseRef = useRef(choose);
   chooseRef.current = choose;
+
+  // A feature chosen elsewhere resolves to exactly its records (S0-R3): reveal a grouped record,
+  // focus its line, or clear any unrelated previous focus and say why it is not drawn.
+  useEffect(() => {
+    if (!selected) return;
+    const current = modelRef.current.edges.find((edge) => edge.id === focusEdgeId);
+    if (current?.evidenceId === selected || focusEvidence === selected) return;
+    const records = baseRef.current.records.filter((record) => record.evidenceId === selected);
+    const drawable = records.find((record) => record.status === "drawn" || record.status === "grouped");
+    setFocusNodeId(null);
+    if (drawable?.edgeId) {
+      if (drawable.status === "grouped") setLiterals((sides) => Array.from(new Set([...sides, drawable.side])));
+      setFocusEdgeId(drawable.edgeId);
+      setFocusEvidence(null);
+      setRevealEdge(drawable.edgeId);
+    } else {
+      setFocusEdgeId(null);
+      setFocusEvidence(selected);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected]);
 
   // Create once per compared pair; everything else updates the existing graph in place.
   useEffect(() => {
@@ -372,17 +539,36 @@ export function EvidenceGraph({
         maxZoom: 2.5,
       });
       const previous = views.get(viewKey);
+      let size: Size = { w: cy.width(), h: cy.height() };
+      drawnScale.current = scaleRef.current;
       if (previous && previous.zoom > 0) {
         cy.zoom(previous.zoom);
-        cy.pan(previous.pan);
+        const ratio = scaleRef.current / previous.scale;
+        if (ratio === 1 && previous.size.w === size.w && previous.size.h === size.h) cy.pan(previous.pan);
+        else {
+          // The text size or canvas changed while away: same zoom and centre, selection in view.
+          const centre = centreOf(previous.pan, previous.zoom, previous.size);
+          cy.pan({ x: size.w / 2 - centre.x * ratio * previous.zoom, y: size.h / 2 - centre.y * ratio * previous.zoom });
+          keepInView(cy, focusEdgeRef.current);
+        }
       } else initialView(cy);
-      cy.on("viewport", () => save({ zoom: cy.zoom(), pan: { ...cy.pan() } }));
-      save({ zoom: cy.zoom(), pan: { ...cy.pan() } });
+      const view = () => save({ zoom: cy.zoom(), pan: { ...cy.pan() }, scale: drawnScale.current, size: { w: cy.width(), h: cy.height() } });
+      cy.on("viewport", view);
+      view();
       cy.on("tap", "node", (event: { target: { id: () => string } }) => chooseRef.current(null, modelRef.current.nodes.find((node) => node.id === event.target.id()) ?? null));
       cy.on("tap", "edge", (event: { target: { id: () => string } }) => chooseRef.current(modelRef.current.edges.find((edge) => edge.id === event.target.id()) ?? null, null));
       cyRef.current = cy;
-      // A resized container (layout switch, text size) keeps the same view.
-      observer = new ResizeObserver(() => cy.resize());
+      setReady((value) => value + 1);
+      // A resized container (layout switch, text size) keeps its centre and the selection in view.
+      observer = new ResizeObserver(() => {
+        cy.resize();
+        const next: Size = { w: cy.width(), h: cy.height() };
+        if (next.w === size.w && next.h === size.h) return;
+        cy.panBy({ x: (next.w - size.w) / 2, y: (next.h - size.h) / 2 });
+        size = next;
+        keepInView(cy, focusEdgeRef.current);
+        view();
+      });
       observer.observe(container.current);
     })();
     return () => {
@@ -394,10 +580,13 @@ export function EvidenceGraph({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewKey]);
 
-  // Sync elements (labels, expansions) and theme without moving the view.
+  // Sync elements (labels, expansions, text size) and theme. A text-size change spreads the
+  // layout, so the same zoom and centre are kept and the selection stays in view (21 F01).
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
+    const ratio = scale / drawnScale.current;
+    const centre = centreOf(cy.pan(), cy.zoom(), { w: cy.width(), h: cy.height() });
     cy.batch(() => {
       const wanted = elements() as { group: string; data: { id: string } & Record<string, unknown>; position?: { x: number; y: number } }[];
       const ids = new Set(wanted.map((element) => element.data.id));
@@ -413,34 +602,34 @@ export function EvidenceGraph({
       }
       cy.style(styles());
     });
-  }, [elements, styles, themeVersion]);
+    if (ratio !== 1) {
+      drawnScale.current = scale;
+      cy.pan({ x: cy.width() / 2 - centre.x * ratio * cy.zoom(), y: cy.height() / 2 - centre.y * ratio * cy.zoom() });
+      keepInView(cy, focusEdgeRef.current);
+    }
+  }, [elements, styles, themeVersion, scale, keepInView]);
 
-  // Selection (here or from the list) highlights its line and fades the rest; the view never moves.
+  // Selection highlights its line or node and de-emphasises the rest; the view never moves.
   useEffect(() => {
     const cy = cyRef.current;
     if (!cy) return;
     cy.elements().unselect().removeClass("faded");
-    const edges = focusEdgeId ? cy.getElementById(focusEdgeId) : selected ? cy.edges().filter((edge: { data: (key: string) => string }) => edge.data("id").startsWith(`e:${selected}:`)) : null;
+    const edge = focusEdgeId ? cy.getElementById(focusEdgeId) : null;
     const node = focusNodeId ? cy.getElementById(focusNodeId) : null;
-    const chosen = edges?.nonempty() ? edges : node?.nonempty() ? node : null;
+    const chosen = edge?.nonempty() ? edge : node?.nonempty() ? node : null;
     if (!chosen) return;
     chosen.select();
     const keep = chosen.union(chosen.connectedNodes()).union(chosen.connectedEdges());
     cy.elements().difference(keep).addClass("faded");
-  }, [selected, focusEdgeId, focusNodeId, elements]);
+  }, [focusEdgeId, focusNodeId, elements, ready]);
 
-  // A feature chosen in the evidence list becomes this view's selection.
+  // An explicit reveal (from the evidence list) brings its line into view, keeping the zoom.
   useEffect(() => {
-    if (!selected) return;
-    const current = modelRef.current.edges.find((edge) => edge.id === focusEdgeId);
-    if (current?.evidenceId === selected) return;
-    const first = modelRef.current.edges.find((edge) => edge.evidenceId === selected);
-    if (first) {
-      setFocusEdgeId(first.id);
-      setFocusNodeId(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected]);
+    const cy = cyRef.current;
+    if (!cy || !revealEdge || cy.getElementById(revealEdge).empty()) return;
+    keepInView(cy, revealEdge);
+    setRevealEdge(null);
+  }, [revealEdge, elements, ready, keepInView]);
 
   const zoom = (factor: number) => {
     const cy = cyRef.current;
@@ -462,6 +651,7 @@ export function EvidenceGraph({
     initialView(cy);
     setFocusEdgeId(null);
     setFocusNodeId(null);
+    setFocusEvidence(null);
     onSelect(null);
     report({ type: "graph_reset" });
   };
@@ -481,7 +671,7 @@ export function EvidenceGraph({
         const id = entityNodeId(node.side, { ontology_version_id: node.ontology, kind: edge.parent.kind, iri: edge.parent.iri });
         if (!model.nodes.some((item) => item.id === id)) nodes.push({ id, side: node.side, role: "context", ontology: node.ontology, kind: edge.parent.kind, iri: edge.parent.iri, depth: node.depth + 1, order: index, anchor: node.id });
         const kind = edge.basis === "structural_navigation" ? "structural" : edge.basis === "reasoner_inferred" ? "inferred" : "asserted";
-        edges.push({ id: `h:${node.side}:${edge.id}`, source: node.id, target: id, kind, side: node.side, relation: { text: node.kind === "class" ? "subclass of" : node.kind === "individual" ? "instance of" : "subproperty of" } });
+        edges.push({ id: `h:${node.side}:${node.id}:${edge.id}`, source: node.id, target: id, kind, side: node.side, relation: { text: node.kind === "class" ? "subclass of" : node.kind === "individual" ? "instance of" : "subproperty of" } });
       });
       if (!edges.length) {
         setExpandError(page.status === "absent_in_scope" ? "No asserted parent is shown for this node." : page.reason ?? "Parents of this node are not available here.");
@@ -498,7 +688,6 @@ export function EvidenceGraph({
   const features = model.edges.filter((edge) => edge.kind === "feature");
   const bridges = model.edges.filter((edge) => edge.kind === "bridge");
   const added = model.edges.filter((edge) => ["asserted", "structural", "inferred"].includes(edge.kind));
-  const nodeById = (id: string) => model.nodes.find((node) => node.id === id);
   const itemText = (edge: ModelEdge) => {
     const to = nodeById(edge.target);
     const name = to?.role === "literal" ? `“${clip(to.text ?? "", 60)}”` : to ? entityName(to) : "";
@@ -508,6 +697,44 @@ export function EvidenceGraph({
     return `${from ? entityName(from) : ""} ${relationText(edge)} ${name}`.trim();
   };
   const legendKinds = (["feature", "bridge", "asserted", "structural", "inferred"] as EdgeKind[]).filter((kind) => kind === "feature" || model.edges.some((edge) => edge.kind === kind));
+  const itemOf = (evidenceId: string) => bundle.items.find((item) => item.evidence_id === evidenceId) ?? null;
+  const openRecord = (evidenceId: string, factId: string) => {
+    const item = itemOf(evidenceId);
+    const subject = item?.entity ?? (item?.side === "target" ? target : source);
+    inspector?.open({ factId, ontologies: [subject.ontology_version_id], subject }, `${channelName(item?.channel ?? "")} record`, "record");
+  };
+
+  /** Every record of one feature, with where it is in the graph; drawn ones can be selected. */
+  const recordList = (evidenceId: string, current: string | null) => {
+    const records = base.records.filter((record) => record.evidenceId === evidenceId);
+    if (records.length < 2 && records.every((record) => record.edgeId === current)) return null;
+    return (
+      <ul className="graph-records" aria-label="Records of this feature">
+        {records.map((record, index) => {
+          const edge = record.edgeId ? model.edges.find((item) => item.id === record.edgeId) : null;
+          return (
+            <li key={`${record.factId ?? "none"}-${index}`}>
+              <span>
+                {edge && record.edgeId !== current ? (
+                  <button type="button" className="link-btn" onClick={() => choose(edge, null, true)}>
+                    {itemText(edge)}
+                  </button>
+                ) : (
+                  (edge ? itemText(edge) : `Record ${index + 1}`)
+                )}
+                <span className="meta"> · {record.edgeId === current ? "selected" : RECORD_STATE[record.status]}</span>
+              </span>
+              {record.factId && !edge && inspector && (
+                <button type="button" className="btn btn-sm" onClick={() => openRecord(evidenceId, record.factId!)}>
+                  Original record
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
 
   const inspectorBody = () => {
     if (focusEdge) {
@@ -525,17 +752,19 @@ export function EvidenceGraph({
         );
       }
       if (focusEdge.kind === "feature") {
-        const subject = focusEdge.side === "source" ? source : target;
         return (
           <>
             <h4 className="graph-inspector-title">
               {channelName(focusEdge.channel ?? "")} feature · {focusEdge.side === "source" ? "source" : "target"}
             </h4>
-            <p className="fact-reading">{itemText(focusEdge)}</p>
+            <p className="fact-reading" data-fact-id={focusEdge.factId ?? undefined}>
+              {itemText(focusEdge)}
+            </p>
             <p className="meta">{meaning}</p>
+            {focusEdge.evidenceId && recordList(focusEdge.evidenceId, focusEdge.id)}
             <div className="graph-inspector-actions">
-              {inspector && focusEdge.factId && (
-                <button type="button" className="btn btn-sm" onClick={() => inspector.open({ factId: focusEdge.factId!, ontologies: [subject.ontology_version_id], subject }, `${channelName(focusEdge.channel ?? "")} record`, "record")}>
+              {inspector && focusEdge.factId && focusEdge.evidenceId && (
+                <button type="button" className="btn btn-sm" onClick={() => openRecord(focusEdge.evidenceId!, focusEdge.factId!)}>
                   Original record
                 </button>
               )}
@@ -557,6 +786,41 @@ export function EvidenceGraph({
         <>
           <h4 className="graph-inspector-title">{itemText(focusEdge)}</h4>
           <p className="meta">{meaning}</p>
+        </>
+      );
+    }
+    if (focusEvidence) {
+      const item = itemOf(focusEvidence);
+      return (
+        <>
+          <h4 className="graph-inspector-title">
+            {channelName(item?.channel ?? "")} feature · {item?.side === "target" ? "target" : "source"}
+          </h4>
+          <p>This feature is not drawn in the graph.</p>
+          {recordList(focusEvidence, null) ?? (
+            <ul className="graph-records" aria-label="Records of this feature">
+              {base.records
+                .filter((record) => record.evidenceId === focusEvidence)
+                .map((record, index) => (
+                  <li key={index}>
+                    <span>Record {index + 1}</span>
+                    <span className="meta"> · {RECORD_STATE[record.status]}</span>
+                    {record.factId && inspector && (
+                      <button type="button" className="btn btn-sm" onClick={() => openRecord(focusEvidence, record.factId!)}>
+                        Original record
+                      </button>
+                    )}
+                  </li>
+                ))}
+            </ul>
+          )}
+          {onShowInList && (
+            <div className="graph-inspector-actions">
+              <button type="button" className="btn btn-sm btn-quiet" onClick={() => onShowInList(focusEvidence)}>
+                Show in evidence list
+              </button>
+            </div>
+          )}
         </>
       );
     }
@@ -608,7 +872,7 @@ export function EvidenceGraph({
             {legendKinds.map((kind) => (
               <span key={kind}>
                 <EdgeGlyph kind={kind} />
-                {kind === "feature" ? "Feature Exact used" : kind === "bridge" ? "Kind compared on both sides" : kind === "asserted" ? "Added: asserted parent" : kind === "structural" ? "Added: structural" : "Added: inferred"}
+                {kind === "feature" ? "Feature Exact used (its relation is on the line)" : kind === "bridge" ? "Kind compared on both sides" : kind === "asserted" ? "Added: asserted parent" : kind === "structural" ? "Added: structural" : "Added: inferred"}
               </span>
             ))}
             <span>Rounded = source · cut corners = target</span>
@@ -624,6 +888,7 @@ export function EvidenceGraph({
               const own = features.filter((edge) => edge.side === side);
               const hidden = model.nodes.find((node) => node.role === "group" && node.side === side);
               const compared = model.nodes.find((node) => node.role === "focal" && node.side === side);
+              const undrawn = base.records.filter((record) => record.side === side && (record.status === "no_graph_form" || record.status === "unavailable"));
               return (
                 <section key={side}>
                   <h4>{side === "source" ? "Source features" : "Target features"}</h4>
@@ -636,24 +901,41 @@ export function EvidenceGraph({
                     <ul>
                       {own.map((edge) => (
                         <li key={edge.id}>
-                          <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} data-tour="graph-feature" onClick={() => choose(edge, null)}>
+                          <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} data-tour="graph-feature" data-evidence-id={edge.evidenceId} data-fact-id={edge.factId ?? undefined} onClick={() => choose(edge, null, true)}>
                             <span className="graph-item-kind">{channelName(edge.channel ?? "")}</span> {itemText(edge)}
                           </button>
                         </li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="meta">None shown.</p>
+                    !hidden && !undrawn.length && <p className="meta">None shown.</p>
                   )}
                   {hidden && (
                     <button type="button" className="link-btn" onClick={() => setLiterals((current) => Array.from(new Set([...current, side])))}>
                       Show {hidden.count} more records
                     </button>
                   )}
-                  {base.omitted[side] > 0 && (
-                    <p className="meta">
-                      {base.omitted[side]} {base.omitted[side] === 1 ? "record has" : "records have"} no graph form; see the evidence list.
-                    </p>
+                  {undrawn.length > 0 && (
+                    <ul>
+                      {undrawn.map((record, index) => (
+                        <li key={`${record.evidenceId}-${record.factId ?? index}`}>
+                          <button
+                            type="button"
+                            className={focusEvidence === record.evidenceId ? "graph-item on" : "graph-item"}
+                            aria-pressed={focusEvidence === record.evidenceId}
+                            data-evidence-id={record.evidenceId}
+                            onClick={() => {
+                              setFocusEdgeId(null);
+                              setFocusNodeId(null);
+                              setFocusEvidence(record.evidenceId);
+                              onSelect(record.evidenceId);
+                            }}
+                          >
+                            <span className="graph-item-kind">{channelName(record.channel)}</span> record not drawn
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   )}
                 </section>
               );
@@ -664,7 +946,7 @@ export function EvidenceGraph({
                 <ul>
                   {bridges.map((edge) => (
                     <li key={edge.id}>
-                      <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null)}>
+                      <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
                         {relationText(edge)}
                       </button>
                     </li>
@@ -681,7 +963,7 @@ export function EvidenceGraph({
                 <ul>
                   {added.map((edge) => (
                     <li key={edge.id}>
-                      <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null)}>
+                      <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
                         {itemText(edge)}
                       </button>
                     </li>

@@ -12,9 +12,17 @@
 //   that two features correspond. A channel recorded on one side only gets no line.
 // - Ontology context added on request is a different kind of line and never a feature.
 //
+// - Each feature line carries its own relation (predicate and qualifier). Entity nodes show only
+//   the entity, so two relationships that share a target never borrow each other's meaning
+//   (S0-R1); literal records keep their predicate in their own fact-scoped node.
+// - Every selected record has a status (drawn, grouped behind a count, no graph form, or not
+//   available), so a selection from the evidence list can reveal exactly that record or say why
+//   it is not drawn (S0-R3).
+//
 // Layout: source on the left, target on the right, each side's features in a column outside its
-// compared entity, ordered by kind; expansions in further columns. Heights come from the label
-// lines, and each column is swept so nothing overlaps (no fixed wide rows).
+// compared entity, ordered by kind, with room between for the relation labels; expansions in
+// further columns. Heights come from the label lines, and each column is swept so nothing
+// overlaps (no fixed wide rows). Distances scale with the reader's text size.
 
 import type { EntityKind, EntityRef, OwlNode, SelectedEvidence } from "./types";
 
@@ -51,9 +59,22 @@ export interface ModelEdge {
   relation: { text?: string; property?: string; quantifier?: string };
 }
 
+/** Where one selected record ended up in the graph. */
+export interface ModelRecord {
+  evidenceId: string;
+  factId: string | null;
+  side: GraphSide;
+  channel: string;
+  status: "drawn" | "grouped" | "no_graph_form" | "unavailable";
+  /** The feature line for a drawn or grouped record (grouped lines appear when the group is shown). */
+  edgeId?: string;
+}
+
 export interface GraphModel {
   nodes: ModelNode[];
   edges: ModelEdge[];
+  /** Every selected record, in evidence order, including those not drawn. */
+  records: ModelRecord[];
   /** Records with no supported graph form, per side (they stay in the evidence list). */
   omitted: { source: number; target: number };
   /** Channels with features on one side only (no comparison line is drawn for them). */
@@ -115,17 +136,23 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
     return id;
   };
   const sides = { source: new Set<string>(), target: new Set<string>() };
-  const literals: { side: GraphSide; build: () => void }[] = [];
+  const literals: { side: GraphSide; record: ModelRecord; build: () => void }[] = [];
+  const records: ModelRecord[] = [];
   for (const item of items) {
     const side = item.side;
     sides[side].add(item.channel);
     const from = focal[side];
     const ontology = item.entity.ontology_version_id;
+    if (!item.fact_ids.length) records.push({ evidenceId: item.evidence_id, factId: null, side, channel: item.channel, status: "unavailable" });
     for (const factId of item.fact_ids) {
       const ast = axioms[factId]?.ast as OwlNode | undefined;
       const base = { kind: "feature" as const, side, channel: item.channel, evidenceId: item.evidence_id, factId };
       const id = `e:${item.evidence_id}:${factId}`;
+      const record: ModelRecord = { evidenceId: item.evidence_id, factId, side, channel: item.channel, status: "drawn", edgeId: id };
+      records.push(record);
       if (!ast) {
+        record.status = item.status === "available" ? "no_graph_form" : "unavailable";
+        delete record.edgeId;
         omitted[side] += 1;
         continue;
       }
@@ -150,6 +177,7 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
         const property = iriOf(ast.property);
         literals.push({
           side,
+          record,
           build: () => {
             const node = `lit:${side}:${factId}`;
             nodes.set(node, { id: node, side, role: "literal", ontology, kind: "class", text, depth: 1, order: 2 });
@@ -158,6 +186,8 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
         });
         continue;
       }
+      record.status = "no_graph_form";
+      delete record.edgeId;
       omitted[side] += 1;
     }
   }
@@ -165,6 +195,7 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
     const own = literals.filter((item) => item.side === side);
     const shown = options.expandLiterals?.has(side) || own.length <= LITERAL_LIMIT ? own : own.slice(0, LITERAL_LIMIT - 1);
     shown.forEach((item) => item.build());
+    own.filter((item) => !shown.includes(item)).forEach((item) => (item.record.status = "grouped"));
     const hidden = own.length - shown.length;
     if (hidden > 0) {
       const id = `group:${side}`;
@@ -177,7 +208,7 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
     if (sides.source.has(channel) && sides.target.has(channel)) edges.push({ id: `bridge:${channel}`, source: focal.source, target: focal.target, kind: "bridge", channel, relation: {} });
     else oneSided.push({ channel, side: sides.source.has(channel) ? "source" : "target" });
   }
-  return { nodes: Array.from(nodes.values()), edges, omitted, oneSided };
+  return { nodes: Array.from(nodes.values()), edges, records, omitted, oneSided };
 }
 
 export interface Size {
@@ -185,11 +216,15 @@ export interface Size {
   height: number;
 }
 
-/** Column-based layout with per-column overlap sweeps. `size` gives each node's drawn box. */
-export function layoutGraph(nodes: ModelNode[], size: (node: ModelNode) => Size, gap = 18): Record<string, { x: number; y: number }> {
+/**
+ * Column-based layout with per-column overlap sweeps. `size` gives each node's drawn box; `scale`
+ * is the reader's text size, so enlarged labels get proportionally more room. The gap between
+ * a compared entity and its feature column holds the feature lines' relation labels.
+ */
+export function layoutGraph(nodes: ModelNode[], size: (node: ModelNode) => Size, gap = 18, scale = 1): Record<string, { x: number; y: number }> {
   const positions: Record<string, { x: number; y: number }> = {};
-  // Compact columns so the focal pair and its features read at the starting zoom.
-  const column = (side: GraphSide, depth: number) => (side === "source" ? -1 : 1) * (depth === 0 ? 150 : 430 + 280 * (depth - 1));
+  const column = (side: GraphSide, depth: number) => (side === "source" ? -1 : 1) * scale * (depth === 0 ? 130 : 475 + 270 * (depth - 1));
+  gap *= scale;
   for (const side of ["source", "target"] as GraphSide[]) {
     const focal = nodes.find((node) => node.side === side && node.role === "focal");
     if (focal) positions[focal.id] = { x: column(side, 0), y: 0 };
