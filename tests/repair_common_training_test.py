@@ -314,3 +314,17 @@ def test_interrupted_dev_case_keeps_its_deadline_on_resume(tmp_path, monkeypatch
     assert (
         saved["history"][0]["generated"][dev[0][0].case_id]["status"] == "case_budget_unavailable"
     )
+
+
+def test_successor_stage_reservations_fit_inside_model_limit():
+    from tools.repair.prepare_common_training import bounded_fit_resources
+
+    base = load_protocol_v3(
+        Path("specs/exact-repair/protocol/xr21-review2-conformance.json")
+    ).model_dump(by_alias=True)
+    original = dict(base["resources"])
+    base["resources"] = bounded_fit_resources(base["resources"])
+    assert original["campaign_wall_seconds"] != base["resources"]["campaign_wall_seconds"]
+    assert sum(base["resources"]["stage_wall_seconds"].values()) == 21600
+    assert sum(base["resources"]["stage_cpu_seconds"].values()) == 86400
+    RepairProtocolV3.model_validate(base)

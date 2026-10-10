@@ -7,6 +7,7 @@ hosted call. A later admission successor must resolve every listed runtime gate.
 from __future__ import annotations
 
 import argparse
+import copy
 from collections import Counter, defaultdict
 import json
 from pathlib import Path
@@ -106,6 +107,22 @@ def native_calibration_observation(campaign, registry):
         },
         scope="exposed engineering calibration; no trained-model or target selection evidence",
     )
+
+
+def bounded_fit_resources(template):
+    """Reserve finite loader stages inside, not in addition to, the model cap."""
+    resources = copy.deepcopy(template)
+    resources.update(
+        allocated_gpus=1,
+        concurrency=1,
+        case_wall_seconds=392.0,
+        campaign_wall_seconds=21600.0,
+        campaign_gpu_hours=3.0,
+        campaign_cpu_seconds=86400.0,
+    )
+    resources["stage_wall_seconds"] = dict(corpus=1.0, label=1.0, train=21598.0)
+    resources["stage_cpu_seconds"] = dict(corpus=4.0, label=4.0, train=86392.0)
+    return resources
 
 
 def prepare(campaign, output):
@@ -251,7 +268,7 @@ def prepare(campaign, output):
                 code_hash=source["code_hash"],
                 dirty_hash=source["dirty_hash"],
                 purpose="development",
-                run_id=f"common-training-001-{condition}-s{seed}",
+                run_id=f"{output.name}-{condition}-s{seed}",
             )
             own = [
                 r
@@ -271,14 +288,7 @@ def prepare(campaign, output):
                     r["case_seconds"] for r in own if r["selection_slot"]["epoch"] == 50
                 ),
             )
-            protocol["resources"].update(
-                allocated_gpus=1,
-                concurrency=1,
-                case_wall_seconds=392.0,
-                campaign_wall_seconds=21600.0,
-                campaign_gpu_hours=3.0,
-            )
-            protocol["resources"]["stage_wall_seconds"]["train"] = 21600.0
+            protocol["resources"] = bounded_fit_resources(protocol["resources"])
             protocol["losses"]["scale_alignment"] = "UNFROZEN/TRAIN-only-weak-scale-calibration"
             protocol["llm_labels"].update(
                 teacher_profile="UNFROZEN/four-model-panel-selection",
@@ -362,11 +372,103 @@ def prepare(campaign, output):
     return result
 
 
+def audit_prepared(prepared_path, output):
+    """Validate committed metadata without optimization, annotation or outcomes."""
+    from tools.repair.prepare import load_preparation
+    from tools.repair.common_training import validate_closed_preparation
+    from tools.repair.shared_release import authenticate
+    from exact.repair.protocol import load_protocol_v3, training_projection_v3
+
+    prepared_path, output = Path(prepared_path), Path(output)
+    prepared = read(prepared_path)
+    if prepared["status"] != "prepared_not_queued" or prepared["fit_execution_authorized"]:
+        raise ValueError("Expected an inert common training preparation")
+    refs = prepared["preparations"]
+    if len(refs) != 6:
+        raise ValueError("Expected exactly six paired preparations")
+    cases, caches, report = load_preparation(authenticate(refs[0]))
+    schedule = bound(prepared["development_schedule"])
+    pairs = {}
+    for ref in refs:
+        value = bound(ref)
+        if canonical_hash({k: v for k, v in value.items() if k != "hash"}) != value["hash"]:
+            raise ValueError("Preparation identity changed")
+        if (
+            value["release"] != prepared["common_release"]
+            or value["audit_run"] != prepared["audit_run"]
+        ):
+            raise ValueError("Paired common data or receipt lineage changed")
+        model = load_protocol_v3(authenticate(value["protocol"]))
+        if model.identity.execution_authorized:
+            raise ValueError("Unresolved candidate protocol authorized execution")
+        protocol = training_projection_v3(model)
+        validate_closed_preparation(cases, report, protocol, case_limit=None, retry_labels=False)
+        seed, condition = model.training.seeds[0], model.losses.target_basis
+        if (seed, condition) in pairs:
+            raise ValueError("Duplicate paired model")
+        rows = [
+            r
+            for r in schedule["rows"]
+            if r["selection_slot"]["seed"] == seed
+            and r["selection_slot"]["supervision_condition"] == condition
+        ]
+        limits = {r["slot_id"]: r["case_seconds"] for r in rows}
+        reserve = sum(r["case_seconds"] for r in rows if r["selection_slot"]["epoch"] == 50)
+        if (
+            model.training.development_case_seconds != limits
+            or model.training.final_development_reserve_seconds != reserve
+        ):
+            raise ValueError("Protocol and remaining final DEV schedule disagree")
+        pairs[seed, condition] = dict(
+            model=model.model.model_dump(),
+            costs=model.objective.model_dump(),
+            limits=[r["case_seconds"] for r in rows],
+        )
+    if set(pairs) != {(seed, c) for seed in (13, 37, 73) for c in CONDITIONS}:
+        raise ValueError("Paired model denominator changed")
+    for seed in (13, 37, 73):
+        if pairs[seed, CONDITIONS[0]] != pairs[seed, CONDITIONS[1]]:
+            raise ValueError("Paired architecture/costs/schedule changed")
+    intentions = [bound(ref) for ref in prepared["train_annotation_intentions"]]
+    if any(d["authorized"] or len(d["slots"]) > 256 for d in intentions):
+        raise ValueError("TRAIN intention shard is authorized or oversized")
+    if sum(len(d["slots"]) for d in intentions) != 308:
+        raise ValueError("TRAIN intention denominator changed")
+    result = dict(
+        schema="exact-repair/common-training-preparation-audit/v1",
+        status="complete",
+        preparation=binding(prepared_path),
+        expected_train_cases=128,
+        expected_development_cases=32,
+        loaded_cases=len(cases),
+        caches=len(caches),
+        symbolic_labels=sum(len(c.labels) for c in caches.values()),
+        protocols=6,
+        development_rows=len(schedule["rows"]),
+        semantic_slots=schedule["unique_semantic_slots"],
+        swapped_calls=schedule["independent_swapped_calls"],
+        train_annotation_intentions=308,
+        heldout_outcomes_opened=False,
+        hosted_calls=0,
+        optimizer_updates=0,
+        fitting_admitted=False,
+    )
+    if len(cases) != 160 or report["selected_counts"] != {"train": 128, "development": 32}:
+        raise ValueError("Campaign TRAIN/DEV denominator changed")
+    immutable(output / "report.json", result)
+    return result
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--audit-prepared", action="store_true")
     parser.add_argument("campaign", type=Path)
     parser.add_argument("output", type=Path)
     args = parser.parse_args()
+    if args.audit_prepared:
+        result = audit_prepared(args.campaign, args.output)
+        print(json.dumps(result))
+        return
     result = prepare(args.campaign, args.output)
     print(
         json.dumps(
