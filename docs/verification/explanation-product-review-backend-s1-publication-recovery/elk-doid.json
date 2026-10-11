@@ -1,0 +1,249 @@
+{
+  "automatically_published": false,
+  "backend": {
+    "effective_workers": 6,
+    "fallback_reason": null,
+    "implementation_version": "0.2.1",
+    "name": "rust",
+    "native_available": true,
+    "requested_workers": 6
+  },
+  "classification": {
+    "complete": false,
+    "reasons": [
+      {
+        "constructors": [
+          "ObjectExactCardinality"
+        ],
+        "features": [
+          "OBJECT_EXACT_CARDINALITY"
+        ],
+        "polarities": [
+          "ANY"
+        ],
+        "task": "class_taxonomy"
+      },
+      {
+        "constructors": [
+          "ObjectMinCardinality"
+        ],
+        "features": [
+          "OBJECT_MIN_CARDINALITY"
+        ],
+        "polarities": [
+          "ANY"
+        ],
+        "task": "class_taxonomy"
+      },
+      {
+        "constructors": [
+          "ObjectUnionOf"
+        ],
+        "features": [
+          "OBJECT_UNION_OF_POSITIVE"
+        ],
+        "polarities": [
+          "POSITIVE"
+        ],
+        "task": "class_taxonomy"
+      }
+    ]
+  },
+  "consistency": {
+    "complete": false,
+    "reasons": [
+      {
+        "constructors": [
+          "ObjectExactCardinality"
+        ],
+        "features": [
+          "OBJECT_EXACT_CARDINALITY"
+        ],
+        "polarities": [
+          "ANY"
+        ],
+        "task": "consistency"
+      },
+      {
+        "constructors": [
+          "ObjectMinCardinality"
+        ],
+        "features": [
+          "OBJECT_MIN_CARDINALITY"
+        ],
+        "polarities": [
+          "ANY"
+        ],
+        "task": "consistency"
+      },
+      {
+        "constructors": [
+          "ObjectUnionOf"
+        ],
+        "features": [
+          "OBJECT_UNION_OF_POSITIVE"
+        ],
+        "polarities": [
+          "POSITIVE"
+        ],
+        "task": "consistency"
+      }
+    ],
+    "value": true
+  },
+  "diagnostics": {
+    "base_flattening_bytes": 0,
+    "base_rule_preparations": 1,
+    "cached_class_queries": 0,
+    "cached_entailment_queries": 0,
+    "class_query_base_preparations": 0,
+    "class_query_cache_bytes": 0,
+    "class_query_cache_evictions": 0,
+    "class_query_cache_hits": 0,
+    "class_query_cache_limit_bytes": 67108864,
+    "class_query_programs_prepared": 0,
+    "class_query_taxonomy_index_builds": 0,
+    "class_query_taxonomy_neighbor_visits": 0,
+    "class_query_taxonomy_traversals": 0,
+    "class_taxonomy_cached": false,
+    "compiler_cache_schema_version": 1,
+    "compiler_digest": "8222019b547ed849b41d94639e627e02464f25cb714b9711bb91402b63bfbaa2",
+    "compiler_disjoint_groups_count": 18,
+    "compiler_entities_count": 16393,
+    "compiler_equivalent_class_axioms_count": 731,
+    "compiler_expression_occurrences_count": 19124,
+    "compiler_expressions_count": 19124,
+    "compiler_feature_counts_count": 79,
+    "compiler_property_chains_count": 18,
+    "compiler_property_occurrences_count": 18,
+    "compiler_property_ranges_count": 0,
+    "compiler_source_fingerprint": "a09db2a37ef128a1f3eb1912e12b11441e80751009534c5c9bb84bd32a5f108a",
+    "compiler_source_fingerprint_count": 1,
+    "compiler_subclass_axioms_count": 26843,
+    "compiler_subproperty_axioms_count": 0,
+    "conclusion_candidates": 0,
+    "conclusions_inserted": 0,
+    "consumer_compile_seconds": 0.4503641617484391,
+    "context_count": 0,
+    "contexts_created": 0,
+    "duplicate_candidates": 0,
+    "effective_workers": 6,
+    "encoded_buffer_bytes": 14854704,
+    "encoded_buffer_count": 11,
+    "encoded_compiler_gil_released": true,
+    "encoded_compiler_seconds": 0.350388484,
+    "encoded_detached_buffer_count": 11,
+    "encoded_indexed_buffer_count": 0,
+    "encoded_native_boundary_seconds": 0.449719762,
+    "encoded_posting_bytes": 0,
+    "encoded_private_ir_bytes": 0,
+    "encoded_referenced_view_count": 0,
+    "encoded_segment_count": 1,
+    "encoded_session_build_seconds": 0.010087433,
+    "encoded_staging_copy_bytes": 0,
+    "encoded_validation_seconds": 0.08924316,
+    "encoded_view_publication_seconds": 3.273778351955116,
+    "encoded_zero_copy_buffers": 11,
+    "implementation_version": "0.2.1",
+    "inconsistent_ontology": false,
+    "ingestion_path": "encoded-native",
+    "ir_schema_version": 1,
+    "materialized_scalar_rows": 0,
+    "native_abi_version": "abi3-py310",
+    "native_core_receipt_validated": true,
+    "native_live_result_envelopes": 0,
+    "native_metadata_domain_copies": 0,
+    "native_metadata_validation": true,
+    "native_pipeline_required": true,
+    "native_result_publications": 0,
+    "native_result_validation": true,
+    "native_symbol_lookups": 0,
+    "native_symbol_rows_materialized": 0,
+    "object_property_taxonomy_cached": false,
+    "parser_calls": 0,
+    "per_row_ffi_calls": 0,
+    "product_candidates": 0,
+    "realization_cached": false,
+    "resolver_calls": 0,
+    "rule_dispatches": 0,
+    "scalar_axiom_materializations": 0,
+    "scalar_term_materializations": 0,
+    "stage": "properties",
+    "structural_copy_bytes": 0,
+    "wire_decoder_calls": 0,
+    "wire_encoder_calls": 0
+  },
+  "eligible_for_integration_review": false,
+  "host": "liseda-t2",
+  "input": {
+    "name": "doid",
+    "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+    "policy_hash": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "receipt": "inputs/doid.receipt.json",
+    "receipt_sha256": "sha256:9cad3ae40290d9d4aa169022180d6ced0433cb46513180d76c8165810312987d",
+    "scope": "root",
+    "source": "inputs/doid.ofn",
+    "source_sha256": "sha256:34e9908e69be6e4406b7b1774d13d90062eff2546c83305c20bf8be9e6871e30"
+  },
+  "manifest_sha256": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+  "options": {
+    "backend": "rust",
+    "parser_memory_bytes": 42949672960,
+    "require_native_pipeline": true,
+    "seconds_per_input": 108000,
+    "unsupported": "ignore_with_explicit_incompleteness",
+    "workers": 6
+  },
+  "parse": {
+    "axioms": 91530,
+    "backend": "native",
+    "complete": true,
+    "documents": 1
+  },
+  "peak_rss_bytes": 269471744,
+  "phases": [
+    {
+      "phase": "native_parse",
+      "seconds": 3.7506538750603795,
+      "status": "complete"
+    },
+    {
+      "phase": "native_admission",
+      "seconds": 3.7835515062324703,
+      "status": "complete"
+    },
+    {
+      "phase": "consistency",
+      "seconds": 0.0007067769765853882,
+      "status": "complete"
+    },
+    {
+      "phase": "classification",
+      "seconds": 0.5493630468845367,
+      "status": "complete"
+    },
+    {
+      "phase": "taxonomy_export",
+      "seconds": 0.28053451515734196,
+      "status": "complete"
+    }
+  ],
+  "runner_sha256": "sha256:a0ebe08f6e8e42a0ccfee41a67c4e1a791451145b2d6de2af03ce6995646a0d1",
+  "schema": "exact-cluster-elk-result/1",
+  "seconds": 8.547376779839396,
+  "slurm_job_id": "14455",
+  "source_documents": [
+    "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb"
+  ],
+  "status": "completed_incomplete",
+  "taxonomy": {
+    "direct_edges": 35333,
+    "nodes": 16375,
+    "path": "taxonomy.partial.json",
+    "sha256": "sha256:8563d5690fd1a52669f76460c57f4e12e69e65b5910c333d7e22dd838c3d1cd5"
+  },
+  "versions": {
+    "pyelk-reasoner": "0.2.1",
+    "pyowl-core": "0.2.1"
+  }
+}

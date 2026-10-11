@@ -1,5 +1,7 @@
 # Backend S1 contracts for frontend S2
 
+**Post-migration resumption, 11 October 2026:** See the [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) and its live-status paths. The failed assembly described below is historical; a separate cache-only continuation now owns completion and new verification.
+
 **Prose recovery, 2026-10-10:** The [generation recovery handoff](explanation-product-review-backend-s1-prose-recovery.md)
 supersedes the authentication blocker below: 74 real profiles and 12 comparisons completed;
 separate claim review admitted 56 profile artifacts and eight comparison artifacts. Unsupported

@@ -1,5 +1,7 @@
 # Backend S1: provider prose recovery
 
+**Post-migration resumption, 11 October 2026:** See the [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) and its live-status paths. The failed assembly described below is historical; a separate cache-only continuation now owns completion and new verification.
+
 **2026-10-10.** This is the B04 follow-up after the user replaced the expired OpenRouter
 credential. Starting checkout: `66b588ce979eab1b9b0b446d7eba9d61712b549d`.
 The [machine receipt](explanation-product-review-backend-s1-prose-recovery/receipt.json)

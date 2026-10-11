@@ -1,0 +1,9 @@
+{
+  "doid_hermit_14460": "running at one read-only scheduler check",
+  "ncit_hermit_14462": "pending dependency at the same check",
+  "admission_14461": "completed",
+  "changes_to_jobs": false,
+  "blocking_publication": false,
+  "recorded_at": "2026-10-11T16:22:01.708137+00:00",
+  "timing_note": "Scheduler states were observed earlier in this turn; not a fresh poll at record creation."
+}

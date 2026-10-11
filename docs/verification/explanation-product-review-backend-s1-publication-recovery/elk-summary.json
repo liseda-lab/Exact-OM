@@ -1,0 +1,22 @@
+{
+  "admission_only": false,
+  "automatically_published": false,
+  "current_input": "doid",
+  "manifest_sha256": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+  "results": [
+    {
+      "eligible_for_integration_review": false,
+      "name": "ncit",
+      "result_sha256": "sha256:8cd61822b26fb42332b2ac37f9fc829c39c669669a4cef54b32ed4c6dcfd1701",
+      "status": "completed_incomplete"
+    },
+    {
+      "eligible_for_integration_review": false,
+      "name": "doid",
+      "result_sha256": "sha256:63234a4f7d11d18ada3bfa10bb98417480eb9eb26674de0eab0c4a351346623d",
+      "status": "completed_incomplete"
+    }
+  ],
+  "schema": "exact-cluster-elk-run/1",
+  "status": "completed_with_incomplete_results"
+}

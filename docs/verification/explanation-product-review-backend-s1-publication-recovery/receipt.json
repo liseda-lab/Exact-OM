@@ -1,0 +1,167 @@
+{
+  "schema": "exact-study-publication-recovery/1",
+  "recorded_at": "2026-10-11T16:24:48.685088+00:00",
+  "starting_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
+  "historical_failure_evidence_commit": "77552fd",
+  "generation_implementation_commit": "3174f4bb1a67f3731f94271ff8ff88eb0b3b4d37",
+  "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+  "preparation_inputs": {
+    "cases": 24,
+    "contexts": {
+      "ontologies/0/manifest.json": "sha256:b005af9e3972687c7b15da783043a2b3e861fba4efe73673e320ec7a4289d652",
+      "ontologies/1/manifest.json": "sha256:bf80bce8910ad1bddb690c61de232e065c0b27c3eaa08c7f02a1d4958d83df82"
+    },
+    "description_preparation": "independent-prose/1",
+    "generate_pairs": 12,
+    "revision": "development-review-s1-prose-20261010",
+    "run_manifest": "sha256:85091d47a65dbdd2c5e4c0839948de42c390b38323a09d31bf364b8730de33a2",
+    "schema": "exact-review-preparation/1",
+    "source_decisions": "sha256:bb70a75555131af2eada72a792016b67ba56f66653a68389c83689f61dcdf251"
+  },
+  "selection_sha256": "sha256:671ea119aac934eea82c19eacc6959a2cf50515b1bde4b8ab21344e025a523fc",
+  "case_count": 24,
+  "presented_pairs": 120,
+  "candidate_pool": {
+    "candidate_pairs": 30374,
+    "covered_sources": 300,
+    "mean_pool_size": 101.24666666666667,
+    "pool_size_max": 158,
+    "pool_size_q50": 100.0,
+    "pool_size_q90": 100.0,
+    "pool_size_q95": 100.0,
+    "source_entities": 300
+  },
+  "candidate_pool_fingerprint": "5148597e23d8c7479842b09396996897a8876ba617acab1dc8ab86c5256bf5de",
+  "coverage": {
+    "absent_or_asymmetric_definitions": 5,
+    "close_alternatives": 16,
+    "multiple_parents": 20,
+    "restrictions_or_equivalences": 8,
+    "rich_definitions": 23
+  },
+  "missing_coverage": {
+    "absent_or_asymmetric_definitions": 0,
+    "close_alternatives": 0,
+    "multiple_parents": 0,
+    "restrictions_or_equivalences": 0,
+    "rich_definitions": 0,
+    "sparse_evidence": 3
+  },
+  "split_role": "development",
+  "reference_role": "valid",
+  "provider_plan_sha256": "sha256:99858ad647b9e8b06cc4e4020823704d23d72ae57d44eb381810af1fc94f780c",
+  "saved_review": {
+    "provider_requests": 86,
+    "approved_claims": 68,
+    "rejected_claims": 104,
+    "profiles_with_approved_prose": 56,
+    "comparisons_with_approved_prose": 8,
+    "fully_rejected_profiles": 18,
+    "fully_rejected_comparisons": 4,
+    "one_sided_comparisons": 2,
+    "missing_definition_profiles_without_approved_prose": 12
+  },
+  "new_paid_requests": 0,
+  "runtime_contract_hashes": {
+    "specs/explanation-framework/protocol/description-review.runtime-schema.json": "sha256:77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "specs/explanation-framework/protocol/exploration.runtime-openapi.json": "sha256:676fec06883c072896cb2cd98423b5a5b50cd8fcd4069668cac82fab1c3fdc72",
+    "specs/explanation-framework/protocol/review-about.runtime-schema.json": "sha256:75425ce843b5e157676a2d741ee2c185d2468a83bcbfd244c4e095cb30a6584c",
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "sha256:0b2fda6005b4092b2f8e4cce30b60002904c90e82710fea9a0ca6942799658c8",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "sha256:614f7414c71022472819359dd3ebb7c779f61dc3f74e677ccf73fa3ed53fe3ec",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "sha256:f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "sha256:752d8c9b711313df1119b8367a61c58ff4953c6d850ba4275ec97585c534f3ff"
+  },
+  "schema_check": "passed",
+  "test_runs": [
+    {
+      "receipt": "preparation-regressions.xml",
+      "tests": 193,
+      "passed": 192,
+      "skipped": 1,
+      "failures": 0,
+      "sha256": "sha256:7d685aace3d031c8a9cabc6193bf1affbef6726a9f496874eec4292cd8be74dc"
+    },
+    {
+      "receipt": "transport-regressions.xml",
+      "tests": 41,
+      "passed": 41,
+      "skipped": 0,
+      "failures": 0,
+      "sha256": "sha256:625911352e83d78ebf2950b4d3794abdd341c8d926e064da48e7a2eee349fef7"
+    },
+    {
+      "receipt": "postgres-regression.xml",
+      "tests": 1,
+      "passed": 1,
+      "skipped": 0,
+      "failures": 0,
+      "sha256": "sha256:ccdc4d918bd046f81579e8e5bbd751ab3377db6d8e0abebded21dbc33f9699f2"
+    }
+  ],
+  "distinct_tests_passed": 234,
+  "unresolved_skips": 0,
+  "publication": {
+    "status": "assembling",
+    "publication_sha256": null,
+    "package_sha256": null
+  },
+  "worker_snapshot": {
+    "schema": "exact-prose-resume-worker/1",
+    "pid": 81642,
+    "started_at": "2026-10-11T16:12:44.608440+00:00",
+    "generation_mode": "saved-cache-only",
+    "paid_requests_authorized_by_worker": 0,
+    "steps": [],
+    "reviewed_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
+    "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+    "status": "running",
+    "phase": "cache_only_assembly",
+    "seconds": 0.0010755870025604963
+  },
+  "live_status": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/resume-worker-20261011.json",
+  "worker_script_sha256": "sha256:a51b93f22dec57b29fec95ee06e318f18ae40a0418a5b28ee7f4dc4c4f67cb2e",
+  "actual_checks": {
+    "prose_api": {
+      "status": "not_completed"
+    },
+    "https_postgresql": {
+      "status": "not_completed"
+    }
+  },
+  "optional_reasoner_receipts": {
+    "elk-doid.json": {
+      "sha256": "sha256:a5afe7a184608862de034714b0ed871dd04795ae679adfecabf370b8abdf185a",
+      "status": "completed_incomplete"
+    },
+    "elk-ncit.json": {
+      "sha256": "sha256:788c221f2b842738817a0a358020e983792cb12f545345bf6bce965f1dc3168e",
+      "status": "completed_incomplete"
+    },
+    "elk-summary.json": {
+      "sha256": "sha256:6b424cb8b2a9384e60c144276ae874a73f77b6416f81f36ac924966f315358b3",
+      "status": "completed_with_incomplete_results"
+    },
+    "remaining-jobs.json": {
+      "sha256": "sha256:a47b2a32d2a2d1b5eaa53766bdf6ac01babf8067b032c759c883b5f35a747a3b",
+      "status": null
+    }
+  },
+  "rendered_frontend_journey": "not performed; S2 forms/3 negotiation and presentation remain required",
+  "conclusions": {
+    "data_preparation": "Background assembly and dependent verification; use live status, not process existence, to establish completion.",
+    "joint_acceptance": "open: S2 rendered integration, B04 missing-definition/two-sided coverage, original DOID/import admission, representative coverage and measured performance.",
+    "research_launch": "not authorized or established; final matcher/cases, owner approval, deployment, accessibility and pilot gates remain separate."
+  },
+  "verification_commands": {
+    "working_directory": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+    "python": "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "preparation_regressions": "python -m pytest -q tests/explanation_review_*_test.py tests/explanation_independent_review_test.py tests/explanation_description_*_test.py tests/explanation_tutorial_entity_contract_test.py tests/explanation_tutorial_admission_test.py tests/explanation_tutorial_http_admission_test.py tests/explanation_integration_contract_test.py",
+    "transport_regressions": "python -m pytest -q tests/explanation_followup_boundaries_test.py tests/llm_routing_test.py tests/openrouter_ledger_test.py",
+    "postgres_regression": "EXACT_REVIEW_TEST_PGBIN=/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/lib/python3.12/site-packages/pgserver/pginstall/bin EXACT_REVIEW_TEST_PGPORT=19483 python -m pytest -q tests/explanation_review_environment_test.py::test_real_postgresql_restart_preserves_database_and_owned_identity",
+    "schemas": "python -m tools.freeze_explanation_contracts --check",
+    "assembly": "python -m tools.prepare_review_bundle --root /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input --run /Users/pedrocotovio/Library/Caches/exact-om-review/s1-20261010/inputs/local300 --cases 24 --generate-pairs 12 --revision development-review-s1-prose-20261010 --generation-mode provider --generation-attempt 7 --generation-cache-only",
+    "prose_verification": "python -m tools.verify_review_prose /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prose-verification-20261011.json",
+    "https_journey": "python -m tools.complete_review_environment_checks /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment-verification-20261011",
+    "repeat_note": "Use fresh JUnit/output paths. An output file from a completed verifier is immutable; do not run a duplicate assembly worker."
+  }
+}
