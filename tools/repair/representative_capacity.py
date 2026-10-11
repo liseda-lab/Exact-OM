@@ -551,6 +551,10 @@ def recovery_rows(manifest):
     if not reference:
         return {}
     recovery = bound(reference)
+    if recovery.get("schema") == "exact-repair/capacity-payload-recovery/v1":
+        from tools.repair.capacity_payload_recovery import retained_rows
+
+        return retained_rows(manifest, recovery)
     prior = bound(recovery["manifest"])
     if prior.get("technical_recovery"):
         raise ValueError("A further recovery requires a separate same-cause review")
@@ -653,7 +657,12 @@ def audit(prepared, output):
             if saved != {k: v for k, v in reported.items() if k != "id"}:
                 raise ValueError("Capacity row and terminal report differ")
             validate_saved(saved, canonical_hash((canonical_hash(manifest), row)))
-            operation = work / "rows" / row["id"] / "payload" / "operation.json"
+            row_directory = (
+                Path(saved["retained_row"]["path"]).parent
+                if saved.get("retained_row")
+                else work / "rows" / row["id"]
+            )
+            operation = row_directory / "payload" / "operation.json"
             if operation.exists():
                 operations.append(
                     dict(
@@ -684,6 +693,18 @@ def audit(prepared, output):
         in {"error", "interrupted_unknown", "not_attempted", "prior_implementation_failure"}
         or not r.get("cleanup_complete")
     ]
+    prior_usage = {}
+    for receipt in prepared.get("prior_worker_receipts", []):
+        terminal, _, _, _ = validate_completion(receipt)
+        if terminal["step_id"] in {v["step_id"] for v in terminals.values()}:
+            raise ValueError("A current worker cannot also be a prior charge")
+        prior_usage[terminal["step_id"]] = dict(
+            receipt=receipt,
+            **{
+                key: terminal[key]
+                for key in ("elapsed_seconds", "cpu_seconds", "peak_rss_mb", "status")
+            },
+        )
     result = dict(
         schema="exact-repair/representative-capacity-review/v1",
         status="complete",
@@ -706,6 +727,7 @@ def audit(prepared, output):
             }
             for k, v in terminals.items()
         },
+        prior_worker_usage=prior_usage,
         qualification_rule="No performance threshold; terminal unknown/unsupported/timeouts retained. Review actual operation reachability and live remaining capacity before TEST admission.",
         hosted_calls=0,
         optimizer_updates=0,

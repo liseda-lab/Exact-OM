@@ -209,6 +209,32 @@ def test_deadline_preserves_unattempted_rows_and_reserve(tmp_path, monkeypatch):
         remaining(time.time() - 1)
 
 
+def test_timed_out_atomic_write_is_inventoried_without_hashing_or_replay(tmp_path, monkeypatch):
+    from pathlib import Path
+    from exact.repair.workers import CallResult
+
+    manifest = fixture_manifest(tmp_path)
+    calls = []
+
+    def interrupted_write(*args, **kwargs):
+        calls.append(1)
+        payload = Path(args[7])
+        write_artifact(payload / "operation.json", dict(operation="native_deletion"))
+        debris = payload / ".selection.json.abcdefgh"
+        debris.touch(mode=0)
+        return CallResult("timeout", detail="interrupted write")
+
+    monkeypatch.setattr("exact.repair.workers.bounded_call", interrupted_write)
+    first = execute_rows(manifest, tmp_path / "run")
+    second = execute_rows(manifest, tmp_path / "run")
+    assert first == second and calls == [1]
+    row = first["rows"][0]
+    assert row["status"] == "timeout" and row["result"] is None
+    assert [Path(a["path"]).name for a in row["artifacts"]] == ["operation.json"]
+    assert row["unpublished_artifacts"][0]["mode"] == 0
+    assert Path(row["unpublished_artifacts"][0]["path"]).stat().st_mode & 0o777 == 0
+
+
 def test_nested_worker_inherits_expired_campaign_deadline(monkeypatch):
     from exact.repair.workers import bounded_call
 
