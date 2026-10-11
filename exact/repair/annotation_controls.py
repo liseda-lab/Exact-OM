@@ -16,7 +16,7 @@ from exact.repair.records import canonical_json
 SCHEMA_VERSION = "semantic-fidelity-response/v1"
 
 
-def response_format(packet, swapped=False):
+def response_format(packet, swapped=False, *, verbatim_quotes=True):
     """Shape constraints only. Grounding, scores and abstention still need validation."""
 
     def obj(properties):
@@ -46,7 +46,11 @@ def response_format(packet, swapped=False):
             b_score=dict(type=["number", "null"], minimum=0, maximum=1),
             evidence_ids=dict(type="array", items=citation),
             reason=text,
-            quotes=dict(type="array", items=obj(dict(evidence_id=citation, span=text))),
+            quotes=dict(
+                type="array",
+                items=obj(dict(evidence_id=citation, span=text)),
+                **({"maxItems": 0} if not verbatim_quotes else {}),
+            ),
             symbolic_claims=dict(
                 type="array",
                 items=obj(

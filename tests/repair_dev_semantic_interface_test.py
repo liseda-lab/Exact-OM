@@ -356,3 +356,49 @@ def test_readiness_review_requires_all_models_and_preserves_missing_semantics(
         interface.review(plan["path"], paths[:-1], tmp_path / "partial")
     with pytest.raises(ValueError, match="Duplicated"):
         interface.review(plan["path"], [paths[0]] * 6, tmp_path / "duplicate")
+
+
+def test_quote_free_wire_preserves_citations_and_rejects_fabricated_quotes():
+    from exact.repair.annotation_controls import response_format
+    from exact.repair.semantic_fidelity import (
+        CITATION_PROMPT,
+        CITATION_PROMPT_VERSION,
+        annotation_prompt,
+    )
+
+    _, packet, _ = _offline_lookup_fixture("development")
+    old = response_format(packet)
+    fixed = response_format(packet, verbatim_quotes=False)
+    before = old["json_schema"]["schema"]["properties"]["criteria"]["items"]["properties"]
+    after = fixed["json_schema"]["schema"]["properties"]["criteria"]["items"]["properties"]
+    assert after["quotes"]["maxItems"] == 0 and "maxItems" not in before["quotes"]
+    assert {k: v for k, v in before.items() if k != "quotes"} == {
+        k: v for k, v in after.items() if k != "quotes"
+    }
+    assert annotation_prompt(CITATION_PROMPT_VERSION) == CITATION_PROMPT
+    value = judgment(packet)
+    for criterion in value["criteria"]:
+        criterion["quotes"] = []
+    assert validate_comparison(json.dumps(value), packet).global_target_eligible
+    value["criteria"][0]["quotes"] = [dict(evidence_id="D1", span="invented quote")]
+    with pytest.raises(ValueError, match="quote"):
+        validate_comparison(json.dumps(value), packet)
+
+
+def test_same_comparison_new_presentation_keeps_all_shared_request_costs(tmp_path):
+    from tests.repair_october_learning_annotation_runner_test import manifest
+    from tools.repair.corrective_semantics import _reserve_phase
+
+    settings = dict(manifest(tmp_path), phase="development")
+    _reserve_phase(
+        settings, "first-interface:original", "same-packet", 0.02, comparison_id="fixed-pair"
+    )
+    before = read(tmp_path / "ledger/phase-reservations.json")
+    _reserve_phase(
+        settings, "quotation-interface:original", "same-packet", 0.03, comparison_id="fixed-pair"
+    )
+    after = read(tmp_path / "ledger/phase-reservations.json")
+    assert all(after["reservations"][k] == v for k, v in before["reservations"].items())
+    assert len(after["reservations"]) == 2
+    assert len({r["comparison_id"] for r in after["reservations"].values()}) == 1
+    assert sum(r["reserved_cost_usd"] for r in after["reservations"].values()) == 0.05

@@ -129,6 +129,8 @@ def validate_manifest(value):
     if value["phase"] not in PHASE_LIMITS:
         raise ValueError("Unregistered annotation phase")
     _request_budget(value)
+    if value.get("no_verbatim_quotes") and not value.get("dev_interface_amendment"):
+        raise ValueError("Quotation interface requires its explicit DEV amendment")
     if value.get("dev_interface_amendment"):
         from tools.repair.dev_semantic_interface import validate_amendment
 
@@ -964,7 +966,11 @@ def annotate_packet(
                             if controls["reasoning"] is not None
                             else {}
                         ),
-                        response_format=response_format(packet, swapped),
+                        response_format=response_format(
+                            packet,
+                            swapped,
+                            verbatim_quotes=not manifest.get("no_verbatim_quotes", False),
+                        ),
                     )
                 },
             )
@@ -1195,11 +1201,19 @@ def _verified_plan(case_record, assignment, *, rejection_precheck=True):
 
 
 def annotate_comparison(
-    packet, manifest, output: str | Path, *, comparison_id, order_swap_audit, seconds
+    packet,
+    manifest,
+    output: str | Path,
+    *,
+    comparison_id,
+    order_swap_audit,
+    seconds,
+    presentation_id=None,
 ) -> Path | None:
     """Original plus a scheduled audit; missing or discordant audits cannot label."""
     started = time.monotonic()
     output = Path(output)
+    presentation_id = presentation_id or comparison_id
     if manifest.get("rate_limit_policy"):
         from tools.repair.annotation_backoff import annotate as annotate_presentation
     else:
@@ -1208,7 +1222,7 @@ def annotate_comparison(
         packet,
         manifest,
         output / "original",
-        slot_id=comparison_id + ":original",
+        slot_id=presentation_id + ":original",
         comparison_id=comparison_id,
         seconds=seconds,
     )
@@ -1218,7 +1232,7 @@ def annotate_comparison(
         packet,
         manifest,
         output / "swapped",
-        slot_id=comparison_id + ":swapped",
+        slot_id=presentation_id + ":swapped",
         comparison_id=comparison_id,
         swapped=True,
         seconds=seconds - (time.monotonic() - started),
@@ -1439,9 +1453,16 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         manifest,
         request_path.parent / "annotation",
         comparison_id=(
-            canonical_hash((slot, manifest["dev_interface_amendment"]))
+            canonical_hash(
+                (slot, manifest.get("comparison_basis", manifest["dev_interface_amendment"]))
+            )
             if manifest.get("dev_interface_amendment")
             else slot
+        ),
+        **(
+            dict(presentation_id=canonical_hash((slot, manifest["dev_interface_amendment"])))
+            if manifest.get("comparison_basis")
+            else {}
         ),
         order_swap_audit=bool(frozen_slot.get("swapped", False)),
         seconds=seconds - (time.monotonic() - started),

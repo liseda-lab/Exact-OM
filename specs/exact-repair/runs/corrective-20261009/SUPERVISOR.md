@@ -1,5 +1,22 @@
 # October corrective repair campaign
 
+## 11 October: quotation-format follow-up
+
+The first interface panel admitted every full packet and produced three usable
+controls, but the filler response failed strict quote attribution (text from D1
+was attributed to D2). Its native boolean claims were available; this is not an
+unresolved provider or input-size error. Preserve the rejected raw answer and all
+five charged presentations. The versioned follow-up in
+`learning/dev-interface-recovery-20261011-002` uses prompt v3.4 and a strict schema
+with `quotes.maxItems=0`: cited paraphrases and checked boolean claims remain
+mandatory; optional direct quotations are omitted. Quote validation is unchanged.
+Rerun the same fixed interface controls and apply that one corrected interface to
+the entire original cohort, including earlier successful observations. Do not
+select favorable old/new labels. The five earlier qualification requests remain
+charged, and the full follow-up still fits the existing DEV96 / total704 / $35
+limits. All version001 consumer descriptors remain held; only version002 consumers
+may be released after qualification. Preserve the same absolute recovery deadline.
+
 ## 11 October: corrected DEV evidence interface
 
 The latest explicit user instruction, "Please fix", authorizes the concrete
