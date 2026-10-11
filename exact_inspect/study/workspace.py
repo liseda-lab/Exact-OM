@@ -45,7 +45,12 @@ from ..models import (
     SelectedEvidence,
 )
 from ..sqlite_safety import readonly_connection
-from ..navigation import EntryPointPage, PreparedHierarchyPage, NAVIGATION_CONTRACT
+from ..navigation import (
+    EntryPointPage,
+    PreparedHierarchyPage,
+    PreparedEquivalentsPage,
+    NAVIGATION_CONTRACT,
+)
 from .models import Identifier, StrictModel
 
 
@@ -131,7 +136,11 @@ class WorkspaceCapabilitiesResponse(StrictModel):
     page_limit: int
     iri_limit: int
     ontology_versions: list[Identifier]
-    bases: list[Literal["literal_asserted", "structural_navigation", "reasoner_inferred"]]
+    bases: list[
+        Literal[
+            "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
+        ]
+    ]
     reasoner: Literal["not_run", "available", "partial", "failed", "unsupported"]
     reason: str
     completeness: dict[str, dict[str, Any]]
@@ -199,11 +208,22 @@ def _admit_explanation(value, case, policy, contexts):
         or result["entities"][1] not in [c["entity"] for c in case["candidates"]]
     ):
         raise ValueError("Comparison is not an active-case ordered pair")
+    from ..readable_descriptions import label_facts
+    from ..generation import FactPacket
+
+    reference_labels = (
+        label_facts(FactPacket.model_validate(result["support_packet"]))
+        if result.get("support_packet")
+        else []
+    )
     for claim in result["claims"]:
         if not claim["fact_ids"]:
             raise ValueError("Workspace claims require original fact citations")
         for fid in claim["fact_ids"]:
-            for entity in result["entities"]:
+            permitted_subjects = result["entities"] + [
+                f["subject"] for f in reference_labels if f["fact_id"] == fid
+            ]
+            for entity in permitted_subjects:
                 try:
                     contexts[entity["ontology_version_id"]].fact(fid, entity, policy=policy)
                     break
@@ -845,7 +865,15 @@ def install_workspace_routes(router, store, participant_dependency):
                 "iri_limit": 2048,
                 "ontology_versions": list(w.contexts),
                 "bases": ["literal_asserted", "structural_navigation"]
-                + (["reasoner_inferred"] if "available" in statuses else []),
+                + (["reasoner_inferred"] if "available" in statuses else [])
+                + (
+                    ["elk_inferred_partial"]
+                    if any(
+                        n.get("partial_inference", {}).get("status") == "partial"
+                        for n in navigation.values()
+                    )
+                    else []
+                ),
                 "reasoner": reasoner,
                 "reason": (
                     "Prepared inference is available"
@@ -927,7 +955,11 @@ def install_workspace_routes(router, store, participant_dependency):
         kind: EntityKind = "class",
         category: str | None = None,
         basis: Literal[
-            "asserted", "literal_asserted", "structural_navigation", "reasoner_inferred"
+            "asserted",
+            "literal_asserted",
+            "structural_navigation",
+            "reasoner_inferred",
+            "elk_inferred_partial",
         ] = "asserted",
         limit: int = Query(20, ge=1, le=100),
         cursor: str | None = None,
@@ -954,7 +986,7 @@ def install_workspace_routes(router, store, participant_dependency):
         ontology_version_id: str,
         kind: EntityKind = "class",
         basis: Literal[
-            "literal_asserted", "structural_navigation", "reasoner_inferred"
+            "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
         ] = "literal_asserted",
         language: str | None = None,
         limit: int = Query(20, ge=1, le=100),
@@ -985,10 +1017,15 @@ def install_workspace_routes(router, store, participant_dependency):
             ),
         )
 
-    @router.get(prefix + "/equivalents", response_model=Page[EntityRef])
+    @router.get(
+        prefix + "/equivalents",
+        response_model=PreparedEquivalentsPage,
+        response_model_exclude_unset=True,
+    )
     def equivalents(
         scope_id: str,
         ontology_version_id: str,
+        basis: Literal["reasoner_inferred", "elk_inferred_partial"] = "reasoner_inferred",
         iri: str = Query(..., min_length=1, max_length=2048),
         kind: EntityKind = "class",
         limit: int = Query(20, ge=1, le=100),
@@ -1001,9 +1038,9 @@ def install_workspace_routes(router, store, participant_dependency):
             identity,
             lambda w: w.page(
                 "equivalents",
-                {"entity": ref},
+                {"entity": ref, "basis": basis},
                 lambda c: w.context(ontology_version_id).equivalent_entities(
-                    ref, limit=limit, cursor=c, policy=w.policy
+                    ref, limit=limit, cursor=c, policy=w.policy, basis=basis
                 ),
                 cursor,
             ),
@@ -1021,7 +1058,7 @@ def install_workspace_routes(router, store, participant_dependency):
         kind: EntityKind = "class",
         direction: Literal["parents", "children"] = "parents",
         basis: Literal[
-            "literal_asserted", "structural_navigation", "reasoner_inferred"
+            "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
         ] = "literal_asserted",
         limit: int = Query(50, ge=1, le=100),
         cursor: str | None = None,

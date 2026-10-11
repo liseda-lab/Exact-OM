@@ -49,7 +49,7 @@ from .models import (
     RunSummary,
     SelectedEvidence,
 )
-from .navigation import EntryPointPage, PreparedHierarchyPage
+from .navigation import EntryPointPage, PreparedHierarchyPage, PreparedEquivalentsPage
 from .review_metadata import ReviewBundleSummary
 
 
@@ -166,6 +166,7 @@ class PreparedService:
                     "source_spans",
                     "typed_expressions",
                     "reasoner_inferred",
+                    "elk_inferred_partial",
                     "navigation",
                 }
             },
@@ -596,7 +597,7 @@ def create_prepared_app(
         ontology_id: str,
         kind: EntityKind = "class",
         basis: Literal[
-            "literal_asserted", "structural_navigation", "reasoner_inferred"
+            "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
         ] = "literal_asserted",
         language: str | None = None,
         limit: int = Query(20, ge=1, le=100),
@@ -614,9 +615,14 @@ def create_prepared_app(
             )
         )
 
-    @app.get("/api/v1/ontologies/{ontology_id}/equivalents", response_model=Page[EntityRef])
+    @app.get(
+        "/api/v1/ontologies/{ontology_id}/equivalents",
+        response_model=PreparedEquivalentsPage,
+        response_model_exclude_unset=True,
+    )
     def equivalents(
         ontology_id: str,
+        basis: Literal["reasoner_inferred", "elk_inferred_partial"] = "reasoner_inferred",
         iri: str = Query(..., min_length=1, max_length=2048),
         kind: EntityKind = "class",
         limit: int = Query(20, ge=1, le=100),
@@ -626,6 +632,7 @@ def create_prepared_app(
         return bounded(
             active.context(ontology_id).equivalent_entities(
                 EntityRef(ontology_version_id=ontology_id, iri=iri, kind=kind),
+                basis=basis,
                 limit=limit,
                 cursor=cursor,
                 policy=active.policy,
@@ -641,7 +648,7 @@ def create_prepared_app(
         kind: EntityKind = "class",
         direction: Literal["parents", "children", "ancestors"] = "parents",
         basis: Literal[
-            "literal_asserted", "structural_navigation", "reasoner_inferred"
+            "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
         ] = "literal_asserted",
         limit: int = Query(50, ge=1, le=1000),
         cursor: str | None = None,

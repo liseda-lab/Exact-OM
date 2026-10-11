@@ -87,7 +87,13 @@ def export_policy_context(
         ) as temporary:
             staging = Path(temporary)
             for name in ("manifest.json", *context.manifest["artifacts"]):
-                if name not in {"manifest.json", "context.sqlite", "navigation.sqlite"}:
+                if name not in {
+                    "manifest.json",
+                    "context.sqlite",
+                    "navigation.sqlite",
+                    "partial-navigation.sqlite",
+                    "partial-admission.json",
+                }:
                     raise ValueError("Unsupported prepared context artifact")
                 copy_immutable(context.path / name, staging / name)
             OntologyContext(staging)
@@ -295,6 +301,15 @@ def export_policy_context(
                 "artifacts": {"context.sqlite": file_hash(database)},
             }
         )
+        manifest["capabilities"].pop("elk_inferred_partial", None)
+        manifest["portable"] = {
+            **manifest["portable"],
+            "browsing": [
+                x
+                for x in manifest["portable"].get("browsing", [])
+                if x not in {"partial-navigation.sqlite", "partial-admission.json"}
+            ],
+        }
         atomic_json(staging / "manifest.json", manifest)
         # Revalidate the new bytes before the package becomes discoverable.
         OntologyContext(staging)

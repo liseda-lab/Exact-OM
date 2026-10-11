@@ -10,7 +10,7 @@ import json
 from contextlib import contextmanager
 from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .context_semantics import KINDS, _allowed, _ref
 from .contracts import EntityRef, Page, WireModel, canonical_hash, decode_cursor, file_hash
@@ -19,7 +19,10 @@ from .sqlite_safety import readonly_connection
 
 NAVIGATION_CONTRACT = "exact-hierarchy/1"
 NAVIGATION_FILE = "navigation.sqlite"
-BASES = ("literal_asserted", "structural_navigation", "reasoner_inferred")
+PARTIAL_BASIS = "elk_inferred_partial"
+PARTIAL_CONTRACT = "exact-partial-hierarchy/1"
+PARTIAL_FILE = "partial-navigation.sqlite"
+BASES = ("literal_asserted", "structural_navigation", "reasoner_inferred", PARTIAL_BASIS)
 TABLES = {
     "metadata": ("key", "value"),
     "entries": ("basis", "kind", "ordinal", "iri", "entry_kind", "component_size"),
@@ -35,33 +38,62 @@ class EntryPoint(WireModel):
     component_size: int = Field(ge=1)
 
 
+def _validate_partial_page(value):
+    if value.basis == PARTIAL_BASIS and value.status == "partial":
+        from .postmigration_contracts import PartialInferenceMetadata
+
+        PartialInferenceMetadata.model_validate(value.inference)
+    return value
+
+
 class EntryPointPage(Page[EntryPoint]):
-    navigation_contract: Literal["exact-hierarchy/1"] = NAVIGATION_CONTRACT
+    navigation_contract: Literal["exact-hierarchy/1", "exact-partial-hierarchy/1"] = (
+        NAVIGATION_CONTRACT
+    )
     default_entity: EntityRef | None = None
     basis: str
     completeness: dict[str, Any]
     inference: dict[str, Any]
 
+    _partial = model_validator(mode="after")(_validate_partial_page)
+
 
 class PreparedHierarchyPage(HierarchyPage):
-    navigation_contract: Literal["exact-hierarchy/1"] = NAVIGATION_CONTRACT
+    navigation_contract: Literal["exact-hierarchy/1", "exact-partial-hierarchy/1"] = (
+        NAVIGATION_CONTRACT
+    )
     inference: dict[str, Any] | None = None
     entity_semantics: dict[str, Any] | None = None
 
+    _partial = model_validator(mode="after")(_validate_partial_page)
+
+
+class PreparedEquivalentsPage(Page[EntityRef]):
+    navigation_contract: Literal["exact-hierarchy/1", "exact-partial-hierarchy/1"] = (
+        NAVIGATION_CONTRACT
+    )
+    basis: str = "reasoner_inferred"
+    inference: dict[str, Any] | None = None
+
+    _partial = model_validator(mode="after")(_validate_partial_page)
+
 
 class PreparedNavigation:
-    def __init__(self, context):
+    def __init__(self, context, *, partial=False):
         self.context = context
-        self.metadata = context.manifest["navigation"]
-        self.path = context.path / NAVIGATION_FILE
+        self.metadata = context.manifest["partial_navigation" if partial else "navigation"]
+        filename = PARTIAL_FILE if partial else NAVIGATION_FILE
+        self.path = context.path / filename
         if self.path.is_symlink() or self.path.resolve().parent != context.path.resolve():
             raise ValueError("Navigation artifact must be inside its context package")
-        if self.metadata.get("contract_version") != NAVIGATION_CONTRACT:
+        if self.metadata.get("contract_version") != (
+            PARTIAL_CONTRACT if partial else NAVIGATION_CONTRACT
+        ):
             raise ValueError("Unsupported prepared navigation contract")
         if self.metadata.get("context_sha256") != context.manifest["artifacts"]["context.sqlite"]:
             raise ValueError("Navigation belongs to another context revision")
         self.signature = self._stat()
-        expected = context.manifest["artifacts"].get(NAVIGATION_FILE)
+        expected = context.manifest["artifacts"].get(filename)
         if not expected or file_hash(self.path) != expected or self._stat() != self.signature:
             raise ValueError("Navigation artifact checksum mismatch")
         self.identity = expected
@@ -86,16 +118,25 @@ class PreparedNavigation:
         return actual == self.metadata["policy_hash"]
 
 
-def metadata(context, policy=None):
+def prepared(context, basis):
+    return getattr(
+        context, "_partial_navigation" if basis == PARTIAL_BASIS else "_navigation", None
+    )
+
+
+def metadata(context, policy=None, *, basis=None):
     """Advertise only the result prepared for this exact effective policy."""
     policy = context._effective_policy(policy)
-    navigation = getattr(context, "_navigation", None)
+    navigation = prepared(context, basis)
     if navigation and navigation.matches(policy):
         with navigation.connection():
             pass
-        return navigation.metadata
-    return {
-        "contract_version": NAVIGATION_CONTRACT,
+        info = dict(navigation.metadata)
+        if basis is None and getattr(context, "_partial_navigation", None):
+            info["partial_inference"] = metadata(context, policy, basis=PARTIAL_BASIS)["inference"]
+        return info
+    info = {
+        "contract_version": PARTIAL_CONTRACT if basis == PARTIAL_BASIS else NAVIGATION_CONTRACT,
         "entry_points": "not_run",
         "inference": {
             "status": "not_run",
@@ -103,6 +144,10 @@ def metadata(context, policy=None):
             "supported_kinds": ["class"],
         },
     }
+
+    if basis is None and getattr(context, "_partial_navigation", None):
+        info["partial_inference"] = metadata(context, policy, basis=PARTIAL_BASIS)["inference"]
+    return info
 
 
 def entry_points(
@@ -119,8 +164,8 @@ def entry_points(
     context._bound(limit)
     if kind not in KINDS or basis not in BASES:
         raise ValueError("Unsupported entry-point kind or basis")
-    info = metadata(context, policy)
-    navigation = getattr(context, "_navigation", None)
+    info = metadata(context, policy, basis=basis)
+    navigation = prepared(context, basis)
     scope = context._scope(
         {
             "operation": "entry_points",
@@ -131,8 +176,9 @@ def entry_points(
         policy,
         basis,
     )
+    last = decode_cursor(cursor, scope) if cursor else -1
     extra = {
-        "navigation_contract": NAVIGATION_CONTRACT,
+        "navigation_contract": PARTIAL_CONTRACT if basis == PARTIAL_BASIS else NAVIGATION_CONTRACT,
         "basis": basis,
         "default_entity": None,
         "completeness": context.manifest["completeness"],
@@ -145,8 +191,9 @@ def entry_points(
             **context._page([], None, scope, status="not_run", reason=info["inference"]["reason"]),
             **extra,
         }
-    if basis == "reasoner_inferred" and (
-        kind != "class" or info["inference"]["status"] != "available"
+    if basis in {"reasoner_inferred", PARTIAL_BASIS} and (
+        kind != "class"
+        or info["inference"]["status"] != ("partial" if basis == PARTIAL_BASIS else "available")
     ):
         status = "unsupported" if kind != "class" else info["inference"]["status"]
         return {
@@ -163,7 +210,6 @@ def entry_points(
             ),
             **extra,
         }
-    last = decode_cursor(cursor, scope) if cursor else -1
     if type(last) is not int or last < -1:
         from .contracts import DomainError
 
@@ -196,15 +242,22 @@ def entry_points(
     )
     return {
         **context._page(
-            items, total, scope, next_key=rows[limit - 1]["ordinal"] if len(rows) > limit else None
+            items,
+            total,
+            scope,
+            next_key=rows[limit - 1]["ordinal"] if len(rows) > limit else None,
+            status="partial" if basis == PARTIAL_BASIS else None,
+            reason="Partial taxonomy; absence is unknown" if basis == PARTIAL_BASIS else None,
         ),
         **extra,
     }
 
 
-def inferred_hierarchy(context, ref, *, direction, limit, cursor, policy):
-    info = metadata(context, policy)["inference"]
-    navigation = getattr(context, "_navigation", None)
+def inferred_hierarchy(
+    context, ref, *, direction, limit, cursor, policy, basis="reasoner_inferred"
+):
+    info = metadata(context, policy, basis=basis)["inference"]
+    navigation = prepared(context, basis)
     scope = context._scope(
         {
             "operation": "hierarchy",
@@ -214,15 +267,18 @@ def inferred_hierarchy(context, ref, *, direction, limit, cursor, policy):
             "navigation": navigation.identity if navigation else None,
         },
         policy,
-        "reasoner_inferred",
+        basis,
     )
+    last = decode_cursor(cursor, scope) if cursor else ""
     extra = {
-        "navigation_contract": NAVIGATION_CONTRACT,
+        "navigation_contract": PARTIAL_CONTRACT if basis == PARTIAL_BASIS else NAVIGATION_CONTRACT,
         "inference": info,
-        "basis": "reasoner_inferred",
+        "basis": basis,
         "entity_semantics": None,
     }
-    if ref["kind"] != "class" or info["status"] != "available":
+    if ref["kind"] != "class" or info["status"] != (
+        "partial" if basis == PARTIAL_BASIS else "available"
+    ):
         return {
             **context._page(
                 [],
@@ -237,7 +293,6 @@ def inferred_hierarchy(context, ref, *, direction, limit, cursor, policy):
             ),
             **extra,
         }
-    last = decode_cursor(cursor, scope) if cursor else ""
     if not isinstance(last, str):
         from .contracts import DomainError
 
@@ -285,8 +340,12 @@ def inferred_hierarchy(context, ref, *, direction, limit, cursor, policy):
         total,
         scope,
         next_key=rows[page_limit - 1]["id"] if len(rows) > page_limit else None,
-        status="partial" if bounded else None,
-        reason="Ancestor node budget reached" if bounded else None,
+        status="partial" if bounded or basis == PARTIAL_BASIS else None,
+        reason=(
+            "Ancestor node budget reached"
+            if bounded
+            else ("Partial taxonomy; absence is unknown" if basis == PARTIAL_BASIS else None)
+        ),
     )
     nodes = {ref["iri"]: ref}
     for edge in items:
@@ -301,13 +360,17 @@ def inferred_hierarchy(context, ref, *, direction, limit, cursor, policy):
     }
 
 
-def equivalent_entities(context, entity, *, limit=20, cursor=None, policy=None):
+def equivalent_entities(
+    context, entity, *, limit=20, cursor=None, policy=None, basis="reasoner_inferred"
+):
     """Page the named members of the selected entity's recorded taxonomy node."""
     policy = context._effective_policy(policy)
     context._bound(limit)
     ref = context._entity(entity, policy)
-    info = metadata(context, policy)["inference"]
-    navigation = getattr(context, "_navigation", None)
+    if basis not in {"reasoner_inferred", PARTIAL_BASIS}:
+        raise ValueError("Unsupported equivalence basis")
+    info = metadata(context, policy, basis=basis)["inference"]
+    navigation = prepared(context, basis)
     scope = context._scope(
         {
             "operation": "equivalents",
@@ -315,23 +378,33 @@ def equivalent_entities(context, entity, *, limit=20, cursor=None, policy=None):
             "navigation": navigation.identity if navigation else None,
         },
         policy,
-        "reasoner_inferred",
+        basis,
     )
-    if not _allowed(policy, context.ontology_version_id, "hierarchy"):
-        return context._page([], None, scope, status="not_exported")
-    if ref["kind"] != "class" or info["status"] != "available":
-        return context._page(
-            [],
-            None,
-            scope,
-            status="unsupported" if ref["kind"] != "class" else info["status"],
-            reason=(
-                "Inferred taxonomy supports classes only"
-                if ref["kind"] != "class"
-                else info.get("reason")
-            ),
-        )
     last = decode_cursor(cursor, scope) if cursor else ""
+    extra = {
+        "basis": basis,
+        "inference": info,
+        "navigation_contract": PARTIAL_CONTRACT if basis == PARTIAL_BASIS else NAVIGATION_CONTRACT,
+    }
+    if not _allowed(policy, context.ontology_version_id, "hierarchy"):
+        return {**context._page([], None, scope, status="not_exported"), **extra}
+    if ref["kind"] != "class" or info["status"] != (
+        "partial" if basis == PARTIAL_BASIS else "available"
+    ):
+        return {
+            **context._page(
+                [],
+                None,
+                scope,
+                status="unsupported" if ref["kind"] != "class" else info["status"],
+                reason=(
+                    "Inferred taxonomy supports classes only"
+                    if ref["kind"] != "class"
+                    else info.get("reason")
+                ),
+            ),
+            **extra,
+        }
     if not isinstance(last, str):
         from .contracts import DomainError
 
@@ -341,6 +414,19 @@ def equivalent_entities(context, entity, *, limit=20, cursor=None, policy=None):
             "SELECT group_id FROM members WHERE iri=? AND kind=?", (ref["iri"], ref["kind"])
         ).fetchone()
         if group is None:
+            if basis == PARTIAL_BASIS:
+                return {
+                    **context._page(
+                        [],
+                        0,
+                        scope,
+                        status="partial",
+                        reason="Class not represented in partial taxonomy",
+                    ),
+                    "basis": basis,
+                    "inference": info,
+                    "navigation_contract": PARTIAL_CONTRACT,
+                }
             raise ValueError("Prepared taxonomy omitted an admitted class")
         total = db.execute("SELECT count(*) FROM members WHERE group_id=?", (group[0],)).fetchone()[
             0
@@ -349,9 +435,14 @@ def equivalent_entities(context, entity, *, limit=20, cursor=None, policy=None):
             "SELECT iri FROM members WHERE group_id=? AND iri>? ORDER BY iri LIMIT ?",
             (group[0], last, limit + 1),
         ).fetchall()
-    return context._page(
+    result = context._page(
         [_ref(context.ontology_version_id, row[0], "class") for row in rows[:limit]],
         total,
         scope,
         next_key=rows[limit - 1][0] if len(rows) > limit else None,
+        status="partial" if basis == PARTIAL_BASIS else None,
+        reason="Partial equivalence; absence is unknown" if basis == PARTIAL_BASIS else None,
     )
+    if basis == PARTIAL_BASIS:
+        result.update(basis=basis, inference=info, navigation_contract=PARTIAL_CONTRACT)
+    return result

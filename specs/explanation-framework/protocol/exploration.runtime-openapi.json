@@ -580,7 +580,8 @@
               "enum": [
                 "literal_asserted",
                 "structural_navigation",
-                "reasoner_inferred"
+                "reasoner_inferred",
+                "elk_inferred_partial"
               ],
               "type": "string",
               "default": "literal_asserted",
@@ -671,6 +672,20 @@
             }
           },
           {
+            "name": "basis",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "reasoner_inferred",
+                "elk_inferred_partial"
+              ],
+              "type": "string",
+              "default": "reasoner_inferred",
+              "title": "Basis"
+            }
+          },
+          {
             "name": "iri",
             "in": "query",
             "required": true,
@@ -732,7 +747,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Page_EntityRef_"
+                  "$ref": "#/components/schemas/PreparedEquivalentsPage"
                 }
               }
             }
@@ -812,7 +827,8 @@
               "enum": [
                 "literal_asserted",
                 "structural_navigation",
-                "reasoner_inferred"
+                "reasoner_inferred",
+                "elk_inferred_partial"
               ],
               "type": "string",
               "default": "literal_asserted",
@@ -2289,6 +2305,99 @@
         ],
         "title": "ComparisonResolutionCounts"
       },
+      "DescriptionPresentation": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "const": "exact-description-presentation/1",
+            "title": "Contract Version"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "reviewed_profile",
+              "necessary_conditions",
+              "available_facts",
+              "reviewed_comparison",
+              "paired_context",
+              "source_only_profile",
+              "target_only_profile",
+              "unavailable"
+            ],
+            "title": "Kind"
+          },
+          "covered_sides": {
+            "items": {
+              "type": "string",
+              "enum": [
+                "source",
+                "target"
+              ]
+            },
+            "type": "array",
+            "title": "Covered Sides"
+          },
+          "claim_sides": {
+            "additionalProperties": {
+              "items": {
+                "type": "string",
+                "enum": [
+                  "source",
+                  "target"
+                ]
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Claim Sides"
+          },
+          "relation_asserted": {
+            "type": "boolean",
+            "const": false,
+            "title": "Relation Asserted"
+          },
+          "scope_note": {
+            "type": "string",
+            "title": "Scope Note"
+          },
+          "render_revision": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "typed-readable/3"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Render Revision"
+          },
+          "review_receipt_sha256": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Receipt Sha256"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "contract_version",
+          "kind",
+          "covered_sides",
+          "claim_sides",
+          "relation_asserted",
+          "scope_note",
+          "render_revision",
+          "review_receipt_sha256"
+        ],
+        "title": "DescriptionPresentation"
+      },
       "EntityContextResponse": {
         "properties": {
           "artifact_type": {
@@ -2529,7 +2638,10 @@
           },
           "navigation_contract": {
             "type": "string",
-            "const": "exact-hierarchy/1",
+            "enum": [
+              "exact-hierarchy/1",
+              "exact-partial-hierarchy/1"
+            ],
             "title": "Navigation Contract",
             "default": "exact-hierarchy/1"
           },
@@ -3405,6 +3517,16 @@
             ],
             "title": "Support Status"
           },
+          "presentation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DescriptionPresentation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "independent_review": {
             "anyOf": [
               {
@@ -4211,106 +4333,6 @@
         ],
         "title": "Page[Candidate]"
       },
-      "Page_EntityRef_": {
-        "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/EntityRef"
-            },
-            "type": "array",
-            "title": "Items"
-          },
-          "returned_count": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Returned Count"
-          },
-          "total_count": {
-            "anyOf": [
-              {
-                "type": "integer",
-                "minimum": 0.0
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Total Count"
-          },
-          "next_cursor": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Next Cursor"
-          },
-          "truncated": {
-            "type": "boolean",
-            "title": "Truncated",
-            "default": false
-          },
-          "scope": {
-            "$ref": "#/components/schemas/Scope"
-          },
-          "status": {
-            "type": "string",
-            "enum": [
-              "available",
-              "absent_in_scope",
-              "not_exported",
-              "unavailable_source",
-              "unresolved_import",
-              "unsupported",
-              "filtered",
-              "partial",
-              "failed",
-              "not_requested",
-              "not_run"
-            ],
-            "title": "Status",
-            "default": "available"
-          },
-          "reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Reason"
-          },
-          "order": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "pair_id_ascending",
-                  "source_id_ascending",
-                  "package_id_ascending"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Order"
-          }
-        },
-        "additionalProperties": false,
-        "type": "object",
-        "required": [
-          "items",
-          "returned_count",
-          "scope"
-        ],
-        "title": "Page[EntityRef]"
-      },
       "Page_ExplanationSummary_": {
         "properties": {
           "items": {
@@ -5082,6 +5104,132 @@
         "title": "PreferredLabel",
         "description": "Policy-visible display label or an explicit scoped absence."
       },
+      "PreparedEquivalentsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EntityRef"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "returned_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Returned Count"
+          },
+          "total_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Count"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "truncated": {
+            "type": "boolean",
+            "title": "Truncated",
+            "default": false
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "absent_in_scope",
+              "not_exported",
+              "unavailable_source",
+              "unresolved_import",
+              "unsupported",
+              "filtered",
+              "partial",
+              "failed",
+              "not_requested",
+              "not_run"
+            ],
+            "title": "Status",
+            "default": "available"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "order": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "pair_id_ascending",
+                  "source_id_ascending",
+                  "package_id_ascending"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Order"
+          },
+          "navigation_contract": {
+            "type": "string",
+            "enum": [
+              "exact-hierarchy/1",
+              "exact-partial-hierarchy/1"
+            ],
+            "title": "Navigation Contract",
+            "default": "exact-hierarchy/1"
+          },
+          "basis": {
+            "type": "string",
+            "title": "Basis",
+            "default": "reasoner_inferred"
+          },
+          "inference": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inference"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "items",
+          "returned_count",
+          "scope"
+        ],
+        "title": "PreparedEquivalentsPage"
+      },
       "PreparedHierarchyPage": {
         "properties": {
           "items": {
@@ -5198,7 +5346,10 @@
           },
           "navigation_contract": {
             "type": "string",
-            "const": "exact-hierarchy/1",
+            "enum": [
+              "exact-hierarchy/1",
+              "exact-partial-hierarchy/1"
+            ],
             "title": "Navigation Contract",
             "default": "exact-hierarchy/1"
           },
@@ -5383,6 +5534,59 @@
             "type": "array",
             "maxItems": 20,
             "title": "Ontologies"
+          },
+          "composition_identity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Composition Identity"
+          },
+          "delivered_layers": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Delivered Layers"
+          },
+          "selected_evidence_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected Evidence Counts"
+          },
+          "recorded_bridge_counts": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "integer"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recorded Bridge Counts"
           }
         },
         "additionalProperties": false,

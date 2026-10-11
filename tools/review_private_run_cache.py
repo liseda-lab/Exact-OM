@@ -5,16 +5,26 @@ import uuid
 from pathlib import Path
 
 from exact.runs.reader import RunReader
+from exact.runs.decisions import feature_terms
 from exact_inspect import decisions
 from exact_inspect.artifacts import atomic_json
 from exact_inspect.contracts import DomainError, canonical_hash, file_hash
+
+
+def resolve_recorded_feature(context, item, entity):
+    """Producer null qualifiers mean unrecorded, as in the canonical feature identity.
+
+    Keep explicit non-null qualifiers. The original-fact resolver still requires
+    one unambiguous lexical/datatype/language match; no label-based recovery.
+    """
+    return context.resolve_feature({**feature_terms(item), "family": item.get("family")}, entity)
 
 
 def prepared_private_run(root, run, *, contexts, source_version, target_version, selected_entities):
     root, run = Path(root), Path(run).resolve()
     selected = sorted({canonical_hash(entity) for entity in selected_entities})
     resolver = {
-        "implementation": "review-selected-original-facts/3",
+        "implementation": "review-selected-original-facts/4",
         "contexts": {
             version: file_hash(context.database) for version, context in sorted(contexts.items())
         },
@@ -93,7 +103,7 @@ def prepared_private_run(root, run, *, contexts, source_version, target_version,
             target_root_sha256=binding["root_hashes"][target_version],
             context_revision=binding["resolver_revision"],
             evidence_resolver=lambda item, entity: (
-                contexts[entity["ontology_version_id"]].resolve_feature(item, entity)
+                resolve_recorded_feature(contexts[entity["ontology_version_id"]], item, entity)
                 if canonical_hash(entity) in selected
                 else {}
             ),

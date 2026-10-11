@@ -354,6 +354,8 @@ def prepare(
     if generation_mode not in {"provider", "typed-only"}:
         raise ValueError("Generation mode must be provider or typed-only")
     root, run = Path(root).resolve(), Path(run).resolve()
+    if (root / "composition-inputs.json").exists():
+        raise ValueError("Use the bound composition/resume command for a layered publication")
     attempt = attempt_paths(root, generation_attempt)
     package = root / "package"
     publication_path = root / "publication.json"

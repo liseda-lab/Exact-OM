@@ -179,6 +179,10 @@ def description_templates(packet) -> list:
 
     if packet.selection.get("description_contract") != DESCRIPTION_VERSION:
         return []
+    if packet.selection.get("render_revision") == "typed-readable/3":
+        from .readable_descriptions import profile_templates
+
+        return profile_templates(packet)
     claims = []
     for fact in packet.facts:
         value = fact.get("value") or {}
@@ -234,6 +238,12 @@ def selected_support(claims, packet, status):
 
     if status != "validated":
         return "factual_fallback", "fallback"
+    if packet.selection.get("render_revision") == "typed-readable/3":
+        meaningful = packet.task == "entity_profile" and any(
+            (c.model_dump() if hasattr(c, "model_dump") else c)["category"] == "scope"
+            for c in claims
+        )
+        return ("grounded_description" if meaningful else "fact_extract", "typed_template_support")
     templates = description_templates(packet) + comparison_templates(packet)
     selected = [claim.model_dump() if hasattr(claim, "model_dump") else claim for claim in claims]
     typed = any(
@@ -292,14 +302,24 @@ def validate_metadata_envelope(result):
 def preparation_metadata(result: dict[str, Any]) -> dict[str, Any]:
     """Read-time legacy mapping; never rewrite a frozen explanation or its hashes."""
     validate_metadata_envelope(result)
+    from .readable_descriptions import presentation
+
     if result.get("preparation_kind") is not None and result.get("support_status") is not None:
         return {
+            "presentation": (
+                presentation(result)
+                if result.get("support_packet") and result.get("task")
+                else None
+            ),
             "preparation_kind": result["preparation_kind"],
             "support_status": result["support_status"],
             "support_reasons": result.get("support_reasons", []),
         }
     failed = result.get("manifest", {}).get("status") != "validated"
     return {
+        "presentation": (
+            presentation(result) if result.get("support_packet") and result.get("task") else None
+        ),
         "preparation_kind": "factual_fallback" if failed else "fact_extract",
         "support_status": "fallback" if failed else "exact_support",
         "support_reasons": ["Legacy artifact: no reviewed description synthesis recorded."],
@@ -341,7 +361,9 @@ def validate_prepared_support(result, contexts, policy):
         "derivation_id",
         "category",
     }
-    for raw in packet.facts:
+    from .readable_descriptions import label_facts
+
+    for raw in [*packet.facts, *label_facts(packet)]:
         if set(raw) - allowed:
             raise ValueError("Unadmitted field in description support packet")
         context = contexts[raw["subject"]["ontology_version_id"]]

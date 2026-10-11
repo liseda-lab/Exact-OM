@@ -1,0 +1,276 @@
+{
+  "$defs": {
+    "CompletenessResult": {
+      "additionalProperties": false,
+      "properties": {
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "complete",
+        "reasons"
+      ],
+      "title": "CompletenessResult",
+      "type": "object"
+    },
+    "ConsistencyResult": {
+      "additionalProperties": false,
+      "properties": {
+        "complete": {
+          "title": "Complete",
+          "type": "boolean"
+        },
+        "reasons": {
+          "items": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "title": "Reasons",
+          "type": "array"
+        },
+        "value": {
+          "title": "Value",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "complete",
+        "reasons",
+        "value"
+      ],
+      "title": "ConsistencyResult",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "contract_version": {
+      "const": "exact-partial-hierarchy/1",
+      "title": "Contract Version",
+      "type": "string"
+    },
+    "basis": {
+      "const": "elk_inferred_partial",
+      "title": "Basis",
+      "type": "string"
+    },
+    "status": {
+      "const": "partial",
+      "title": "Status",
+      "type": "string"
+    },
+    "complete": {
+      "const": false,
+      "title": "Complete",
+      "type": "boolean"
+    },
+    "completion": {
+      "const": "partial_for_recorded_ELK_procedure",
+      "title": "Completion",
+      "type": "string"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "class_count": {
+      "minimum": 0,
+      "title": "Class Count",
+      "type": "integer"
+    },
+    "unrepresented_class_count": {
+      "minimum": 0,
+      "title": "Unrepresented Class Count",
+      "type": "integer"
+    },
+    "equivalence_group_count": {
+      "minimum": 1,
+      "title": "Equivalence Group Count",
+      "type": "integer"
+    },
+    "reported_direct_edge_count": {
+      "minimum": 0,
+      "title": "Reported Direct Edge Count",
+      "type": "integer"
+    },
+    "served_direct_edge_count": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Served Direct Edge Count"
+    },
+    "reasoner": {
+      "const": "pyelk",
+      "title": "Reasoner",
+      "type": "string"
+    },
+    "versions": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "title": "Versions",
+      "type": "object"
+    },
+    "options": {
+      "additionalProperties": true,
+      "title": "Options",
+      "type": "object"
+    },
+    "supported_kinds": {
+      "items": {
+        "const": "class",
+        "type": "string"
+      },
+      "title": "Supported Kinds",
+      "type": "array"
+    },
+    "consistency": {
+      "$ref": "#/$defs/ConsistencyResult"
+    },
+    "classification": {
+      "$ref": "#/$defs/CompletenessResult"
+    },
+    "unsupported_constructs": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Unsupported Constructs",
+      "type": "array"
+    },
+    "input_sha256": {
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "artifact_sha256": {
+      "title": "Artifact Sha256",
+      "type": "string"
+    },
+    "admission_identity": {
+      "title": "Admission Identity",
+      "type": "string"
+    },
+    "policy_hash": {
+      "title": "Policy Hash",
+      "type": "string"
+    },
+    "scope": {
+      "title": "Scope",
+      "type": "string"
+    },
+    "source_imports_complete": {
+      "title": "Source Imports Complete",
+      "type": "boolean"
+    },
+    "source_documents": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Source Documents",
+      "type": "array"
+    },
+    "semantics": {
+      "const": "direct_named_class_sub_to_super_edges_between_equivalence_groups",
+      "title": "Semantics",
+      "type": "string"
+    },
+    "directness": {
+      "const": "direct_in_returned_partial_taxonomy_only",
+      "title": "Directness",
+      "type": "string"
+    },
+    "positive_edge_guarantee": {
+      "const": "returned_by_pinned_ELK_supported_projection",
+      "title": "Positive Edge Guarantee",
+      "type": "string"
+    },
+    "full_ontology_entailment": {
+      "const": "unknown_without_exported_justification",
+      "title": "Full Ontology Entailment",
+      "type": "string"
+    },
+    "negative_entailment": {
+      "const": "unknown",
+      "title": "Negative Entailment",
+      "type": "string"
+    },
+    "satisfiability": {
+      "const": "unknown",
+      "title": "Satisfiability",
+      "type": "string"
+    },
+    "justifications": {
+      "const": "not_exported",
+      "title": "Justifications",
+      "type": "string"
+    },
+    "top": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Top",
+      "type": "array"
+    },
+    "bottom": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Bottom",
+      "type": "array"
+    }
+  },
+  "required": [
+    "contract_version",
+    "basis",
+    "status",
+    "complete",
+    "completion",
+    "reason",
+    "class_count",
+    "unrepresented_class_count",
+    "equivalence_group_count",
+    "reported_direct_edge_count",
+    "reasoner",
+    "versions",
+    "options",
+    "supported_kinds",
+    "consistency",
+    "classification",
+    "unsupported_constructs",
+    "input_sha256",
+    "artifact_sha256",
+    "admission_identity",
+    "policy_hash",
+    "scope",
+    "source_imports_complete",
+    "source_documents",
+    "semantics",
+    "directness",
+    "positive_edge_guarantee",
+    "full_ontology_entailment",
+    "negative_entailment",
+    "satisfiability",
+    "justifications",
+    "top",
+    "bottom"
+  ],
+  "title": "PartialInferenceMetadata",
+  "type": "object"
+}

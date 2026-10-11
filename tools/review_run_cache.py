@@ -18,6 +18,12 @@ def prepared_policy_run(
         for context in contexts.values()
     ):
         raise ValueError("Prepared export contexts must match the visibility policy")
+    if (destination / "decisions.manifest.json").is_file():
+        prior = json.loads((destination / "decisions.manifest.json").read_bytes())
+        if prior.get("literal_recovery") or prior.get("delivered_layers"):
+            raise ValueError(
+                "Delivered evidence layers require composition; plain export would discard enrichment"
+            )
     revision = source.manifest()["revision"]
     binding = {
         "schema": "exact-review-policy-export/1",

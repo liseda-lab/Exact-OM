@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .postmigration_contracts import DescriptionPresentation
+
 from typing import Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, JsonValue, model_serializer, model_validator
@@ -207,6 +209,7 @@ class GeneratedExplanationResponse(ResourceModel):
         Literal["typed_template_support", "exact_support", "fallback", "independently_reviewed"]
         | None
     ) = None
+    presentation: DescriptionPresentation | None = None
     independent_review: IndependentDescriptionReview | None = None
     support_reasons: list[str] = Field(default_factory=list)
     support_packet: FactPacket | None = None

@@ -99,7 +99,9 @@ def _root_components(entities, edges):
         yield group, cyclic, sum(len(down[iri]) for iri in group)
 
 
-def _entries(context, db, policy, *, inferred=False):
+def _entries(
+    context, db, policy, *, inferred=False, inferred_basis="reasoner_inferred", only_inferred=False
+):
     with context._connection(vm_step_budget=50_000_000_000) as source:
         labels = {}
 
@@ -115,11 +117,11 @@ def _entries(context, db, policy, *, inferred=False):
                 labels[key] = value[0] if value and value[0] else ""
             return labels[key]
 
-        for basis in BASES:
-            if basis == "reasoner_inferred" and not inferred:
+        for basis in ([inferred_basis] if only_inferred else BASES[:3]):
+            if basis == inferred_basis and not inferred:
                 continue
             for kind in sorted(KINDS):
-                if basis == "reasoner_inferred" and kind != "class":
+                if basis == inferred_basis and kind != "class":
                     continue
                 entities = [
                     r[0]
@@ -132,7 +134,11 @@ def _entries(context, db, policy, *, inferred=False):
                 elif not _allowed(policy, context.ontology_version_id, "hierarchy"):
                     choices = []
                 else:
-                    if basis == "reasoner_inferred":
+                    if basis == inferred_basis:
+                        entities = [
+                            r[0]
+                            for r in db.execute("SELECT iri FROM members WHERE kind=?", (kind,))
+                        ]
                         rows = list(
                             db.execute("SELECT child,parent FROM edges WHERE kind=?", (kind,))
                         )

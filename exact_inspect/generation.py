@@ -303,6 +303,10 @@ def comparison_templates(packet: FactPacket) -> list[Claim]:
     """
     if packet.task != "pair_comparison":
         return []
+    if packet.selection.get("render_revision") == "typed-readable/3":
+        from .readable_descriptions import comparison_templates as readable_comparison
+
+        return readable_comparison(packet)
     sides = [
         [
             f
@@ -354,7 +358,9 @@ def comparison_templates(packet: FactPacket) -> list[Claim]:
 
 def grounding(output: ExplanationOutput, packet: FactPacket) -> tuple[str, list[str]]:
     """Validate scope and exact supported excerpts; paraphrase semantics remain unverified."""
-    facts = {f["fact_id"]: f for f in packet.facts}
+    from .readable_descriptions import label_facts
+
+    facts = {f["fact_id"]: f for f in [*packet.facts, *label_facts(packet)]}
     reasons = []
     from .descriptions import description_templates
 

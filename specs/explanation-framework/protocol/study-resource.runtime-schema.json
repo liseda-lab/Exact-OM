@@ -72,6 +72,363 @@
       "title": "ClaimReviewDecision",
       "type": "object"
     },
+    "ComparisonResolutionCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "recorded": {
+          "minimum": 0,
+          "title": "Recorded",
+          "type": "integer"
+        },
+        "resolved": {
+          "minimum": 0,
+          "title": "Resolved",
+          "type": "integer"
+        },
+        "unresolved": {
+          "minimum": 0,
+          "title": "Unresolved",
+          "type": "integer"
+        },
+        "ambiguous": {
+          "minimum": 0,
+          "title": "Ambiguous",
+          "type": "integer"
+        },
+        "unsupported": {
+          "minimum": 0,
+          "title": "Unsupported",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "recorded",
+        "resolved",
+        "unresolved",
+        "ambiguous",
+        "unsupported"
+      ],
+      "title": "ComparisonResolutionCounts",
+      "type": "object"
+    },
+    "DescriptionPresentation": {
+      "additionalProperties": false,
+      "properties": {
+        "contract_version": {
+          "const": "exact-description-presentation/1",
+          "title": "Contract Version",
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "reviewed_profile",
+            "necessary_conditions",
+            "available_facts",
+            "reviewed_comparison",
+            "paired_context",
+            "source_only_profile",
+            "target_only_profile",
+            "unavailable"
+          ],
+          "title": "Kind",
+          "type": "string"
+        },
+        "covered_sides": {
+          "items": {
+            "enum": [
+              "source",
+              "target"
+            ],
+            "type": "string"
+          },
+          "title": "Covered Sides",
+          "type": "array"
+        },
+        "claim_sides": {
+          "additionalProperties": {
+            "items": {
+              "enum": [
+                "source",
+                "target"
+              ],
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "title": "Claim Sides",
+          "type": "object"
+        },
+        "relation_asserted": {
+          "const": false,
+          "title": "Relation Asserted",
+          "type": "boolean"
+        },
+        "scope_note": {
+          "title": "Scope Note",
+          "type": "string"
+        },
+        "render_revision": {
+          "anyOf": [
+            {
+              "const": "typed-readable/3",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Render Revision"
+        },
+        "review_receipt_sha256": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Review Receipt Sha256"
+        }
+      },
+      "required": [
+        "contract_version",
+        "kind",
+        "covered_sides",
+        "claim_sides",
+        "relation_asserted",
+        "scope_note",
+        "render_revision",
+        "review_receipt_sha256"
+      ],
+      "title": "DescriptionPresentation",
+      "type": "object"
+    },
+    "EvidenceBridge": {
+      "additionalProperties": false,
+      "description": "Matcher comparison metadata, never an original ontology relationship.",
+      "properties": {
+        "bridge_id": {
+          "title": "Bridge Id",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "channel_comparison",
+            "feature_correspondence"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "status": {
+          "default": "recorded",
+          "enum": [
+            "recorded",
+            "withheld"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "channel": {
+          "title": "Channel",
+          "type": "string"
+        },
+        "source_channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Channel"
+        },
+        "target_channel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Channel"
+        },
+        "source_family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Family"
+        },
+        "target_family": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Family"
+        },
+        "comparison_basis": {
+          "anyOf": [
+            {
+              "enum": [
+                "matrix_support",
+                "attribute_anchor",
+                "difference_endpoint",
+                "lexical_score"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Comparison Basis"
+        },
+        "recorded_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Saved matcher comparison metric; not semantic equivalence or calibrated probability.",
+          "title": "Recorded Score"
+        },
+        "source": {
+          "$ref": "#/$defs/exact_inspect__contracts__EntityRef"
+        },
+        "target": {
+          "$ref": "#/$defs/exact_inspect__contracts__EntityRef"
+        },
+        "source_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Evidence Ids",
+          "type": "array"
+        },
+        "target_evidence_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Evidence Ids",
+          "type": "array"
+        },
+        "source_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Fact Ids",
+          "type": "array"
+        },
+        "target_fact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Fact Ids",
+          "type": "array"
+        },
+        "artifact_refs": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Artifact Refs",
+          "type": "array"
+        },
+        "interpretation": {
+          "const": "matcher_comparison",
+          "default": "matcher_comparison",
+          "title": "Interpretation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "bridge_id",
+        "level",
+        "channel",
+        "source",
+        "target",
+        "artifact_refs"
+      ],
+      "title": "EvidenceBridge",
+      "type": "object"
+    },
+    "EvidenceCompleteness": {
+      "additionalProperties": false,
+      "properties": {
+        "selected": {
+          "minimum": 0,
+          "title": "Selected",
+          "type": "integer"
+        },
+        "resolved": {
+          "minimum": 0,
+          "title": "Resolved",
+          "type": "integer"
+        },
+        "unresolved": {
+          "minimum": 0,
+          "title": "Unresolved",
+          "type": "integer"
+        },
+        "not_exported": {
+          "minimum": 0,
+          "title": "Not Exported",
+          "type": "integer"
+        },
+        "withheld": {
+          "minimum": 0,
+          "title": "Withheld",
+          "type": "integer"
+        },
+        "graph_supported": {
+          "minimum": 0,
+          "title": "Graph Supported",
+          "type": "integer"
+        },
+        "graph_unsupported": {
+          "minimum": 0,
+          "title": "Graph Unsupported",
+          "type": "integer"
+        },
+        "graph_not_recorded": {
+          "minimum": 0,
+          "title": "Graph Not Recorded",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "selected",
+        "resolved",
+        "unresolved",
+        "not_exported",
+        "withheld",
+        "graph_supported",
+        "graph_unsupported",
+        "graph_not_recorded"
+      ],
+      "title": "EvidenceCompleteness",
+      "type": "object"
+    },
     "EvidenceLink": {
       "additionalProperties": false,
       "properties": {
@@ -347,6 +704,27 @@
       "title": "FactPacket",
       "type": "object"
     },
+    "FrozenPairMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
+        },
+        "target": {
+          "$ref": "#/$defs/exact_inspect__study__models__EntityRef"
+        },
+        "evidence_metadata": {
+          "$ref": "#/$defs/PairEvidenceMetadata"
+        }
+      },
+      "required": [
+        "source",
+        "target",
+        "evidence_metadata"
+      ],
+      "title": "FrozenPairMetadata",
+      "type": "object"
+    },
     "GroundedClaim": {
       "additionalProperties": false,
       "properties": {
@@ -473,6 +851,41 @@
           },
           "maxItems": 100,
           "title": "Packet Fact Subjects",
+          "type": "array"
+        },
+        "presentation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DescriptionPresentation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "packet_render_revision": {
+          "anyOf": [
+            {
+              "const": "typed-readable/3",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Packet Render Revision"
+        },
+        "packet_reference_label_ids": {
+          "items": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_.:/-]+$",
+            "type": "string"
+          },
+          "maxItems": 60,
+          "title": "Packet Reference Label Ids",
           "type": "array"
         },
         "reviewer_receipt": {
@@ -929,6 +1342,143 @@
       "title": "OriginalValue",
       "type": "object"
     },
+    "PairEvidenceMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "version": {
+          "const": "exact-evidence-metadata/1",
+          "default": "exact-evidence-metadata/1",
+          "title": "Version",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "selected",
+            "none_selected",
+            "not_exported",
+            "request_failed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "counts": {
+          "$ref": "#/$defs/EvidenceCompleteness"
+        },
+        "bridge_status": {
+          "enum": [
+            "recorded",
+            "not_recorded",
+            "withheld"
+          ],
+          "title": "Bridge Status",
+          "type": "string"
+        },
+        "bridges": {
+          "items": {
+            "$ref": "#/$defs/EvidenceBridge"
+          },
+          "title": "Bridges",
+          "type": "array"
+        },
+        "comparison_records": {
+          "items": {
+            "$ref": "#/$defs/RecordedComparisonResolution"
+          },
+          "title": "Comparison Records",
+          "type": "array"
+        },
+        "comparison_resolution": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ComparisonResolutionCounts"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scope": {
+          "default": "saved_run",
+          "enum": [
+            "saved_run",
+            "prepared_visibility_policy"
+          ],
+          "title": "Scope",
+          "type": "string"
+        }
+      },
+      "required": [
+        "status",
+        "counts",
+        "bridge_status"
+      ],
+      "title": "PairEvidenceMetadata",
+      "type": "object"
+    },
+    "RecordedComparisonResolution": {
+      "additionalProperties": false,
+      "description": "A saved comparison's identity resolution, without exposing raw legacy aliases.",
+      "properties": {
+        "record_id": {
+          "title": "Record Id",
+          "type": "string"
+        },
+        "channel": {
+          "enum": [
+            "lexical",
+            "hierarchy",
+            "similarity",
+            "attributes",
+            "difference",
+            "unknown"
+          ],
+          "title": "Channel",
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "resolved",
+            "unresolved",
+            "ambiguous",
+            "unsupported"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "reason_code": {
+          "title": "Reason Code",
+          "type": "string"
+        },
+        "bridge_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Bridge Id"
+        },
+        "artifact_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Artifact Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "record_id",
+        "channel",
+        "status",
+        "reason_code"
+      ],
+      "title": "RecordedComparisonResolution",
+      "type": "object"
+    },
     "Score": {
       "additionalProperties": false,
       "description": "A recorded value with stage semantics, never an implied calibrated probability.",
@@ -1150,6 +1700,20 @@
       },
       "title": "Evidence",
       "type": "array"
+    },
+    "pair_metadata": {
+      "maxProperties": 5,
+      "patternProperties": {
+        "^[A-Za-z0-9_.:/-]+$": {
+          "$ref": "#/$defs/FrozenPairMetadata"
+        }
+      },
+      "propertyNames": {
+        "maxLength": 128,
+        "minLength": 1
+      },
+      "title": "Pair Metadata",
+      "type": "object"
     },
     "limitations": {
       "items": {

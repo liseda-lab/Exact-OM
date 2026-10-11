@@ -41,6 +41,7 @@ def build_explanation_resource(
     packets: Iterable[FactPacket] = (),
     explanations: Iterable[dict[str, Any]] = (),
     evidence: Mapping[str, list[dict[str, Any]]] | None = None,
+    pair_metadata: Mapping[str, dict[str, Any]] | None = None,
 ) -> ExplanationResource:
     """Freeze a bounded original-context view and independently validated generated text.
 
@@ -248,6 +249,10 @@ def build_explanation_resource(
                         )
                     ),
                     **preparation,
+                    packet_render_revision=packet.selection.get("render_revision"),
+                    packet_reference_label_ids=[
+                        f["fact_id"] for f in packet.selection.get("referenced_labels", [])
+                    ],
                     reviewer_receipt=review_hash,
                     scoped_entities=[
                         StudyEntity.model_validate(e.model_dump()) for e in packet.entities
@@ -267,8 +272,17 @@ def build_explanation_resource(
                 "Generated interpretation is unavailable; original fact excerpts are shown."
             )
     referenced_labels: list[OriginalFact] = []
+    for packet in packets:
+        from ..readable_descriptions import label_facts
+
+        for raw in label_facts(packet):
+            fact = original_record(raw, reference_label=True)
+            if not any(
+                x.fact_id == fact.fact_id and x.subject == fact.subject for x in referenced_labels
+            ):
+                referenced_labels.append(fact)
     labels_truncated = False
-    label_bytes = 2  # JSON array brackets; each subsequent item adds one comma.
+    label_bytes = len(canonical_json([f.model_dump(mode="json") for f in referenced_labels]))
     if "labels" in policy.categories:
         seen_iris = {(e.ontology_version_id, e.iri) for e in entities}
         references: list[tuple[str, str]] = []
@@ -293,6 +307,11 @@ def build_explanation_resource(
                     continue
                 raw = context.fact(label["fact_id"], row["entity"], policy=policy)
                 fact = original_record(raw, reference_label=True)
+                if any(
+                    x.fact_id == fact.fact_id and x.subject == fact.subject
+                    for x in referenced_labels
+                ):
+                    continue
                 added_bytes = len(canonical_json(fact)) + bool(referenced_labels)
                 if (
                     len(referenced_labels) >= REFERENCED_LABEL_LIMIT
@@ -315,6 +334,7 @@ def build_explanation_resource(
         independent_reviews=independent_reviews,
         hierarchy=list(edges.values()),
         evidence=evidence_links,
+        pair_metadata=pair_metadata or {},
         limitations=list(dict.fromkeys(limitations)),
         capabilities={
             "context": "partial",

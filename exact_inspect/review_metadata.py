@@ -1,7 +1,7 @@
 """Public-safe metadata shared by exploration and the provisional study."""
 
 from typing import Literal
-from pydantic import Field
+from pydantic import Field, model_serializer
 from .contracts import WireModel, EntityRef
 
 
@@ -39,3 +39,21 @@ class ReviewBundleSummary(WireModel):
     cases: list[ReviewCaseSummary] = Field(default_factory=list, max_length=200)
     limitations: list[str] = Field(max_length=20)
     ontologies: list[ReviewOntology] = Field(max_length=20)
+
+    composition_identity: str | None = None
+    delivered_layers: dict[str, str] | None = None
+    selected_evidence_counts: dict[str, int] | None = None
+    recorded_bridge_counts: dict[str, int] | None = None
+
+    @model_serializer(mode="wrap")
+    def historical_shape(self, handler):
+        result = handler(self)
+        for key in [
+            "composition_identity",
+            "delivered_layers",
+            "selected_evidence_counts",
+            "recorded_bridge_counts",
+        ]:
+            if getattr(self, key) is None:
+                result.pop(key, None)
+        return result

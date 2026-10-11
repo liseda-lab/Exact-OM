@@ -13,6 +13,7 @@ from exact_inspect.study.resources import ExplanationResource
 from exact_inspect.study.v2_models import TutorialDefinition
 from exact_inspect.service import create_prepared_app
 from exact_inspect.review_metadata import ReviewBundleSummary
+from exact_inspect.postmigration_contracts import PartialInferenceMetadata, DescriptionPresentation
 from exact_inspect.description_review import IndependentDescriptionReview
 
 
@@ -26,6 +27,8 @@ def snapshots():
             allow_test_sqlite=True,
         )
         return {
+            "partial-inference.runtime-schema.json": PartialInferenceMetadata.model_json_schema(),
+            "description-presentation.runtime-schema.json": DescriptionPresentation.model_json_schema(),
             "exploration.runtime-openapi.json": create_prepared_app(None).openapi(),
             "review-about.runtime-schema.json": ReviewBundleSummary.model_json_schema(),
             "description-review.runtime-schema.json": IndependentDescriptionReview.model_json_schema(),

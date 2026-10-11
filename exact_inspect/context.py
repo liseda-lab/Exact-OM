@@ -106,6 +106,11 @@ class OntologyContext:
             from .navigation import PreparedNavigation
 
             self._navigation = PreparedNavigation(self)
+        self._partial_navigation = None
+        if self.manifest.get("partial_navigation"):
+            from .navigation import PreparedNavigation
+
+            self._partial_navigation = PreparedNavigation(self, partial=True)
 
     def navigation_metadata(self, policy=None):
         from .navigation import metadata
@@ -625,7 +630,12 @@ class OntologyContext:
         ref = self._entity(entity, policy)
         if direction not in {"parents", "children", "ancestors"}:
             raise ValueError("Unsupported hierarchy direction")
-        if basis not in {"literal_asserted", "structural_navigation", "reasoner_inferred"}:
+        if basis not in {
+            "literal_asserted",
+            "structural_navigation",
+            "reasoner_inferred",
+            "elk_inferred_partial",
+        }:
             raise ValueError("Unsupported hierarchy basis")
         scope = self._scope(
             {
@@ -639,11 +649,17 @@ class OntologyContext:
         )
         if not _allowed(policy, self.ontology_version_id, "hierarchy"):
             return self._page([], None, scope, status="not_exported")
-        if basis == "reasoner_inferred":
+        if basis in {"reasoner_inferred", "elk_inferred_partial"}:
             from .navigation import inferred_hierarchy
 
             return inferred_hierarchy(
-                self, ref, direction=direction, limit=limit, cursor=cursor, policy=policy
+                self,
+                ref,
+                direction=direction,
+                limit=limit,
+                cursor=cursor,
+                policy=policy,
+                basis=basis,
             )
         last = decode_cursor(cursor, scope) if cursor else ""
         if not isinstance(last, str):

@@ -6,6 +6,8 @@ structured OWL values retain the public constructor shape without a serving pars
 
 from __future__ import annotations
 
+from ..postmigration_contracts import DescriptionPresentation
+
 from collections.abc import Iterator
 from typing import Annotated, Any, Literal
 
@@ -191,6 +193,9 @@ class GroundedClaim(StrictModel):
     scoped_entities: list[EntityRef] = Field(default_factory=list, max_length=2)
     packet_fact_ids: list[Identifier] = Field(default_factory=list, max_length=100)
     packet_fact_subjects: list[EntityRef] = Field(default_factory=list, max_length=100)
+    presentation: DescriptionPresentation | None = None
+    packet_render_revision: Literal["typed-readable/3"] | None = None
+    packet_reference_label_ids: list[Identifier] = Field(default_factory=list, max_length=60)
     reviewer_receipt: Identifier | None = None
     generation_manifest_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
 
@@ -255,6 +260,15 @@ def validate_claim_identities(claims):
             raise ValueError("Conflicting claim identity for different content or scope")
 
 
+from ..evidence_metadata import PairEvidenceMetadata
+
+
+class FrozenPairMetadata(StrictModel):
+    source: EntityRef
+    target: EntityRef
+    evidence_metadata: PairEvidenceMetadata
+
+
 class ExplanationResource(StrictModel):
     """Strict allowlist for study panels; arbitrary scorer dictionaries cannot enter."""
 
@@ -274,6 +288,7 @@ class ExplanationResource(StrictModel):
     )
     hierarchy: list[HierarchyEdge] = Field(default_factory=list)
     evidence: list[EvidenceLink] = Field(default_factory=list)
+    pair_metadata: dict[Identifier, FrozenPairMetadata] = Field(default_factory=dict, max_length=5)
     limitations: list[str] = Field(default_factory=list)
     capabilities: dict[
         Literal["context", "profiles", "hierarchy", "evidence", "comparison"],
@@ -330,6 +345,11 @@ class ExplanationResource(StrictModel):
             > REFERENCED_LABEL_BYTES
         ):
             raise ValueError("Referenced labels exceed the prepared byte budget")
+        for label in self.referenced_labels:
+            if label.fact_id not in facts:
+                facts[label.fact_id] = [label]
+            subject = (label.subject.ontology_version_id, label.subject.iri, label.subject.kind)
+            contextual_facts[(label.fact_id, subject)] = label
         for review_hash, support in self.independent_reviews.items():
             # Recheck the full nested envelope even when the caller supplied a
             # previously constructed model with mutable JSON descendants.
@@ -447,7 +467,21 @@ class ExplanationResource(StrictModel):
                     facts=selected,
                     missingness=[],
                     selection=(
-                        {"description_contract": DESCRIPTION_VERSION}
+                        {
+                            "description_contract": DESCRIPTION_VERSION,
+                            **(
+                                {
+                                    "render_revision": claim.packet_render_revision,
+                                    "referenced_labels": [
+                                        f.model_dump(mode="json")
+                                        for f in self.referenced_labels
+                                        if f.fact_id in claim.packet_reference_label_ids
+                                    ],
+                                }
+                                if claim.packet_render_revision
+                                else {}
+                            ),
+                        }
                         if claim.grounding == "typed_description"
                         else {}
                     ),
@@ -459,6 +493,86 @@ class ExplanationResource(StrictModel):
                     for template in comparison_templates(packet) + description_templates(packet)
                 ):
                     raise ValueError("Comparison does not match a grounded semantic template")
+        from ..readable_descriptions import presentation
+
+        presentation_groups = {}
+        for claim in self.entity_profiles + self.pair_comparison:
+            if not set(claim.packet_reference_label_ids) <= {
+                f.fact_id for f in self.referenced_labels
+            }:
+                raise ValueError("Description packet references unavailable labels")
+            if claim.presentation is not None:
+                key = (
+                    claim.generation_manifest_sha256,
+                    canonical_hash([e.model_dump(mode="json") for e in claim.scoped_entities]),
+                )
+                presentation_groups.setdefault(key, []).append(claim)
+        for claims in presentation_groups.values():
+            first = claims[0]
+            support = self.independent_reviews.get(first.reviewer_receipt)
+            if support:
+                presentation_facts = support.packet.facts
+            elif first.packet_fact_subjects:
+                presentation_facts = [
+                    contextual_facts[(fid, (e.ontology_version_id, e.iri, e.kind))].model_dump(
+                        mode="json"
+                    )
+                    for fid, e in zip(
+                        first.packet_fact_ids, first.packet_fact_subjects, strict=True
+                    )
+                ]
+            else:
+                presentation_facts = [
+                    f.model_dump(mode="json")
+                    for f in self.facts
+                    if f.subject in first.scoped_entities
+                ]
+            expected = presentation(
+                {
+                    "task": (
+                        "entity_profile" if len(first.scoped_entities) == 1 else "pair_comparison"
+                    ),
+                    "entities": [e.model_dump(mode="json") for e in first.scoped_entities],
+                    "claims": [c.model_dump(mode="json") for c in claims],
+                    "support_status": first.support_status,
+                    "preparation_kind": first.preparation_kind,
+                    "independent_review": (
+                        support.receipt.model_dump(mode="json") if support else None
+                    ),
+                    "support_packet": {
+                        "facts": presentation_facts,
+                        "selection": {"render_revision": first.packet_render_revision},
+                    },
+                }
+            )
+            if any(c.presentation.model_dump(mode="json") != expected for c in claims):
+                raise ValueError(
+                    "Description presentation differs from its cited scope and support"
+                )
+        for candidate_id, pair in self.pair_metadata.items():
+            if any(
+                (e.ontology_version_id, e.iri, e.kind) not in identities
+                for e in [pair.source, pair.target]
+            ):
+                raise ValueError("Frozen comparison is outside the permitted pair")
+            rows = {e.evidence_id: e for e in self.evidence if e.candidate_id == candidate_id}
+            if pair.evidence_metadata.counts.selected != len(rows):
+                raise ValueError("Frozen comparison inventory differs from selected evidence")
+            for bridge in pair.evidence_metadata.bridges:
+                if (
+                    bridge.source.model_dump() != pair.source.model_dump()
+                    or bridge.target.model_dump() != pair.target.model_dump()
+                ):
+                    raise ValueError("Frozen bridge differs from its typed pair")
+                for side in ["source", "target"]:
+                    for eid in getattr(bridge, side + "_evidence_ids"):
+                        if eid not in rows or rows[eid].role != side:
+                            raise ValueError("Frozen bridge refers to another selected feature")
+                    permitted_facts = {
+                        fid for e in rows.values() if e.role == side for fid in e.fact_ids
+                    }
+                    if not set(getattr(bridge, side + "_fact_ids")) <= permitted_facts:
+                        raise ValueError("Frozen bridge cites unavailable original facts")
         for edge in self.hierarchy:
             if not set(edge.fact_ids) <= set(facts):
                 raise ValueError("Hierarchy references unavailable facts")
