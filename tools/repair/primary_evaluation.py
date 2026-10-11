@@ -471,10 +471,12 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
     if manifest.get("schema") != SCHEMA or not manifest.get("execution_authorized"):
         raise ValueError("Primary evaluation is not admitted")
     engineering = manifest.get("scope") == "representative_development"
+    retained_rows = {}
     if engineering:
-        from tools.repair.representative_capacity import validate_manifest
+        from tools.repair.representative_capacity import recovery_rows, validate_manifest
 
         validate_manifest(manifest)
+        retained_rows = recovery_rows(manifest)
     elif manifest.get("scope") != "fixture":
         if now() < manifest["not_before_epoch"] or not manifest.get("model_freeze_receipt"):
             raise ValueError("TEST remains closed until the model freeze")
@@ -558,6 +560,12 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     )
                     break
                 continue
+            if row["id"] in retained_rows:
+                saved = retained_rows[row["id"]]
+                validate_saved(saved, row_identity)
+                immutable(path, saved)
+                saved_rows[row["id"]] = saved
+                continue
             if guard.exists():
                 started = read(guard)
                 if started.get("identity") != row_identity:
@@ -614,7 +622,8 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             else:
                 started = now()
                 case_deadline = min(
-                    limit - CLEANUP_SECONDS, started + row["case_seconds"] - CLEANUP_SECONDS
+                    limit - CLEANUP_SECONDS,
+                    started + row["case_seconds"] - CLEANUP_SECONDS,
                 )
                 immutable(
                     guard,
@@ -642,6 +651,7 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     timeout=remaining(case_deadline),
                     memory_mb=manifest["memory_mb"],
                     cpu_seconds=manifest.get("cpus", 3) * remaining(case_deadline),
+                    cleanup_seconds=2.0 if manifest.get("device") == "cuda" else 0.2,
                 )
                 saved = dict(
                     identity=row_identity,

@@ -1445,6 +1445,9 @@ def bounded_freeze_checkpoint(
         str(checkpoint_path),
         timeout=limit,
         memory_mb=memory_mb,
+        # CUDA context teardown can outlast the native worker's 0.2s grace.
+        # bounded_call deducts the larger reserve from this same stage budget.
+        cleanup_seconds=2.0 if str(options.get("device", "cpu")).startswith("cuda") else 0.2,
         checkpoint_sha256=checkpoint_sha256,
         **worker_options,
         **options,
