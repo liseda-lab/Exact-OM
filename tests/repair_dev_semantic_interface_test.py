@@ -426,3 +426,22 @@ def test_complete_theory_contrast_is_exact_and_never_a_semantic_equivalence_clai
     assert "THEORY_COMPARISON" not in interface.native_evidence(
         case.probes, (packet.plan_a, packet.plan_b), {}
     )
+
+
+def test_complete_criteria_schema_prevents_empty_mask_but_keeps_unknowns():
+    import jsonschema
+    from exact.repair.annotation_controls import response_format
+
+    _, packet, _ = _offline_lookup_fixture("development")
+    schema = response_format(packet, complete_criteria=True)["json_schema"]["schema"]
+    value = judgment(packet)
+    jsonschema.validate(value, schema)
+    value["criteria"] = []
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(value, schema)
+    value = judgment(packet, decision="abstain", a=None, b=None)
+    value["abstention_reason"] = "Meaning of the introduced term is not supplied"
+    for criterion in value["criteria"]:
+        criterion.update(status="unknown", preference="abstain")
+    jsonschema.validate(value, schema)
+    assert not validate_comparison(json.dumps(value), packet).global_target_eligible

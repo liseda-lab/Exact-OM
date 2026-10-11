@@ -234,7 +234,10 @@ def packet_admission(packet, manifest, swapped):
     ]
     wire = dict(
         response_format=response_format(
-            packet, swapped, verbatim_quotes=not manifest.get("no_verbatim_quotes", False)
+            packet,
+            swapped,
+            verbatim_quotes=not manifest.get("no_verbatim_quotes", False),
+            complete_criteria=manifest.get("complete_criteria", False),
         )
     )
     if controls["reasoning"] is not None:

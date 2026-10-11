@@ -970,6 +970,7 @@ def annotate_packet(
                             packet,
                             swapped,
                             verbatim_quotes=not manifest.get("no_verbatim_quotes", False),
+                            complete_criteria=manifest.get("complete_criteria", False),
                         ),
                     )
                 },

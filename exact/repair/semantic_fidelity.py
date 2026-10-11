@@ -150,7 +150,19 @@ missing entailment; assess asserted content using the declared meaning evidence,
 and retain unknown where the missing result is necessary for the judgment.
 """
 )
+COMPLETE_PROMPT_VERSION = "semantic-fidelity-prompt/v3.6"
+COMPLETE_PROMPT = (
+    CONTRAST_PROMPT
+    + """
+The criteria array must contain exactly one object for EVERY required criterion,
+even on abstention. Never return an empty array. For an unknown criterion, use
+status unknown, preference abstain, null scores, cited available evidence and a
+reason describing the specific missing information. An overall abstain needs a
+nonempty abstention_reason. Do not invent a decided score merely to fill the array.
+"""
+)
 PROMPTS = {
+    COMPLETE_PROMPT_VERSION: COMPLETE_PROMPT,
     CONTRAST_PROMPT_VERSION: CONTRAST_PROMPT,
     CITATION_PROMPT_VERSION: CITATION_PROMPT,
     PROMPT_VERSION: PROMPT,
