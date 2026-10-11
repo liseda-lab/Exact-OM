@@ -19,6 +19,7 @@ from exact.repair.records import canonical_hash, read_record
 from tools.repair.batch import read, sha
 from tools.repair.historical_regression import binding
 from tools.repair.prepare_primary_runtime import validate_schedule
+from tools.repair.scaling_payload_recovery import payload_manifest
 from tools.repair.shared_release import bound, immutable
 
 SCHEMA = "exact-repair/primary-evaluation-execution/v1"
@@ -653,6 +654,7 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     cpu_seconds=manifest.get("cpus", 3) * remaining(case_deadline),
                     cleanup_seconds=2.0 if manifest.get("device") == "cuda" else 0.2,
                 )
+                artifacts, unpublished = payload_manifest(directory / "payload")
                 saved = dict(
                     identity=row_identity,
                     status=outcome.status,
@@ -665,11 +667,8 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     reserved_seconds=row["case_seconds"],
                     resources=dict(outcome.resource_usage),
                     shared_cost_reference=dependency,
-                    artifacts=[
-                        binding(p)
-                        for p in sorted((directory / "payload").rglob("*"))
-                        if p.is_file() and p.suffix != ".lock"
-                    ],
+                    artifacts=artifacts,
+                    unpublished_artifacts=unpublished,
                 )
                 if outcome.status == "error" or not outcome.cleanup_complete:
                     error = RuntimeError(
