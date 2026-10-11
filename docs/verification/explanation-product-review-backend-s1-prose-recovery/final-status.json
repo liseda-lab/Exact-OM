@@ -1,0 +1,60 @@
+{
+  "actual_preflight_api": "passed",
+  "assembly": {
+    "error": "Prepared database cannot be read safely.",
+    "error_type": "DomainError",
+    "phase": "failed",
+    "pid": 40837,
+    "schema": "exact-prose-assembly/1",
+    "seconds": 645.5925391148776
+  },
+  "backend_tests_passed": 90,
+  "checkout_read_errors": "Git and some working-tree reads also returned Operation timed out; this is a separate observed storage/materialization limitation, not proof of a specific cloud-provider cause.",
+  "claims_approved": 68,
+  "claims_rejected": 104,
+  "comparison_artifacts_with_approved_prose": 8,
+  "dependent_verification": {
+    "error_type": "RuntimeError",
+    "phase": "waiting_for_assembly",
+    "pid": 42536,
+    "schema": "exact-prose-post-assembly/1",
+    "seconds": 300.20811055391096,
+    "status": "failed"
+  },
+  "final_status_commit": "not completed: Git pack/tree reads returned Operation timed out. The updated handoff and final failure receipts are saved and staged; existing implementation and review commits are retained.",
+  "full_publication_api_and_https_verification": "not run; assembly failed",
+  "git_failure": "fatal: unable to read tree 8ae928056ffcc281cd4b8feab506698b1a23d5a3",
+  "implementation_commit": "3174f4bb1a67f3731f94271ff8ff88eb0b3b4d37",
+  "profile_artifacts_with_approved_prose": 56,
+  "provider_requests_completed": 86,
+  "recorded_at": "2026-10-10T20:02:07.682913+00:00",
+  "resume": "Resolve local storage, then resume cache-only assembly from the saved jobs and reviews. No new paid generation is required.",
+  "review_handoff_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
+  "schema": "exact-prose-recovery-final-status/1",
+  "storage_failure": {
+    "additional_space_or_reuse_of_a_verified_prepared_export_required": true,
+    "automatic_retry": false,
+    "discarded_rebuildable_new_scratch_databases": [
+      {
+        "logical_bytes": 394461184,
+        "path": "package/runs/review/decisions.sqlite"
+      },
+      {
+        "logical_bytes": 3159818240,
+        "path": "private-decision-imports/f8f598ca1db8dfcc3c192173e1a95122442bd57fed2b54995146b4d8e2fad541/decisions.sqlite"
+      }
+    ],
+    "failure_log": "assembly.log",
+    "free_bytes_after_cleanup": 5853917184,
+    "full_api_and_https_checks_run": false,
+    "generation_and_review_saved": true,
+    "phase": "portable_decision_export",
+    "publication_created": false,
+    "recorded_at": "2026-10-10T19:58:38.728424+00:00",
+    "root_cause": "sqlite3.OperationalError: database or disk is full",
+    "schema": "exact-prose-assembly-storage-failure/1",
+    "wrapped_error": "Prepared database cannot be read safely."
+  },
+  "supersedes": "The background snapshots in receipt.json were recorded before this failure. Generation, review, hashes and regression evidence remain valid.",
+  "workers_running": false
+}

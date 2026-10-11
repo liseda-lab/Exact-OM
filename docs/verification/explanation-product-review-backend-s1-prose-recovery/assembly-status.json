@@ -1,1 +1,1 @@
-{"phase":"preparing_cache_only_publication","pid":40837,"schema":"exact-prose-assembly/1","seconds":63.88866224489175}
+{"error":"Prepared database cannot be read safely.","error_type":"DomainError","phase":"failed","pid":40837,"schema":"exact-prose-assembly/1","seconds":645.5925391148776}

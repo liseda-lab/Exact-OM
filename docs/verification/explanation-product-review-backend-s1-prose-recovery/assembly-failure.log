@@ -1,0 +1,35 @@
+cloning_frozen_inputs
+preparing_cache_only_publication
+failed
+Traceback (most recent call last):
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/sqlite_safety.py", line 224, in readonly_connection
+    yield connection
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/decisions.py", line 867, in _connect
+    yield connection
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/decisions_export.py", line 72, in export_policy_run
+    target.execute(
+sqlite3.OperationalError: database or disk is full
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/assemble.py", line 38, in <module>
+    publication = prepare(destination, source / 'inputs/local300', count=24, generate_pairs=12,
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/tools/prepare_review_bundle.py", line 429, in prepare
+    portable_run = prepared_policy_run(
+                   ^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/tools/review_run_cache.py", line 58, in prepared_policy_run
+    result = exporter(source, destination, contexts=contexts, policy=policy)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/decisions_export.py", line 44, in export_policy_run
+    with source._connect() as original, closing(sqlite3.connect(database)) as target:
+  File "/usr/local/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/decisions.py", line 866, in _connect
+    with readonly_connection(self.database, DECISION_TABLES) as connection:
+  File "/usr/local/Cellar/python@3.12/3.12.3/Frameworks/Python.framework/Versions/3.12/lib/python3.12/contextlib.py", line 158, in __exit__
+    self.gen.throw(value)
+  File "/Users/pedrocotovio/Documents/Repos/OM/Exact-OM/exact_inspect/sqlite_safety.py", line 238, in readonly_connection
+    raise DomainError(
+exact_inspect.contracts.DomainError: Prepared database cannot be read safely.

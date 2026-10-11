@@ -4,6 +4,8 @@
 credential. Starting checkout: `66b588ce979eab1b9b0b446d7eba9d61712b549d`.
 The [machine receipt](explanation-product-review-backend-s1-prose-recovery/receipt.json)
 records implementation identity, frozen inputs, independent reviews and verification.
+The subsequent [final status](explanation-product-review-backend-s1-prose-recovery/final-status.json)
+supersedes its earlier pending background snapshots with the observed storage failure.
 The earlier [S1 follow-up](explanation-product-review-backend-s1-followup.md) remains the
 record for ontology admission, evidence recovery, inference and the earlier API journey.
 
@@ -28,6 +30,13 @@ It improves usable prose materially but **does not close all of B04**, joint acc
 research launch readiness. Missing-definition synthesis, four wholly rejected comparisons,
 two one-sided comparisons and rendered S2 usefulness remain explicit limitations.
 
+**Final assembly result:** the new publication could not be completed. After 645.593 seconds,
+SQLite reported `database or disk is full` while exporting the portable decision database.
+The safe database wrapper exposed this as `Prepared database cannot be read safely`; the retained
+trace identifies disk exhaustion as the underlying error. No new publication or environment
+was created. The dependent full-publication API and HTTPS/PostgreSQL checks did not run.
+The two workers have stopped; their final failure receipts supersede the earlier pending snapshots.
+
 ## Root causes and corrections
 
 | Finding | Cause and correction | Disposition / owner |
@@ -37,6 +46,7 @@ two one-sided comparisons and rendered S2 usefulness remain explicit limitations
 | P2: unreadable prose | Template examples encouraged literal copying; long provenance envelopes distracted from the admitted meaning. V5 sends a compact view of the same admitted facts and explicit missingness, without renderer templates. Original complete packets remain frozen for provenance and review. | Improved in reviewed examples; semantic quality still requires claim-by-claim review. |
 | P1: batch continuation after transport failure | A full run could continue after a saved job lacked a provider response. It now stops immediately, just like preflight, and cannot silently retry a completed/failed job on resume. | Regression covers success followed by credential failure and repeated invocation without new calls. |
 | P1: unsupported model assertions | Drafts inferred broader/narrower disease scope, shifted qualifiers, guessed parent labels, or strengthened material basis into causation. One comparison denied a karyotype explicitly present in its cited definition; another dropped “presumed” from TPO causation. | Rejected by the separate review; no blanket semantic approval, category alias repair or evidence substitution. B04 coverage remains open. |
+| P1: new publication unavailable | The local volume ran out of writable space during the portable decision export. The partial export and newly rebuilt private scratch database were removed after retaining the failure evidence and input manifests. | Open environment/storage gate. Saved provider jobs, independent reviews and original publications remain available. No paid rerun is required. |
 
 The provider schema follows the documented [OpenRouter structured-output interface](https://openrouter.ai/docs/guides/features/structured-outputs).
 It constrains shape, not truth. Production admitted-fact validation and independent review
@@ -105,14 +115,16 @@ rendered journey remains open. No new browser cancellation/stall conclusion is c
 
 ## Local startup and running work
 
-Assembly runs once in the background. `assembly-status.json` and `assembly.log` in the new root
-identify the exact phase or failure. `prepared-input/publication.json` is written last and is
-the assembly completion marker. No existing service or database is stopped or modified.
+`assembly-status.json` and `assembly.log` in the new root record the storage failure.
+`assembly-storage-failure.json` records cleanup of 3,554,279,424 logical bytes in two new,
+rebuildable scratch databases. Input manifests, all responses/reviews and existing publications
+were retained. `prepared-input/publication.json` is absent; it is written last on success.
 
-The post-assembly worker records `verification-status.json`, checks all served prose, prepares
-a new isolated environment and runs the existing HTTPS/PostgreSQL journey plus restart/resume.
-It leaves successful services running. Consult its receipt before treating the new endpoints
-as ready. Long work is handed off rather than keeping the conversation waiting.
+The dependent worker's `verification-status.json` is failed at `waiting_for_assembly`.
+No new endpoints are ready and no background worker is still running. Resume only after
+providing enough local storage or implementing verified reuse of the existing portable export.
+The observed private index is approximately 3.16 GB and the earlier full portable export 2.70 GB;
+assembly also needs SQLite working space and study resources. Do not repeatedly retry a full disk.
 
 From the repository, use the existing Python executable:
 
@@ -120,8 +132,20 @@ From the repository, use the existing Python executable:
 /Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python
 ```
 
-The new environment root is `<new-root>/environment`, with PostgreSQL 19303, study HTTPS
-19304 and exploration HTTPS 19305. After successful preparation, lifecycle operations are:
+To resume the unpublished assembly after resolving storage, use the same saved responses:
+
+```text
+python -m tools.prepare_review_bundle --root <new-root>/prepared-input --run <original-root>/inputs/local300 --cases 24 --generate-pairs 12 --revision development-review-s1-prose-20261010 --generation-mode provider --generation-attempt 7 --generation-cache-only
+python -m tools.verify_review_prose <new-root>/prepared-input <new-root>/prose-verification.json
+```
+
+Here `<original-root>` is the private `s1-20261010` root above. Cache-only mode prevents paid
+dispatch. Preserve failed receipts; the stopped `verify-after-assembly.py` file documents the
+subsequent environment arguments, but do not restart it against the old failed assembly marker.
+Use fresh verification output paths for any repeated completed check.
+
+The **planned, not yet prepared** environment root is `<new-root>/environment`, with PostgreSQL
+19303, study HTTPS 19304 and exploration HTTPS 19305. After successful preparation, operations are:
 
 ```text
 python -m tools.review_environment status --root <new-root>/environment
@@ -159,8 +183,8 @@ name is never the criterion for a “validated generated description” label.
    after S2. Manual accessibility and pilot usefulness remain separate checks.
 
 **Implementation correctness:** authentication and response-shape recovery are verified; independent
-review excludes unsupported claims. Complete-publication/runtime verification is bounded by its
-recorded worker status. **Joint acceptance:** open for S2, rendered verification and the remaining
+review excludes unsupported claims. Complete-publication/runtime verification is blocked by
+local storage and has not run. **Joint acceptance:** open for assembly, S2, rendered verification and the remaining
 B04/data/performance gaps. **Launch readiness:** not established. Original DOID/full-import admission,
 manual accessibility, pilot usability, owner approval and deployment remain open; real inference
 remains the user's explicitly optional exception after the failed bounded ELK attempts.

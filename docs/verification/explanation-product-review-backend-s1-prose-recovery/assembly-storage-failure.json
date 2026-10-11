@@ -1,0 +1,24 @@
+{
+  "schema": "exact-prose-assembly-storage-failure/1",
+  "recorded_at": "2026-10-10T19:58:38.728424+00:00",
+  "phase": "portable_decision_export",
+  "root_cause": "sqlite3.OperationalError: database or disk is full",
+  "wrapped_error": "Prepared database cannot be read safely.",
+  "publication_created": false,
+  "full_api_and_https_checks_run": false,
+  "generation_and_review_saved": true,
+  "discarded_rebuildable_new_scratch_databases": [
+    {
+      "path": "package/runs/review/decisions.sqlite",
+      "logical_bytes": 394461184
+    },
+    {
+      "path": "private-decision-imports/f8f598ca1db8dfcc3c192173e1a95122442bd57fed2b54995146b4d8e2fad541/decisions.sqlite",
+      "logical_bytes": 3159818240
+    }
+  ],
+  "failure_log": "assembly.log",
+  "additional_space_or_reuse_of_a_verified_prepared_export_required": true,
+  "automatic_retry": false,
+  "free_bytes_after_cleanup": 5853917184
+}
