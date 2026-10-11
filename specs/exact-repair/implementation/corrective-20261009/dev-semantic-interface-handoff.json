@@ -1,7 +1,7 @@
 {
   "activation": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-004/activation.json",
-    "sha256": "d0c0d354e366d007222b9c91fdf0c7c59544da2ca96b542cdb5f858e4452cff4"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-004/activation-final.json",
+    "sha256": "88c338c849ba172822ac99b1846c7d32ba16c9091837143158ce96573856771a"
   },
   "costs_reset": false,
   "handoff": {
@@ -17,7 +17,7 @@
     "whole-cohort immutable annotation revision, shared budgets and compatible resume"
   ],
   "limitation": "One final control response contradicts native evidence and remains invalid. The primary selection gate is unchanged. Remaining fixed slots continue independently; do not declare all six models selected or the teacher semantically correct.",
-  "recorded_epoch": 1791758778.67092,
+  "recorded_epoch": 1791758862.110479,
   "schema": "exact-repair/committed-campaign-handoff/v1",
   "source_commit": "a18e6b2540000ed001bce27d8699d136d93bc901",
   "test_opened": false,
