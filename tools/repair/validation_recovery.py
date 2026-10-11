@@ -116,6 +116,21 @@ def qualification(rows, expected_families):
     )
 
 
+def runtime_configuration(protocol):
+    """Use exactly the primary entry point's defaults for omitted optional keys."""
+    import inspect
+    from tools.repair import train
+
+    config = {
+        name: value.default
+        for name, value in inspect.signature(train.train_cases).parameters.items()
+        if value.default is not inspect.Parameter.empty
+    }
+    config.update(train._protocol_arguments(protocol))
+    config["profile"] = train._protocol_profile(protocol)
+    return config
+
+
 def run(manifest_path, output):
     import torch
     from exact.repair.graph import EffectivePreparation
@@ -145,8 +160,7 @@ def run(manifest_path, output):
         load_protocol_v3(authenticate(primary["protocol"]), for_execution=True)
     )
     cases, caches, _ = load_preparation(authenticate(primary["preparation"]))
-    config = train._protocol_arguments(protocol)
-    config["profile"] = train._protocol_profile(protocol)
+    config = runtime_configuration(protocol)
     dev = {
         case.case_id: (case, cache)
         for case, cache in scheduled_runtime_development(cases, caches, config)
@@ -279,6 +293,11 @@ def run(manifest_path, output):
                 cache,
                 seconds=max(0, start["deadline_epoch"] - time.time()),
                 graph=graph,
+                selected_other_assignment=(
+                    tuple(0 for _ in case.problem.objects)
+                    if config["proposal_context"] == "selected_other_actions"
+                    else None
+                ),
                 semantic_target=target,
                 selection_slot=slot,
                 stage_report_path=output / "stages" / (key + ".json"),

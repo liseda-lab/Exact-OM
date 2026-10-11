@@ -1338,7 +1338,17 @@ def _freeze_worker(
     options = dict(options)
     model.to(options.pop("device", "cpu"))
     model.eval()
-    return freeze_neural_round(problem, model, **options)
+    result = freeze_neural_round(problem, model, **options)
+    device = next(model.parameters()).device
+    ownership = dict(device=str(device))
+    if device.type == "cuda":
+        ownership["gpu_uuid"] = str(torch.cuda.get_device_properties(device).uuid)
+    return replace(
+        result,
+        proposal_reports=tuple(
+            {**dict(row), "worker_ownership": ownership} for row in result.proposal_reports
+        ),
+    )
 
 
 def bounded_freeze_neural_round(

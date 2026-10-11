@@ -8,6 +8,38 @@ from exact.repair.workers import CallResult
 from tools.repair import train
 
 
+def test_recovery_uses_actual_training_entrypoint_defaults(monkeypatch):
+    from tools.repair.validation_recovery import runtime_configuration
+
+    monkeypatch.setattr(
+        train, "_protocol_arguments", lambda _: {"encoder": "hgt", "hidden_dim": 128}
+    )
+    monkeypatch.setattr(train, "_protocol_profile", lambda _: ())
+    config = runtime_configuration({})
+    assert config["proposal_arm"] == "grammar_mixture"
+    assert config["plan_rating_aggregation"] is None
+    assert config["hidden_dim"] == 128
+
+
+def test_all_evaluated_snapshots_survive_even_without_a_selected_model(tmp_path):
+    import torch
+    from exact.repair.model import RepairModel
+    from exact.repair.graph_schema import declared_metadata, generic_graph_schema
+
+    model = RepairModel(
+        declared_metadata(generic_graph_schema()), encoder="none", hidden_dim=8, heads=2, layers=0
+    )
+    first = train.development_snapshot(model, tmp_path, epoch=5, optimizer_updates=630)
+    assert train.development_snapshot(model, tmp_path, epoch=5, optimizer_updates=630) == first
+    with torch.no_grad():
+        next(model.parameters()).add_(0.01)
+    with pytest.raises(ValueError, match="weights changed"):
+        train.development_snapshot(model, tmp_path, epoch=5, optimizer_updates=630)
+    second = train.development_snapshot(model, tmp_path, epoch=6, optimizer_updates=756)
+    assert first["sha256"] != second["sha256"]
+    assert (tmp_path / "epoch-5.json").exists() and (tmp_path / "epoch-6.json").exists()
+
+
 @pytest.mark.parametrize("device", ["cpu", "cuda:0"])
 def test_dev_inherits_model_device_retains_failure_stages_and_explicit_budget(monkeypatch, device):
     calls = []

@@ -333,6 +333,43 @@ def _staged_training_model(
         )
 
 
+def development_snapshot(model, directory, *, epoch, optimizer_updates):
+    """Keep every evaluated endpoint, including those with unavailable DEV labels."""
+    from exact.repair.api import write_artifact
+    from exact.repair.pipeline import model_digest
+    from tools.repair.historical_regression import binding
+
+    directory = Path(directory)
+    receipt = directory / f"epoch-{epoch}.json"
+    identity = dict(
+        epoch=epoch, optimizer_updates=optimizer_updates, model_hash=model_digest(model)
+    )
+    if receipt.exists():
+        saved = json.loads(receipt.read_text())
+        if any(saved[k] != value for k, value in identity.items()):
+            raise ValueError("Evaluated endpoint weights changed on resume")
+        artifact = saved["artifact"]
+        if hashlib.sha256(Path(artifact["path"]).read_bytes()).hexdigest() != artifact["sha256"]:
+            raise ValueError("Evaluated endpoint snapshot integrity changed")
+        return artifact
+    path = directory / f"epoch-{epoch}-{identity['model_hash']}.pt"
+    save_training_state(
+        path,
+        dict(
+            **identity,
+            model_schema=f"exact-repair/model/{model.revision}",
+            config=model.config,
+            metadata=model.metadata,
+            state_dict={k: v.detach().cpu() for k, v in model.state_dict().items()},
+        ),
+    )
+    artifact = binding(path)
+    write_artifact(
+        receipt, dict(schema="exact-repair/development-snapshot/v1", **identity, artifact=artifact)
+    )
+    return artifact
+
+
 def _assignment_label(
     case: GeneratedCase,
     assignment: tuple[int, ...],
@@ -2711,6 +2748,18 @@ def train_cases(
                 or epoch + 1 == epochs
             )
         ):
+            evaluated_snapshot = (
+                development_snapshot(
+                    model,
+                    checkpoint_path.parent / "development-checkpoints",
+                    epoch=epoch + 1,
+                    optimizer_updates=optimizer_updates,
+                )
+                if checkpoint_path is not None
+                else None
+            )
+            if evaluated_snapshot is not None:
+                row["evaluated_checkpoint"] = evaluated_snapshot
             decoded: dict[str, dict[str, Any]] = development_progress["decoded"]
             generated_reports: dict[str, dict[str, Any]] = development_progress["generated"]
             with torch.no_grad():
@@ -2841,6 +2890,15 @@ def train_cases(
                         post_decode_annotation_manifest=post_decode_annotation_manifest,
                         annotation_directory=(
                             checkpoint_path.parent / "development-annotations"
+                            if checkpoint_path is not None
+                            else None
+                        ),
+                        model_snapshot=evaluated_snapshot,
+                        stage_report_path=(
+                            checkpoint_path.parent
+                            / "development-stages"
+                            / str(epoch + 1)
+                            / (canonical_hash(case.case_id) + ".json")
                             if checkpoint_path is not None
                             else None
                         ),
