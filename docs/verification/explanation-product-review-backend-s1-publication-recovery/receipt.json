@@ -1,6 +1,6 @@
 {
   "schema": "exact-study-publication-recovery/1",
-  "recorded_at": "2026-10-11T16:24:48.685088+00:00",
+  "recorded_at": "2026-10-11T17:33:07.359446+00:00",
   "starting_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
   "historical_failure_evidence_commit": "77552fd",
   "generation_implementation_commit": "3174f4bb1a67f3731f94271ff8ff88eb0b3b4d37",
@@ -101,9 +101,12 @@
   "distinct_tests_passed": 234,
   "unresolved_skips": 0,
   "publication": {
-    "status": "assembling",
-    "publication_sha256": null,
-    "package_sha256": null
+    "status": "prepared_and_verified",
+    "publication_sha256": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+    "package_sha256": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+    "isolated_test_publication_sha256": "sha256:3766c2f909ebd9eea5a60e5d8faca6ecdba53d44dd4c581061543b5ea8446862",
+    "isolated_test_revision": "review-20261011T170327-40ba5a1a68",
+    "identity_note": "Environment preparation creates a separately identified private test publication from the immutable source bundle."
   },
   "worker_snapshot": {
     "schema": "exact-prose-resume-worker/1",
@@ -111,21 +114,296 @@
     "started_at": "2026-10-11T16:12:44.608440+00:00",
     "generation_mode": "saved-cache-only",
     "paid_requests_authorized_by_worker": 0,
-    "steps": [],
+    "steps": [
+      {
+        "phase": "cache_only_assembly",
+        "status": "passed",
+        "seconds": 2873.285911436891
+      },
+      {
+        "phase": "prose_api_and_resource_parity",
+        "status": "passed",
+        "seconds": 112.09237033990212
+      },
+      {
+        "phase": "prepare_isolated_environment",
+        "status": "passed",
+        "seconds": 58.14180270396173
+      },
+      {
+        "phase": "https_postgresql_journey_and_restart",
+        "status": "passed",
+        "seconds": 844.6256582478527
+      }
+    ],
     "reviewed_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
     "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
-    "status": "running",
-    "phase": "cache_only_assembly",
-    "seconds": 0.0010755870025604963
+    "status": "passed",
+    "phase": "complete",
+    "seconds": 3888.157058737939,
+    "publication_sha256": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+    "package_sha256": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+    "free_bytes": 149287632896
   },
   "live_status": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/resume-worker-20261011.json",
   "worker_script_sha256": "sha256:a51b93f22dec57b29fec95ee06e318f18ae40a0418a5b28ee7f4dc4c4f67cb2e",
   "actual_checks": {
     "prose_api": {
-      "status": "not_completed"
+      "approved_prose_claims": 68,
+      "boundary": "Actual main ASGI API, admitted support and frozen study-resource/index parity; not a browser or PostgreSQL journey or a new semantic approval",
+      "case_count": 24,
+      "counts": {
+        "actual_api_responses_checked": 260,
+        "draft_claims_approved": 68,
+        "draft_claims_rejected": 104,
+        "entity_profile_with_approved_claims": 56,
+        "pair_comparison_with_approved_claims": 8,
+        "review_receipts": 86,
+        "typed_fallback_claim_occurrences": 403
+      },
+      "package_sha256": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+      "policy_sha256": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+      "presented_pairs": 120,
+      "publication_sha256": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+      "schema": "exact-review-prose-verification/1",
+      "seconds": 110.93177656992339,
+      "status": "passed",
+      "unique_artifacts": 260,
+      "verifier_sha256": "sha256:a34fc7953e83777aea1525578e785523260dbf6e6aa8b7a910ac1f5be4df634a"
     },
     "https_postgresql": {
-      "status": "not_completed"
+      "backend": {
+        "file_count": 53,
+        "git_commit": "608e6aa8879a28aeef03bea3eb097f5fc1d8b43b",
+        "schema": "exact-review-backend-source/1",
+        "source_sha256": "088ed29f110e0fee1e80a7f6c8867e69493e2121533c87a3125d41a219ca0b7a"
+      },
+      "phase": "complete",
+      "publication_sha256": "3766c2f909ebd9eea5a60e5d8faca6ecdba53d44dd4c581061543b5ea8446862",
+      "resumed_stage": "completed",
+      "schema": "exact-review-environment-followup/1",
+      "session_sha256": "02e4b3ebceae550515883ebe9aa1b560cf69790b4961424cf94f161df7ca5be4",
+      "startup_kind": "fresh owned workers; an existing cluster/publication may be reused",
+      "startup_seconds": 117.5614805968944,
+      "status": "passed",
+      "verifier_sha256": "654ab4cee8b5326982ccfdfb0c02b751eef5498ad19d566444bd418d34f88d2d",
+      "warm_restart_seconds": 93.08308632299304
+    },
+    "journey": {
+      "boundary": "Actual certificate-verified HTTPS API journey; not a browser or human-activity test",
+      "certificate_sha256": "64ad00684d637a99d9f3e207d4b09e87069c142ceeae6ce021c7dbed54879720",
+      "check_counts": {
+        "actual_elapsed_timing": 27,
+        "baseline_pair_metadata_denied": 60,
+        "baseline_workspace_denied": 12,
+        "case_usable_observation": 24,
+        "current_case": 24,
+        "current_explanation_resource": 12,
+        "default_export": 1,
+        "entity_context_full": 12,
+        "entity_facts_page": 12,
+        "entry_points_page1": 24,
+        "entry_points_page2": 24,
+        "foreign_candidate_metadata_denied": 12,
+        "frozen_tutorial_resource": 1,
+        "immutable_csv_export": 2,
+        "immutable_json_export": 2,
+        "legacy_client_refused": 1,
+        "main_bounded_ancestor_graph": 2,
+        "main_exact_iri_search": 2,
+        "main_full_index_page": 2285,
+        "main_hierarchy_page": 8,
+        "main_pair_metadata": 60,
+        "mutation:cases": 72,
+        "mutation:complete": 1,
+        "mutation:consent": 1,
+        "mutation:questionnaires": 2,
+        "mutation:setup": 1,
+        "mutation:tutorial": 17,
+        "negotiated_session": 1,
+        "original_axiom": 12,
+        "original_fact": 12,
+        "post_interrupt_full_body": 3,
+        "post_interrupt_state": 3,
+        "prepared_explanation_full": 24,
+        "prepared_explanations_page": 12,
+        "public_exploration_catalogue": 1,
+        "repeat_csv_export": 2,
+        "restricted_export": 1,
+        "served_participation_page": 1,
+        "state_after_tutorial_rejection": 2,
+        "study_exact_iri_search": 2,
+        "study_full_index_page": 2285,
+        "study_hierarchy_page": 8,
+        "study_pair_metadata": 60,
+        "study_ready": 1,
+        "study_selected_evidence": 60,
+        "test_invitation": 1,
+        "tutorial_rejection:omitted_entity_kind": 1,
+        "tutorial_rejection:unadmitted_fact": 1,
+        "workspace_capabilities": 12
+      },
+      "client_contract": "study-review/1",
+      "complete_read_surfaces": {
+        "ontologies": [
+          {
+            "ancestor_graph_edges": 12,
+            "ancestor_graph_nodes": 11,
+            "entities": 16395,
+            "hierarchy": {
+              "children": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 2
+              },
+              "parents": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 1
+              }
+            },
+            "hierarchy_empty_probes": 0,
+            "hierarchy_probes_attempted": 1,
+            "ontology_sha256": "d5c93facf2061cfdaeeeb0564b1fad762bfe8634f1d2b77b224a48d66a861687",
+            "pages": 164,
+            "same_study_and_exploration_inventory": true,
+            "search_probe_outside_focal_cases": true,
+            "seconds": 31.701,
+            "sha256": "42d2370728bcb40572ecccee562e670fa4c6c6aa4be726b55e161901eb6d118f"
+          },
+          {
+            "ancestor_graph_edges": 11,
+            "ancestor_graph_nodes": 11,
+            "entities": 212055,
+            "hierarchy": {
+              "children": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 0
+              },
+              "parents": {
+                "continuation_edges": 0,
+                "continuation_exercised": false,
+                "first_page_edges": 1
+              }
+            },
+            "hierarchy_empty_probes": 2,
+            "hierarchy_probes_attempted": 3,
+            "ontology_sha256": "fa7f4b3d1cf82db1f1ed963db0b6616ee2b960ae1ca47b119d1bcf22e325f12c",
+            "pages": 2121,
+            "same_study_and_exploration_inventory": true,
+            "search_probe_outside_focal_cases": true,
+            "seconds": 454.677,
+            "sha256": "aa4e8154de9f1e7a1ab68b7e26c25ba551c30150d6d4169a9e780184756693f4"
+          }
+        ],
+        "scope": "Full entity-index pagination, exact-IRI search, hierarchy and bounded ancestor graph API inputs; no frontend graph rendering claim"
+      },
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "elapsed_seconds": 632.587,
+      "exports": [
+        {
+          "csv_sha256": "6fe38a33da48e0386ef7dee41aab1cbabc85d83573b8f4f882677668153c6355",
+          "json_sha256": "84f3980a6543027bd71da4e6bfb140bb17ab12851a09893c4f17862b19eb7728",
+          "named_methods": false,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        },
+        {
+          "csv_sha256": "f697fa5edd125cc6e779f9bce25e2c5e848a91f4d14a8bd71aeadaaf03d724bc",
+          "json_sha256": "89686623525b48a348c0127610471d10eb6401a1f911ad1be89932df2e457675",
+          "named_methods": true,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        }
+      ],
+      "interruptions": [
+        {
+          "declared_bytes": 37608,
+          "full_body_sha256": "9b302ce50db8bd89f5ecf8a201529e7877c1f3f1ace798b1c14538fa3df5b49f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.181
+        },
+        {
+          "declared_bytes": 37608,
+          "full_body_sha256": "9b302ce50db8bd89f5ecf8a201529e7877c1f3f1ace798b1c14538fa3df5b49f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.188
+        },
+        {
+          "declared_bytes": 37608,
+          "full_body_sha256": "9b302ce50db8bd89f5ecf8a201529e7877c1f3f1ace798b1c14538fa3df5b49f",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.186
+        }
+      ],
+      "participant_states_with_catalogue_withheld": 100,
+      "public_catalogue": {
+        "case_count": 24,
+        "main_sha256": "7a2070a9b07f5d98f2261b0d1c39ea6a20b341c75e7bf53ad351a81b07358957",
+        "participant_case_catalogue_withheld": true,
+        "participant_sha256": "7acd873142840ea7e2a94b27913b9f74d397e86745623254c7d061f3227e9819",
+        "same_public_review_provenance": true,
+        "target_count": 120
+      },
+      "publication_sha256": "3766c2f909ebd9eea5a60e5d8faca6ecdba53d44dd4c581061543b5ea8446862",
+      "schema": "exact-review-api-verification/1",
+      "scope": "real_bundle",
+      "service_log_observation": {
+        "counts": {
+          "asgi_exceptions": 0,
+          "content_length_protocol_errors": 0,
+          "h11_local_protocol_errors": 0,
+          "tracebacks": 0
+        },
+        "new_bytes": 0,
+        "scope": "Owned study process log during this API journey; no historical-causation claim",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "session_sha256": "02e4b3ebceae550515883ebe9aa1b560cf69790b4961424cf94f161df7ca5be4",
+      "status": "passed",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.007,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      },
+      "verifier_sha256": "089119667b2c675d178b0d2cb09a67d3d4285c3e6b80b4e32bc5f86f31c554eb"
     }
   },
   "optional_reasoner_receipts": {
@@ -148,8 +426,8 @@
   },
   "rendered_frontend_journey": "not performed; S2 forms/3 negotiation and presentation remain required",
   "conclusions": {
-    "data_preparation": "Background assembly and dependent verification; use live status, not process existence, to establish completion.",
-    "joint_acceptance": "open: S2 rendered integration, B04 missing-definition/two-sided coverage, original DOID/import admission, representative coverage and measured performance.",
+    "data_preparation": "Completed immutable cache-only assembly, approved-claim/API/resource parity, real certificate-verified HTTPS/PostgreSQL API journey and restart preservation. Review bundle ready for frontend S2; no rendered-browser or research-launch acceptance.",
+    "joint_acceptance": "open: S2 rendered integration, B04 missing-definition/two-sided coverage, original DOID/import admission, representative coverage and startup/performance review. Measured startup 117.56 s and restart 93.08 s; no performance acceptance inferred.",
     "research_launch": "not authorized or established; final matcher/cases, owner approval, deployment, accessibility and pilot gates remain separate."
   },
   "verification_commands": {
@@ -163,5 +441,25 @@
     "prose_verification": "python -m tools.verify_review_prose /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prose-verification-20261011.json",
     "https_journey": "python -m tools.complete_review_environment_checks /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment /Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment-verification-20261011",
     "repeat_note": "Use fresh JUnit/output paths. An output file from a completed verifier is immutable; do not run a duplicate assembly worker."
+  },
+  "completed_at": "2026-10-11T17:17:32.765499+00:00",
+  "completion_review_commit": "608e6aa8879a28aeef03bea3eb097f5fc1d8b43b",
+  "completion_receipts": {
+    "worker-completed.json": {
+      "sha256": "sha256:085eceead944c65ed9ea7c8ae2aecd262e542251575b93b290b2a4bd1828056b",
+      "source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/resume-worker-20261011.json"
+    },
+    "prose-verification.json": {
+      "sha256": "sha256:4bf6e5539062b110a1520896c27bb29594c6091d963f4bb3d290987281361ed2",
+      "source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prose-verification-20261011.json"
+    },
+    "environment-verification.json": {
+      "sha256": "sha256:8775ebf0ddc40eb2cba126bd34e13afb472965a1ed02e21037c8cf4e9601d776",
+      "source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment-verification-20261011/status.json"
+    },
+    "journey.json": {
+      "sha256": "sha256:6cb02a96aa265943698387570c9fa8bb7cb963193ae3c080ff45c71ee06de885",
+      "source": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/environment-verification-20261011/journey.json"
+    }
   }
 }

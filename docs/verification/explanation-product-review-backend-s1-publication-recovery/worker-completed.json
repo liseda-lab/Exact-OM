@@ -1,0 +1,37 @@
+{
+  "schema": "exact-prose-resume-worker/1",
+  "pid": 81642,
+  "started_at": "2026-10-11T16:12:44.608440+00:00",
+  "generation_mode": "saved-cache-only",
+  "paid_requests_authorized_by_worker": 0,
+  "steps": [
+    {
+      "phase": "cache_only_assembly",
+      "status": "passed",
+      "seconds": 2873.285911436891
+    },
+    {
+      "phase": "prose_api_and_resource_parity",
+      "status": "passed",
+      "seconds": 112.09237033990212
+    },
+    {
+      "phase": "prepare_isolated_environment",
+      "status": "passed",
+      "seconds": 58.14180270396173
+    },
+    {
+      "phase": "https_postgresql_journey_and_restart",
+      "status": "passed",
+      "seconds": 844.6256582478527
+    }
+  ],
+  "reviewed_commit": "b661b3f7f6abdd521b7322d21cdb276c4120b5d1",
+  "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+  "status": "passed",
+  "phase": "complete",
+  "seconds": 3888.157058737939,
+  "publication_sha256": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+  "package_sha256": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+  "free_bytes": 149287632896
+}

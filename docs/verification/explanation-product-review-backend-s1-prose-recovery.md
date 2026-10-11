@@ -1,6 +1,6 @@
 # Backend S1: provider prose recovery
 
-**Post-migration resumption, 11 October 2026:** See the [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) and its live-status paths. The failed assembly described below is historical; a separate cache-only continuation now owns completion and new verification.
+**Post-migration completion, 11 October 2026:** The [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) records successful assembly, 260 prose/API parity responses, the complete 24-case HTTPS/PostgreSQL API journey and restart preservation. The failed assembly described below is historical and superseded by those completion receipts. Frontend S2, explicit prose/coverage gaps and participant acceptance remain open.
 
 **2026-10-10.** This is the B04 follow-up after the user replaced the expired OpenRouter
 credential. Starting checkout: `66b588ce979eab1b9b0b446d7eba9d61712b549d`.

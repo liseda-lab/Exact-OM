@@ -1,6 +1,6 @@
 # Backend S1 contracts for frontend S2
 
-**Post-migration resumption, 11 October 2026:** See the [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) and its live-status paths. The failed assembly described below is historical; a separate cache-only continuation now owns completion and new verification.
+**Post-migration completion, 11 October 2026:** The [publication recovery handoff](explanation-product-review-backend-s1-publication-recovery.md) records successful assembly, 260 prose/API parity responses, the complete 24-case HTTPS/PostgreSQL API journey and restart preservation. The failed assembly described below is historical and superseded by those completion receipts. Frontend S2, explicit prose/coverage gaps and participant acceptance remain open.
 
 **Prose recovery, 2026-10-10:** The [generation recovery handoff](explanation-product-review-backend-s1-prose-recovery.md)
 supersedes the authentication blocker below: 74 real profiles and 12 comparisons completed;
