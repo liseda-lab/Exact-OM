@@ -15,6 +15,7 @@ import time
 from exact.repair.records import canonical_hash, canonical_json
 from exact.repair.semantic_fidelity import (
     NATIVE_EVIDENCE_PROMPT_VERSION,
+    CITATION_PROMPT_VERSION,
     consequence_basis_from_probes,
 )
 from tools.repair.batch import read, sha
@@ -98,7 +99,10 @@ def validate_amendment(manifest):
         or amendment.get("test_opened") is not False
         or manifest["phase"] != "development"
         or manifest.get("packet_encoding") is not None
-        or manifest.get("prompt_version") != NATIVE_EVIDENCE_PROMPT_VERSION
+        or manifest.get("prompt_version")
+        not in {NATIVE_EVIDENCE_PROMPT_VERSION, CITATION_PROMPT_VERSION}
+        or manifest.get("no_verbatim_quotes", False)
+        != (manifest.get("prompt_version") == CITATION_PROMPT_VERSION)
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])
@@ -134,6 +138,20 @@ def validate_amendment(manifest):
     }
     if set(slots) != scheduled or not set(amendment["qualification_slots"]) <= scheduled:
         raise ValueError("DEV correction must cover the complete frozen final cohort")
+    if manifest.get("comparison_basis") is not None:
+        parent = bound(manifest["comparison_basis"])
+        if (
+            manifest["comparison_basis"] != amendment.get("previous_interface_amendment")
+            or parent["previous_manifest"] != amendment["previous_manifest"]
+            or set(parent["requests"]) != set(slots)
+            or any(
+                parent["requests"][key]["source_request"] != slots[key]["source_request"]
+                for key in slots
+            )
+        ):
+            raise ValueError(
+                "Shared comparison identity requires the exact same frozen repair pair"
+            )
     if manifest["rate_limit_policy"]["resume_deadline_epoch"] != amendment["deadline_epoch"]:
         raise ValueError("DEV correction transport window changed")
     return amendment

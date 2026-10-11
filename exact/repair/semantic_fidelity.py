@@ -113,7 +113,27 @@ meaning evidence still requires unknown/null and abstention. Never force a score
 Keep each reason brief; exact quotes are optional. List all cited evidence keys.
 """
 )
+CITATION_PROMPT_VERSION = "semantic-fidelity-prompt/v3.4"
+CITATION_PROMPT = (
+    NATIVE_EVIDENCE_PROMPT
+    + """
+For this request, use citation IDs and paraphrased reasons, without direct quotes.
+Always return quotes: []. Do not put verbatim quotations in reasons either.
+The exact evidence text remains supplied for inspection. Cite its evidence ID;
+put every boolean claim in symbolic_claims with the corresponding checked value.
+Before scoring, compare the named native entailment outcomes for each plan with
+the declared intended commitments. VERIFIED_FEASIBLE does not mean those
+commitments are preserved. A false result for an intended consequence is evidence
+of missing support, never evidence that it is fully preserved. Common fixed axioms
+do not make complete theories identical: use the theory hashes, not a visual guess
+from repeated text. Different theories may still support a semantic tie, but that
+requires evidence. Never claim an intended consequence is entailed when its native
+result is false; include the corresponding evidence ID in symbolic_claims.
+This changes request presentation, not evidence, scores or abstention rules.
+"""
+)
 PROMPTS = {
+    CITATION_PROMPT_VERSION: CITATION_PROMPT,
     PROMPT_VERSION: PROMPT,
     INTERFACE_PROMPT_VERSION: INTERFACE_PROMPT,
     NATIVE_EVIDENCE_PROMPT_VERSION: NATIVE_EVIDENCE_PROMPT,

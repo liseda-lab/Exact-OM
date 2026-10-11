@@ -232,7 +232,11 @@ def packet_admission(packet, manifest, swapped):
             content=json.dumps(context, sort_keys=True, separators=(",", ":"), allow_nan=False),
         ),
     ]
-    wire = dict(response_format=response_format(packet, swapped))
+    wire = dict(
+        response_format=response_format(
+            packet, swapped, verbatim_quotes=not manifest.get("no_verbatim_quotes", False)
+        )
+    )
     if controls["reasoning"] is not None:
         wire["reasoning"] = controls["reasoning"]
     byte_count = len(
