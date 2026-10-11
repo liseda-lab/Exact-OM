@@ -280,30 +280,44 @@ def _staged_training_model(
     elementary_seconds,
     selection_options,
     case_cpu_seconds=None,
+    stage_report_path=None,
+    model_snapshot=None,
+    baseline_evidence=None,
     **options,
 ):
     """A CPU checkpoint crosses the worker boundary, never a live CUDA context."""
     from exact.repair.pipeline import staged_verified_repair
 
+    started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="repair-staged-dev-") as temporary:
         path = Path(temporary) / "model.pt"
-        save_training_state(
-            path,
-            dict(
-                model_schema=f"exact-repair/model/{model.revision}",
-                config=model.config,
-                metadata=model.metadata,
-                state_dict={key: value.detach().cpu() for key, value in model.state_dict().items()},
-            ),
-        )
+        if model_snapshot is None:
+            save_training_state(
+                path,
+                dict(
+                    model_schema=f"exact-repair/model/{model.revision}",
+                    config=model.config,
+                    metadata=model.metadata,
+                    state_dict={
+                        key: value.detach().cpu() for key, value in model.state_dict().items()
+                    },
+                ),
+            )
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        else:
+            # The phase runner authenticates this immutable model once before
+            # entering the case loop; workers verify its bytes on every read.
+            path, digest = Path(model_snapshot["path"]), model_snapshot["sha256"]
         settings = dict(selection_options or {})
+        remaining_seconds = max(0.001, seconds - (time.monotonic() - started))
         return bounded_call(
             staged_verified_repair,
             problem,
             checkpoint_path=str(path),
-            checkpoint_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-            total_seconds=seconds,
-            elementary_seconds=min(elementary_seconds, seconds / 3),
+            checkpoint_sha256=digest,
+            total_seconds=remaining_seconds,
+            elementary_seconds=min(elementary_seconds, remaining_seconds),
+            stage_report_path=str(stage_report_path) if stage_report_path else None,
             generation_options=options,
             repair_options=dict(
                 shortlist_size=settings.get("shortlist_size", 1),
@@ -311,10 +325,49 @@ def _staged_training_model(
                 shortlist_seconds=settings.get("construction_seconds"),
                 diagnose=True,
                 preserve_verified_input=True,
+                baseline_evidence=baseline_evidence,
             ),
-            timeout=seconds,
+            timeout=remaining_seconds,
+            cleanup_seconds=2.0 if str(options.get("device", "cpu")).startswith("cuda") else 0.2,
             cpu_seconds=case_cpu_seconds,
         )
+
+
+def development_snapshot(model, directory, *, epoch, optimizer_updates):
+    """Keep every evaluated endpoint, including those with unavailable DEV labels."""
+    from exact.repair.api import write_artifact
+    from exact.repair.pipeline import model_digest
+    from tools.repair.historical_regression import binding
+
+    directory = Path(directory)
+    receipt = directory / f"epoch-{epoch}.json"
+    identity = dict(
+        epoch=epoch, optimizer_updates=optimizer_updates, model_hash=model_digest(model)
+    )
+    if receipt.exists():
+        saved = json.loads(receipt.read_text())
+        if any(saved[k] != value for k, value in identity.items()):
+            raise ValueError("Evaluated endpoint weights changed on resume")
+        artifact = saved["artifact"]
+        if hashlib.sha256(Path(artifact["path"]).read_bytes()).hexdigest() != artifact["sha256"]:
+            raise ValueError("Evaluated endpoint snapshot integrity changed")
+        return artifact
+    path = directory / f"epoch-{epoch}-{identity['model_hash']}.pt"
+    save_training_state(
+        path,
+        dict(
+            **identity,
+            model_schema=f"exact-repair/model/{model.revision}",
+            config=model.config,
+            metadata=model.metadata,
+            state_dict={k: v.detach().cpu() for k, v in model.state_dict().items()},
+        ),
+    )
+    artifact = binding(path)
+    write_artifact(
+        receipt, dict(schema="exact-repair/development-snapshot/v1", **identity, artifact=artifact)
+    )
+    return artifact
 
 
 def _assignment_label(
@@ -638,6 +691,10 @@ def generated_development(
     execution_schedule: str = "one_stage",
     elementary_seconds: float = 30.0,
     selection_slot: Mapping[str, Any] | None = None,
+    stage_report_path: Path | None = None,
+    model_snapshot: Mapping[str, Any] | None = None,
+    baseline_evidence=None,
+    defer_annotation: bool = False,
     **options,
 ):
     """Evaluate sampled grammar availability and expose uncached policy choices.
@@ -651,6 +708,11 @@ def generated_development(
         return {"status": "generation_deadline", "useful_candidate_coverage": None}
     semantic_target = semantic_target or SemanticTargetSpec(canonical_hash(case.probes))
     started = time.monotonic()
+    if "device" not in options:
+        # Entry points must carry actual ownership through the checkpoint boundary.
+        parameters = getattr(model, "parameters", lambda: iter(()))()
+        first = next(iter(parameters), None)
+        options["device"] = str(first.device) if first is not None else "cpu"
     annotation_reserve = 0.0
     annotation_call_reserve = 92.0
     annotation_scheduled = False
@@ -673,6 +735,8 @@ def generated_development(
             # replacement presentation of the original comparison.
             annotation_reserve += 90.0
             annotation_call_reserve += 90.0
+        if defer_annotation:
+            annotation_reserve = 0.0
         if seconds <= annotation_reserve:
             return dict(
                 status="annotation_budget_unavailable",
@@ -688,10 +752,16 @@ def generated_development(
         stage_call = _staged_training_model(
             case.problem,
             model,
-            seconds=repair_seconds if annotation_reserve else seconds * 0.7,
+            # Semantic labelling is separate from repair, including unannotated
+            # cases. Reserve explicit seconds instead of recursively shrinking
+            # every stage by arbitrary fractions.
+            seconds=max(0.001, repair_seconds - min(30.0, repair_seconds / 4)),
             elementary_seconds=elementary_seconds,
             selection_options=selection_options,
             case_cpu_seconds=case_cpu_seconds,
+            stage_report_path=stage_report_path,
+            model_snapshot=model_snapshot,
+            baseline_evidence=baseline_evidence,
             final_candidate_removals=dict(case.final_candidate_removals),
             **options,
         )
@@ -709,6 +779,11 @@ def generated_development(
                 detail=stage_call.detail,
                 useful_candidate_coverage=None,
                 parent_group_id=case.structural_parent,
+                stages=stage_call.value.stages if stage_call.status == "complete" else (),
+                cleanup_complete=stage_call.cleanup_complete,
+                stage_report_path=str(stage_report_path) if stage_report_path else None,
+                device=options["device"],
+                elapsed_seconds=time.monotonic() - started,
             )
     elif execution_schedule == "one_stage":
         frozen = _freeze_training_model(
@@ -877,7 +952,7 @@ def generated_development(
                         annotation_started = time.monotonic()
                         artifact = (
                             annotate_decoded(request_path, manifest, seconds=annotation_left)
-                            if annotation_left > 0
+                            if annotation_left > 0 and not defer_annotation
                             else None
                         )
                         if artifact is not None:
@@ -888,6 +963,7 @@ def generated_development(
                         decoded["annotation_seconds"] = time.monotonic() - annotation_started
                         decoded["annotation_request"] = str(request_path)
                         decoded["annotation_artifact"] = str(artifact) if artifact else None
+                        decoded["annotation_pending"] = defer_annotation
                     if (
                         (target_basis in {"ai_weak", "mixed"})
                         or fidelity_evaluator_labels
@@ -948,6 +1024,7 @@ def generated_development(
         )
     return {
         "status": "generated",
+        "device": options["device"],
         "execution_schedule": execution_schedule,
         "annotation_reserve_seconds": annotation_reserve,
         "semantic_selection_scheduled": annotation_scheduled,
@@ -965,6 +1042,7 @@ def generated_development(
         "proposal_reports": json.loads(
             canonical_json(tuple(dict(row) for row in generated.proposal_reports))
         ),
+        "worker_ownership": generated.worker_ownership,
         "elapsed_seconds": time.monotonic() - started,
         "scope": "generated-pool symbolic verification and independent declared semantic queries",
     }
@@ -2671,6 +2749,18 @@ def train_cases(
                 or epoch + 1 == epochs
             )
         ):
+            evaluated_snapshot = (
+                development_snapshot(
+                    model,
+                    checkpoint_path.parent / "development-checkpoints",
+                    epoch=epoch + 1,
+                    optimizer_updates=optimizer_updates,
+                )
+                if checkpoint_path is not None
+                else None
+            )
+            if evaluated_snapshot is not None:
+                row["evaluated_checkpoint"] = evaluated_snapshot
             decoded: dict[str, dict[str, Any]] = development_progress["decoded"]
             generated_reports: dict[str, dict[str, Any]] = development_progress["generated"]
             with torch.no_grad():
@@ -2801,6 +2891,15 @@ def train_cases(
                         post_decode_annotation_manifest=post_decode_annotation_manifest,
                         annotation_directory=(
                             checkpoint_path.parent / "development-annotations"
+                            if checkpoint_path is not None
+                            else None
+                        ),
+                        model_snapshot=evaluated_snapshot,
+                        stage_report_path=(
+                            checkpoint_path.parent
+                            / "development-stages"
+                            / str(epoch + 1)
+                            / (canonical_hash(case.case_id) + ".json")
                             if checkpoint_path is not None
                             else None
                         ),

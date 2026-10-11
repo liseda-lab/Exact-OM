@@ -545,6 +545,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
         from tools.repair.evaluation_ownership import external_pools
 
         dependencies = external_pools(manifest)
+        from tools.repair.evaluation_ownership import external_public_inputs
+
+        public_inputs = external_public_inputs(manifest)
         rows, saved_rows = manifest["rows"], {}
         error = None
         for row in rows:
@@ -593,7 +596,7 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                 if dependency
                 else {}
             )
-            public = manifest["public_inputs"].get(row["case_id"])
+            public = public_inputs.get(row["case_id"])
             model_name = row["adapter"]["model"]
             model = manifest["models"].get(model_name) if model_name else None
             reason = (

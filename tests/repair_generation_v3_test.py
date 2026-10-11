@@ -463,6 +463,7 @@ def test_typed_generation_records_are_actual_pipeline_output_and_roundtrip(tmp_p
     frozen = result.value
     report = frozen.proposal_reports[0]
     assert isinstance(report, GenerationReportV3)
+    assert frozen.worker_ownership == {"device": "cpu"}
     assert frozen.problem.proposal_provenance == frozen.proposal_reports
     assert read_record(report.to_dict()) == report
     restored = read_record(frozen.problem.to_dict())

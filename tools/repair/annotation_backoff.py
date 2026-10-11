@@ -20,6 +20,16 @@ def validate_policy(manifest):
     policy = manifest.get("rate_limit_policy")
     if policy is None:
         return None
+    if policy.get("resume_deadline_epoch") is not None:
+        deadline = policy["resume_deadline_epoch"]
+        if (
+            isinstance(deadline, bool)
+            or not isinstance(deadline, (int, float))
+            or not math.isfinite(deadline)
+            or deadline <= 0
+            or deadline > manifest.get("deadline_epoch", 0)
+        ):
+            raise ValueError("Transport resume deadline must fit the frozen campaign deadline")
     reference = policy["authorization"]
     if sha(reference["path"]) != reference["sha256"]:
         raise ValueError("Rate-limit authorization changed")
@@ -90,7 +100,7 @@ def annotate(packet, manifest, output, *, slot_id, swapped=False, seconds=94, co
         annotate_packet,
     )
 
-    validate_policy(manifest)
+    policy = validate_policy(manifest)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     checkpoint = output / "backoff.json"
@@ -104,7 +114,14 @@ def annotate(packet, manifest, output, *, slot_id, swapped=False, seconds=94, co
             next_attempt_epoch=0,
             failures=[],
             complete=False,
-            deadline_epoch=time.time() + _remaining_seconds(seconds, manifest),
+            # Optional shared service window survives short owner slices. It is
+            # frozen into this identity, never renewed on resume. Wire attempts
+            # still consume the original request and cost ledgers individually.
+            deadline_epoch=(
+                policy["resume_deadline_epoch"]
+                if policy and policy.get("resume_deadline_epoch")
+                else time.time() + _remaining_seconds(seconds, manifest)
+            ),
         )
     )
     if state["identity"] != identity:
@@ -122,11 +139,12 @@ def annotate(packet, manifest, output, *, slot_id, swapped=False, seconds=94, co
                 raise ValueError("Rate-limit terminal output changed")
         return output / "labels.json" if state["has_labels"] else None
     write_artifact(checkpoint, state)
+    call_deadline = time.time() + _remaining_seconds(seconds, manifest)
     while True:
-        remaining = min(
-            _remaining_seconds(seconds, manifest), state["deadline_epoch"] - time.time()
-        )
-        if remaining < 92 or state["next_attempt_epoch"] + 92 >= state["deadline_epoch"]:
+        remaining = min(call_deadline - time.time(), state["deadline_epoch"] - time.time())
+        if remaining < 92 or state["next_attempt_epoch"] + 92 >= min(
+            state["deadline_epoch"], call_deadline
+        ):
             write_artifact(
                 output / "receipt.json",
                 dict(

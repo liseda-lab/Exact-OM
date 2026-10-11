@@ -140,6 +140,62 @@ def test_actual_entrypoint_sends_full_packet_above_legacy_byte_cap(tmp_path, mon
     assert context["packet"] == json.loads(json.dumps(p.judge_payload()))
 
 
+def test_byte_limited_backoff_slot_is_terminal_without_charge_and_next_slot_runs(
+    tmp_path, monkeypatch
+):
+    import exact.llm.routing
+    from tools.repair import annotation_backoff
+    from tests.repair_annotation_backoff_test import settings
+
+    client, calls = wire_client(tmp_path / "ledger", monkeypatch, {"effort": "low"})
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    m = amended(tmp_path)
+    m["teacher_panel"] = {"test_only": True}
+    m["rate_limit_policy"] = settings(tmp_path)["rate_limit_policy"]
+    monkeypatch.setattr(runner, "_request_budget", lambda m: (runner.PHASE_LIMITS, None))
+    oversized = reprofile(
+        replace(packet(), local_context=("complete retained native context " * 2200,)),
+        m["request_profiles"]["teacher"],
+    )
+    before = oversized.to_dict()
+    out = tmp_path / "oversized"
+    assert annotation_backoff.annotate(oversized, m, out, slot_id="large", seconds=300) is None
+    state = runner.read(out / "backoff.json")
+    receipt = runner.read(out / "receipt.json")
+    assert state["complete"] and not state["has_labels"] and not state["failures"]
+    assert receipt["status"] == "input_byte_bound" and receipt["retry_permitted"] is False
+    assert receipt["max_input_bytes"] == 65536 and not receipt["costs_reset"]
+    assert oversized.to_dict() == before
+    assert calls == [] and not (tmp_path / "ledger/phase-reservations.json").exists()
+    assert annotation_backoff.annotate(oversized, m, out, slot_id="large", seconds=300) is None
+    assert runner.read(out / "backoff.json") == state
+    assert runner.read(out / "receipt.json") == receipt
+    assert annotation_backoff.annotate(packet(), m, tmp_path / "next", slot_id="next", seconds=300)
+    assert len(calls) == 1
+    assert len(runner.read(tmp_path / "ledger/phase-reservations.json")["reservations"]) == 1
+
+
+def test_input_integrity_error_still_fails_without_terminal_mask_or_charge(tmp_path, monkeypatch):
+    import exact.llm.routing
+    from exact.repair import annotation_controls
+
+    client, calls = wire_client(tmp_path / "ledger", monkeypatch, {"effort": "low"})
+    monkeypatch.setattr(exact.llm.routing, "LLMRouter", lambda *a, **k: client.router)
+    m = amended(tmp_path)
+    m["teacher_panel"] = {"test_only": True}
+    monkeypatch.setattr(runner, "_request_budget", lambda m: (runner.PHASE_LIMITS, None))
+
+    def corrupt(*args):
+        raise ValueError("Pinned annotation tokenizer changed")
+
+    monkeypatch.setattr(annotation_controls, "input_token_bound", corrupt)
+    with pytest.raises(ValueError, match="tokenizer changed"):
+        runner.annotate_packet(packet(), m, tmp_path / "out", slot_id="s", seconds=300)
+    assert calls == []
+    assert not (tmp_path / "out/receipt.json").exists()
+    assert not (tmp_path / "ledger/phase-reservations.json").exists()
+
+
 def test_recovery_rejects_changed_plan_split_and_missing_original(tmp_path, monkeypatch):
     from tools.repair import train_input_recovery as recovery
     from tools.repair.semantic_packet_encoding import encode

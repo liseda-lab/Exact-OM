@@ -243,7 +243,10 @@ def external_pools(manifest):
                 row[k] != consumer[k] for k in ("case_id", "input_identity", "protocol")
             ):
                 raise ValueError("Shared pool dependency input/protocol differs")
-        if any(producer.get(k) != manifest.get(k) for k in ("schedule", "source_commit")):
+        if any(
+            producer.get(k) != manifest.get(k)
+            for k in ("schedule", "source_commit", "public_input_producer")
+        ):
             raise ValueError("Shared pool source/schedule differs")
         case_id = row["case_id"]
         if producer["public_inputs"].get(case_id) != manifest["public_inputs"].get(
@@ -321,3 +324,64 @@ def external_pools(manifest):
             raise ValueError("Shared pool implementation failure needs reconciliation")
         result[row_id] = saved
     return result
+
+
+def external_public_inputs(manifest):
+    """Resolve one completed public-input producer without weakening TEST guards."""
+    inputs = dict(manifest["public_inputs"])
+    contract = manifest.get("public_input_producer")
+    if contract is None:
+        return inputs
+    from tools.repair.conference_test_inputs import validate
+    from tools.repair.historical_regression import binding
+    from tools.repair.shared_release import validate_completion
+    from exact.repair.records import canonical_hash
+    import time
+
+    producer = bound(contract["manifest"])
+    declared, cases = validate(producer, time.time())
+    if any(producer.get(k) != manifest.get(k) for k in
+           ("schedule", "source_commit", "model_freeze_receipt")):
+        raise ValueError("Public input source/schedule/freeze differs")
+    if not set(manifest["cases"]) <= set(declared) or inputs:
+        raise ValueError("Public input producer can only supply its exact Conference cases")
+    if any(manifest["cases"][c["case_id"]] != c for c in cases if c["case_id"] in manifest["cases"]):
+        raise ValueError("Public input case declaration differs")
+    attempt = Path(contract["attempt"])
+    terminal = read(attempt / "completion.json")
+    receipt = dict(completion=binding(attempt / "completion.json"),
+                   step=binding(attempt / "step.json"), outputs=binding(attempt / "outputs.json"),
+                   batch=binding(terminal["batch"]), dispatch_nonce=contract["dispatch_nonce"],
+                   step_id=terminal["step_id"], expected_status="complete")
+    terminal, outputs, batch, job = validate_completion(receipt)
+    batch_path = Path(terminal["batch"])
+    if sha(batch_path) != batch_path.with_name("batch.sha256").read_text().strip():
+        raise ValueError("Public input producer batch changed")
+    if (terminal["job_id"] != contract["job_id"] or terminal["work"] != contract["work"]
+            or producer["dispatch_nonce"] != contract["dispatch_nonce"]
+            or batch["frozen_files"].get(contract["manifest"]["path"]) != contract["manifest"]["sha256"]
+            or not any(contract["manifest"]["path"] in cmd for cmd in job["commands"])):
+        raise ValueError("Public input producer identity is not bound to execution")
+    work = Path(contract["work"])
+    report = bound(dict(path=str(work / "report.json"), sha256=outputs["report.json"]))
+    if (report["manifest_identity"] != canonical_hash(producer)
+            or report["expected_cases"] != 7
+            or [r["case_id"] for r in report["rows"]] != producer["case_ids"]):
+        raise ValueError("Public input producer denominator changed")
+    for row in report["rows"]:
+        saved = bound(row["completion"])
+        if saved != {k: v for k, v in row.items() if k not in {"case_id", "completion"}}:
+            raise ValueError("Public input row differs from terminal report")
+        relative = str(Path(row["completion"]["path"]).relative_to(work))
+        if outputs.get(relative) != row["completion"]["sha256"]:
+            raise ValueError("Public input row is absent from the terminal output inventory")
+        ref = saved.get("result", {}).get("public_input")
+        if ref:
+            relative = str(Path(ref["path"]).relative_to(work))
+            if (saved["status"] != "complete" or not saved["cleanup_complete"]
+                    or outputs.get(relative) != ref["sha256"]):
+                raise ValueError("Public input artifact lacks a complete bound construction")
+            authenticate(ref)
+            if row["case_id"] in manifest["cases"]:
+                inputs[row["case_id"]] = ref
+    return inputs

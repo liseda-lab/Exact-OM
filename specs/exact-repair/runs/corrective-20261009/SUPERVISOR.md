@@ -1,5 +1,84 @@
 # October corrective repair campaign
 
+## 11 October: user-authorized validation recovery
+
+Latest recovery handoff is `qualification/validation-recovery-20261011-001/handoff.json`
+and the frozen successor preparation is `learning/final-dev-recovery-20261011-001`.
+This paragraph supersedes the exploratory pilot instructions below. The corrected
+seed13 pilots verified all 16 cases per condition (eight coherent and eight
+corrupted, all eight families), with clean worker lifecycles. The unbounded work
+inside the optional Horn rejection precheck was the main native bottleneck; its
+deterministic work bound now falls through to full native verification. The full
+verifier's 10-second limit and acceptance checks are unchanged. The slowest pilot
+case took 88.31 seconds. Freeze 150 seconds per complete DEV repair and 90 seconds
+for the elementary stage, with CPU annotation outside the GPU case budget.
+
+Recover the final epoch6 DEV pass for all six saved models, retaining all old
+epoch5 and epoch6 outcomes. All original checkpoint criteria were unavailable;
+selection of a recovered epoch6 checkpoint is permitted only by the unchanged
+full-coverage and semantic-label rule. Do not infer epoch5 weights from mtime or
+retrain to reconstruct them. Paired conditions use identical physical hardware
+for each case, across disjoint 16-case GPU shards. First complete the seed13 pair,
+inspect its actual repair/cleanup/selection evidence, then admit the already
+prepared seed37 and seed73 pair shards after operational qualification. A missing
+or abstained semantic label cannot be replaced with the model's prediction or a
+new paid observation. LLM superiority is never an admission gate.
+
+`validation_recovery --aggregate` joins the two complete, digest-bound shard
+reports for a model; `--annotate-report` completes its preselected comparisons
+on CPU and applies the original selection criterion. Prepare those consumers
+from authenticated charged producer receipts as soon as shards complete; source
+requests are immutable and annotation state lives in the declared separate
+directory. Resume `transport_deferred` with the same request/state/manifest and
+fixed shared deadline; do not reset charges or call a short worker slice an
+unavailable scientific label. The recorded runtime amendment extends only the
+expired per-model elapsed windows to the original DEV stage expiry, preserving
+their original clocks, 4 GPU-hour model caps, primary 24 GPU-hour cap and all
+other limits. There is no new request allocation or monetary authorization.
+
+After all six recovered reviews, replace the readiness gate's bound evidence
+with an authenticated consolidated review. Require real selection evidence,
+complete DEV coverage and clean lifecycle before preparing the learned TEST
+successor. Keep the old zero-model freeze and all earlier results intact and
+its queued TEST descriptors held. TEST remains closed until 14 October 17:00 UTC.
+The ideal recovery deadline is the existing DEV stage expiry on 11 October;
+finish the corrected six-model review today and protect the unchanged paper
+milestones. Routine consumer preparation is authorized; email only for a real
+remaining user decision or an exhausted eligible queue.
+
+The user explicitly approved correcting the broken validation runtime and weak
+supervisor gate. Preserve the six completed training states, every old DEV row,
+all costs and original stage clocks. The zero-selected-model freeze is not a
+successful primary study. Its future TEST launches are held while this recovery
+is qualified; TEST remains closed. Work in the corrective worktree.
+
+Use `tools.repair.validation_recovery` to evaluate authenticated saved weights in
+detached, owned Slurm steps. Start with the seed13 pair and a fixed DEV diagnostic
+covering all eight families and coherent/corrupted controls. Measure actual GPU
+workers, native diagnosis, first verified repairs and cleanup under explicit
+budgets before freezing the successor full DEV runtime. The pilot has no optimizer
+updates or hosted calls. A process completing and writing every denominator row
+does not establish operational readiness: require verified repairs on the declared
+repairable controls and complete worker cleanup. Do not require the LLM arm to win.
+
+Every failed stage must retain its timings and reason. Reuse baseline evidence only
+under its complete existing identity and proof checks. Use frozen weight artifacts
+instead of repeatedly serializing the live model. Preserve both scheduled DEV
+checkpoint identities where recoverable; do not infer an epoch solely from a
+snapshot's modification time. No arbitrary last-checkpoint selection or silently
+lowered coverage threshold. Any scientifically necessary protocol amendment must
+be explicit before TEST. Technical recovery is authorized; routine preparation,
+budget profiling and already-authorized provider backoff are not user blockers.
+
+Register the campaign's `readiness_gates` with digest-bound review evidence and
+explicit recovery run IDs. Zero selectable models or unqualified lifecycle must
+trigger diagnosis after active recovery finishes, even if future-dated TEST work
+remains in the queue. Retain stable gate/error identities and the two-unsuccessful-
+technical-repair rule. Only email for a concrete remaining user action. Decouple
+DEV annotation from GPU repair using saved, verified comparison requests; a frozen
+shared transport window may span worker slices, but never renew its deadline,
+resample an abstention or invalid answer, or erase earlier request/cost reservations.
+
 This is the user-authorized successor to the stopped preliminary study. Its root is `/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009`. Read `campaign.json`, `authorization.json`, `planning-contract.json`, `ledger.json`, the active registry and actual nonce-bound completion receipts. Specs 15/16 and the unchanged formal contracts are authoritative. Historical XR-2/T2 STOP files stay in place; do not touch the matcher campaign or allocation 14372.
 
 ## Deadline and priority
