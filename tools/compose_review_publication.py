@@ -6,19 +6,30 @@ Run under tools.review_storage_budget; no providers or reasoners are called.
 """
 
 from __future__ import annotations
-import argparse, copy, json, os, shutil, sqlite3, stat, subprocess, sys, time
-from pathlib import Path
+
+import argparse
+import copy
+import hashlib
+import json
+import os
+import shutil
+import sqlite3
+import stat
+import subprocess
+import sys
+import time
 from collections import Counter
 from contextlib import closing
 from datetime import datetime, timezone
-import hashlib
+from pathlib import Path
+
 from exact_inspect.artifacts import atomic_json, publish_bundle, validate_bundle
-from exact_inspect.contracts import canonical_hash, file_hash, EntityRef
 from exact_inspect.context import OntologyContext
+from exact_inspect.contracts import EntityRef, canonical_hash, file_hash
 from exact_inspect.decisions import DecisionStore
 from exact_inspect.generation import FactPacket
 from exact_inspect.partial_elk import admit, materialize
-from exact_inspect.readable_descriptions import revise, presentation, RENDER_REVISION
+from exact_inspect.readable_descriptions import RENDER_REVISION, presentation, revise
 from exact_inspect.study.builder import build_explanation_resource
 from exact_inspect.study.models import Publish
 from exact_inspect.study.workspace import build_workspace_scope
@@ -274,19 +285,31 @@ def compose(prose, evidence, elk, destination, revision):
             verify_assets(raw, destination)
             verify_workspaces(raw, destination)
             receipt = json.loads((destination / "composition.json").read_bytes())
-            if receipt["publication_sha256"] != file_hash(destination / "publication.json"):
-                raise ValueError("Composed publication changed")
+            if (
+                receipt["publication_sha256"] != file_hash(destination / "publication.json")
+                or receipt["package_sha256"] != file_hash(destination / "package/package.json")
+                or receipt["catalogue_sha256"] != file_hash(destination / "catalogue.json")
+            ):
+                raise ValueError("Composed publication, package or catalogue changed")
             return receipt
     elif destination.exists():
         raise ValueError("Use a new private revision")
     run_id = next(iter(pb.runs))
     oldrun = DecisionStore(evidence / "package" / eb.runs[run_id])
     newrun = DecisionStore(prose / "package" / pb.runs[run_id])
-    print("phase compare full matcher pool and predecessor layers", flush=True)
-    invariant = compare_runs(oldrun, newrun)
     destination.mkdir(parents=True, exist_ok=True)
     if not marker.exists():
         atomic_json(marker, binding)
+    preservation = destination / "preservation.json"
+    if preservation.exists():
+        saved = json.loads(preservation.read_bytes())
+        if saved["binding"] != canonical_hash(binding):
+            raise ValueError("Preservation inputs changed")
+        invariant = saved["result"]
+    else:
+        print("phase compare full matcher pool and predecessor layers", flush=True)
+        invariant = compare_runs(oldrun, newrun)
+        atomic_json(preservation, {"binding": canonical_hash(binding), "result": invariant})
     print("phase stage private revision", flush=True)
     package = destination / "package"
     # Large contexts are reused by APFS clone, without adding hardlinks under running readers.
@@ -338,6 +361,8 @@ def compose(prose, evidence, elk, destination, revision):
         if not (destination / path).exists():
             private_copy(prose / path, destination / path)
     contexts = {v: OntologyContext(package / p) for v, p in pb.ontologies.items()}
+    if any(c.manifest["artifacts"]["context.sqlite"] != ph[v] for v, c in contexts.items()):
+        raise ValueError("Staged context differs from pinned predecessors")
     print("phase partial ELK admission", flush=True)
     for version, context in list(contexts.items()):
         name = context.manifest["name"].lower()
@@ -584,6 +609,18 @@ def compose(prose, evidence, elk, destination, revision):
         atomic_json(package / path, result)
         dependencies[key] = path
     metadata["provenance"]["description_dependencies"] = dependencies
+    changed = {
+        str(Path(pb.runs[run_id]) / name)
+        for name in ["decisions.sqlite", "decisions.manifest.json"]
+    }
+    changed.update(
+        str(Path(p) / name)
+        for p in pb.ontologies.values()
+        for name in ["manifest.json", "context.sqlite"]
+    )
+    for artifact in pb.artifacts:
+        if artifact.path not in changed and file_hash(package / artifact.path) != artifact.sha256:
+            raise ValueError("An unchanged predecessor artifact changed in private staging")
     publish_bundle(package, **metadata)
     raw = Publish.model_validate(raw).model_dump(mode="json")
     catalogue.update(
@@ -592,9 +629,15 @@ def compose(prose, evidence, elk, destination, revision):
         composition_evidence=coverage,
         description_replacements=lineage,
     )
+    from tools.review_environment import verify_assets, verify_workspaces
+
+    verify_assets(raw, destination)
+    verify_workspaces(raw, destination)
     atomic_json(destination / "catalogue.json", catalogue)
     receipt = {
         "schema": VERSION,
+        "assembler_sha256": file_hash(Path(__file__)),
+        "catalogue_sha256": file_hash(destination / "catalogue.json"),
         "binding": binding,
         "matcher_preservation": invariant,
         "approved_claims_preserved": preserved,

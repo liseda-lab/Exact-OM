@@ -1,24 +1,31 @@
 """Synthetic boundary regressions; real publication verification is recorded separately."""
 
-import copy, json
+import copy
+import json
 from pathlib import Path
+
 import pyowl_core as core
 import pytest
 from fastapi.testclient import TestClient
+
 from exact_inspect.artifacts import atomic_json, publish_bundle
-from exact_inspect.context import build_context_package, OntologyContext
+from exact_inspect.context import OntologyContext, build_context_package
 from exact_inspect.context_export import export_policy_context
 from exact_inspect.context_resources import export_ontology_resource
 from exact_inspect.contracts import (
-    VisibilityPolicy,
+    DomainError,
     EntityRef,
+    VisibilityPolicy,
     canonical_hash,
     file_hash,
-    DomainError,
+)
+from exact_inspect.navigation import (
+    PARTIAL_BASIS,
+    EntryPointPage,
+    PreparedHierarchyPage,
 )
 from exact_inspect.navigation_prepare import prepare_navigation
-from exact_inspect.navigation import PARTIAL_BASIS, PreparedHierarchyPage, EntryPointPage
-from exact_inspect.partial_elk import admit, materialize, VERSIONS, SEMANTICS
+from exact_inspect.partial_elk import SEMANTICS, VERSIONS, admit, materialize
 from exact_inspect.service import create_prepared_app
 from tools.compose_review_publication import merge_evidence
 
@@ -236,6 +243,9 @@ def test_partial_contract_pages_equivalents_empty_and_old_basis(fixture, tmp_pat
     [
         "checksum",
         "policy",
+        "scope",
+        "input_identity",
+        "resource_tamper",
         "consistency",
         "timeout",
         "missing_endpoint",
@@ -248,12 +258,18 @@ def test_partial_admission_fails_closed(fixture, change):
     context, policy, args = fixture
     if change == "checksum":
         Path(args["taxonomy_path"]).write_bytes(b"{}")
+    elif change == "resource_tamper":
+        Path(args["resource_path"]).write_bytes(b"Ontology()")
     else:
         key = "result" if change in {"consistency", "timeout"} else "taxonomy"
         path = args[key + "_path"]
         d = json.loads(path.read_bytes())
         if change == "policy":
             d["policy_hash"] = "sha256:" + "0" * 64
+        elif change == "scope":
+            d["scope"] = "another_scope"
+        elif change == "input_identity":
+            d["input_sha256"] = "sha256:" + "0" * 64
         elif change == "consistency":
             d["consistency"]["value"] = False
         elif change == "timeout":
@@ -280,10 +296,15 @@ def test_partial_admission_fails_closed(fixture, change):
 
 def test_readable_necessary_conditions_citations_and_frozen_resource(fixture):
     context, policy, _ = fixture
-    from tools.prepare_review_bundle import packet_for, deterministic_result
-    from exact_inspect.readable_descriptions import enrich, profile_templates, revise, presentation
     from exact_inspect.descriptions import validate_prepared_support
+    from exact_inspect.readable_descriptions import (
+        enrich,
+        presentation,
+        profile_templates,
+        revise,
+    )
     from exact_inspect.study.builder import build_explanation_resource
+    from tools.prepare_review_bundle import deterministic_result, packet_for
 
     contexts = {context.ontology_version_id: context}
     packet, _ = packet_for(ent(context), contexts, policy)
@@ -386,7 +407,7 @@ def test_import_uses_canonical_recorded_qualifiers_without_guessing(tmp_path):
 
 
 def test_private_stage_resume_and_changed_source_fail_closed(tmp_path):
-    from tools.compose_review_publication import stage_tree, private_copy
+    from tools.compose_review_publication import private_copy, stage_tree
 
     source = tmp_path / "source"
     source.mkdir()
@@ -424,11 +445,11 @@ def test_partial_materialization_resume_published_and_scope_guard(fixture, tmp_p
 
 
 def test_frozen_description_presentation_cannot_invent_two_sided_scope(fixture):
-    from tools.prepare_review_bundle import packet_for, deterministic_result
-    from exact_inspect.readable_descriptions import revise
     from exact_inspect.generation import FactPacket
+    from exact_inspect.readable_descriptions import revise
     from exact_inspect.study.builder import build_explanation_resource
     from exact_inspect.study.resources import ExplanationResource
+    from tools.prepare_review_bundle import deterministic_result, packet_for
 
     context, policy, _ = fixture
     contexts = {context.ontology_version_id: context}
@@ -448,9 +469,9 @@ def test_frozen_description_presentation_cannot_invent_two_sided_scope(fixture):
 
 
 def test_scoped_description_admits_only_bound_reference_labels(fixture, tmp_path):
-    from tools.prepare_review_bundle import packet_for, deterministic_result
     from exact_inspect.readable_descriptions import revise
     from exact_inspect.study.workspace import _admit_explanation
+    from tools.prepare_review_bundle import deterministic_result, packet_for
 
     context, policy, _ = fixture
     contexts = {context.ontology_version_id: context}
