@@ -17,6 +17,7 @@ from exact.repair.semantic_fidelity import (
     NATIVE_EVIDENCE_PROMPT_VERSION,
     CITATION_PROMPT_VERSION,
     CONTRAST_PROMPT_VERSION,
+    COMPLETE_PROMPT_VERSION,
     consequence_basis_from_probes,
 )
 from tools.repair.batch import read, sha
@@ -131,11 +132,21 @@ def validate_amendment(manifest):
         or manifest["phase"] != "development"
         or manifest.get("packet_encoding") is not None
         or manifest.get("prompt_version")
-        not in {NATIVE_EVIDENCE_PROMPT_VERSION, CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION}
+        not in {
+            NATIVE_EVIDENCE_PROMPT_VERSION,
+            CITATION_PROMPT_VERSION,
+            CONTRAST_PROMPT_VERSION,
+            COMPLETE_PROMPT_VERSION,
+        }
         or manifest.get("no_verbatim_quotes", False)
-        != (manifest.get("prompt_version") in {CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION})
+        != (
+            manifest.get("prompt_version")
+            in {CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION, COMPLETE_PROMPT_VERSION}
+        )
         or manifest.get("theory_text_comparison", False)
-        != (manifest.get("prompt_version") == CONTRAST_PROMPT_VERSION)
+        != (manifest.get("prompt_version") in {CONTRAST_PROMPT_VERSION, COMPLETE_PROMPT_VERSION})
+        or manifest.get("complete_criteria", False)
+        != (manifest.get("prompt_version") == COMPLETE_PROMPT_VERSION)
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])

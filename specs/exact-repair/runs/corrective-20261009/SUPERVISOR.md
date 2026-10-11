@@ -1,5 +1,23 @@
 # October corrective repair campaign
 
+## 11 October: require the complete criteria array on the wire
+
+The complete-theory contrast removed the observed false identity explanations on
+the substantive controls, but one response returned an empty criteria array and
+an unexplained abstention. The local validator correctly rejected it. The wire
+schema had allowed that empty array despite the fixed applicability contract.
+Version004 (`learning/dev-interface-recovery-20261011-004`) adds exact minItems /
+maxItems bounds and prompt v3.6; it still allows every criterion to be unknown
+with null scores and a specific reason. This changes neither evidence nor the
+selection gate. Retain all fifteen prior qualification requests and costs.
+The same fixed cohort remains 32 comparisons / 38 presentations; the complete
+follow-up totals at most90 DEV requests before any transport failures, leaving
+six of the original96 request slots. The dollar and total704 ceilings, all original
+start times and the absolute recovery deadline are unchanged. Only version004
+consumers may be enabled. Do not replay further valid abstentions or use older
+favorable labels. Finish independent eligible slots and report any remaining
+unavailable supervision as a genuine scientific limitation under the unchanged gate.
+
 ## 11 October: complete-theory contrast
 
 Version002 passed structural eligibility on all four controls, but manual review
