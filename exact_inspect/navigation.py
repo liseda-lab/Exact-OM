@@ -7,13 +7,22 @@ offline operation in navigation_prepare; the immutable result is policy-bound.
 from __future__ import annotations
 
 import json
+from collections import OrderedDict
 from contextlib import contextmanager
+from threading import RLock
 from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
 from .context_semantics import KINDS, _allowed, _ref
-from .contracts import EntityRef, Page, WireModel, canonical_hash, decode_cursor, file_hash
+from .contracts import (
+    EntityRef,
+    Page,
+    WireModel,
+    canonical_hash,
+    decode_cursor,
+    file_hash,
+)
 from .models import HierarchyPage, PreferredLabel
 from .sqlite_safety import readonly_connection
 
@@ -78,6 +87,10 @@ class PreparedEquivalentsPage(Page[EntityRef]):
     _partial = model_validator(mode="after")(_validate_partial_page)
 
 
+_VERIFIED_NAVIGATION = OrderedDict()
+_VERIFICATION_LOCK = RLock()
+
+
 class PreparedNavigation:
     def __init__(self, context, *, partial=False):
         self.context = context
@@ -94,7 +107,17 @@ class PreparedNavigation:
             raise ValueError("Navigation belongs to another context revision")
         self.signature = self._stat()
         expected = context.manifest["artifacts"].get(filename)
-        if not expected or file_hash(self.path) != expected or self._stat() != self.signature:
+        key = (str(self.path.resolve()), self.signature)
+        with _VERIFICATION_LOCK:
+            digest = _VERIFIED_NAVIGATION.get(key)
+            if digest is None:
+                digest = file_hash(self.path)
+                if self._stat() != self.signature:
+                    raise ValueError("Navigation artifact changed during verification")
+                _VERIFIED_NAVIGATION[key] = digest
+                while len(_VERIFIED_NAVIGATION) > 128:
+                    _VERIFIED_NAVIGATION.popitem(last=False)
+        if not expected or digest != expected or self._stat() != self.signature:
             raise ValueError("Navigation artifact checksum mismatch")
         self.identity = expected
         with self.connection() as db:

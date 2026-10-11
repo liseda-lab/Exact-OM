@@ -513,8 +513,8 @@ def test_partial_cursor_cannot_reuse_unavailable_complete_only_basis(fixture):
 
 @pytest.mark.parametrize("basis", ["literal_asserted", "elk_inferred_partial"])
 def test_scoped_ancestor_graph_uses_same_bounded_artifact(fixture, tmp_path, basis):
-    from tests.explanation_study_workspace_test import Store, client_for
     from exact_inspect.study.workspace import build_workspace_scope
+    from tests.explanation_study_workspace_test import Store, client_for
 
     context, policy, args = fixture
     data, binding = admit(context, **args)
@@ -575,3 +575,41 @@ def test_composition_refuses_duplicate_latest_evidence_identity():
     saved = {"evidence_id": "same", "fact_ids": ["admitted"]}
     with pytest.raises(ValueError, match="identities"):
         merge_evidence([saved], [saved, saved])
+
+
+def test_navigation_admission_reuses_verified_bytes_but_rejects_replacement(fixture, monkeypatch):
+    import os
+
+    import exact_inspect.navigation as nav
+
+    context, policy, args = fixture
+    data, binding = admit(context, **args)
+    context = materialize(context, policy=policy, data=data, binding=binding)
+    cache = getattr(nav, "_VERIFIED_NAVIGATION", None)
+    if cache is not None:
+        cache.clear()
+    checked = []
+    original_hash = nav.file_hash
+
+    def counted(path):
+        checked.append(str(path))
+        return original_hash(path)
+
+    monkeypatch.setattr(nav, "file_hash", counted)
+    first = OntologyContext(context.path)
+    second = OntologyContext(context.path)
+    assert len(checked) == 2  # One asserted and one partial artifact, not each request.
+    assert first.hierarchy(ent(first), basis=PARTIAL_BASIS, policy=policy) == second.hierarchy(
+        ent(second), basis=PARTIAL_BASIS, policy=policy
+    )
+    path = context.path / "partial-navigation.sqlite"
+    before = path.stat()
+    assert before.st_nlink == 1
+    with path.open("ab") as stream:
+        stream.write(b"changed")
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+    with pytest.raises(ValueError, match="changed after verification"):
+        first.hierarchy(ent(first), basis=PARTIAL_BASIS, policy=policy)
+    with pytest.raises(ValueError, match="checksum mismatch"):
+        OntologyContext(context.path)
+    assert len(checked) == 3
