@@ -285,6 +285,7 @@ def _staged_training_model(
     """A CPU checkpoint crosses the worker boundary, never a live CUDA context."""
     from exact.repair.pipeline import staged_verified_repair
 
+    started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix="repair-staged-dev-") as temporary:
         path = Path(temporary) / "model.pt"
         save_training_state(
@@ -297,13 +298,14 @@ def _staged_training_model(
             ),
         )
         settings = dict(selection_options or {})
+        remaining_seconds = max(0.001, seconds - (time.monotonic() - started))
         return bounded_call(
             staged_verified_repair,
             problem,
             checkpoint_path=str(path),
             checkpoint_sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
-            total_seconds=seconds,
-            elementary_seconds=min(elementary_seconds, seconds / 3),
+            total_seconds=remaining_seconds,
+            elementary_seconds=min(elementary_seconds, remaining_seconds / 3),
             generation_options=options,
             repair_options=dict(
                 shortlist_size=settings.get("shortlist_size", 1),
@@ -312,7 +314,8 @@ def _staged_training_model(
                 diagnose=True,
                 preserve_verified_input=True,
             ),
-            timeout=seconds,
+            timeout=remaining_seconds,
+            cleanup_seconds=2.0 if str(options.get("device", "cpu")).startswith("cuda") else 0.2,
             cpu_seconds=case_cpu_seconds,
         )
 

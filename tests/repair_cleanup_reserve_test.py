@@ -55,3 +55,27 @@ def test_checkpoint_boundary_reserves_device_cleanup(monkeypatch, device, reserv
 def test_invalid_cleanup_reserve_rejected(reserve):
     with pytest.raises(ValueError, match="cleanup_seconds"):
         workers.bounded_call(operator.add, 1, 2, timeout=5, cleanup_seconds=reserve)
+
+
+@pytest.mark.parametrize("device,reserve", [("cpu", 0.2), ("cuda", 2.0), ("cuda:0", 2.0)])
+def test_staged_dev_reserves_serialization_and_device_cleanup(monkeypatch, device, reserve):
+    from tools.repair import train
+
+    clock = [10.0]
+    calls = []
+    monkeypatch.setattr(train.time, "monotonic", lambda: clock[0])
+
+    def save(path, state):
+        path.write_bytes(b"checkpoint")
+        clock[0] += 1.25
+
+    monkeypatch.setattr(train, "save_training_state", save)
+    monkeypatch.setattr(train, "bounded_call", lambda *a, **k: calls.append(k))
+    model = SimpleNamespace(revision="v3", config={}, metadata={}, state_dict=lambda: {})
+    train._staged_training_model(
+        None, model, seconds=8, elementary_seconds=3, selection_options={}, device=device
+    )
+    assert calls[0]["timeout"] == calls[0]["total_seconds"] == 6.75
+    assert calls[0]["elementary_seconds"] == 2.25
+    assert calls[0]["cleanup_seconds"] == reserve
+    assert calls[0]["generation_options"]["device"] == device
