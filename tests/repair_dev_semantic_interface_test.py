@@ -402,3 +402,27 @@ def test_same_comparison_new_presentation_keeps_all_shared_request_costs(tmp_pat
     assert len(after["reservations"]) == 2
     assert len({r["comparison_id"] for r in after["reservations"].values()}) == 1
     assert sum(r["reserved_cost_usd"] for r in after["reservations"].values()) == 0.05
+
+
+def test_complete_theory_contrast_is_exact_and_never_a_semantic_equivalence_claim():
+    case, packet, _ = _offline_lookup_fixture("development")
+    evidence = interface.native_evidence(
+        case.probes, (packet.plan_a, packet.plan_b), {}, compare_text=True
+    )
+    contrast = evidence["THEORY_COMPARISON"]
+    fields = json.loads(contrast["text"])
+    assert contrast["symbolic_value"] == "false"
+    assert fields["complete_theory_texts_identical"] is False
+    assert fields["lines_only_in_first_plan"] == sorted(
+        set(packet.plan_a.content[0].splitlines()) - set(packet.plan_b.content[0].splitlines())
+    )
+    assert fields["omitted_difference_lines"] == 0
+    assert "not semantic or logical equivalence" in fields["interpretation"]
+    same = interface.native_evidence(
+        case.probes, (packet.plan_a, packet.plan_a), {}, compare_text=True
+    )
+    assert same["THEORY_COMPARISON"]["symbolic_value"] == "true"
+    assert json.loads(same["THEORY_COMPARISON"]["text"])["lines_only_in_first_plan"] == []
+    assert "THEORY_COMPARISON" not in interface.native_evidence(
+        case.probes, (packet.plan_a, packet.plan_b), {}
+    )

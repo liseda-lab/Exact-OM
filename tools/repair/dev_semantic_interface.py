@@ -16,6 +16,7 @@ from exact.repair.records import canonical_hash, canonical_json
 from exact.repair.semantic_fidelity import (
     NATIVE_EVIDENCE_PROMPT_VERSION,
     CITATION_PROMPT_VERSION,
+    CONTRAST_PROMPT_VERSION,
     consequence_basis_from_probes,
 )
 from tools.repair.batch import read, sha
@@ -26,7 +27,7 @@ SCHEMA = "exact-repair/dev-semantic-interface-amendment/v1"
 EVIDENCE_REVISION = "native-plan-query-evidence/v1"
 
 
-def native_evidence(probes, plans, evidence):
+def native_evidence(probes, plans, evidence, *, compare_text=False):
     """Expose already-qualified outcomes, without calculating or inventing labels.
 
     Callers authenticate the saved native-plan context or build it with the full
@@ -85,6 +86,36 @@ def native_evidence(probes, plans, evidence):
                 if key in result and result[key] != item:
                     raise ValueError("Native evidence ID collision")
                 result[key] = item
+    if compare_text:
+        a, b = plans
+        key = "THEORY_COMPARISON"
+        if key in result:
+            raise ValueError("Theory comparison evidence ID collision")
+        left, right = a.content[0], b.content[0]
+        same = left == right
+        result[key] = dict(
+            source_id=canonical_hash((a.content_hash, b.content_hash)),
+            release="verified-complete-theory-text-comparison/v1",
+            kind="native_asserted_text_identity",
+            symbolic_value="true" if same else "false",
+            text=canonical_json(
+                dict(
+                    first_plan_id=a.plan_id,
+                    second_plan_id=b.plan_id,
+                    first_plan_theory_hash=a.theory_hash,
+                    second_plan_theory_hash=b.theory_hash,
+                    complete_theory_texts_identical=same,
+                    lines_only_in_first_plan=sorted(
+                        set(left.splitlines()) - set(right.splitlines())
+                    ),
+                    lines_only_in_second_plan=sorted(
+                        set(right.splitlines()) - set(left.splitlines())
+                    ),
+                    interpretation="Exact asserted text comparison, not semantic or logical equivalence. Both complete theories remain present.",
+                    omitted_difference_lines=0,
+                )
+            ),
+        )
     return result
 
 
@@ -100,9 +131,11 @@ def validate_amendment(manifest):
         or manifest["phase"] != "development"
         or manifest.get("packet_encoding") is not None
         or manifest.get("prompt_version")
-        not in {NATIVE_EVIDENCE_PROMPT_VERSION, CITATION_PROMPT_VERSION}
+        not in {NATIVE_EVIDENCE_PROMPT_VERSION, CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION}
         or manifest.get("no_verbatim_quotes", False)
-        != (manifest.get("prompt_version") == CITATION_PROMPT_VERSION)
+        != (manifest.get("prompt_version") in {CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION})
+        or manifest.get("theory_text_comparison", False)
+        != (manifest.get("prompt_version") == CONTRAST_PROMPT_VERSION)
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])
