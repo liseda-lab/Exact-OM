@@ -1629,6 +1629,7 @@ def staged_verified_repair(
     final_verification_seconds: float | None = None,
     checkpoint_path: str | None = None,
     checkpoint_sha256: str | None = None,
+    stage_report_path: str | None = None,
 ) -> StagedRepairResult:
     """Seek a verified incumbent before bounded rich-generation epochs.
 
@@ -1639,7 +1640,7 @@ def staged_verified_repair(
     import math
     from .candidates import deduplicate_candidates
     from .grammar import mapping_grammar
-    from .kernel import repair
+    from .kernel import repair, collect_baselines
     from .records import ObjectiveV2
     from .workers import SUPERVISION_GRACE_SECONDS
 
@@ -1667,6 +1668,53 @@ def staged_verified_repair(
     def remaining():
         return max(0.0, total - (monotonic() - started))
 
+    def record(stage):
+        stages.append(stage)
+        if stage_report_path is not None:
+            from .api import write_artifact
+
+            write_artifact(
+                stage_report_path,
+                dict(
+                    schema="exact-repair/staged-progress/v1",
+                    input_hash=problem.content_hash,
+                    checkpoint_sha256=checkpoint_sha256,
+                    device=options.get("device", "cpu"),
+                    elapsed_seconds=monotonic() - started,
+                    stages=stages,
+                ),
+            )
+
+    # The source/target/original-alignment identities are unchanged across the
+    # elementary and rich inventories. Collect qualified evidence once, leaving
+    # most of the budget for actual repair; kernel admission still validates it.
+    if kernel_options.get("diagnose", True) and kernel_options.get("baseline_evidence") is None:
+        from .workers import bounded_call
+
+        allowance = min(remaining() / 4, problem.budgets.verification_seconds * 4)
+        scoped = replace(problem, budgets=replace(problem.budgets, total_seconds=allowance))
+        before = monotonic()
+        capture = bounded_call(collect_baselines, scoped, timeout=allowance)
+        record(
+            dict(
+                phase="baseline",
+                status=capture.status,
+                detail=capture.detail,
+                cleanup_complete=capture.cleanup_complete,
+                wall_seconds=monotonic() - before,
+                failures=capture.value.failures if capture.status == "complete" else (),
+            )
+        )
+        if not capture.cleanup_complete:
+            return StagedRepairResult(
+                None, None, tuple(stages), monotonic() - started, "CLEANUP_INCOMPLETE"
+            )
+        if capture.status == "complete":
+            kernel_options["baseline_evidence"] = capture.value
+    # Never reacquire the same four diagnostics in every staged solve. Source
+    # exception qualification remains mandatory inside repair regardless of this.
+    kernel_options["diagnose"] = False
+
     def run_kernel(frozen, seconds, index, initial=None):
         scoped = replace(
             frozen.problem,
@@ -1680,7 +1728,7 @@ def staged_verified_repair(
             calls["initial_assignment"] = initial
         before = monotonic()
         result = repair_neural_round(frozen, **calls)
-        stages.append(
+        record(
             dict(
                 phase="selection_verification",
                 first_verified_seconds=(
@@ -1695,6 +1743,10 @@ def staged_verified_repair(
                 assignment_ids=[c.candidate_id for c in result.selected],
                 wall_seconds=monotonic() - before,
                 search_status=result.search_status,
+                failures=result.failures,
+                stage_seconds=result.stage_seconds,
+                checks=result.checks,
+                solves=result.solves,
             )
         )
         return frozen, result
@@ -1721,8 +1773,10 @@ def staged_verified_repair(
             replace(obj, candidates=deduplicate_candidates(encoding.elementary_candidates))
         )
     elementary = replace_inventory(problem, tuple(objects))
-    elementary_deadline = started + min(elementary_seconds, total - final_allowance)
-    preflight_seconds = min(max(0.001, elementary_seconds / 3), remaining() - final_allowance)
+    elementary_deadline = monotonic() + min(elementary_seconds, remaining() - final_allowance)
+    preflight_seconds = min(
+        problem.budgets.verification_seconds, elementary_seconds / 3, remaining() - final_allowance
+    )
     if preflight_seconds > 0:
         preflight = replace(
             elementary,
@@ -1734,13 +1788,15 @@ def staged_verified_repair(
         )
         before = monotonic()
         initial_result = repair(preflight, neutral, **kernel_options)
-        stages.append(
+        record(
             dict(
                 phase="initial_coherence",
                 status=initial_result.logical_status,
                 input_hash=preflight.content_hash,
                 wall_seconds=monotonic() - before,
                 optimization_bypassed=initial_result.optimization_bypassed,
+                failures=initial_result.failures,
+                stage_seconds=initial_result.stage_seconds,
             )
         )
         if (
@@ -1789,7 +1845,7 @@ def staged_verified_repair(
             elementary_options["enabled_actions"] = ("keep", "delete")
         before = monotonic()
         outcome = freeze(elementary, max(0.001, allowance / 2), **elementary_options)
-        stages.append(
+        record(
             dict(
                 phase="elementary_scoring",
                 status=outcome.status,
@@ -1821,7 +1877,7 @@ def staged_verified_repair(
         outcome = freeze(
             problem, generation_seconds, **{**options, "preserved_candidates": preserved}
         )
-        stages.append(
+        record(
             dict(
                 phase="rich_generation",
                 status=outcome.status,

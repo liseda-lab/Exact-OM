@@ -846,6 +846,7 @@ def repair(
     risk_order: Callable[[tuple[int, ...]], float] | None = None,
     risk_identity: str = "none",
     baseline_evidence: BaselineReportV3 | None = None,
+    diagnosis_seconds: float | None = None,
     initial_assignment: tuple[int, ...] | None = None,
     ledger_path: str | Path | None = None,
     resume: bool = False,
@@ -880,6 +881,10 @@ def repair(
         not math.isfinite(shortlist_seconds) or shortlist_seconds <= 0
     ):
         raise ValueError("shortlist construction budget must be finite and positive")
+    if diagnosis_seconds is not None and (
+        not math.isfinite(diagnosis_seconds) or diagnosis_seconds <= 0
+    ):
+        raise ValueError("diagnosis budget must be finite and positive")
     if risk_order is not None and risk_identity == "none":
         raise ValueError("a risk ordering callback requires a frozen identity")
     if initial_assignment is not None:
@@ -1347,11 +1352,17 @@ def repair(
         and not resume
         and remaining(1) > 0
     ):
+        # Diagnosis is evidence preparation, not the entire repair. Reserve time
+        # for solving and verifying an incumbent even when a baseline stalls.
+        diagnosis_budget = min(
+            remaining(budgets.total_seconds),
+            diagnosis_seconds if diagnosis_seconds is not None else budgets.total_seconds / 4,
+        )
         remaining_problem = dataclasses.replace(
             problem,
             budgets=dataclasses.replace(
                 budgets,
-                total_seconds=remaining(budgets.total_seconds),
+                total_seconds=diagnosis_budget,
                 max_checks=max(0, budgets.max_checks - checks),
             ),
         )
@@ -1359,7 +1370,7 @@ def repair(
             "baseline",
             collect_baselines,
             remaining_problem,
-            timeout=remaining(budgets.total_seconds),
+            timeout=diagnosis_budget,
         )
         if capture.status == "complete" and isinstance(capture.value, BaselineReportV3):
             baseline_evidence = capture.value

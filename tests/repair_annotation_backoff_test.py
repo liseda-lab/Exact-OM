@@ -118,6 +118,32 @@ def test_wait_is_checkpointed_without_renewing_deadline(tmp_path, monkeypatch):
     assert len(calls) == 1
 
 
+def test_frozen_shared_window_resumes_after_short_worker_slice(tmp_path, monkeypatch):
+    import time
+
+    clock = [time.time()]
+    wait = httpx.Response(
+        429,
+        json=dict(error=dict(code=429, metadata=dict(retry_after_seconds=600))),
+        request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
+    )
+    _, calls = install(tmp_path, monkeypatch, [wait, response(judgment(packet()))])
+    config, output = settings(tmp_path), tmp_path / "out"
+    config["deadline_epoch"] = clock[0] + 3600
+    config["rate_limit_policy"]["resume_deadline_epoch"] = clock[0] + 1800
+    monkeypatch.setattr(backoff.time, "time", lambda: clock[0])
+    assert backoff.annotate(packet(), config, output, slot_id="s", seconds=120) is None
+    first = runner.read(output / "backoff.json")
+    clock[0] += 601
+    assert (
+        backoff.annotate(packet(), config, output, slot_id="s", seconds=120)
+        == output / "labels.json"
+    )
+    last = runner.read(output / "backoff.json")
+    assert last["deadline_epoch"] == first["deadline_epoch"]
+    assert len(last["failures"]) == 1 and len(calls) == 2
+
+
 def test_each_rejected_request_counts_towards_existing_budget(tmp_path, monkeypatch):
     _, calls = install(tmp_path, monkeypatch, [rejection()])
     config = settings(tmp_path)

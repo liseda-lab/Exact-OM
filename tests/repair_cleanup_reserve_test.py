@@ -76,6 +76,6 @@ def test_staged_dev_reserves_serialization_and_device_cleanup(monkeypatch, devic
         None, model, seconds=8, elementary_seconds=3, selection_options={}, device=device
     )
     assert calls[0]["timeout"] == calls[0]["total_seconds"] == 6.75
-    assert calls[0]["elementary_seconds"] == 2.25
+    assert calls[0]["elementary_seconds"] == 3
     assert calls[0]["cleanup_seconds"] == reserve
     assert calls[0]["generation_options"]["device"] == device

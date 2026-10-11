@@ -1,5 +1,40 @@
 # October corrective repair campaign
 
+## 11 October: user-authorized validation recovery
+
+The user explicitly approved correcting the broken validation runtime and weak
+supervisor gate. Preserve the six completed training states, every old DEV row,
+all costs and original stage clocks. The zero-selected-model freeze is not a
+successful primary study. Its future TEST launches are held while this recovery
+is qualified; TEST remains closed. Work in the corrective worktree.
+
+Use `tools.repair.validation_recovery` to evaluate authenticated saved weights in
+detached, owned Slurm steps. Start with the seed13 pair and a fixed DEV diagnostic
+covering all eight families and coherent/corrupted controls. Measure actual GPU
+workers, native diagnosis, first verified repairs and cleanup under explicit
+budgets before freezing the successor full DEV runtime. The pilot has no optimizer
+updates or hosted calls. A process completing and writing every denominator row
+does not establish operational readiness: require verified repairs on the declared
+repairable controls and complete worker cleanup. Do not require the LLM arm to win.
+
+Every failed stage must retain its timings and reason. Reuse baseline evidence only
+under its complete existing identity and proof checks. Use frozen weight artifacts
+instead of repeatedly serializing the live model. Preserve both scheduled DEV
+checkpoint identities where recoverable; do not infer an epoch solely from a
+snapshot's modification time. No arbitrary last-checkpoint selection or silently
+lowered coverage threshold. Any scientifically necessary protocol amendment must
+be explicit before TEST. Technical recovery is authorized; routine preparation,
+budget profiling and already-authorized provider backoff are not user blockers.
+
+Register the campaign's `readiness_gates` with digest-bound review evidence and
+explicit recovery run IDs. Zero selectable models or unqualified lifecycle must
+trigger diagnosis after active recovery finishes, even if future-dated TEST work
+remains in the queue. Retain stable gate/error identities and the two-unsuccessful-
+technical-repair rule. Only email for a concrete remaining user action. Decouple
+DEV annotation from GPU repair using saved, verified comparison requests; a frozen
+shared transport window may span worker slices, but never renew its deadline,
+resample an abstention or invalid answer, or erase earlier request/cost reservations.
+
 This is the user-authorized successor to the stopped preliminary study. Its root is `/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009`. Read `campaign.json`, `authorization.json`, `planning-contract.json`, `ledger.json`, the active registry and actual nonce-bound completion receipts. Specs 15/16 and the unchanged formal contracts are authoritative. Historical XR-2/T2 STOP files stay in place; do not touch the matcher campaign or allocation 14372.
 
 ## Deadline and priority

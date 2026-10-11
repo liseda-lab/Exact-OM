@@ -878,7 +878,9 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
     for finding in observation["findings"]:
         if finding.get("retryable") and finding.get("errors"):
             observation["incidents"].append(inspection_incident(registry["runs"], finding))
-    from exact.experiments.completion import idle_completion
+    from exact.experiments.completion import idle_completion, readiness_incidents
+
+    observation["incidents"].extend(readiness_incidents(registry, observation, now=now))
 
     completed_queue = idle_completion(registry, observation, dispatch_state)
     if completed_queue:
