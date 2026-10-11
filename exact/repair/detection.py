@@ -60,15 +60,32 @@ def _rules(axioms: tuple[Any, ...]) -> tuple[list[tuple[Any, Any, frozenset]], t
 
 
 class _Completion:
-    def __init__(self, axioms: tuple[Any, ...], max_contexts: int, max_depth: int):
+    def __init__(
+        self, axioms: tuple[Any, ...], max_contexts: int, max_depth: int, max_work: int = 10000
+    ):
         self.rules, self.omitted = _rules(axioms)
         self.max_contexts, self.max_depth = max_contexts, max_depth
         self.contexts = 0
         self.cache: dict[Any, dict[Any, frozenset]] = {}
         self.running: set[Any] = set()
         self.truncated = False
+        self.max_work, self.work = max_work, 0
+
+    def spend(self) -> bool:
+        """Bound rule/query expansion, including work within a single context.
+
+        Context/depth limits alone did not bound large acyclic class closures.
+        Exhaustion only loses optional negative proofs; it never proves validity.
+        """
+        if self.work >= self.max_work:
+            self.truncated = True
+            return False
+        self.work += 1
+        return True
 
     def complete(self, seeds: dict[Any, frozenset], depth: int = 0) -> dict[Any, frozenset]:
+        if not self.spend():
+            return {**seeds, owl.OWL_THING: frozenset()}
         key = tuple(
             sorted(((x, s) for x, s in seeds.items()), key=lambda pair: canonical_hash(pair))
         )
@@ -88,6 +105,8 @@ class _Completion:
             return False
 
         def entails(expression: Any, current: dict[Any, frozenset]) -> frozenset | None:
+            if not self.spend():
+                return None
             if expression in current:
                 return current[expression]
             if isinstance(expression, owl.ObjectIntersectionOf):
@@ -122,6 +141,8 @@ class _Completion:
 
         changed = True
         while changed and owl.OWL_NOTHING not in facts:
+            if not self.spend():
+                break
             changed = False
             for expression, support in list(facts.items()):
                 if isinstance(expression, owl.ObjectIntersectionOf):
@@ -137,7 +158,8 @@ class _Completion:
                     if owl.OWL_NOTHING in witness:
                         changed |= put(owl.OWL_NOTHING, support | witness[owl.OWL_NOTHING])
         self.running.remove(key)
-        self.cache[key] = facts
+        if not self.truncated:
+            self.cache[key] = facts
         return facts
 
 
@@ -148,13 +170,13 @@ class PreparedDetector:
     It is deliberately not a persisted cache of unknown decisions.
     """
 
-    def __init__(self, axioms, policy, *, max_contexts=512, max_depth=16):
-        if max_contexts < 1 or max_depth < 0:
+    def __init__(self, axioms, policy, *, max_contexts=512, max_depth=16, max_work=10000):
+        if max_contexts < 1 or max_depth < 0 or type(max_work) is not int or max_work < 1:
             raise ValueError("invalid prepared detector bounds")
         self.axioms = tuple(sorted(set(axioms), key=canonical_hash))
         self.policy = policy
-        self.bounds = (max_contexts, max_depth)
-        self.completion = _Completion(self.axioms, max_contexts, max_depth)
+        self.bounds = (max_contexts, max_depth, max_work)
+        self.completion = _Completion(self.axioms, max_contexts, max_depth, max_work)
         self.identity = canonical_hash(
             (
                 "prepared-active-detector/v1",
@@ -173,6 +195,7 @@ class PreparedDetector:
         # Bounds are per activation request. Previously completed memoised work
         # remains reusable; transient truncated entries are never reused.
         self.completion.contexts = 0
+        self.completion.work = 0
         self.completion.truncated = False
         for expression in active:
             if not _supported(expression):
@@ -201,14 +224,15 @@ def detect_violations(
     *,
     max_contexts: int = 512,
     max_depth: int = 16,
+    max_work: int = 10000,
 ) -> tuple[ProofSupportV3, ...]:
     """Export sufficient monotone violations; an empty tuple has no positive meaning."""
-    if max_contexts < 1 or max_depth < 0:
+    if max_contexts < 1 or max_depth < 0 or type(max_work) is not int or max_work < 1:
         raise ValueError("detector bounds must be positive contexts/nonnegative depth")
     axioms = tuple(sorted(set(axioms), key=canonical_hash))
     active = tuple(sorted(set(active), key=canonical_hash))
     theory_hash = canonical_hash((axioms, active))
-    completion = _Completion(axioms, max_contexts, max_depth)
+    completion = _Completion(axioms, max_contexts, max_depth, max_work)
     proofs = []
     classes = tuple(
         owl.Class(owl.IRI(c)) if isinstance(c, str) else c for c in policy.monitored_classes

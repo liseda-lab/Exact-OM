@@ -353,12 +353,75 @@ def run(manifest_path, output):
     return report
 
 
+def native_probe(manifest_path, output):
+    """Check original/deletion plans for fixed DEV inputs without a model or GPU."""
+    from exact.repair.kernel import verify_assignment
+    from exact.repair.workers import bounded_call
+    from tools.repair.prepare import load_preparation
+
+    manifest, output = read(manifest_path), Path(output)
+    if manifest.get("test_allowed") is not False or manifest.get("optimizer_updates") != 0:
+        raise ValueError("Native diagnostic must preserve closed TEST and saved weights")
+    primary = bound(bound(manifest["weights"])["primary_manifest"])
+    cases, _, _ = load_preparation(authenticate(primary["preparation"]))
+    dev = {case.case_id: case for case in cases if case.split == "development"}
+    rows = []
+    for case_id in manifest["case_ids"]:
+        case = dev[case_id]
+        assignments = dict(
+            original=tuple(
+                next(i for i, c in enumerate(obj.candidates) if c.axioms == obj.original_axioms)
+                for obj in case.problem.objects
+            ),
+            deletion=tuple(
+                next(i for i, c in enumerate(obj.candidates) if not c.axioms)
+                for obj in case.problem.objects
+            ),
+        )
+        for kind, assignment in assignments.items():
+            path = output / "rows" / (canonical_hash((case_id, kind)) + ".json")
+            if path.exists():
+                rows.append(binding(path))
+                continue
+            start = time.monotonic()
+            result = bounded_call(
+                verify_assignment, case.problem, assignment, timeout=10, memory_mb=8192
+            )
+            row = dict(
+                case_id=case_id,
+                family=case.family,
+                control=case.control,
+                kind=kind,
+                assignment=assignment,
+                status=result.status,
+                detail=result.detail,
+                cleanup_complete=result.cleanup_complete,
+                elapsed_seconds=time.monotonic() - start,
+                verification=result.value.to_dict() if result.status == "complete" else None,
+                verified=result.status == "complete" and result.value.authorizes,
+            )
+            immutable(path, row)
+            rows.append(binding(path))
+    immutable(
+        output / "report.json",
+        dict(
+            status="complete",
+            manifest=binding(Path(manifest_path)),
+            rows=rows,
+            hosted_calls=0,
+            optimizer_updates=0,
+            test_opened=False,
+        ),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("manifest")
     parser.add_argument("output")
+    parser.add_argument("--native-probe", action="store_true")
     args = parser.parse_args()
-    run(args.manifest, args.output)
+    (native_probe if args.native_probe else run)(args.manifest, args.output)
 
 
 if __name__ == "__main__":
