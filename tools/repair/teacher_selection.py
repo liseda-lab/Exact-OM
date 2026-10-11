@@ -213,6 +213,11 @@ def qualified_contract(manifest):
     source, phase = bound(selected["manifest"]), bound(selected["phase_state"])
     proposal, _, previous = panel_contract(source)
     profile = selected["selected_profile"]
+    revised_interface = bool(manifest.get("dev_interface_amendment"))
+    if revised_interface:
+        from tools.repair.dev_semantic_interface import validate_amendment
+
+        validate_amendment(manifest)
     if not (
         selected["schema"] == "exact-repair/qualified-teacher/v1"
         and gate["status"] == review["status"] == "qualified"
@@ -232,11 +237,13 @@ def qualified_contract(manifest):
         and manifest["cost_ceiling_usd"] == source["cost_ceiling_usd"]
         and not manifest.get("teacher_panel")
         and compatible_input_profile(manifest, source, profile)
+        and (
+            revised_interface
+            or all(manifest[k] == source[k] for k in ("prompt_version", "prompt_hash"))
+        )
         and all(
             manifest[k] == source[k]
             for k in (
-                "prompt_version",
-                "prompt_hash",
                 "rubric_version",
                 "criterion_weights",
                 "test_profile",
@@ -266,7 +273,14 @@ def compatible_input_profile(manifest, source, profile):
         return True
     controls = manifest["request_profiles"][profile]
     optional = {"max_input_tokens", "max_input_bytes", "input_amendment"}
-    if {k: v for k, v in controls.items() if k not in optional} != baseline:
+    if manifest.get("dev_interface_amendment"):
+        from tools.repair.dev_semantic_interface import validate_amendment
+
+        validate_amendment(manifest)
+        optional.add("max_output_tokens")
+    if {k: v for k, v in controls.items() if k not in optional} != {
+        k: v for k, v in baseline.items() if k not in optional
+    }:
         return False
     controls = request_profile(manifest, profile)
     if "input_amendment" in controls:

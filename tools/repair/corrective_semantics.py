@@ -129,6 +129,10 @@ def validate_manifest(value):
     if value["phase"] not in PHASE_LIMITS:
         raise ValueError("Unregistered annotation phase")
     _request_budget(value)
+    if value.get("dev_interface_amendment"):
+        from tools.repair.dev_semantic_interface import validate_amendment
+
+        validate_amendment(value)
     _manifest_prompt(value)
     from tools.repair.annotation_profile import request_profile
 
@@ -972,7 +976,9 @@ def annotate_packet(
         authorized=True,
         role_profiles={TEACHER: selected_teacher, EVALUATOR: evaluator},
         role_budgets=budgets,
-        aggregate_budget=AnnotationBudget(704, 704 * total_tokens, manifest["cost_ceiling_usd"], 704 * 90),
+        aggregate_budget=AnnotationBudget(
+            704, 704 * total_tokens, manifest["cost_ceiling_usd"], 704 * 90
+        ),
         max_input_bytes=byte_cap,
         max_output_tokens=output_cap,
         max_cost_per_request_usd=cost,
@@ -1293,8 +1299,8 @@ def decoded_transport_packet(packet, manifest, directory):
     return compact
 
 
-def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float) -> Path | None:
-    """Attach fresh DEV labels only to the exact decoded, verified generated pool."""
+def prepare_decoded_packet(request_path: Path, manifest_path: Path, *, seconds: float):
+    """Reconstruct qualified complete DEV evidence without transmitting a request."""
     from exact.repair.workers import bounded_call
     from tools.repair.prepare import case_from_dict
 
@@ -1349,7 +1355,7 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         tuple(request["assignment"]),
         tuple(lookup[c] for c, lookup in zip(counterpart, by_id)),
     )
-    if assignments[0] == assignments[1]:
+    if assignments[0] == assignments[1] and not manifest.get("dev_interface_amendment"):
         return None
     plans: list[SemanticPlanV3] = []
     from exact.repair.kernel import materialize
@@ -1395,13 +1401,18 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
             raise ValueError("Annotation verifier returned an invalid semantic plan record")
         immutable(saved_plan, dict(context_hash=context_hash, plan=outcome.value.to_dict()))
         plans.append(outcome.value)
+    evidence = entry["evidence"]
+    if manifest.get("dev_interface_amendment"):
+        from tools.repair.dev_semantic_interface import native_evidence
+
+        evidence = native_evidence(case.probes, plans, evidence)
     packet = SemanticEvidencePacketV3(
         case.case_id,
         case.structural_parent,
         case.split,
         entry["task"],
         tuple(entry["original_observation"]),
-        entry["evidence"],
+        evidence,
         tuple(entry["local_context"]),
         plans[0],
         plans[1],
@@ -1411,11 +1422,27 @@ def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float)
         entry["coverage"],
     )
     packet = decoded_transport_packet(packet, manifest, request_path.parent / "transport")
+    return packet
+
+
+def annotate_decoded(request_path: Path, manifest_path: Path, *, seconds: float) -> Path | None:
+    """Attach fresh DEV labels only to the exact decoded, verified generated pool."""
+    started = time.monotonic()
+    packet = prepare_decoded_packet(request_path, manifest_path, seconds=seconds)
+    if packet is None:
+        return None
+    manifest, request = read(manifest_path), read(request_path)
+    slot = canonical_hash(request["selection_slot"])
+    frozen_slot = manifest["frozen_annotation_slots"][slot]
     return annotate_comparison(
         packet,
         manifest,
         request_path.parent / "annotation",
-        comparison_id=slot,
+        comparison_id=(
+            canonical_hash((slot, manifest["dev_interface_amendment"]))
+            if manifest.get("dev_interface_amendment")
+            else slot
+        ),
         order_swap_audit=bool(frozen_slot.get("swapped", False)),
         seconds=seconds - (time.monotonic() - started),
     )
@@ -1551,7 +1578,8 @@ def run(manifest_path, output):
         policy_failure = deferred and deferred["failed_slot"] == row["id"]
         transport_receipt = Path(output) / row["id"] / "receipt.json"
         waiting_capacity = (
-            manifest.get("rate_limit_policy") and artifact is None
+            manifest.get("rate_limit_policy")
+            and artifact is None
             and transport_receipt.exists()
             and read(transport_receipt).get("status") == "rate_limit_deferred"
         )
@@ -1571,8 +1599,11 @@ def run(manifest_path, output):
                     else (
                         "not_attempted_provider_policy"
                         if deferred
-                        else "rate_limit_deferred" if waiting_capacity
-                        else "complete" if artifact else "unavailable"
+                        else (
+                            "rate_limit_deferred"
+                            if waiting_capacity
+                            else "complete" if artifact else "unavailable"
+                        )
                     )
                 ),
                 artifact=str(artifact) if artifact else None,

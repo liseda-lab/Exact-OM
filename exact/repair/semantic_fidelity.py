@@ -83,7 +83,41 @@ Definitions are semantic evidence, not checked entailment. plan query_outcomes
 are not citation IDs. Do not invent keys or assert uncitable entailment, even in
 prose. Use [] for absent quotes/boolean claims. Retain all criteria.
 """
-PROMPTS = {PROMPT_VERSION: PROMPT, INTERFACE_PROMPT_VERSION: INTERFACE_PROMPT}
+# A separately authorized evidence-interface revision. Preserve both older prompts.
+NATIVE_EVIDENCE_PROMPT_VERSION = "semantic-fidelity-prompt/v3.3"
+NATIVE_EVIDENCE_PROMPT = (
+    INTERFACE_PROMPT
+    + """
+Packet interpretation for this revision:
+Each plan.content contains its COMPLETE reconstructed theory inline, followed by
+original/selected editable bundles and proof identities. There are no omitted
+shared blocks. Judge the complete theory; a selected bundle is not the whole theory.
+For an explicitly authored fictional task, the supplied authored definitions and
+intended commitments stipulate the LIMITED assessment scope. They are sufficient
+semantic evidence within that scope; external independent domain sources are not
+required for this controlled proxy. They do not establish real-world truth or
+checked entailment. Undefined symbols have only the formal constraints supplied;
+do not invent additional meanings for them or infer any preferred repair action.
+Native query evidence is keyed in packet.evidence, identifies the exact plan by
+plan_id and theory_hash, and states the query and its result. Match that plan_id
+to the current A/B presentation before citing it. A false entailment result means
+NOT ENTAILED, not entailment of the negation. A non-vacuity result concerns the
+listed class expressions' satisfiability, not the truth of the queried axiom.
+Use these entries for boolean claims; their checked outcomes do not alone establish
+semantic fidelity. Use the authored definitions/commitments for semantic judgments.
+Equal plan IDs mean the same complete assignment: any decided criterion must be
+a tie with equal anchored scores. Judge that plan's quality from the evidence;
+identity alone gives no numeric score. Sufficient evidence of equivalence supports
+a tie, even when the plans make no different commitments. Genuine insufficient
+meaning evidence still requires unknown/null and abstention. Never force a score.
+Keep each reason brief; exact quotes are optional. List all cited evidence keys.
+"""
+)
+PROMPTS = {
+    PROMPT_VERSION: PROMPT,
+    INTERFACE_PROMPT_VERSION: INTERFACE_PROMPT,
+    NATIVE_EVIDENCE_PROMPT_VERSION: NATIVE_EVIDENCE_PROMPT,
+}
 
 
 def annotation_prompt(version: str) -> str:
@@ -1978,7 +2012,9 @@ class SemanticAnnotationAdapter:
             role,
             packet.case_id,
             input_token_bound(
-                messages, controls, getattr(self.run, "input_tokenizer", None),
+                messages,
+                controls,
+                getattr(self.run, "input_tokenizer", None),
                 self.run.max_input_bytes,
             )
             + self.run.max_output_tokens,
