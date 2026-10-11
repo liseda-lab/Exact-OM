@@ -541,6 +541,79 @@ def run(manifest, output):
     return execute_rows(manifest, output)
 
 
+def recovery_rows(manifest):
+    """Authenticate and retain one failed cleanup prefix without replay.
+
+    The failed case's deadline has expired. Process retirement permits the
+    remaining unattempted cases to run, never another attempt at that case.
+    """
+    reference = manifest.get("technical_recovery")
+    if not reference:
+        return {}
+    recovery = bound(reference)
+    prior = bound(recovery["manifest"])
+    if prior.get("technical_recovery"):
+        raise ValueError("A further recovery requires a separate same-cause review")
+    changed = {"dispatch_nonce", "source_commit", "concurrent_barrier", "technical_recovery"}
+    if {k: v for k, v in prior.items() if k not in changed} != {
+        k: v for k, v in manifest.items() if k not in changed
+    }:
+        raise ValueError("Technical recovery changed scientific rows or limits")
+    completion, outputs, batch, job = validate_completion(recovery["receipt"])
+    if completion["status"] != "failed" or recovery["manifest"]["path"] not in job["commands"][0]:
+        raise ValueError("Technical recovery requires its original failed worker")
+    retirement = bound(recovery["retirement"])
+    if (
+        retirement.get("retired_step") != completion["step_id"]
+        or completion["step_id"] in retirement["live_steps"]
+        or retirement["observed_epoch"] < completion["finished_epoch"]
+        or retirement.get("all_owned_processes_retired") is not True
+    ):
+        raise ValueError("Failed worker cleanup has not been reconciled")
+    work = Path(completion["work"])
+    for relative, digest in outputs.items():
+        authenticate(dict(path=str(work / relative), sha256=digest))
+    report = read(work / "report.json")
+    if outputs.get("report.json") != binding(work / "report.json")["sha256"] or (
+        report["manifest_identity"] != canonical_hash(prior)
+        or [r["id"] for r in report["rows"]] != [r["id"] for r in prior["rows"]]
+    ):
+        raise ValueError("Failed report identity or denominator differs")
+    attempted = [r for r in report["rows"] if r["status"] != "not_attempted"]
+    if len(attempted) != 1:
+        raise ValueError("Recovery must preserve exactly the diagnosed failed prefix")
+    row = attempted[0]
+    frozen = next(r for r in prior["rows"] if r["id"] == row["id"])
+    saved_path = work / "rows" / row["id"] / "completion.json"
+    saved = read(saved_path)
+    if (
+        row["id"] != recovery["failed_row_id"]
+        or saved != {k: v for k, v in row.items() if k != "id"}
+        or outputs.get(str(saved_path.relative_to(work))) != binding(saved_path)["sha256"]
+        or saved["identity"] != canonical_hash((canonical_hash(prior), frozen))
+        or saved["status"] != "cleanup_incomplete"
+        or saved.get("cleanup_complete") is not False
+        or saved.get("detail") != "nested worker cleanup incomplete"
+        or not 0 < saved["charged_seconds"] < frozen["case_seconds"]
+    ):
+        raise ValueError("Recovery is not the diagnosed technical cleanup failure")
+    return {
+        row["id"]: dict(
+            identity=canonical_hash((canonical_hash(manifest), frozen)),
+            status="prior_implementation_failure",
+            result=None,
+            cleanup_complete=True,
+            prior_cleanup_complete=False,
+            charged_seconds=saved["charged_seconds"],
+            prior_charged_seconds=saved["charged_seconds"],
+            artifacts=[binding(saved_path), recovery["retirement"]],
+            prior_attempt=recovery["receipt"],
+            shared_cost_reference=saved.get("shared_cost_reference"),
+            cost_rule="Prior failed row charged once; expired case never replayed; descendant retirement authenticated separately",
+        )
+    }
+
+
 def audit(prepared, output):
     """Authenticate terminal workers and report measured coverage without replay."""
     prepared = read(prepared)
@@ -552,7 +625,7 @@ def audit(prepared, output):
             completion=binding(attempt / "completion.json"),
             step=binding(attempt / "step.json"),
             outputs=binding(attempt / "outputs.json"),
-            batch=prepared["batch"],
+            batch=prepared.get("worker_batches", {}).get(descriptor["id"], prepared["batch"]),
             dispatch_nonce=descriptor["launch"]["nonce"],
             step_id=terminal["step_id"],
             expected_status="complete",
@@ -607,7 +680,8 @@ def audit(prepared, output):
         r["id"]
         for report in reports.values()
         for r in report["rows"]
-        if r["status"] in {"error", "interrupted_unknown", "not_attempted"}
+        if r["status"]
+        in {"error", "interrupted_unknown", "not_attempted", "prior_implementation_failure"}
         or not r.get("cleanup_complete")
     ]
     result = dict(
@@ -636,6 +710,7 @@ def audit(prepared, output):
         hosted_calls=0,
         optimizer_updates=0,
         test_outcomes_opened=False,
+        technical_recovery=prepared.get("technical_recovery"),
     )
     immutable(Path(output) / "report.json", result)
     return result

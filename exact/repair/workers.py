@@ -346,7 +346,7 @@ def _tree_pids(pid: int) -> list[int]:
     return result
 
 
-def _stop(pid: int, own_group: bool) -> bool:
+def _stop(pid: int, own_group: bool, cleanup_seconds: float = 0.2) -> bool:
     """Kill only this broker's descendants; cleanup is bounded and explicit."""
     descendants = _tree_pids(pid)
     if own_group:
@@ -359,7 +359,7 @@ def _stop(pid: int, own_group: bool) -> bool:
             os.kill(child, signal.SIGKILL)
         except ProcessLookupError:
             pass
-    deadline = time.monotonic() + 0.2
+    deadline = time.monotonic() + cleanup_seconds
     reaped = False
     while time.monotonic() < deadline:
         if not reaped:
@@ -528,6 +528,7 @@ def bounded_call(
     cpu_seconds: float | None = None,
     event_handler: Callable[[Any], bool] | None = None,
     event_directory: str | None = None,
+    cleanup_seconds: float = 0.2,
     **kwargs: Any,
 ) -> CallResult:
     """Monitor startup, native work, event validation/storage and bounded transport.
@@ -535,7 +536,9 @@ def bounded_call(
     A POSIX broker starts a clean spawned native worker and owns event callbacks.
     Both are killable while the caller monitors deadlines and sampled tree CPU/RSS.
     The controller receives only bounded messages and durable-prefix receipts.
-    Cleanup has a 0.2-second grace; explicit journal replay needs its own budget.
+    Cleanup defaults to a 0.2-second grace. A larger explicit reserve is taken
+    from the work timeout, never added to the enclosing allowance. Explicit
+    journal replay needs its own budget.
     """
     global _NESTED_CLEANUP_COMPLETE
     if not _NESTED_CLEANUP_COMPLETE:
@@ -546,6 +549,13 @@ def bounded_call(
         )
     if not isfinite(timeout):
         raise ValueError("timeout must be finite")
+    if (
+        type(cleanup_seconds) not in (int, float)
+        or not isfinite(cleanup_seconds)
+        or cleanup_seconds < 0.2
+    ):
+        raise ValueError("cleanup_seconds must be finite and at least 0.2")
+    timeout -= cleanup_seconds - 0.2
     if cpu_seconds is not None and (
         type(cpu_seconds) not in (int, float) or not isfinite(cpu_seconds) or cpu_seconds <= 0
     ):
@@ -563,7 +573,7 @@ def bounded_call(
         absolute = float(inherited)
         if not isfinite(absolute):
             raise ValueError("inherited repair deadline must be finite")
-        timeout = min(timeout, absolute - time.time() - SUPERVISION_GRACE_SECONDS)
+        timeout = min(timeout, absolute - time.time() - cleanup_seconds - 0.02)
     if timeout <= 0:
         return CallResult("timeout", detail="stage deadline exhausted")
     record_phase(
@@ -573,6 +583,7 @@ def bounded_call(
         timeout_seconds=timeout,
         memory_mb=memory_mb,
         cpu_seconds=cpu_seconds,
+        cleanup_seconds=cleanup_seconds,
     )
     started = time.monotonic()
     deadline = started + timeout
@@ -692,7 +703,11 @@ def bounded_call(
     finally:
         stopped.set()
         record_phase("cleanup", "start", owner_pid=pid)
-        cleanup = _stop(pid, own_group)
+        cleanup = (
+            _stop(pid, own_group)
+            if cleanup_seconds == 0.2
+            else _stop(pid, own_group, cleanup_seconds)
+        )
         exit_code = _STOP_EXIT_CODES.pop(pid, None)
         if broker is not None and exit_code is not None:
             # _stop owns waitpid so it can bound cleanup of the whole tree;
