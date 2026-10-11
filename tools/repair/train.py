@@ -1042,6 +1042,7 @@ def generated_development(
         "proposal_reports": json.loads(
             canonical_json(tuple(dict(row) for row in generated.proposal_reports))
         ),
+        "worker_ownership": generated.worker_ownership,
         "elapsed_seconds": time.monotonic() - started,
         "scope": "generated-pool symbolic verification and independent declared semantic queries",
     }

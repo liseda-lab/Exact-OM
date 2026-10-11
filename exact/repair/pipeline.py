@@ -50,6 +50,7 @@ class FrozenNeuralRound:
     model_hash: str
     proposal_reports: tuple[GenerationReportV3, ...]
     risk_scorer: Any = None
+    worker_ownership: dict[str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -1343,12 +1344,7 @@ def _freeze_worker(
     ownership = dict(device=str(device))
     if device.type == "cuda":
         ownership["gpu_uuid"] = str(torch.cuda.get_device_properties(device).uuid)
-    return replace(
-        result,
-        proposal_reports=tuple(
-            {**dict(row), "worker_ownership": ownership} for row in result.proposal_reports
-        ),
-    )
+    return replace(result, worker_ownership=ownership)
 
 
 def bounded_freeze_neural_round(
@@ -1859,6 +1855,7 @@ def staged_verified_repair(
             dict(
                 phase="elementary_scoring",
                 status=outcome.status,
+                worker_ownership=getattr(outcome.value, "worker_ownership", None),
                 cleanup_complete=outcome.cleanup_complete,
                 detail=outcome.detail,
                 wall_seconds=monotonic() - before,
@@ -1891,6 +1888,7 @@ def staged_verified_repair(
             dict(
                 phase="rich_generation",
                 status=outcome.status,
+                worker_ownership=getattr(outcome.value, "worker_ownership", None),
                 cleanup_complete=outcome.cleanup_complete,
                 detail=outcome.detail,
                 wall_seconds=monotonic() - before,

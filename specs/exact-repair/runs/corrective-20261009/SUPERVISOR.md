@@ -2,6 +2,50 @@
 
 ## 11 October: user-authorized validation recovery
 
+Latest recovery handoff is `qualification/validation-recovery-20261011-001/handoff.json`
+and the frozen successor preparation is `learning/final-dev-recovery-20261011-001`.
+This paragraph supersedes the exploratory pilot instructions below. The corrected
+seed13 pilots verified all 16 cases per condition (eight coherent and eight
+corrupted, all eight families), with clean worker lifecycles. The unbounded work
+inside the optional Horn rejection precheck was the main native bottleneck; its
+deterministic work bound now falls through to full native verification. The full
+verifier's 10-second limit and acceptance checks are unchanged. The slowest pilot
+case took 88.31 seconds. Freeze 150 seconds per complete DEV repair and 90 seconds
+for the elementary stage, with CPU annotation outside the GPU case budget.
+
+Recover the final epoch6 DEV pass for all six saved models, retaining all old
+epoch5 and epoch6 outcomes. All original checkpoint criteria were unavailable;
+selection of a recovered epoch6 checkpoint is permitted only by the unchanged
+full-coverage and semantic-label rule. Do not infer epoch5 weights from mtime or
+retrain to reconstruct them. Paired conditions use identical physical hardware
+for each case, across disjoint 16-case GPU shards. First complete the seed13 pair,
+inspect its actual repair/cleanup/selection evidence, then admit the already
+prepared seed37 and seed73 pair shards after operational qualification. A missing
+or abstained semantic label cannot be replaced with the model's prediction or a
+new paid observation. LLM superiority is never an admission gate.
+
+`validation_recovery --aggregate` joins the two complete, digest-bound shard
+reports for a model; `--annotate-report` completes its preselected comparisons
+on CPU and applies the original selection criterion. Prepare those consumers
+from authenticated charged producer receipts as soon as shards complete; source
+requests are immutable and annotation state lives in the declared separate
+directory. Resume `transport_deferred` with the same request/state/manifest and
+fixed shared deadline; do not reset charges or call a short worker slice an
+unavailable scientific label. The recorded runtime amendment extends only the
+expired per-model elapsed windows to the original DEV stage expiry, preserving
+their original clocks, 4 GPU-hour model caps, primary 24 GPU-hour cap and all
+other limits. There is no new request allocation or monetary authorization.
+
+After all six recovered reviews, replace the readiness gate's bound evidence
+with an authenticated consolidated review. Require real selection evidence,
+complete DEV coverage and clean lifecycle before preparing the learned TEST
+successor. Keep the old zero-model freeze and all earlier results intact and
+its queued TEST descriptors held. TEST remains closed until 14 October 17:00 UTC.
+The ideal recovery deadline is the existing DEV stage expiry on 11 October;
+finish the corrected six-model review today and protect the unchanged paper
+milestones. Routine consumer preparation is authorized; email only for a real
+remaining user decision or an exhausted eligible queue.
+
 The user explicitly approved correcting the broken validation runtime and weak
 supervisor gate. Preserve the six completed training states, every old DEV row,
 all costs and original stage clocks. The zero-selected-model freeze is not a

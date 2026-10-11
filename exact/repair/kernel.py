@@ -242,7 +242,9 @@ def verify_assignment(
             exception_checks,
             detail="a frozen source exception could not be proved",
         )
-    options = {} if rejection_precheck is True else {"rejection_precheck": rejection_precheck}
+    options: dict[str, Any] = (
+        {} if rejection_precheck is True else {"rejection_precheck": rejection_precheck}
+    )
     report = verify_theory(axioms, active, problem.policy, canonical_hash(assignment), **options)
     return _compose_exceptions(problem, assignment, report, exception_checks, artifact)
 
