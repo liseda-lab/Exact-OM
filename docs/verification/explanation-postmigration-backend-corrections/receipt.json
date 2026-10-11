@@ -1,0 +1,262 @@
+{
+  "assembly": {
+    "contexts": {
+      "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+      "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738"
+    },
+    "elk": {
+      "doid": {
+        "manifest": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+        "resource_receipt": "sha256:9cad3ae40290d9d4aa169022180d6ced0433cb46513180d76c8165810312987d",
+        "result": "sha256:63234a4f7d11d18ada3bfa10bb98417480eb9eb26674de0eab0c4a351346623d",
+        "taxonomy": "sha256:8563d5690fd1a52669f76460c57f4e12e69e65b5910c333d7e22dd838c3d1cd5"
+      },
+      "ncit": {
+        "manifest": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+        "resource_receipt": "sha256:f8835f4ddf83aa67f3eab6fbc97ff4b2e53f1cfe41b3f8737a10be3cc2b9fe8c",
+        "result": "sha256:8cd61822b26fb42332b2ac37f9fc829c39c669669a4cef54b32ed4c6dcfd1701",
+        "taxonomy": "sha256:68cc52ef6e78d356d923741614b28cc50c876665db4725ec914a6032916c93a4"
+      }
+    },
+    "evidence_package": "sha256:587a06159a5ce3be559a407bf741ac01cc34aff587f958e6bc2f41777ed54aac",
+    "evidence_publication": "sha256:de980187339840d0f623eb8d38162bca0c08f50d32707ae691fd5a4201286dc0",
+    "policy": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "prose_package": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+    "prose_publication": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+    "renderer": "typed-readable/3",
+    "revision": "development-review-combined-20261011",
+    "schema": "exact-review-composition/1"
+  },
+  "backend_runtime": {
+    "file_count": 56,
+    "git_commit": "bc8e57cd771bc13551a90486edadcde87ce09fa3",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "bb771d7fa8e40032af39771c62cadac4d4e5b343a9b9eb66348e665f088f811d"
+  },
+  "catalogue": {
+    "bytes": 430514,
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/catalogue.json",
+    "sha256": "587b1c53bc38d4ef9b557305d42c360519059c9bb80ef786003adc693f1e5fc4"
+  },
+  "coverage_limits": {
+    "absent_or_asymmetric_definitions": 0,
+    "close_alternatives": 0,
+    "multiple_parents": 0,
+    "restrictions_or_equivalences": 0,
+    "rich_definitions": 0,
+    "sparse_evidence": 3
+  },
+  "environment": {
+    "certificate_sha256": "1477e681941200f744331c4e3951d303c41523dcf8fc9cdb97b0f332c2e12bc8",
+    "existing_sessions": "preserved; new isolated test sessions only",
+    "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-delivered-final-20261010/frontend",
+    "frontend_scope": "retained S0; intentionally incompatible with new review sessions",
+    "frontend_sha256": "47bdca016cdb745c725f8173e0f5458e5a39cc2f4b7cf526318b66b30b72b3a2",
+    "memory_limitation": "one resident-memory sample; not a peak",
+    "ports": {
+      "exploration": 19425,
+      "postgres": 19423,
+      "study": 19424
+    },
+    "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/environment-r3",
+    "sampled_service_memory": [
+      {
+        "cpu_percent": 0.0,
+        "role": "exploration",
+        "rss_kib": 78052
+      },
+      {
+        "cpu_percent": 0.6,
+        "role": "postgres",
+        "rss_kib": 5976
+      },
+      {
+        "cpu_percent": 3.0,
+        "role": "study",
+        "rss_kib": 176816
+      }
+    ],
+    "services": {
+      "exploration": {
+        "port": 19425,
+        "ready": true,
+        "state": "owned"
+      },
+      "postgres": {
+        "port": 19423,
+        "ready": true,
+        "state": "owned"
+      },
+      "study": {
+        "port": 19424,
+        "ready": true,
+        "state": "owned"
+      }
+    },
+    "source_publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication.json",
+    "startup_measurement": {
+      "boundary": "Cold process startup including preflight and initial study admission, existing filesystem caches",
+      "seconds": 144.08366985013708,
+      "services": {
+        "exploration": {
+          "port": 19425,
+          "ready": true,
+          "state": "owned"
+        },
+        "postgres": {
+          "port": 19423,
+          "ready": true,
+          "state": "owned"
+        },
+        "study": {
+          "port": 19424,
+          "ready": true,
+          "state": "owned"
+        }
+      },
+      "status": "passed"
+    },
+    "study_revision": "review-20261011T230854-0752049331",
+    "test_publication": {
+      "bytes": 221889,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/environment-r3/publications/review-20261011T230854-0752049331.json",
+      "sha256": "16578bf285162d4f1c905bfef1da97fddbbee77a0509dd8c0f07714225dc6689"
+    }
+  },
+  "frontend_S2": "pending; no frontend implementation included",
+  "handoff_commit": "Resolve the commit adding this receipt using git log -1 --format=%H -- docs/verification/explanation-postmigration-backend-corrections/receipt.json",
+  "implementation_commits": [
+    "f8131bce46578b9d0f9dd6e92945be7599d0ca5c",
+    "780af0c29dae37be8357f36eb178d39270e7e406",
+    "66a33420a144a4fdc125a581dc54057e1592a8ed",
+    "bc8e57cd771bc13551a90486edadcde87ce09fa3"
+  ],
+  "implementation_status": "implemented_and_self_verified",
+  "independent_combined_review": "pending",
+  "joint_acceptance": "not_established",
+  "launch_readiness": "not_established",
+  "no_full_ontology_classification_restart": true,
+  "no_provider_dispatch": true,
+  "no_public_push_or_deployment": true,
+  "open_gates": [
+    "frontend S2 build and negotiated client",
+    "joint rendered study journey and screenshots",
+    "independent combined backend/frontend acceptance",
+    "historical R16 browser reload causation not reproduced",
+    "three missing sparse-source stratum examples",
+    "original DOID import-closure/ontology admission",
+    "manual accessibility and screen-reader audit",
+    "usability pilot and study-owner approval",
+    "deployment/restore validation",
+    "final study data approval"
+  ],
+  "package": {
+    "bytes": 397668,
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package.json",
+    "sha256": "1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70"
+  },
+  "package_id": "sha256:b4027297f62b41066cca3e4c529c0a28a9984c945df444491ca9a94790a9a7fb",
+  "postgres_version": "postgres (PostgreSQL) 16.2",
+  "publication": {
+    "bytes": 158812,
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication.json",
+    "sha256": "5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a"
+  },
+  "recorded_at": "2026-10-11T23:24:16.701840+00:00",
+  "requirements": {
+    "C01": {
+      "implementation": "complete",
+      "independent_acceptance": "pending",
+      "verification": "backend_self_verified"
+    },
+    "C02": {
+      "implementation": "complete",
+      "independent_acceptance": "pending",
+      "verification": "backend_self_verified"
+    },
+    "C03": {
+      "implementation": "complete",
+      "independent_acceptance": "pending",
+      "verification": "backend_self_verified"
+    },
+    "C05_backend": {
+      "implementation": "complete",
+      "independent_acceptance": "pending",
+      "verification": "backend_self_verified"
+    }
+  },
+  "reviewed_commit": "6d9961e2aec3d08645262d91aed8c9febca203b8",
+  "runtime_versions": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "python": "3.12.3",
+    "uvicorn": "0.35.0"
+  },
+  "schema": "exact-postmigration-backend-corrections/1",
+  "sparse_pool_audit": "sparse-pool-probe.json",
+  "storage_summary": {
+    "initial_measured_bytes": 33474312351,
+    "latest_measured_bytes": 48626403375,
+    "maximum_conservative_reserved_total_bytes": 67467041205,
+    "maximum_observed_guard_measurement_bytes": 48626481199
+  },
+  "tests": {
+    "backend": {
+      "passed": 256,
+      "seconds": 297.484,
+      "sequence": "Broad suite before late ancestor/cache corrections; affected suites rerun after their fixes. Counts overlap.",
+      "skipped": [
+        {
+          "reason": "Dedicated PostgreSQL URL, PGBIN and PGDATA required for v2 backup/restore",
+          "test": "tests.explanation_study_v2_test.test_v2_postgresql_backup_restore_preserves_training_and_draft"
+        }
+      ]
+    },
+    "completed_composition_resume": "passed unchanged hashes",
+    "frontend": {
+      "failed": 0,
+      "node": "24.19.0",
+      "passed": 112,
+      "react": "19.1.0",
+      "runtime_reuse": "retained dependencies; no install or frontend modification",
+      "seconds": 1.903,
+      "typescript": "5.9.3"
+    },
+    "late_correction_suites": {
+      "ancestor_and_duplicate_guard": {
+        "passed": 51,
+        "seconds": 154.17
+      },
+      "navigation_cache_and_tampering": {
+        "passed": 76,
+        "seconds": 25.17
+      }
+    },
+    "native_elk_fixtures": 4,
+    "real_https": {
+      "cases": 24,
+      "completed_journeys": 2,
+      "pairs": 120,
+      "requests": 2661,
+      "served_descriptions": 260,
+      "status": "passed"
+    },
+    "relocation": "passed; rename/restore without duplicate physical bundle",
+    "schemas": "passed",
+    "source_protection": "all five groups unchanged"
+  },
+  "verification_source": {
+    "assembler_sha256": "c65eb94ef0ec5cf3780e94f0a27a8085172066d20d55e62790cc21bb6aa7a1f4",
+    "commit": "bc8e57cd771bc13551a90486edadcde87ce09fa3",
+    "implementation_commits": [
+      "f8131bce46578b9d0f9dd6e92945be7599d0ca5c",
+      "780af0c29dae37be8357f36eb178d39270e7e406",
+      "66a33420a144a4fdc125a581dc54057e1592a8ed",
+      "bc8e57cd771bc13551a90486edadcde87ce09fa3"
+    ],
+    "verifier_sha256": "a9a942dfdb73debadd265d22f833c5bcfa64ea8a8f807485b58d11ba6500d85b"
+  }
+}

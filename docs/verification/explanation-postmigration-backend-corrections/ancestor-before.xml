@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="3" time="2.309" timestamp="2026-10-11T23:57:27.195286+01:00" hostname="Pedros-MacBook-Pro-4.local"><testcase classname="tests.explanation_postmigration_corrections_test" name="test_scoped_ancestor_graph_uses_same_bounded_artifact[literal_asserted]" time="0.315"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;literal_error&quot;,&quot;loc&quot;:[&quot;query&quot;,&quot;direction&quot;],&quot;msg&quot;:&quot;Input should be 'parents' or 'children'&quot;,&quot;input&quot;:&quot;ancestors&quot;,&quot;ctx&quot;:{&quot;expected&quot;:&quot;'parents' or 'children'&quot;}}]}&#10;assert 422 == 200&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">fixture = (&lt;exact_inspect.context.OntologyContext object at 0x1129461b0&gt;, VisibilityPolicy(policy_id='exploration-v1', ontology_...('/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-0/test_scoped_ancestor_graph_use0/taxonomy.json'), ...})
+tmp_path = PosixPath('/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-0/test_scoped_ancestor_graph_use0')
+basis = 'literal_asserted'
+
+    @pytest.mark.parametrize("basis", ["literal_asserted", "elk_inferred_partial"])
+    def test_scoped_ancestor_graph_uses_same_bounded_artifact(fixture, tmp_path, basis):
+        from tests.explanation_study_workspace_test import Store, client_for
+        from exact_inspect.study.workspace import build_workspace_scope
+
+        context, policy, args = fixture
+        data, binding = admit(context, **args)
+        context = materialize(context, policy=policy, data=data, binding=binding)
+        case = {"case_id": "case-a", "source": ent(context).model_dump(),
+                "candidates": [{"candidate_id": "candidate-b", "entity": ent(context, "urn:B").model_dump()}],
+                "explanation_refs": []}
+        scope = build_workspace_scope(tmp_path, scope_id="opaque-workspace", kind="case", case=case,
+            contexts={context.ontology_version_id: context}, policy=policy, reuse_prepared_contexts=True)
+        study = {"contract_version": "exact-study/1.0", "study_revision": "revision-a", "cases": [case],
+            "policy_hash": policy.policy_hash.removeprefix("sha256:"), "visibility_policy": policy.model_dump(mode="json"),
+            "workspace_scopes": [scope.model_dump(mode="json")]}
+        store = Store(tmp_path, study)
+        with client_for(store) as client:
+            query = {**ent(context).model_dump(), "basis": basis, "direction": "ancestors", "limit": 5}
+            response = client.get("/api/v1/study/workspace/opaque-workspace/hierarchy", params=query)
+&gt;           assert response.status_code == 200, response.text
+E           AssertionError: {"detail":[{"type":"literal_error","loc":["query","direction"],"msg":"Input should be 'parents' or 'children'","input":"ancestors","ctx":{"expected":"'parents' or 'children'"}}]}
+E           assert 422 == 200
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/explanation_postmigration_corrections_test.py:534: AssertionError</failure></testcase><testcase classname="tests.explanation_postmigration_corrections_test" name="test_scoped_ancestor_graph_uses_same_bounded_artifact[elk_inferred_partial]" time="0.309"><failure message="AssertionError: {&quot;detail&quot;:[{&quot;type&quot;:&quot;literal_error&quot;,&quot;loc&quot;:[&quot;query&quot;,&quot;direction&quot;],&quot;msg&quot;:&quot;Input should be 'parents' or 'children'&quot;,&quot;input&quot;:&quot;ancestors&quot;,&quot;ctx&quot;:{&quot;expected&quot;:&quot;'parents' or 'children'&quot;}}]}&#10;assert 422 == 200&#10; +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code">fixture = (&lt;exact_inspect.context.OntologyContext object at 0x112c53cb0&gt;, VisibilityPolicy(policy_id='exploration-v1', ontology_...('/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-0/test_scoped_ancestor_graph_use1/taxonomy.json'), ...})
+tmp_path = PosixPath('/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-0/test_scoped_ancestor_graph_use1')
+basis = 'elk_inferred_partial'
+
+    @pytest.mark.parametrize("basis", ["literal_asserted", "elk_inferred_partial"])
+    def test_scoped_ancestor_graph_uses_same_bounded_artifact(fixture, tmp_path, basis):
+        from tests.explanation_study_workspace_test import Store, client_for
+        from exact_inspect.study.workspace import build_workspace_scope
+
+        context, policy, args = fixture
+        data, binding = admit(context, **args)
+        context = materialize(context, policy=policy, data=data, binding=binding)
+        case = {"case_id": "case-a", "source": ent(context).model_dump(),
+                "candidates": [{"candidate_id": "candidate-b", "entity": ent(context, "urn:B").model_dump()}],
+                "explanation_refs": []}
+        scope = build_workspace_scope(tmp_path, scope_id="opaque-workspace", kind="case", case=case,
+            contexts={context.ontology_version_id: context}, policy=policy, reuse_prepared_contexts=True)
+        study = {"contract_version": "exact-study/1.0", "study_revision": "revision-a", "cases": [case],
+            "policy_hash": policy.policy_hash.removeprefix("sha256:"), "visibility_policy": policy.model_dump(mode="json"),
+            "workspace_scopes": [scope.model_dump(mode="json")]}
+        store = Store(tmp_path, study)
+        with client_for(store) as client:
+            query = {**ent(context).model_dump(), "basis": basis, "direction": "ancestors", "limit": 5}
+            response = client.get("/api/v1/study/workspace/opaque-workspace/hierarchy", params=query)
+&gt;           assert response.status_code == 200, response.text
+E           AssertionError: {"detail":[{"type":"literal_error","loc":["query","direction"],"msg":"Input should be 'parents' or 'children'","input":"ancestors","ctx":{"expected":"'parents' or 'children'"}}]}
+E           assert 422 == 200
+E            +  where 422 = &lt;Response [422 Unprocessable Entity]&gt;.status_code
+
+tests/explanation_postmigration_corrections_test.py:534: AssertionError</failure></testcase><testcase classname="tests.explanation_postmigration_corrections_test" name="test_composition_refuses_duplicate_latest_evidence_identity" time="0.001"><failure message="Failed: DID NOT RAISE ValueError">def test_composition_refuses_duplicate_latest_evidence_identity():
+        saved = {"evidence_id": "same", "fact_ids": ["admitted"]}
+&gt;       with pytest.raises(ValueError, match="identities"):
+E       Failed: DID NOT RAISE ValueError
+
+tests/explanation_postmigration_corrections_test.py:549: Failed</failure></testcase></testsuite></testsuites>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="1.746" timestamp="2026-10-12T00:05:40.788456+01:00" hostname="Pedros-MacBook-Pro-4.local"><testcase classname="tests.explanation_postmigration_corrections_test" name="test_navigation_admission_reuses_verified_bytes_but_rejects_replacement" time="0.190"><failure message="AssertionError: assert 4 == 2&#10; +  where 4 = len(['/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-1/test_navigation_admission_reus0/ready/navigation.sqli...tmp/exact-review-work/pytest-of-pedrocotovio/pytest-1/test_navigation_admission_reus0/ready/partial-navigation.sqlite'])">fixture = (&lt;exact_inspect.context.OntologyContext object at 0x10c799520&gt;, VisibilityPolicy(policy_id='exploration-v1', ontology_...('/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-1/test_navigation_admission_reus0/taxonomy.json'), ...})
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x10c798290&gt;
+
+    def test_navigation_admission_reuses_verified_bytes_but_rejects_replacement(fixture, monkeypatch):
+        import os
+        import exact_inspect.navigation as nav
+        context, policy, args = fixture
+        data, binding = admit(context, **args)
+        context = materialize(context, policy=policy, data=data, binding=binding)
+        cache = getattr(nav, "_VERIFIED_NAVIGATION", None)
+        if cache is not None:
+            cache.clear()
+        checked = []
+        original_hash = nav.file_hash
+        def counted(path):
+            checked.append(str(path))
+            return original_hash(path)
+        monkeypatch.setattr(nav, "file_hash", counted)
+        first = OntologyContext(context.path)
+        second = OntologyContext(context.path)
+&gt;       assert len(checked) == 2  # One asserted and one partial artifact, not each request.
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 4 == 2
+E        +  where 4 = len(['/private/tmp/exact-review-work/pytest-of-pedrocotovio/pytest-1/test_navigation_admission_reus0/ready/navigation.sqli...tmp/exact-review-work/pytest-of-pedrocotovio/pytest-1/test_navigation_admission_reus0/ready/partial-navigation.sqlite'])
+
+tests/explanation_postmigration_corrections_test.py:597: AssertionError</failure></testcase></testsuite></testsuites>

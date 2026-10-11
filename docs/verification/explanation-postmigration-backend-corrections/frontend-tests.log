@@ -1,0 +1,196 @@
+(node:27018) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/continuation.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ continuation pages append in order, keep earlier items and drop repeats (R06) (5.757738ms)
+✔ counts never claim completeness while more exist (R06) (0.39513ms)
+(node:27019) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/evidenceGraphModel.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a channel recorded on one side gets no comparison line; both sides get one channel-level line (U15) (9.851614ms)
+✔ node identity keeps side, ontology, kind and IRI: punned entities and shared IRIs never merge (24.480859ms)
+✔ every feature line keeps its evidence and record identity; unsupported forms are counted, not dropped (0.544583ms)
+✔ restrictions keep their quantifier; cardinalities are not shortened into another statement (0.858393ms)
+✔ many literal records are grouped behind a count and can be expanded; each record keeps its own node (0.671692ms)
+✔ the layout separates the two sides and never overlaps nodes in a column (2.265081ms)
+✔ every selected record reports where it is: drawn, grouped, no graph form or unavailable (S0-R3) (0.773425ms)
+✔ relationships sharing a target keep their own line, relation and record (S0-R1) (0.473104ms)
+✔ layout distances scale with the reader's text size (0.51171ms)
+✔ a dense side (60 features) stays in one overlap-free column (1.159387ms)
+(node:27020) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/owl.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the same attribute with different fillers keeps both qualified readings intact (2.221377ms)
+✔ mixed inheritance and onset qualifiers are neither dropped nor reordered (0.485815ms)
+✔ an unsupported constructor falls back to the original form instead of a reading (0.434774ms)
+(node:27021) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/trace.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the prefilter stage reads as Exact matching and its producer codes map one to one (21 F03) (1.968462ms)
+✔ a retained event or a selected pair is never read as an exact match (0.445963ms)
+✔ an exact route explains its intentionally skipped scoring stages once (1.42229ms)
+✔ consecutive unrecorded historical stages collapse; failures and single stages stay visible (0.383247ms)
+✔ removal by another exact match is distinct from no record (0.287266ms)
+(node:27022) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/workspace/apiSource.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ study API workspace uses case candidate evidence and session-scoped requests/cache (287.744387ms)
+✔ remote label batches stay inside the active participant scope and session (61.399246ms)
+(node:27023) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/workspace/resourceIndex.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a shared original axiom keeps a copy under every typed subject (C18) (7.32129ms)
+✔ citations to labels and hidden duplicate synonyms resolve to their exact record (C03) (6.668348ms)
+✔ an unknown record states that it is not prepared instead of inventing support (0.363355ms)
+✔ bounded study resources distinguish absent, unprepared and truncated information (C02, C18) (0.89521ms)
+✔ prepared hierarchy navigation says where its information ends (C02) (1.707736ms)
+✔ tutorial card parents carry the recorded typed parent and keep their fact identity (19 F21) (1.873709ms)
+✔ v1 publication parents are typed from the recorded edge or the AST; unknown types stay unprojected (19 F21) (1.573639ms)
+✔ evidence keeps its recorded interpretation and per-candidate scope (C04) (1.119846ms)
+✔ comparisons and profiles are scoped to the inspected pair and entity (0.501625ms)
+✔ search over a bounded resource declares its partial scope (0.632061ms)
+(node:27024) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/lib/workspace/sharedReads.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ an unusable 200 response is a failure for every consumer and is refetched next time (R08) (173.781344ms)
+✔ reset evicts validated results after a render failure of unknown cause (R08) (26.458578ms)
+✔ only possible session or policy loss is reported as suspect; cursors and outages are local (64.770459ms)
+(node:27025) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/accessGuard.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a check issued before a successful retry cannot block the retried attempt (R10) (16.652528ms)
+✔ even an uncancelled late check is bound to the attempt that issued it (2.764422ms)
+✔ a genuine loss in the current attempt still blocks; an outage does not (2.59737ms)
+✔ checks from an obsolete presentation, scope or session are ignored (2.143367ms)
+✔ cancel aborts the outstanding requests (0.588321ms)
+(node:27026) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/assessmentDrafts.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ a visible edit survives leaving the question before its save is acknowledged (S0-R2) (3.306211ms)
+✔ an older acknowledgement never replaces a newer local edit, even when it equals the saved answer (3.012005ms)
+✔ restored writes count until each settles (S0-FU-R2): saved A, queued B, latest A, reload (0.638277ms)
+✔ a terminal replay failure re-saves only what is still based on the saved answer (1.938928ms)
+✔ a conflicting same-question answer is never written automatically (S0-FU-R1) (0.55399ms)
+✔ a conflict on a multi-part answer is resolved only by the participant (144.200949ms)
+✔ editing the saved answer shown in a conflict is a deliberate new edit based on it (0.44789ms)
+✔ an edit made after the saved answer changed elsewhere is kept, not written (0.805658ms)
+✔ independent questions: a failed answer whose saved value is unchanged is re-saved, a bounded number of times (0.828707ms)
+✔ an older outbox without a recorded base never re-saves on its own (0.88905ms)
+✔ a replaced (coalesced) write only stops counting (0.681511ms)
+✔ key order does not matter (4.654486ms)
+(node:27027) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/caseReadiness.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ the recorded v2 explanation and baseline cases are accepted for their own presentation (J01) (2.658405ms)
+✔ a v2 explanation case without its descriptor is blocked, never re-routed (R01) (0.489439ms)
+✔ cross-presentation, cross-revision and malformed candidate lists are rejected (0.362774ms)
+✔ download metadata must be listed and verifiable (1.574838ms)
+✔ the recorded capabilities match their case; any mismatch is incompatible (F11) (3.718428ms)
+✔ scope status is honest: complete for the frozen filtered scope, no inference claimed (0.774848ms)
+✔ the bounded minimum is six contexts plus admitted descriptions and comparisons (F12) (2.418046ms)
+✔ terminal absence is usable; a dangling, mismatched or unknown result is not (3.024666ms)
+✔ required reads run with capped concurrency and keep their order (68.797779ms)
+✔ a 200 context missing a required collection is unusable, not absent (R08) (0.900632ms)
+✔ render expectations follow the admitted components exactly (R09) (0.458791ms)
+(node:27028) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/consultation.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ No clears every method detail and the optional scope (C13) (2.278918ms)
+✔ Yes keeps several methods and only the names of selected methods (0.434034ms)
+✔ final reports need Yes with a method or No; drafts may be incomplete (0.339421ms)
+(node:27029) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/formOrder.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ legacy v1 forms stored with sorted keys render in their declared ordinal order (C05) (79.761709ms)
+✔ a publication with fewer components keeps the declared order of those present (0.372998ms)
+✔ explicit v2 order wins over scrambled object keys and must be an exact permutation (0.861338ms)
+✔ a form with no declared order fails visibly instead of sorting labels (1.821349ms)
+(node:27032) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/mutationQueue.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ reload replays a lost acknowledgement before the newest coalesced draft (5.781574ms)
+✔ a lost acknowledgement retries the exact key, revision and body (7.912756ms)
+✔ changing invitation stops retries and ignores a late old-session acknowledgement (1.091427ms)
+✔ a conflict never rebases later edits and retains them for explicit recovery (1.452961ms)
+✔ the outbox rejects a different session and bounds persisted input (0.558161ms)
+✔ a pending submission cannot be replaced by a later draft (0.680171ms)
+✔ debounced edits are persisted immediately and complete before Pause (0.886334ms)
+✔ edits during a conflict refresh are archived without retrying against stale state (2.456265ms)
+✔ the outbox accepts the planned v2 participant routes and nothing else (F8) (0.383859ms)
+✔ a draft never coalesces across an assessment attempt or a final consultation save (1.100058ms)
+✔ restored writes settle like new ones and keep their client-only context (S0-FU-R2) (3.109056ms)
+✔ a restored write's terminal failure is observable, and unobserved ones are not unhandled (1.184791ms)
+✔ a coalesced draft is told it was replaced, not that it failed (0.359117ms)
+(node:27033) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/practice.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ fallback practice is explicitly synthetic, ordered and separate from study identities (2.031653ms)
+✔ practice completion requires intentional partial and explicit-none actions (0.27679ms)
+(node:27034) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/timing.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ submit freezes timing and a later acknowledgement cannot extend the case (5.77223ms)
+✔ consecutive observations do not overlap and preserve the ready timestamp (0.44488ms)
+✔ overnight timer suspension is an unknown gap rather than ordinary task time (1.094796ms)
+✔ a quick valid ranking retains its observed interval below 250 milliseconds (0.412144ms)
+✔ a parent stage effect preserves the same case's already usable interval (0.460612ms)
+(node:27035) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/tutorialPosition.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ restores the server's lesson, assessment landing and focused question (R03) (2.15929ms)
+✔ an unknown lesson or question never becomes a screen of its own (0.265075ms)
+✔ an acknowledgement never pulls a newer local navigation back (0.356289ms)
+(node:27036) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/tutorialProgress.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ lesson evidence names actual actions, scoped to the current lesson (C11) (2.572662ms)
+✔ the graph lesson accepts the evidence list as an equivalent (0.345753ms)
+✔ answer-control and report lessons distinguish none, insufficient, partial and No (0.283576ms)
+✔ backend requirement evidence preserves typed identities and the actual answer (1.434109ms)
+✔ selecting a comparison bridge or an expanded ontology edge completes nothing (U01) (0.346751ms)
+✔ a selected feature line reports the exact inspected record of the active candidate (0.552441ms)
+✔ a feature from another candidate's evidence set, or a record it does not link, is not evidence (0.679348ms)
+✔ the list alternative uses the record shown first; unresolved or missing records cannot satisfy it (1.390259ms)
+✔ opening a record is not opening a citation; each needs its own admitted identity (2.238712ms)
+✔ reaching the compared entity again by a child link is a return; page load and other entities are not (U03) (0.851821ms)
+✔ pending lesson evidence is bounded, never overwrites saved work and forgets rejected payloads (U02) (0.444958ms)
+(node:27037) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/v2/tutorialContent.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ practice material is synthetic and disjoint from real identities (1.494847ms)
+✔ every claim, edge and evidence item cites records that exist (0.584752ms)
+✔ comparison claims use the backend's fixed template wording (0.42645ms)
+✔ six lessons, the graph lesson optional, and the five items in the frozen order (14) (1.236412ms)
+✔ pass predicates match the programme's assessment table, independent of option position (0.69996ms)
+(node:27038) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/src/study/workspaceEvents.test.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/explanations_visualizer/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+✔ opening the Hierarchy tab is not reported as a hierarchy expansion (C16) (1.602ms)
+✔ expansion, navigation and inspection keep their own action types (1.392895ms)
+✔ a copied IRI or a search is never reported as external use (0.257067ms)
+ℹ tests 112
+ℹ suites 0
+ℹ pass 112
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1902.70351

@@ -1,0 +1,1212 @@
+{
+  "actual_descriptions": 260,
+  "boundary": "Actual HTTPS/PostgreSQL API and frozen artifacts; not rendered browser acceptance",
+  "covered_cases": [
+    "review-01",
+    "review-02",
+    "review-03",
+    "review-04",
+    "review-05",
+    "review-06",
+    "review-07",
+    "review-08",
+    "review-09",
+    "review-10",
+    "review-11",
+    "review-12",
+    "review-13",
+    "review-14",
+    "review-15",
+    "review-16",
+    "review-17",
+    "review-18",
+    "review-19",
+    "review-20",
+    "review-21",
+    "review-22",
+    "review-23",
+    "review-24"
+  ],
+  "covered_pairs": 120,
+  "hierarchy": [
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    }
+  ],
+  "http_status_counts": {
+    "200": 2400,
+    "403": 244,
+    "409": 11,
+    "422": 6
+  },
+  "journeys": [
+    {
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "elapsed_seconds": 175.147,
+      "export": null,
+      "exports": [
+        {
+          "csv_sha256": "019f59ea59de2208f5d094926a4a1ead9957f705fcb607b08d7cba1f11c490a2",
+          "json_sha256": "c7979b64df7c1859fd4cec4f89f91d3fff57ce6fb630dbfdc2fe093148cbe81e",
+          "named_methods": false,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        },
+        {
+          "csv_sha256": "580e61c7803d87fcc8f70535be0b54ed6181d2ecafe4cb57eb05fbf197fc351e",
+          "json_sha256": "0ab61c5b545ea6648034231b02f8d56c1534afb28e1e0f53ba98b88caef4991a",
+          "named_methods": true,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        }
+      ],
+      "interruptions": [
+        {
+          "declared_bytes": 43275,
+          "full_body_sha256": "5a186a50e77b4802048e0392b6c70fea3f6eca8739b766429ea34d1cff303764",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.179
+        },
+        {
+          "declared_bytes": 43275,
+          "full_body_sha256": "5a186a50e77b4802048e0392b6c70fea3f6eca8739b766429ea34d1cff303764",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.185
+        },
+        {
+          "declared_bytes": 43275,
+          "full_body_sha256": "5a186a50e77b4802048e0392b6c70fea3f6eca8739b766429ea34d1cff303764",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.179
+        }
+      ],
+      "publication_sha256": "16578bf285162d4f1c905bfef1da97fddbbee77a0509dd8c0f07714225dc6689",
+      "service_log_observation": {
+        "bytes": 0,
+        "counts": {
+          "asgi_exceptions": 0,
+          "content_length_protocol_errors": 0,
+          "h11_protocol_errors": 0
+        }
+      },
+      "status": "passed",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.006,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      },
+      "verifier_sha256": "089119667b2c675d178b0d2cb09a67d3d4285c3e6b80b4e32bc5f86f31c554eb"
+    },
+    {
+      "completed_cases": null,
+      "conditions": null,
+      "elapsed_seconds": 122.101,
+      "export": null,
+      "exports": null,
+      "interruptions": [],
+      "publication_sha256": "16578bf285162d4f1c905bfef1da97fddbbee77a0509dd8c0f07714225dc6689",
+      "service_log_observation": {
+        "bytes": 0,
+        "counts": {
+          "asgi_exceptions": 0,
+          "content_length_protocol_errors": 0,
+          "h11_protocol_errors": 0
+        }
+      },
+      "status": "allocation_only",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.01,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      },
+      "verifier_sha256": "089119667b2c675d178b0d2cb09a67d3d4285c3e6b80b4e32bc5f86f31c554eb"
+    },
+    {
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "elapsed_seconds": 174.993,
+      "export": null,
+      "exports": [
+        {
+          "csv_sha256": "ab7c5b7bec3e0cff040d4a0668b75df92fd7921d55684077a30f7f2cddd3553a",
+          "json_sha256": "77683c0cc0b7d364a2faeae5d8a487be399e0fc8bd7661ee9e1b1ce474b60f22",
+          "named_methods": false,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        },
+        {
+          "csv_sha256": "ea2aa79a39326c8c0a371fba78f4f27be75bdbbc516719aa76e491479d960f7c",
+          "json_sha256": "b4647e90ca60fa619b7848a395f229028ec6d35e45bee26c2489a1def93b6c9e",
+          "named_methods": true,
+          "tables": [
+            "cases.csv",
+            "consultation_drafts.csv",
+            "data-dictionary.json",
+            "events.csv",
+            "manifest.json",
+            "method_responses.csv",
+            "questionnaires.csv",
+            "sessions.csv",
+            "summary.csv",
+            "timing_segments.csv",
+            "tutorial_attempts.csv",
+            "tutorial_outcomes.csv"
+          ]
+        }
+      ],
+      "interruptions": [
+        {
+          "declared_bytes": 52555,
+          "full_body_sha256": "7593094d195939f8e7c062cc301b7c5b64333ac7afcd19ddfef0b18a4b3b2fbc",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.173
+        },
+        {
+          "declared_bytes": 52555,
+          "full_body_sha256": "7593094d195939f8e7c062cc301b7c5b64333ac7afcd19ddfef0b18a4b3b2fbc",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.171
+        },
+        {
+          "declared_bytes": 52555,
+          "full_body_sha256": "7593094d195939f8e7c062cc301b7c5b64333ac7afcd19ddfef0b18a4b3b2fbc",
+          "limitation": "Client closed the response early; this does not prove server-side cancellation or browser reload behavior",
+          "received_first_chunk_bytes": 128,
+          "scenario": "authenticated_workspace_response_closed_after_first_128_bytes",
+          "seconds": 0.172
+        }
+      ],
+      "publication_sha256": "16578bf285162d4f1c905bfef1da97fddbbee77a0509dd8c0f07714225dc6689",
+      "service_log_observation": {
+        "bytes": 0,
+        "counts": {
+          "asgi_exceptions": 0,
+          "content_length_protocol_errors": 0,
+          "h11_protocol_errors": 0
+        }
+      },
+      "status": "passed",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.007,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      },
+      "verifier_sha256": "089119667b2c675d178b0d2cb09a67d3d4285c3e6b80b4e32bc5f86f31c554eb"
+    }
+  ],
+  "limitation": "Automated API test sessions; no rendered browser acceptance, human engagement or browser reload causation claim.",
+  "navigation_performance_comparison": {
+    "after_median_seconds": 0.036,
+    "after_requests": 36,
+    "before_median_seconds": 1.289,
+    "before_requests": 9,
+    "limitation": "Same operation on the same immutable data, different test session/process and cache state; diagnostic timings, not a controlled benchmark"
+  },
+  "per_operation_latency": {
+    "actual_elapsed_timing": {
+      "maximum_seconds": 0.055,
+      "median_seconds": 0.042,
+      "requests": 57,
+      "total_seconds": 2.401
+    },
+    "allocated_schedule_probe": {
+      "maximum_seconds": 0.04,
+      "median_seconds": 0.04,
+      "requests": 3,
+      "total_seconds": 0.101
+    },
+    "baseline_pair_metadata_denied": {
+      "maximum_seconds": 0.052,
+      "median_seconds": 0.02,
+      "requests": 120,
+      "total_seconds": 2.52
+    },
+    "baseline_partial_entry-points_denied": {
+      "maximum_seconds": 0.022,
+      "median_seconds": 0.02,
+      "requests": 24,
+      "total_seconds": 0.493
+    },
+    "baseline_partial_equivalents_denied": {
+      "maximum_seconds": 0.022,
+      "median_seconds": 0.021,
+      "requests": 24,
+      "total_seconds": 0.499
+    },
+    "baseline_partial_hierarchy_denied": {
+      "maximum_seconds": 0.022,
+      "median_seconds": 0.021,
+      "requests": 24,
+      "total_seconds": 0.489
+    },
+    "baseline_workspace_denied": {
+      "maximum_seconds": 0.021,
+      "median_seconds": 0.02,
+      "requests": 24,
+      "total_seconds": 0.481
+    },
+    "bounded_partial_ancestor_graph": {
+      "maximum_seconds": 0.04,
+      "median_seconds": 0.038,
+      "requests": 4,
+      "total_seconds": 0.149
+    },
+    "case_usable_observation": {
+      "maximum_seconds": 0.067,
+      "median_seconds": 0.042,
+      "requests": 48,
+      "total_seconds": 2.063
+    },
+    "cross_basis_cursor_denied": {
+      "maximum_seconds": 0.034,
+      "median_seconds": 0.031,
+      "requests": 8,
+      "total_seconds": 0.251
+    },
+    "current_case": {
+      "maximum_seconds": 0.042,
+      "median_seconds": 0.026,
+      "requests": 48,
+      "total_seconds": 1.284
+    },
+    "current_explanation_resource": {
+      "maximum_seconds": 0.056,
+      "median_seconds": 0.043,
+      "requests": 24,
+      "total_seconds": 1.037
+    },
+    "default_export": {
+      "maximum_seconds": 0.085,
+      "median_seconds": 0.069,
+      "requests": 2,
+      "total_seconds": 0.138
+    },
+    "entity_context_full": {
+      "maximum_seconds": 0.095,
+      "median_seconds": 0.078,
+      "requests": 24,
+      "total_seconds": 1.895
+    },
+    "entity_facts_page": {
+      "maximum_seconds": 0.038,
+      "median_seconds": 0.034,
+      "requests": 24,
+      "total_seconds": 0.814
+    },
+    "entry_points_page1": {
+      "maximum_seconds": 0.06,
+      "median_seconds": 0.036,
+      "requests": 48,
+      "total_seconds": 1.785
+    },
+    "entry_points_page2": {
+      "maximum_seconds": 0.042,
+      "median_seconds": 0.036,
+      "requests": 48,
+      "total_seconds": 1.742
+    },
+    "foreign_candidate_metadata_denied": {
+      "maximum_seconds": 0.063,
+      "median_seconds": 0.034,
+      "requests": 24,
+      "total_seconds": 0.828
+    },
+    "foreign_partial_scope_denied": {
+      "maximum_seconds": 0.019,
+      "median_seconds": 0.019,
+      "requests": 4,
+      "total_seconds": 0.075
+    },
+    "frozen_combined_resource": {
+      "maximum_seconds": 0.056,
+      "median_seconds": 0.047,
+      "requests": 24,
+      "total_seconds": 1.118
+    },
+    "frozen_tutorial_resource": {
+      "maximum_seconds": 0.036,
+      "median_seconds": 0.033,
+      "requests": 3,
+      "total_seconds": 0.1
+    },
+    "immutable_csv_export": {
+      "maximum_seconds": 0.052,
+      "median_seconds": 0.042,
+      "requests": 4,
+      "total_seconds": 0.167
+    },
+    "immutable_json_export": {
+      "maximum_seconds": 0.06,
+      "median_seconds": 0.048,
+      "requests": 4,
+      "total_seconds": 0.188
+    },
+    "legacy_client_refused": {
+      "maximum_seconds": 0.023,
+      "median_seconds": 0.021,
+      "requests": 3,
+      "total_seconds": 0.063
+    },
+    "main_bound_description": {
+      "maximum_seconds": 0.195,
+      "median_seconds": 0.05,
+      "requests": 264,
+      "total_seconds": 14.937
+    },
+    "main_evidence_continuation": {
+      "maximum_seconds": 0.069,
+      "median_seconds": 0.04,
+      "requests": 260,
+      "total_seconds": 10.56
+    },
+    "main_hierarchy_continuation": {
+      "maximum_seconds": 0.008,
+      "median_seconds": 0.005,
+      "requests": 60,
+      "total_seconds": 0.335
+    },
+    "main_pair_metadata": {
+      "maximum_seconds": 0.083,
+      "median_seconds": 0.041,
+      "requests": 120,
+      "total_seconds": 4.934
+    },
+    "main_partial_entry": {
+      "maximum_seconds": 0.009,
+      "median_seconds": 0.007,
+      "requests": 4,
+      "total_seconds": 0.028
+    },
+    "main_partial_equivalents": {
+      "maximum_seconds": 0.006,
+      "median_seconds": 0.006,
+      "requests": 4,
+      "total_seconds": 0.024
+    },
+    "main_useful_basis_difference": {
+      "maximum_seconds": 0.008,
+      "median_seconds": 0.005,
+      "requests": 36,
+      "total_seconds": 0.208
+    },
+    "mutation:cases": {
+      "maximum_seconds": 0.062,
+      "median_seconds": 0.03,
+      "requests": 144,
+      "total_seconds": 4.443
+    },
+    "mutation:complete": {
+      "maximum_seconds": 0.031,
+      "median_seconds": 0.031,
+      "requests": 2,
+      "total_seconds": 0.062
+    },
+    "mutation:consent": {
+      "maximum_seconds": 0.033,
+      "median_seconds": 0.032,
+      "requests": 3,
+      "total_seconds": 0.097
+    },
+    "mutation:questionnaires": {
+      "maximum_seconds": 0.03,
+      "median_seconds": 0.029,
+      "requests": 5,
+      "total_seconds": 0.145
+    },
+    "mutation:setup": {
+      "maximum_seconds": 1.716,
+      "median_seconds": 1.656,
+      "requests": 3,
+      "total_seconds": 5.01
+    },
+    "mutation:tutorial": {
+      "maximum_seconds": 0.096,
+      "median_seconds": 0.029,
+      "requests": 51,
+      "total_seconds": 1.928
+    },
+    "negotiated_session": {
+      "maximum_seconds": 0.027,
+      "median_seconds": 0.024,
+      "requests": 3,
+      "total_seconds": 0.073
+    },
+    "original_axiom": {
+      "maximum_seconds": 0.039,
+      "median_seconds": 0.036,
+      "requests": 24,
+      "total_seconds": 0.853
+    },
+    "original_fact": {
+      "maximum_seconds": 0.061,
+      "median_seconds": 0.035,
+      "requests": 24,
+      "total_seconds": 0.856
+    },
+    "partial_empty_unknown": {
+      "maximum_seconds": 0.037,
+      "median_seconds": 0.036,
+      "requests": 4,
+      "total_seconds": 0.142
+    },
+    "post_interrupt_full_body": {
+      "maximum_seconds": 0.081,
+      "median_seconds": 0.077,
+      "requests": 6,
+      "total_seconds": 0.465
+    },
+    "post_interrupt_state": {
+      "maximum_seconds": 0.025,
+      "median_seconds": 0.022,
+      "requests": 6,
+      "total_seconds": 0.137
+    },
+    "prepared_explanation_full": {
+      "maximum_seconds": 0.042,
+      "median_seconds": 0.035,
+      "requests": 48,
+      "total_seconds": 1.686
+    },
+    "prepared_explanations_page": {
+      "maximum_seconds": 0.036,
+      "median_seconds": 0.033,
+      "requests": 24,
+      "total_seconds": 0.794
+    },
+    "public_exploration_catalogue": {
+      "maximum_seconds": 0.008,
+      "median_seconds": 0.008,
+      "requests": 3,
+      "total_seconds": 0.024
+    },
+    "repeat_csv_export": {
+      "maximum_seconds": 0.053,
+      "median_seconds": 0.042,
+      "requests": 4,
+      "total_seconds": 0.169
+    },
+    "restricted_export": {
+      "maximum_seconds": 0.088,
+      "median_seconds": 0.07,
+      "requests": 2,
+      "total_seconds": 0.141
+    },
+    "scoped_bound_description": {
+      "maximum_seconds": 0.07,
+      "median_seconds": 0.034,
+      "requests": 264,
+      "total_seconds": 9.182
+    },
+    "scoped_description_inventory": {
+      "maximum_seconds": 0.109,
+      "median_seconds": 0.034,
+      "requests": 144,
+      "total_seconds": 5.023
+    },
+    "scoped_evidence_continuation": {
+      "maximum_seconds": 0.06,
+      "median_seconds": 0.043,
+      "requests": 260,
+      "total_seconds": 11.085
+    },
+    "scoped_hierarchy_continuation": {
+      "maximum_seconds": 0.04,
+      "median_seconds": 0.035,
+      "requests": 60,
+      "total_seconds": 2.095
+    },
+    "scoped_partial_entry": {
+      "maximum_seconds": 0.043,
+      "median_seconds": 0.037,
+      "requests": 4,
+      "total_seconds": 0.15
+    },
+    "scoped_partial_equivalents": {
+      "maximum_seconds": 0.038,
+      "median_seconds": 0.034,
+      "requests": 4,
+      "total_seconds": 0.139
+    },
+    "scoped_recorded_bridges": {
+      "maximum_seconds": 0.134,
+      "median_seconds": 0.081,
+      "requests": 120,
+      "total_seconds": 9.697
+    },
+    "scoped_useful_basis_difference": {
+      "maximum_seconds": 0.071,
+      "median_seconds": 0.036,
+      "requests": 36,
+      "total_seconds": 1.341
+    },
+    "served_participation_page": {
+      "maximum_seconds": 0.009,
+      "median_seconds": 0.008,
+      "requests": 3,
+      "total_seconds": 0.024
+    },
+    "state_after_tutorial_rejection": {
+      "maximum_seconds": 0.024,
+      "median_seconds": 0.023,
+      "requests": 6,
+      "total_seconds": 0.137
+    },
+    "study_ready": {
+      "maximum_seconds": 0.021,
+      "median_seconds": 0.016,
+      "requests": 3,
+      "total_seconds": 0.052
+    },
+    "test_invitation": {
+      "maximum_seconds": 0.024,
+      "median_seconds": 0.022,
+      "requests": 3,
+      "total_seconds": 0.067
+    },
+    "tutorial_rejection:omitted_entity_kind": {
+      "maximum_seconds": 0.003,
+      "median_seconds": 0.003,
+      "requests": 3,
+      "total_seconds": 0.009
+    },
+    "tutorial_rejection:unadmitted_fact": {
+      "maximum_seconds": 0.054,
+      "median_seconds": 0.05,
+      "requests": 3,
+      "total_seconds": 0.153
+    },
+    "workspace_capabilities": {
+      "maximum_seconds": 0.039,
+      "median_seconds": 0.036,
+      "requests": 24,
+      "total_seconds": 0.861
+    }
+  },
+  "raw_receipts": [
+    {
+      "bytes": 334212,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/journey-1.json",
+      "sha256": "ac7bfbe7027a57b1cbda55676b6758f4d41b2f880844316d0661f854193164e6"
+    },
+    {
+      "bytes": 10609,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/journey-2.json",
+      "sha256": "8ba7bb30d1beec99cb4232bb32fbd3731e1d7ff528f5cf9a5300e8e84ef33547"
+    },
+    {
+      "bytes": 334196,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/journey-3.json",
+      "sha256": "a31a5b22ae2f017af69324128af1d3760e68f9bdb5d9311f45bbeeca34a44069"
+    },
+    {
+      "bytes": 468391,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/static.json",
+      "sha256": "339b4f28480b649fa6d35bd7ab28710e5c809d079a1fefaa5363ed06e35f099a"
+    },
+    {
+      "bytes": 125,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/total-runtime.json",
+      "sha256": "8833f5b10b4c46a6df1bc4b7fae8f197445ed3d5219cfbb35576a0dc7eb13c1f"
+    },
+    {
+      "bytes": 512486,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/verification.json",
+      "sha256": "5dbceb67094e825ac931893d80f9a234cb719bc56d9410cf276fd0b238aaec46"
+    }
+  ],
+  "request_count": 2661,
+  "schema": "exact-postmigration-api-summary/1",
+  "status": "passed",
+  "useful_basis_examples": [
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:f92770a4c7683bb825449ba31a56a73b8b211bf3ca298775414511d86330fa10",
+        "value": "malignant fibrous histiocytoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3352",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:0b53d387c6d75be3bbaf85e64ca7ed739c9fe0f1e3e059e98ce2561bae47aa23",
+        "value": "liposarcoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3381",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:c67e71283e517f8f93a2d1d89ddbcce88c08d9b13a09a8d22bfe7dbf2066a40e",
+        "value": "mediastinal osteogenic sarcoma"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_6208",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347",
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385",
+      "child_label": {
+        "fact_id": "sha256:4490268e8af7871c2f55d434aae3e7e32e647ecf3bdb1fbd424a8e9370f2f5e0",
+        "value": "Renal Cell Carcinoma Associated with Neuroblastoma"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100051",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:9bf2fe9caa23b79ad9719c54aab411ac4da095f2e51458fb8e18dbba9b4b1621",
+        "value": "Renal Cell Carcinoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977",
+      "child_label": {
+        "fact_id": "sha256:0c62cc6fc58556edd4bf6c84941babf1fee95535cf37ae30184967d2aed81e55",
+        "value": "Conjunctival Melanocytic Intraepithelial Lesion"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100054",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:3000035965680bdb2cc40e3f57fa82ec3c7c4c4d6a8663d6f7d2fafd4a4f6561",
+        "value": "Conjunctival Melanocytic Neoplasm"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+      "child_label": {
+        "fact_id": "sha256:c4c9d3aa6b240ed70c3438bd9dbffc15bcd55c5af2cdb9ac06b8a81786eb39d4",
+        "value": "Central Nervous System Nongerminomatous Germ Cell Tumor"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100093",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:22766d990101d03eb64dcbac4a8bb72b6ffff4c8e2a85e82289fc2ce8fb935e8",
+        "value": "Nongerminomatous Germ Cell Tumor"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:f92770a4c7683bb825449ba31a56a73b8b211bf3ca298775414511d86330fa10",
+        "value": "malignant fibrous histiocytoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3352",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:0b53d387c6d75be3bbaf85e64ca7ed739c9fe0f1e3e059e98ce2561bae47aa23",
+        "value": "liposarcoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3381",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:c67e71283e517f8f93a2d1d89ddbcce88c08d9b13a09a8d22bfe7dbf2066a40e",
+        "value": "mediastinal osteogenic sarcoma"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_6208",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347",
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385",
+      "child_label": {
+        "fact_id": "sha256:4490268e8af7871c2f55d434aae3e7e32e647ecf3bdb1fbd424a8e9370f2f5e0",
+        "value": "Renal Cell Carcinoma Associated with Neuroblastoma"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100051",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:9bf2fe9caa23b79ad9719c54aab411ac4da095f2e51458fb8e18dbba9b4b1621",
+        "value": "Renal Cell Carcinoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977",
+      "child_label": {
+        "fact_id": "sha256:0c62cc6fc58556edd4bf6c84941babf1fee95535cf37ae30184967d2aed81e55",
+        "value": "Conjunctival Melanocytic Intraepithelial Lesion"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100054",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:3000035965680bdb2cc40e3f57fa82ec3c7c4c4d6a8663d6f7d2fafd4a4f6561",
+        "value": "Conjunctival Melanocytic Neoplasm"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+      "child_label": {
+        "fact_id": "sha256:c4c9d3aa6b240ed70c3438bd9dbffc15bcd55c5af2cdb9ac06b8a81786eb39d4",
+        "value": "Central Nervous System Nongerminomatous Germ Cell Tumor"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100093",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:22766d990101d03eb64dcbac4a8bb72b6ffff4c8e2a85e82289fc2ce8fb935e8",
+        "value": "Nongerminomatous Germ Cell Tumor"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ]
+      }
+    }
+  ]
+}

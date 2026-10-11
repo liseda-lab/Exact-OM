@@ -1,0 +1,2033 @@
+{
+  "approved_claims_preserved": 68,
+  "former_served_fallbacks": [
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:0016683175cb6324a029aa4d1021ec79f0c2f092e0e956a9f1ed8e730932039a",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:92886b600a4b93f8ee0c288a4a6a5bf9d7d7739826a9eeaa1eb86070524b2498",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C118436",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0090001",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "paired_context",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:02b63003c124b06e8f293873d468b498534399a17a21b3dfe4e59605432b83e8",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:ad304aeff878aa33317d4abc904f24b1695ad07fc646a85a6007814bc4efc782",
+      "task": "pair_comparison"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:0f6e4f29bea30185dd25d457b4655e4afc0df30f6492e158e9ab4311045aaa1b",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:77920aee6ce0c53ffcadcdc7145cb851ede817d2701422e380e6c30f5cb345c0",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:13c9cd63c5216456e800a4401fe7152e8a579078c18f1fdd7bfc00c6ada5ae33",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:57d814c853b193b1bc2b6b39daf07f9dd7d50589e9be33250d878a8c20e0966b",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_205",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:284bd00fb1b1511ca5ff41e4dadb4e0cbfd179ca2e181d6184d6988a9a3f5c2e",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:171289f2b37f55dd5a4bd7bf80af1dbb2e39236abe0556bd77ce6e406959ee8d",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:299c942429fc7a19dd4fcdd31666f8a3b2ee4c118148f96dbfdbeed779f2aee7",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:c178f03f044bef21b1d65349fedbbe0169865148b758585bbe9e5a8500a16870",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:323e8e500968fce4b6e3c56bbe9d803909d0e3292ad5f5c5319349184793be3f",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:ba485f53a059a2b4c4ab35f7b2e107eada00974538376b514568c5106bc8386a",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:46a3aa9b85a282f1ff74dac980604d12c3ab25bce01b12efbe0b532fb292a484",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:6f8ccf144b6cf57d653991cfa3ad2d71196bc214dad5ec91226b499933b933ee",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0081334",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:4d5d39839d2029eaa4fe9dd40af26e4d68ad590ca137ce5a7100833400dbc565",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:43bfb8b7589545adef68662bef1cab21999a45ccbc8be809110cc80735f1a238",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0060731",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:57f914378f9eae13eb17bc8db1d5076e5cc9074c36c2357328bd2a135b9f71ef",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:1f79c8a14bb8fd341c58c8d79297f2ddee8de1f775f56961166434a067e0d63b",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121565",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0081332",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "paired_context",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:58b9ffe2c541a9e39c5da89ab8412dbafaf27fa083ade4e7ac33690e7bbf8a58",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:24a70aee18090fee53cf43396723bc729547b45a305ba75d0a0fa3f054c534ac",
+      "task": "pair_comparison"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:5f5759bc53a457ef44ef21cfbcb8720e7fdca6a04f9707aec67a0649c5cd40ff",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:c8e8503806992165c3f7f36f918307ffb413d0084cb49f968a3fb05ea0100454",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:76471c6848d9d03bfe46feb2ab20e7f08428a2fc8802c4838a5f1eddb4252db7",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:cd5a2993de5c3abafd0fc4751b035ba9d7cd00433dad72fddee906878c2b01c4",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:8fa8c9e6e8ed114986910ca0872c6b573667bdf5aa0f7a3a0d33e73fa2bc1a7a",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:99fdfbb08830647788c25733bc9920803abfab2d346762c968bce06d826f74a4",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121565",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:a2dcc62150538470962c1097d26219943e5d0ede13839069b9c987a3364e8a2f",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:ef8deffcd7058bf19bd423401a1489ff6a80ab1e1b46e340dd82f845307fca76",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C110923",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "source_only_profile",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:bee192ae09d1c92de7655cdfd1264046dc413c0f4060ddd7cfed0c9211137136",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:2aedef70ea1c8b5a4634bd5d5fb6afa39453c2553717118e79d05279cf5a85df",
+      "task": "pair_comparison"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:c09be6d5e61281189197f18299078044c57a9b47e10fbd2b93dd177dda137342",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:1d09bbf14ee4ab0a9ed0420478c0d4b9865daa04fef5e1a1801234f30375200f",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0112188",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:c5410879df21783308fd3e5d779e1c0a781de9cbf153653993cd87588407bb82",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:53e367e06462183505ee7ba9ee4a7a5148e53d2e1423efccd86146ddf65b7745",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:d9c25896d5f3f23dcb5dd4b217b5b2d9f8c7783d9cf77372565a0983b4b07af7",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:c36585b249b8f560721a41618914f1986562c0c4e9d48a9e791f63d436a84545",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:ebb2ef5ad93f1867a785f007675279105329cec9956f6abd733739b6745060c1",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:8849107a0d149e92d3321d49bf1ce5a6d59d94819995e1cc222a77721b2aee38",
+      "task": "entity_profile"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116794",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0050678",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "paired_context",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:f33e52dde10064c3d550156b7c042d02ae04ee69fe2f64f97ac6f06248193015",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:3752eea4459d236fbc6fd8e0ec4408bd37e5877265c29807e0daa9babc9565b0",
+      "task": "pair_comparison"
+    },
+    {
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_4337",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "new_presentation": "necessary_conditions",
+      "new_support_status": "typed_template_support",
+      "old_support_status": "fallback",
+      "previous_explanation_id": "sha256:fdbd3e0ece01113f9cf70bb9607ed9ec9a519e175f35fbf1d93cbcf458cf7c1b",
+      "provider_approval": "not_added; saved provider outcome unchanged",
+      "replacement": "sha256:0b6082f5cf8be3183d0b5d848f88c0974fd67aed8dfdc842f1dc850ce8ed6554",
+      "task": "entity_profile"
+    }
+  ],
+  "limits": [
+    "12 typed no-definition summaries are not new provider-approved prose",
+    "three sparse-source examples remain missing",
+    "zero-evidence pairs do not satisfy source-stratum quota"
+  ],
+  "missing_coverage": {
+    "absent_or_asymmetric_definitions": 0,
+    "close_alternatives": 0,
+    "multiple_parents": 0,
+    "restrictions_or_equivalences": 0,
+    "rich_definitions": 0,
+    "sparse_evidence": 3
+  },
+  "no_definition_profiles": [
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:4e9aba6632855cfbf49ec2888705207ac691900123ed6238da19228acea018bd",
+          "fact_ids": [
+            "sha256:25b277fa57bd7511c3b1eb7f08162dd639792fccc540cb935092a8b1453e6819",
+            "sha256:f6e73b2903e3c85d9f213de1f87150a7018479b7ab500ee664798fc82d7416a6"
+          ],
+          "text": "Every instance has this necessary condition: \u201csmall intestine benign neoplasm\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:1d09bbf14ee4ab0a9ed0420478c0d4b9865daa04fef5e1a1801234f30375200f",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:4e9aba6632855cfbf49ec2888705207ac691900123ed6238da19228acea018bd": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:0e31b5340c25a863b38af24119d5fbbaff0e6e1b00b5cf0f28dc6c3c227f86a6",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:0e31b5340c25a863b38af24119d5fbbaff0e6e1b00b5cf0f28dc6c3c227f86a6",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:472bbca3ff317c874cb3d63849e658b0764be74ab0629915e1a550ab10edaa55",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "jejunal neoplasm",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f6e73b2903e3c85d9f213de1f87150a7018479b7ab500ee664798fc82d7416a6",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f6e73b2903e3c85d9f213de1f87150a7018479b7ab500ee664798fc82d7416a6",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:be848c634d32b6d2b8460e4b987767a44e09f6fd77185504476acfa33eb5d446",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_7505",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "small intestine benign neoplasm",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:4d1030ea75a5e0bfb18e18ce30ae64716902188ab532c5d78659de2b866f12ac",
+          "fact_ids": [
+            "sha256:4ec07a1140e8db8efef933a2022e567cf2759496753171db7fa7fc7a45a59bba",
+            "sha256:ff4f0a52177fe4e26b4c80fcaf03b2f2efde6bd8d2eb3c7bc26fd204dc5db144"
+          ],
+          "text": "Every instance has this necessary condition: \u201cretinal disease\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:57d814c853b193b1bc2b6b39daf07f9dd7d50589e9be33250d878a8c20e0966b",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:4d1030ea75a5e0bfb18e18ce30ae64716902188ab532c5d78659de2b866f12ac": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:734136d9a71b03cfbd9a1022cfec53e091a7ff2d1b3db97ff4cdb8e9fa910c9b",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:734136d9a71b03cfbd9a1022cfec53e091a7ff2d1b3db97ff4cdb8e9fa910c9b",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:6938fecd7b542d3ebc2efa2389002a75eff9113985411d0b95d9873326cb69d7",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0080160",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "Cytomegalovirus retinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:7fc3508e3bbf83cc22b0944008f4f413ee84c61ae2c25277e4024f5bc92faba4",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:7fc3508e3bbf83cc22b0944008f4f413ee84c61ae2c25277e4024f5bc92faba4",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:da11e62fde4490db6d33eadff93015cbbf6d453203e695c0bf8bb914b21e8f2b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_11316",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "histoplasmosis retinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:eaddd8b9b85e3c827308aa6e994bc55c407a3d778044f6607074e5f7e4ca4ac9",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:eaddd8b9b85e3c827308aa6e994bc55c407a3d778044f6607074e5f7e4ca4ac9",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:84ba96ed9582f9f583d6a52cd813dc435fa9871bc8cf39e8d7d63ef4d269a792",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3611",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "acute retinal necrosis syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:67e1ccef334c7e2edc2d37bd936f61daf48db24079cdfb41caa5fc3a9af7d28a",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:67e1ccef334c7e2edc2d37bd936f61daf48db24079cdfb41caa5fc3a9af7d28a",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:a6c3d6ccb9e9e4d8221e1ec795f34d78f163787505adb71a40a50062a6d9960f",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "retinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:ff4f0a52177fe4e26b4c80fcaf03b2f2efde6bd8d2eb3c7bc26fd204dc5db144",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:ff4f0a52177fe4e26b4c80fcaf03b2f2efde6bd8d2eb3c7bc26fd204dc5db144",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:0736b3ab9e78f3b02d6f92acc0b1f21c04fd7e3d9cea52d3caefbdb77f2ea4b4",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5679",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "retinal disease",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:d603ae4e9f606330ca9cbea52a9f0b59da6310587389e3f9f779c22fe8bacf0a",
+          "fact_ids": [
+            "sha256:4cab91d2f9949f2f5afb10be397b8a32c9aacffe549ba4af6d8fbfb35823f5c9",
+            "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5"
+          ],
+          "text": "Every instance has this necessary condition: \u201cfocal epilepsy\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:6f8ccf144b6cf57d653991cfa3ad2d71196bc214dad5ec91226b499933b933ee",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:d603ae4e9f606330ca9cbea52a9f0b59da6310587389e3f9f779c22fe8bacf0a": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:ec11cb514133fdbd1ff0a45e62c19c9851d32fbf9e7ce51c36b5560f05feb9a4",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_2234",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "focal epilepsy",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:fe319df7e55cf4650dff677b41673e3ab4c3fc0024164a8510198cfab314bce2",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:fe319df7e55cf4650dff677b41673e3ab4c3fc0024164a8510198cfab314bce2",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:be8ad476a58c478ea266df2c8ae4f05ae3a299b4316c6415a0a620905204544f",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "simple partial epilepsy",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:b1039982c91ce407c153b1e1e6d5eb88960c42e937fc2ec509eaf39b74fb4063",
+          "fact_ids": [
+            "sha256:2f9741d93da0e474200a29e21e6d835b9cad3571d2d5eb7fdabd34602a4f2dfc",
+            "sha256:0037b77ee18cca6aa9ef5247d0aa8561f1efc19515cc0ac4dffbf788da90645c"
+          ],
+          "text": "Every instance has this necessary condition: \u201csmall intestine cancer\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:77920aee6ce0c53ffcadcdc7145cb851ede817d2701422e380e6c30f5cb345c0",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:b1039982c91ce407c153b1e1e6d5eb88960c42e937fc2ec509eaf39b74fb4063": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:e53d2241798a931319300f3d92499e1e6da71d59db32c44e91d2cb5106668d0b",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:e53d2241798a931319300f3d92499e1e6da71d59db32c44e91d2cb5106668d0b",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:86262d11fe07ca4484197139e8ceb5bda0ed7f22ad609f8c0c066669e2efee4b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050926",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "jejunal adenocarcinoma",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:0037b77ee18cca6aa9ef5247d0aa8561f1efc19515cc0ac4dffbf788da90645c",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:0037b77ee18cca6aa9ef5247d0aa8561f1efc19515cc0ac4dffbf788da90645c",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:cf76b92aec428836526df9d07fe05cb6a04fd1a46028d6effc0ddc608066f365",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_10154",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "small intestine cancer",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:be4c752109aeddd40221a05202b77de4e8534d246a20b87e700501756a9545b3",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:be4c752109aeddd40221a05202b77de4e8534d246a20b87e700501756a9545b3",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:129a11b881281f4157b513c14816466cbc236bfe19d21615f061f14bb9610934",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "jejunal cancer",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:8b34948c7f2b104b02a36ffc68a57ce8c2ea0bdda76f5777f20d42ac3733146e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:8b34948c7f2b104b02a36ffc68a57ce8c2ea0bdda76f5777f20d42ac3733146e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c7159b915f1332bce5e917ed3839e505a3ed4b220b0811e7b7c19346871d2945",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_162",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "cancer",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:1f068679a20197c46654d0d1a1613cded2e931d2aa720fd8988a2ea1cc3a138b",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:1f068679a20197c46654d0d1a1613cded2e931d2aa720fd8988a2ea1cc3a138b",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:5ba6a9502709d196b46f250a6f725c8df161e9cd599c0e7f8a37e67918b6c8ab",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3216",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "jejunal somatostatinoma",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:468d335ca96d5a87c0d6509b8e454fc4c56e1c65f6cca63867eec5be08eb93c9",
+          "fact_ids": [
+            "sha256:889694f4e1619e0b2fe6c97af220948d5b484011101e9db3314c75fe03be333f",
+            "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e"
+          ],
+          "text": "Every instance has this necessary condition: \u201cchorioretinitis\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:8849107a0d149e92d3321d49bf1ce5a6d59d94819995e1cc222a77721b2aee38",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:468d335ca96d5a87c0d6509b8e454fc4c56e1c65f6cca63867eec5be08eb93c9": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:9ffbb7de62d5f6cf1d13099676993a26a5dcce48d4a6db2517275af5280dd13e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:9ffbb7de62d5f6cf1d13099676993a26a5dcce48d4a6db2517275af5280dd13e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:d8e1293c86b949c22f07acbf38268b3023f202c7930e35b71c35e00f45b72046",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "disseminated chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:86fffe0c0598bf294fc6a40c157d04ef83230c230031a0acc61946cc87f621e9",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "chorioretinitis",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:e00a80e7b36130f40246d6e332d11d03d644ff74d410abf203e9091a233dc7f2",
+          "fact_ids": [
+            "sha256:698b2dd5c46603b6fd8c8311ec383c4708b19437e4f18f94cdf9e6a8ef5cb97a",
+            "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e"
+          ],
+          "text": "Every instance has this necessary condition: \u201cchorioretinitis\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:92886b600a4b93f8ee0c288a4a6a5bf9d7d7739826a9eeaa1eb86070524b2498",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:e00a80e7b36130f40246d6e332d11d03d644ff74d410abf203e9091a233dc7f2": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:cb915dda7015b4185edae5089d28bbbc7d050553b5375164b9f409d31bd5f7a4",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:cb915dda7015b4185edae5089d28bbbc7d050553b5375164b9f409d31bd5f7a4",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:517a6f6d390c655b1677455b2bb1b4e334e40005ce13c64396139c09df64f7a0",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "peripheral focal chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c7dc331bae0df47c3db6799eeedc6ddbdba7e026ced61407ea19e16d1f2e2a9d",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "focal chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:86fffe0c0598bf294fc6a40c157d04ef83230c230031a0acc61946cc87f621e9",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "chorioretinitis",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:1862f8620c8470e54709086cb75dc8ccc62352bf609288a15911986d2c1e4c35",
+          "fact_ids": [
+            "sha256:52edccdc82aa91cd945fc11eeb8e43c5ca1cf2dc0babf34004cd7f476f392b70",
+            "sha256:7d4036db3a3ede4170402e23bea82a97da6bbd462b1884bef62dc4471e9042da"
+          ],
+          "text": "Every instance has this necessary condition: \u201cskin disease\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:99fdfbb08830647788c25733bc9920803abfab2d346762c968bce06d826f74a4",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:1862f8620c8470e54709086cb75dc8ccc62352bf609288a15911986d2c1e4c35": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:e47b31d96ceaf75b91981ca0c0dc7a4b7a68618e7a974b79b29d21c7fdf13b4e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:e47b31d96ceaf75b91981ca0c0dc7a4b7a68618e7a974b79b29d21c7fdf13b4e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:8f96b7f69640ffaed0b67fa38464cd7ffce913b933017fd64505c1e1e3d55986",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "scalp dermatosis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:7d4036db3a3ede4170402e23bea82a97da6bbd462b1884bef62dc4471e9042da",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:7d4036db3a3ede4170402e23bea82a97da6bbd462b1884bef62dc4471e9042da",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:6f77ad3bdf6f11b90957ae9c5b280801b82b6fe529b01d748a4a63a261ef013f",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_37",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "skin disease",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:8dab208686570bb59afcfd609fb5490634cca72f877b2c2fc1b8d5681194e213",
+          "fact_ids": [
+            "sha256:085f61a56a5957cbcd96c04e09d3bb771a1c5c341b1dd8eaaf4e0cfd1a260959",
+            "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59"
+          ],
+          "text": "Every instance has this necessary condition: \u201cpleural cancer\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:ba485f53a059a2b4c4ab35f7b2e107eada00974538376b514568c5106bc8386a",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:8dab208686570bb59afcfd609fb5490634cca72f877b2c2fc1b8d5681194e213": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:e8f6ec7a8a2b92c33dcf158140bde14b904d194d60199e90bb4c9c4bd5966b01",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:e8f6ec7a8a2b92c33dcf158140bde14b904d194d60199e90bb4c9c4bd5966b01",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:63fde00b75dc949ba692036dbe1db4196cc97973cff5e61436e8bf16a3b97fee",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "malignant parietal pleura tumor",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c25e854db201ed0747cb04460db54161acfd58f7b80220be289c4b2e1cd4106b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5158",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "pleural cancer",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:d416770366a1242888ef60344d100b25966b4271cbc3551059af8c13e70b3831",
+          "fact_ids": [
+            "sha256:45b0b3affe3f6372f778eba64b6346792c5e23d4c2e9e4e1dff600e3813da468",
+            "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59"
+          ],
+          "text": "Every instance has this necessary condition: \u201cpleural cancer\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:c178f03f044bef21b1d65349fedbbe0169865148b758585bbe9e5a8500a16870",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:d416770366a1242888ef60344d100b25966b4271cbc3551059af8c13e70b3831": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:f49e6ee67c9a182552af2925833058373d222f6f63fa95bb6706c6e4b6f4c6f0",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f49e6ee67c9a182552af2925833058373d222f6f63fa95bb6706c6e4b6f4c6f0",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:cae5c4f5e7de91e49604bffda65491842ffc07a3086f781a0de4844783ea3f6d",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "malignant visceral pleura tumor",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c25e854db201ed0747cb04460db54161acfd58f7b80220be289c4b2e1cd4106b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5158",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "pleural cancer",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:6cce22728efb488974cd1cb4f52c6b30240a260bd39b5f0fe58cb97a3972974f",
+          "fact_ids": [
+            "sha256:874ad80b6f4c2db26833beee5f9a70dcbdd2ff7738fe5086ea76bd5a35e15d60",
+            "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8"
+          ],
+          "text": "Every instance has this necessary condition: \u201cfocal chorioretinitis\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:c36585b249b8f560721a41618914f1986562c0c4e9d48a9e791f63d436a84545",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:6cce22728efb488974cd1cb4f52c6b30240a260bd39b5f0fe58cb97a3972974f": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:cb915dda7015b4185edae5089d28bbbc7d050553b5375164b9f409d31bd5f7a4",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:cb915dda7015b4185edae5089d28bbbc7d050553b5375164b9f409d31bd5f7a4",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:517a6f6d390c655b1677455b2bb1b4e334e40005ce13c64396139c09df64f7a0",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "peripheral focal chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c7dc331bae0df47c3db6799eeedc6ddbdba7e026ced61407ea19e16d1f2e2a9d",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "focal chorioretinitis",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:cd6b4b5859b0174c27c6d115b59e2a3054798d853994a8cc434a68b4c5691b0b",
+          "fact_ids": [
+            "sha256:383d03064c8524251d45efa21ed2ac96f06e643bdc15e5b1d0df39146fdf6f60",
+            "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5"
+          ],
+          "text": "Every instance has this necessary condition: \u201cfocal epilepsy\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:c8e8503806992165c3f7f36f918307ffb413d0084cb49f968a3fb05ea0100454",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:cd6b4b5859b0174c27c6d115b59e2a3054798d853994a8cc434a68b4c5691b0b": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:93471a59912e88be8e6995f27287696b458a4169ab46680b8a07a93b7584b2c6",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:93471a59912e88be8e6995f27287696b458a4169ab46680b8a07a93b7584b2c6",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:3fa0719e1e491e17ceddf20454e20103a1fd2343ac5591cec606ee9a0d2d22b5",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "complex partial epilepsy",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:ebfbdc52dcfb5ae026ce4b4db8854a3a7479007cfe56a62903dca7f5214180e5",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:ec11cb514133fdbd1ff0a45e62c19c9851d32fbf9e7ce51c36b5560f05feb9a4",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_2234",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "focal epilepsy",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    },
+    {
+      "claims": [
+        {
+          "category": "scope",
+          "claim_id": "sha256:10aba338f52ddb581a1907cddc20e76a704ba44762a811b4e1f47b8d3579f3ec",
+          "fact_ids": [
+            "sha256:8777c8100e89a0eaeb07323b953a9ed060de48e1ad5b14e6867453910ee54831",
+            "sha256:560f78c3cedf5e38424e1df4520d38669c1255c99ef0eefd814b506ba0075839"
+          ],
+          "text": "Every instance has this necessary condition: \u201ceye disease\u201d."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:cd5a2993de5c3abafd0fc4751b035ba9d7cd00433dad72fddee906878c2b01c4",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:10aba338f52ddb581a1907cddc20e76a704ba44762a811b4e1f47b8d3579f3ec": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "necessary_conditions",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": null,
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "referenced_labels": [
+        {
+          "axiom_ref": "sha256:c5406a7feab501986ff699fb71901b6b81bbfda01dc9889d81d2b8b91833af44",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:c5406a7feab501986ff699fb71901b6b81bbfda01dc9889d81d2b8b91833af44",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:d72c4359024744555e36e6178a6506c729dd2cd4f171552acbac4484f98ec5c0",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_12731",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "pars planitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:c7dc331bae0df47c3db6799eeedc6ddbdba7e026ced61407ea19e16d1f2e2a9d",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "focal chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:560f78c3cedf5e38424e1df4520d38669c1255c99ef0eefd814b506ba0075839",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:560f78c3cedf5e38424e1df4520d38669c1255c99ef0eefd814b506ba0075839",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:d806c0251fbcc9acbf6ab43fd10f6abc89303ad3754fc8c7a380f7edb125c6f9",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_5614",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "eye disease",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:9ffbb7de62d5f6cf1d13099676993a26a5dcce48d4a6db2517275af5280dd13e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:9ffbb7de62d5f6cf1d13099676993a26a5dcce48d4a6db2517275af5280dd13e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:d8e1293c86b949c22f07acbf38268b3023f202c7930e35b71c35e00f45b72046",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "disseminated chorioretinitis",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:86fffe0c0598bf294fc6a40c157d04ef83230c230031a0acc61946cc87f621e9",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "chorioretinitis",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "support_status": "typed_template_support"
+    }
+  ],
+  "retained_one_sided_reviewed_comparisons": [
+    {
+      "claims": [
+        {
+          "category": "key_fact",
+          "claim_id": "sha256:0ef5c43e444973f8e65c62466d56b7b940fab6a2a022e0dce1229fab39a636b1",
+          "fact_ids": [
+            "sha256:c26ffae250481b24467a63c9336379fa8ca65d92853e376f6b264f2066db7e44"
+          ],
+          "text": "Familial thyroid dyshormonogenesis is characterized as a congenital hypothyroidism resulting from defects in thyroid hormone synthesis, present from birth."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121750",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0112183",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:189af064760204cce982ec0601b1a5b64b053b512ac7ca572516dbf84a3ea7a1",
+      "presentation": {
+        "claim_sides": {
+          "sha256:0ef5c43e444973f8e65c62466d56b7b940fab6a2a022e0dce1229fab39a636b1": [
+            "target"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "target"
+        ],
+        "kind": "target_only_profile",
+        "relation_asserted": false,
+        "render_revision": null,
+        "review_receipt_sha256": "sha256:47d96b298053ea1f6634b4b988fab0a964b92fb3b87061379d79a81593c00732",
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      }
+    },
+    {
+      "claims": [
+        {
+          "category": "meaning",
+          "claim_id": "sha256:fa66ba101037d4c1b06a6fa1c7644d751792c7b3e0bcabe5210967f5aeb4c703",
+          "fact_ids": [
+            "sha256:f52cbd5d0d5c0fa5ab64075bfebcf939e8eb0b406e80af6ac7cc28b037bdf8b7",
+            "sha256:254e92b6bb7786c8a10c45ac1aa859a7f4dec7c4b06b046122947506d6a64cb1",
+            "sha256:5d13023a22b52f21f8e7521113773a1a69bf3cfe09027b0ab934b5e01481049a",
+            "sha256:64b48bcdfcd75d68ba2533da539c1ce83a45f218c27fcacf2bd848df1c18d895"
+          ],
+          "text": "Caffey Disease, also known as Infantile Cortical Hyperostosis, is defined as a self-limited inflammatory disorder of unknown etiology found in infants that causes swelling of the soft tissue, changes to bone, and irritability."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C118423",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_6652",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:c9ed6e2359bb5ffaec32721793700d053870e9d609d998c6041e9aae34d4977c",
+      "presentation": {
+        "claim_sides": {
+          "sha256:fa66ba101037d4c1b06a6fa1c7644d751792c7b3e0bcabe5210967f5aeb4c703": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "source_only_profile",
+        "relation_asserted": false,
+        "render_revision": null,
+        "review_receipt_sha256": "sha256:8f9401849ceb2cbf6405176019a529c0e4f5bda1f47dc3cfe33d5e43d2b63952",
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      }
+    }
+  ],
+  "schema": "exact-postmigration-coverage/1",
+  "selected_coverage": {
+    "absent_or_asymmetric_definitions": 5,
+    "close_alternatives": 16,
+    "multiple_parents": 20,
+    "restrictions_or_equivalences": 8,
+    "rich_definitions": 23
+  },
+  "support_counts": {
+    "independently_reviewed": 64,
+    "typed_template_support": 196
+  },
+  "zero_evidence_pairs": [
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-04-candidate-1",
+      "case_id": "review-04",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:6e0cba9621fbc580ded96b27b65c313f77f62c66479d2f14f9be4d98d36afb56",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-05-candidate-1",
+      "case_id": "review-05",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:a5b44204e9a6b22ffe7110d87eb27461af723540645b221fb8f1e98e12c6eff3",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-06-candidate-1",
+      "case_id": "review-06",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:7fe34b4203bf2cd2a1dc29323524ff40114d6147f255fc21ae708c5281333c25",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-08-candidate-1",
+      "case_id": "review-08",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:5452bdd48bfb9c49a1fe09080a6dd285f7bad4ff305c413ba0f92184ab90bec7",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-09-candidate-1",
+      "case_id": "review-09",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:499de7fbfd4df5284c066a9d76f0715126b3af749618a1203ecd763ccabeb962",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-15-candidate-1",
+      "case_id": "review-15",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:ffe4b114174796a047b4f4fdfcbd74aaf53adbbab50ad0e82b3dc383b93720fa",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-17-candidate-1",
+      "case_id": "review-17",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:a1bddc92428d8259de2fa0a55904ab6146b2237331c6cd6d417ee761e770ea7f",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    },
+    {
+      "bridge_statuses": {},
+      "candidate_id": "review-23-candidate-1",
+      "case_id": "review-23",
+      "expression_original_facts": 0,
+      "feature_sides": [],
+      "graph_projection": {},
+      "origin_resolution": {},
+      "pair_id": "sha256:548fce6438ba04d54a9a73479178f8ff88597dd5b8450de6830b0cbbab0d029b",
+      "resolved_original_facts": 0,
+      "selected_features": 0
+    }
+  ]
+}

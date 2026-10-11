@@ -1,0 +1,80 @@
+{
+  "status": "passed",
+  "groups": [
+    {
+      "canonical": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input/package/ontologies/0/context.sqlite",
+      "path_count": 9,
+      "unchanged": true,
+      "identity": {
+        "inode": 351949377,
+        "links": 9,
+        "mode": 292,
+        "flags": 2,
+        "ctime": 1791752070060203887,
+        "mtime": 1790276262000000000,
+        "size": 448765952,
+        "dev": 16777221
+      }
+    },
+    {
+      "canonical": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input/package/ontologies/1/context.sqlite",
+      "path_count": 5,
+      "unchanged": true,
+      "identity": {
+        "inode": 351949378,
+        "links": 5,
+        "mode": 292,
+        "flags": 2,
+        "ctime": 1791752071282839204,
+        "mtime": 1790276778000000000,
+        "size": 9914359808,
+        "dev": 16777221
+      }
+    },
+    {
+      "canonical": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-delivered-final-20261010/input/package/runs/review/decisions.sqlite",
+      "path_count": 2,
+      "unchanged": true,
+      "identity": {
+        "inode": 351535201,
+        "links": 2,
+        "mode": 292,
+        "flags": 2,
+        "ctime": 1791752099624964140,
+        "mtime": 1791645620323863888,
+        "size": 2699005952,
+        "dev": 16777221
+      }
+    },
+    {
+      "canonical": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input/source-review.ofn",
+      "path_count": 5,
+      "unchanged": true,
+      "identity": {
+        "inode": 354658585,
+        "links": 5,
+        "mode": 256,
+        "flags": 2,
+        "ctime": 1791752110004729362,
+        "mtime": 1791737892332741979,
+        "size": 592383955,
+        "dev": 16777221
+      }
+    },
+    {
+      "canonical": "/Users/pedrocotovio/Library/Caches/exact-om-review/s1-prose-20261010/prepared-input/private-decision-imports/9644d24e4fee8da04e470b2c90ddc81cd2ce01ab4a88cc0d586a96155fdc7b64/decisions.sqlite",
+      "path_count": 2,
+      "unchanged": true,
+      "identity": {
+        "inode": 351949379,
+        "links": 2,
+        "mode": 292,
+        "flags": 2,
+        "ctime": 1791752111932034775,
+        "mtime": 1791643875699098495,
+        "size": 3159818240,
+        "dev": 16777221
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "status": "passed",
+  "seconds": 143.21316545503214,
+  "before": {
+    "publication.json": "5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a",
+    "package/package.json": "1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+    "catalogue.json": "587b1c53bc38d4ef9b557305d42c360519059c9bb80ef786003adc693f1e5fc4"
+  },
+  "after": {
+    "publication.json": "5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a",
+    "package/package.json": "1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+    "catalogue.json": "587b1c53bc38d4ef9b557305d42c360519059c9bb80ef786003adc693f1e5fc4"
+  },
+  "publication_sha256": "sha256:5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a"
+}

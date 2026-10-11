@@ -1,0 +1,961 @@
+{
+  "allocation": "No full physical bundle copy; private APFS clones reuse unchanged blocks; protected source hardlinks unchanged.",
+  "detached_service_output_reservation_bytes": 2000000000,
+  "initial_measured_bytes": 33474312351,
+  "latest_filesystem_free_bytes": 164179468288,
+  "latest_measured_bytes": 48626403375,
+  "limit_bytes": 100000000000,
+  "maximum_conservative_reserved_total_bytes": 67467041205,
+  "maximum_observed_guard_measurement_bytes": 48626481199,
+  "minimum_filesystem_free_bytes": 30000000000,
+  "peak_limitations": "Before/after and guard samples are observed points, not an instantaneous physical allocation peak; APFS clones are counted by logical size.",
+  "per_file_service_limit_bytes": 134217728,
+  "reports": [
+    {
+      "bytes": 33474312351,
+      "checked_at": "2026-10-11T21:18:47.418065+00:00",
+      "filesystem_free_bytes": 151477035008,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-budget-before.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33474349215,
+      "checked_at": "2026-10-11T21:20:37.609160+00:00",
+      "filesystem_free_bytes": 151476858880,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-fetch.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542048831,
+      "checked_at": "2026-10-11T21:22:10.339420+00:00",
+      "filesystem_free_bytes": 151401304064,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-fetch.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542089791,
+      "checked_at": "2026-10-11T21:24:26.258363+00:00",
+      "filesystem_free_bytes": 151400722432,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-contract-edit.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542122559,
+      "checked_at": "2026-10-11T21:24:30.398283+00:00",
+      "filesystem_free_bytes": 151405461504,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-contract-edit.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542171711,
+      "checked_at": "2026-10-11T21:27:53.442474+00:00",
+      "filesystem_free_bytes": 151368855552,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542233215,
+      "checked_at": "2026-10-11T21:27:57.381397+00:00",
+      "filesystem_free_bytes": 151367602176,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542282367,
+      "checked_at": "2026-10-11T21:30:22.758954+00:00",
+      "filesystem_free_bytes": 151339192320,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542331551,
+      "checked_at": "2026-10-11T21:30:26.587781+00:00",
+      "filesystem_free_bytes": 151339073536,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542372511,
+      "checked_at": "2026-10-11T21:32:28.622669+00:00",
+      "filesystem_free_bytes": 151325315072,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit4.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542413503,
+      "checked_at": "2026-10-11T21:32:32.458027+00:00",
+      "filesystem_free_bytes": 151325224960,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit4.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33542438079,
+      "checked_at": "2026-10-11T21:32:41.809424+00:00",
+      "filesystem_free_bytes": 151325396992,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focused.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33550301921,
+      "checked_at": "2026-10-11T21:32:54.807150+00:00",
+      "filesystem_free_bytes": 151317487616,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focused.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33550330593,
+      "checked_at": "2026-10-11T21:33:50.617934+00:00",
+      "filesystem_free_bytes": 151315263488,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit5.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33550363361,
+      "checked_at": "2026-10-11T21:33:54.761596+00:00",
+      "filesystem_free_bytes": 151329345536,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit5.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33550392033,
+      "checked_at": "2026-10-11T21:34:22.228875+00:00",
+      "filesystem_free_bytes": 151322710016,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focused2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33558382901,
+      "checked_at": "2026-10-11T21:34:35.373738+00:00",
+      "filesystem_free_bytes": 151316938752,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focused2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33558411573,
+      "checked_at": "2026-10-11T21:35:42.110519+00:00",
+      "filesystem_free_bytes": 151317049344,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit6.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33558440245,
+      "checked_at": "2026-10-11T21:35:46.227470+00:00",
+      "filesystem_free_bytes": 151316942848,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit6.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33558468917,
+      "checked_at": "2026-10-11T21:36:06.985794+00:00",
+      "filesystem_free_bytes": 151317524480,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focused3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566418825,
+      "checked_at": "2026-10-11T21:36:19.985056+00:00",
+      "filesystem_free_bytes": 151313276928,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focused3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566455689,
+      "checked_at": "2026-10-11T21:38:31.354668+00:00",
+      "filesystem_free_bytes": 151312203776,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit7.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566488489,
+      "checked_at": "2026-10-11T21:38:35.389450+00:00",
+      "filesystem_free_bytes": 151311097856,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit7.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566521257,
+      "checked_at": "2026-10-11T21:44:08.029079+00:00",
+      "filesystem_free_bytes": 151312523264,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-check8.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566558121,
+      "checked_at": "2026-10-11T21:44:12.066626+00:00",
+      "filesystem_free_bytes": 151307542528,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit8.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566590889,
+      "checked_at": "2026-10-11T21:44:16.146160+00:00",
+      "filesystem_free_bytes": 151323402240,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit8.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566631849,
+      "checked_at": "2026-10-11T21:45:26.138088+00:00",
+      "filesystem_free_bytes": 151314202624,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-check9.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566668713,
+      "checked_at": "2026-10-11T21:45:30.162958+00:00",
+      "filesystem_free_bytes": 151314079744,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit9.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566701481,
+      "checked_at": "2026-10-11T21:45:34.224634+00:00",
+      "filesystem_free_bytes": 151313944576,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit9.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566730153,
+      "checked_at": "2026-10-11T21:45:47.562994+00:00",
+      "filesystem_free_bytes": 151307440128,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-check10.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33566771113,
+      "checked_at": "2026-10-11T21:45:51.737764+00:00",
+      "filesystem_free_bytes": 151319003136,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focused4.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574721021,
+      "checked_at": "2026-10-11T21:46:05.204252+00:00",
+      "filesystem_free_bytes": 151300759552,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focused4.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574753789,
+      "checked_at": "2026-10-11T21:46:48.168704+00:00",
+      "filesystem_free_bytes": 151297486848,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-native-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574794749,
+      "checked_at": "2026-10-11T21:46:52.392033+00:00",
+      "filesystem_free_bytes": 151313580032,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-native.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574835709,
+      "checked_at": "2026-10-11T21:46:58.951257+00:00",
+      "filesystem_free_bytes": 151310000128,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-native.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574868477,
+      "checked_at": "2026-10-11T21:47:30.262683+00:00",
+      "filesystem_free_bytes": 151297204224,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-check11.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33574909437,
+      "checked_at": "2026-10-11T21:47:34.565781+00:00",
+      "filesystem_free_bytes": 151312138240,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-broad1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673610694,
+      "checked_at": "2026-10-11T21:48:27.619046+00:00",
+      "filesystem_free_bytes": 151219757056,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-broad1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673614790,
+      "checked_at": "2026-10-11T21:48:38.750867+00:00",
+      "filesystem_free_bytes": 151209365504,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-check12.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673655750,
+      "checked_at": "2026-10-11T21:48:43.373619+00:00",
+      "filesystem_free_bytes": 151204016128,
+      "growth_bytes": 50000000,
+      "receipt": "/private/tmp/exact-postmigration-edit11.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673688518,
+      "checked_at": "2026-10-11T21:48:48.006228+00:00",
+      "filesystem_free_bytes": 151201636352,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit11.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673721286,
+      "checked_at": "2026-10-11T21:49:30.161094+00:00",
+      "filesystem_free_bytes": 152243490816,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-check13.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33673762246,
+      "checked_at": "2026-10-11T21:49:38.012420+00:00",
+      "filesystem_free_bytes": 152234827776,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-broad2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33756337809,
+      "checked_at": "2026-10-11T21:51:36.242005+00:00",
+      "filesystem_free_bytes": 152226021376,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-broad2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33756366481,
+      "checked_at": "2026-10-11T21:51:57.526778+00:00",
+      "filesystem_free_bytes": 152222420992,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-check14.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33756407441,
+      "checked_at": "2026-10-11T21:52:02.960038+00:00",
+      "filesystem_free_bytes": 152220536832,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focus5.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33767982927,
+      "checked_at": "2026-10-11T21:52:23.073004+00:00",
+      "filesystem_free_bytes": 152212922368,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focus5.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33768015695,
+      "checked_at": "2026-10-11T21:52:55.369276+00:00",
+      "filesystem_free_bytes": 152212340736,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33768056655,
+      "checked_at": "2026-10-11T21:53:01.375680+00:00",
+      "filesystem_free_bytes": 152222482432,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33768089423,
+      "checked_at": "2026-10-11T21:56:11.250977+00:00",
+      "filesystem_free_bytes": 151144673280,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-composition.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33768126287,
+      "checked_at": "2026-10-11T21:57:21.604729+00:00",
+      "filesystem_free_bytes": 165903716352,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-check15.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33768167247,
+      "checked_at": "2026-10-11T21:57:26.207403+00:00",
+      "filesystem_free_bytes": 165904396288,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-focus6.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778004053,
+      "checked_at": "2026-10-11T21:57:39.921904+00:00",
+      "filesystem_free_bytes": 165894508544,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-focus6.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778036821,
+      "checked_at": "2026-10-11T21:58:25.394058+00:00",
+      "filesystem_free_bytes": 165879123968,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-commit-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778077781,
+      "checked_at": "2026-10-11T21:58:31.126671+00:00",
+      "filesystem_free_bytes": 165875191808,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-commit1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778439413,
+      "checked_at": "2026-10-11T21:58:37.813354+00:00",
+      "filesystem_free_bytes": 165873942528,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-commit1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778488565,
+      "checked_at": "2026-10-11T22:01:05.995874+00:00",
+      "filesystem_free_bytes": 165873119232,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition2-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 33778533621,
+      "checked_at": "2026-10-11T22:01:11.306114+00:00",
+      "filesystem_free_bytes": 165873389568,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47466815893,
+      "checked_at": "2026-10-11T22:05:24.772191+00:00",
+      "filesystem_free_bytes": 165913055232,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-composition2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47466856853,
+      "checked_at": "2026-10-11T22:06:43.725358+00:00",
+      "filesystem_free_bytes": 166010757120,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-check16.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47466901909,
+      "checked_at": "2026-10-11T22:06:48.566461+00:00",
+      "filesystem_free_bytes": 166014955520,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-edit15.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47466963381,
+      "checked_at": "2026-10-11T22:06:55.037327+00:00",
+      "filesystem_free_bytes": 166033395712,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit15.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47466996149,
+      "checked_at": "2026-10-11T22:07:20.463412+00:00",
+      "filesystem_free_bytes": 166064951296,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition3-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47467041205,
+      "checked_at": "2026-10-11T22:07:25.590843+00:00",
+      "filesystem_free_bytes": 166068953088,
+      "growth_bytes": 20000000000,
+      "receipt": "/private/tmp/exact-postmigration-composition3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992504181,
+      "checked_at": "2026-10-11T22:15:31.631334+00:00",
+      "filesystem_free_bytes": 163367362560,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-composition3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992536949,
+      "checked_at": "2026-10-11T22:17:13.759760+00:00",
+      "filesystem_free_bytes": 163364724736,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-static-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992582005,
+      "checked_at": "2026-10-11T22:17:18.655459+00:00",
+      "filesystem_free_bytes": 163364569088,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-static.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992614773,
+      "checked_at": "2026-10-11T22:17:23.449519+00:00",
+      "filesystem_free_bytes": 163364687872,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-static.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992647541,
+      "checked_at": "2026-10-11T22:18:49.929374+00:00",
+      "filesystem_free_bytes": 163368079360,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-static2-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47992692597,
+      "checked_at": "2026-10-11T22:18:54.899466+00:00",
+      "filesystem_free_bytes": 163366969344,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-static2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47993192373,
+      "checked_at": "2026-10-11T22:20:31.640563+00:00",
+      "filesystem_free_bytes": 163374403584,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-static2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47993225141,
+      "checked_at": "2026-10-11T22:21:39.211283+00:00",
+      "filesystem_free_bytes": 163369562112,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-environment-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 47993270197,
+      "checked_at": "2026-10-11T22:21:43.955269+00:00",
+      "filesystem_free_bytes": 163369480192,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-environment-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48033145973,
+      "checked_at": "2026-10-11T22:22:57.580033+00:00",
+      "filesystem_free_bytes": 163328286720,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-environment-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48033182837,
+      "checked_at": "2026-10-11T22:24:27.636902+00:00",
+      "filesystem_free_bytes": 163325575168,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-start-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48033227893,
+      "checked_at": "2026-10-11T22:24:32.403849+00:00",
+      "filesystem_free_bytes": 163325448192,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-bound-environment.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48033268885,
+      "checked_at": "2026-10-11T22:24:38.043001+00:00",
+      "filesystem_free_bytes": 163325501440,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-bound-environment.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48041492533,
+      "checked_at": "2026-10-11T22:26:23.032780+00:00",
+      "filesystem_free_bytes": 163328344064,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-check17.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48041537589,
+      "checked_at": "2026-10-11T22:26:28.292386+00:00",
+      "filesystem_free_bytes": 163327156224,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-edit16.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48041582645,
+      "checked_at": "2026-10-11T22:26:34.811441+00:00",
+      "filesystem_free_bytes": 163327217664,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit16.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48041976021,
+      "checked_at": "2026-10-11T22:29:28.830438+00:00",
+      "filesystem_free_bytes": 163316916224,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48042021077,
+      "checked_at": "2026-10-11T22:29:42.861853+00:00",
+      "filesystem_free_bytes": 163365347328,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043618837,
+      "checked_at": "2026-10-11T22:33:41.299905+00:00",
+      "filesystem_free_bytes": 163349684224,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-api1.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043655701,
+      "checked_at": "2026-10-11T22:34:41.491881+00:00",
+      "filesystem_free_bytes": 163359981568,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-edit17-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043700757,
+      "checked_at": "2026-10-11T22:34:58.599189+00:00",
+      "filesystem_free_bytes": 163355119616,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-edit17.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043737621,
+      "checked_at": "2026-10-11T22:35:04.064345+00:00",
+      "filesystem_free_bytes": 163352190976,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-edit17.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043774485,
+      "checked_at": "2026-10-11T22:36:06.199118+00:00",
+      "filesystem_free_bytes": 163349643264,
+      "growth_bytes": 3000000000,
+      "receipt": "/private/tmp/exact-postmigration-final-tests-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48043819541,
+      "checked_at": "2026-10-11T22:36:52.553769+00:00",
+      "filesystem_free_bytes": 164410589184,
+      "growth_bytes": 3000000000,
+      "receipt": "/private/tmp/exact-postmigration-final-tests.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337197740,
+      "checked_at": "2026-10-11T22:42:01.452855+00:00",
+      "filesystem_free_bytes": 164157239296,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-final-tests.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337230508,
+      "checked_at": "2026-10-11T22:42:28.081531+00:00",
+      "filesystem_free_bytes": 164157120512,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-followup-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337304236,
+      "checked_at": "2026-10-11T22:43:03.982586+00:00",
+      "filesystem_free_bytes": 164156383232,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-followup.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337402700,
+      "checked_at": "2026-10-11T22:45:36.131983+00:00",
+      "filesystem_free_bytes": 164156391424,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-followup.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337439564,
+      "checked_at": "2026-10-11T22:46:37.713320+00:00",
+      "filesystem_free_bytes": 164158992384,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-frontend2-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337488716,
+      "checked_at": "2026-10-11T22:47:00.710109+00:00",
+      "filesystem_free_bytes": 164149043200,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-frontend2-run.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337554252,
+      "checked_at": "2026-10-11T22:47:08.847275+00:00",
+      "filesystem_free_bytes": 164148805632,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-frontend2-run.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337595212,
+      "checked_at": "2026-10-11T22:48:01.969994+00:00",
+      "filesystem_free_bytes": 164102934528,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-frontend3-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337644364,
+      "checked_at": "2026-10-11T22:48:15.974653+00:00",
+      "filesystem_free_bytes": 164095143936,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-frontend3-run.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337709900,
+      "checked_at": "2026-10-11T22:48:25.428940+00:00",
+      "filesystem_free_bytes": 164098908160,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-frontend3-run.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337746764,
+      "checked_at": "2026-10-11T22:48:58.734082+00:00",
+      "filesystem_free_bytes": 164151123968,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api2-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48337804108,
+      "checked_at": "2026-10-11T22:49:15.992500+00:00",
+      "filesystem_free_bytes": 164164030464,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48341540268,
+      "checked_at": "2026-10-11T22:53:21.563853+00:00",
+      "filesystem_free_bytes": 164155990016,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-api2.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48341585324,
+      "checked_at": "2026-10-11T22:56:41.555243+00:00",
+      "filesystem_free_bytes": 165246066688,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-ancestors-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48341634476,
+      "checked_at": "2026-10-11T22:57:26.541132+00:00",
+      "filesystem_free_bytes": 165235740672,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-ancestor-correction.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48442885468,
+      "checked_at": "2026-10-11T23:00:16.164204+00:00",
+      "filesystem_free_bytes": 165461766144,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-ancestor-correction.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48442812828,
+      "checked_at": "2026-10-11T23:01:34.332544+00:00",
+      "filesystem_free_bytes": 165449805824,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-r2-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48442861980,
+      "checked_at": "2026-10-11T23:01:44.495135+00:00",
+      "filesystem_free_bytes": 165445619712,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-environment-r2-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48482975836,
+      "checked_at": "2026-10-11T23:03:09.523997+00:00",
+      "filesystem_free_bytes": 165404291072,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-environment-r2-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48483016796,
+      "checked_at": "2026-10-11T23:05:32.260120+00:00",
+      "filesystem_free_bytes": 165400137728,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-cache-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48483065948,
+      "checked_at": "2026-10-11T23:05:40.118948+00:00",
+      "filesystem_free_bytes": 165396049920,
+      "growth_bytes": 1000000000,
+      "receipt": "/private/tmp/exact-postmigration-cache-fix.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48553104271,
+      "checked_at": "2026-10-11T23:06:21.280341+00:00",
+      "filesystem_free_bytes": 165334523904,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-cache-fix.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48553145231,
+      "checked_at": "2026-10-11T23:07:38.003303+00:00",
+      "filesystem_free_bytes": 165337255936,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-r3-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48553194383,
+      "checked_at": "2026-10-11T23:07:46.009475+00:00",
+      "filesystem_free_bytes": 165337411584,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-environment-r3-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48593119535,
+      "checked_at": "2026-10-11T23:09:02.302992+00:00",
+      "filesystem_free_bytes": 165298450432,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-environment-r3-prepare.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48601703823,
+      "checked_at": "2026-10-11T23:14:57.611820+00:00",
+      "filesystem_free_bytes": 164218462208,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api3-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48601761167,
+      "checked_at": "2026-10-11T23:15:15.407216+00:00",
+      "filesystem_free_bytes": 164213538816,
+      "growth_bytes": 2000000000,
+      "receipt": "/private/tmp/exact-postmigration-api3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48626366511,
+      "checked_at": "2026-10-11T23:23:46.689960+00:00",
+      "filesystem_free_bytes": 164185591808,
+      "growth_bytes": 0,
+      "receipt": "/private/tmp/exact-postmigration-api3.log",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48626403375,
+      "checked_at": "2026-10-11T23:24:02.861100+00:00",
+      "filesystem_free_bytes": 164179468288,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-delivery-budget.json",
+      "status": "allowed"
+    },
+    {
+      "bytes": 48626481199,
+      "checked_at": "2026-10-11T23:24:15.258194+00:00",
+      "filesystem_free_bytes": 164175155200,
+      "growth_bytes": 100000000,
+      "receipt": "/private/tmp/exact-postmigration-handoff-write.log",
+      "status": "allowed"
+    }
+  ],
+  "safety_reserve_bytes": 5000000000,
+  "schema": "exact-postmigration-storage-ledger/1"
+}

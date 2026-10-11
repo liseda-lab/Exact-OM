@@ -1,0 +1,63 @@
+{
+  "ancestor_before_receipt": {
+    "display_adjustment": "Whitespace-only traceback lines stripped in the committed copy; raw original preserved unchanged.",
+    "display_copy_sha256": "b8f4bfbbc5a4341c97b7b85e91bb3ada11b772e1e5e403b9d89f0f1a95c26af5",
+    "raw_path": "/private/tmp/exact-postmigration-ancestor-before.xml",
+    "raw_sha256": "6796a143bfa95ad76ef2f882fede26c5b07e15bddb64d55bbb93cd92131621c5"
+  },
+  "api_initial": {
+    "actual": 409,
+    "correct_contract": "409 stale_cursor",
+    "correction": "Verifier now requires exact status and error code",
+    "expected": 400,
+    "receipt": {
+      "bytes": 37168,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification/journey-1.json",
+      "sha256": "ee207deb6d81ba8780ac152c0ff30788aafd3a419f26baedae4655bfcc35b88e"
+    },
+    "status": "failed_verifier_expectation"
+  },
+  "api_scoped_ancestors": {
+    "actual": 422,
+    "correction": "Add bounded direction, retain cursor binding and baseline authorization; 3 failing before and 51 passing affected tests after, including duplicate-ID guard",
+    "receipt": {
+      "bytes": 85088,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-2/journey-1.json",
+      "sha256": "29b9807b958c3813791a3f156b6d8d338a196fdbe9317e8c110f0d80ff9cf948"
+    },
+    "root_cause": "Scoped route Literal omitted ancestors although main API and prepared indexes supported it"
+  },
+  "earlier_implementation_regressions": {
+    "disposition": "Legacy/shared fact copies required exact claim-subject admission handling; corrected and included in the final 256 passing regressions",
+    "log": "/private/tmp/exact-postmigration-broad1.log",
+    "result": "126 passed, 21 failed"
+  },
+  "frontend_runner": [
+    {
+      "cause": "missing local React resolution",
+      "path": "/private/tmp/exact-postmigration-frontend-tests.log",
+      "result": "111 passed, 1 failed"
+    },
+    {
+      "cause": "recursive test-only module resolver",
+      "path": "/private/tmp/exact-postmigration-frontend-tests2.log",
+      "result": "107 passed, 2 failed"
+    },
+    {
+      "cause": "resolved retained dependency paths before module resolution; no frontend assertion/source change",
+      "path": "/private/tmp/exact-postmigration-frontend-tests3.log",
+      "result": "112 passed"
+    }
+  ],
+  "navigation_rehash": {
+    "correction": "Bounded 128-entry path/stat-bound verified digest cache; expected hash, SQLite binding and every-read stat checks retained",
+    "regression": "one failing before; 76 affected tests passing after",
+    "root_cause": "PreparedNavigation rehashed both sidecars on every scoped request; approximately 474 MB per read"
+  },
+  "schema": "exact-postmigration-failure-record/1",
+  "static_probe_initial": {
+    "cause": "absolute temporary script lacked repository import path",
+    "disposition": "repository-aware invocation passed; no data change",
+    "log": "/private/tmp/exact-postmigration-static.log"
+  }
+}

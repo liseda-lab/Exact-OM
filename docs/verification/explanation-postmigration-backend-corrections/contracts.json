@@ -1,0 +1,66 @@
+{
+  "freeze_check": "passed",
+  "runtime_files": [
+    {
+      "bytes": 1865,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/description-presentation.runtime-schema.json",
+      "sha256": "c2b1dc19843216f2722057871d600252f8e868202244568ee8b11c355d5ec0eb"
+    },
+    {
+      "bytes": 3375,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/description-review.runtime-schema.json",
+      "sha256": "77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4"
+    },
+    {
+      "bytes": 161704,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/exploration.runtime-openapi.json",
+      "sha256": "678c69bbf948e7fa4cd2c683fd077020bf89bceec457cf09eb103ad48033a6f2"
+    },
+    {
+      "bytes": 6103,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/partial-inference.runtime-schema.json",
+      "sha256": "fbb8f19f73608e90b97f621b03a2770420e0db95588d1cf1a79367f75246e531"
+    },
+    {
+      "bytes": 6077,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/review-about.runtime-schema.json",
+      "sha256": "b89e1af6bd34b6ea49053050bf333a6f32241a1dd9921930f0ed9a563d3c9626"
+    },
+    {
+      "bytes": 67859,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/study-publication.runtime-schema.json",
+      "sha256": "bf0bd2211b772824d255e535b18367bf2310eb786b4f04ba0f3d6c222284c2f1"
+    },
+    {
+      "bytes": 42160,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/study-resource.runtime-schema.json",
+      "sha256": "99b74818a8153c3d1f5e236bf6a7d9c16cc1bf48011afd08012fb88a010280f3"
+    },
+    {
+      "bytes": 18999,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/study-tutorial.runtime-schema.json",
+      "sha256": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619"
+    },
+    {
+      "bytes": 392975,
+      "path": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM/specs/explanation-framework/protocol/study.runtime-openapi.json",
+      "sha256": "daa196ef793a3ff37a8129487ca41b5351f2bb08c0ca9c639ae461a908266a62"
+    }
+  ],
+  "schema": "exact-postmigration-schema-bindings/1",
+  "versions": {
+    "analysis_export": "exact-study-analysis/4",
+    "consultation": "consultation/3",
+    "csv_export": "exact-study-csv/4",
+    "description_preparation": "exact-description/2",
+    "description_presentation": "exact-description-presentation/1",
+    "forms": "exact-study-forms/3",
+    "methods": "study-methods/3",
+    "pair_evidence": "exact-evidence-metadata/1",
+    "partial_admission": "exact-elk-partial-admission/1",
+    "partial_hierarchy": "exact-partial-hierarchy/1",
+    "render_revision": "typed-readable/3",
+    "review_client": "study-review/1",
+    "setup": "setup/3"
+  }
+}

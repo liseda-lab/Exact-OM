@@ -1,0 +1,22 @@
+{
+  "boundary": "Cold process startup including preflight and initial study admission, existing filesystem caches",
+  "seconds": 144.08366985013708,
+  "services": {
+    "exploration": {
+      "port": 19425,
+      "ready": true,
+      "state": "owned"
+    },
+    "postgres": {
+      "port": 19423,
+      "ready": true,
+      "state": "owned"
+    },
+    "study": {
+      "port": 19424,
+      "ready": true,
+      "state": "owned"
+    }
+  },
+  "status": "passed"
+}

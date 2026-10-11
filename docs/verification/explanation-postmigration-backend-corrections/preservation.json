@@ -1,0 +1,2869 @@
+{
+  "approved_artifact_count": 64,
+  "approved_claim_count": 68,
+  "assembler_at_publication": "sha256:84b843793cb964c5c9e5d7afb3164d14e3456c74764f25183c344b2229a1281e",
+  "binding": {
+    "contexts": {
+      "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+      "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9": "sha256:bc1ad13c2eb4d1b00d5ef627b06a80e064b264fd3e5dc4d2a4c5c89f5f0ed738"
+    },
+    "elk": {
+      "doid": {
+        "manifest": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+        "resource_receipt": "sha256:9cad3ae40290d9d4aa169022180d6ced0433cb46513180d76c8165810312987d",
+        "result": "sha256:63234a4f7d11d18ada3bfa10bb98417480eb9eb26674de0eab0c4a351346623d",
+        "taxonomy": "sha256:8563d5690fd1a52669f76460c57f4e12e69e65b5910c333d7e22dd838c3d1cd5"
+      },
+      "ncit": {
+        "manifest": "sha256:e12aed8e7fd110e017d2b54153d97a75ba5fab4b8a047be4eb1213e6afa1cb91",
+        "resource_receipt": "sha256:f8835f4ddf83aa67f3eab6fbc97ff4b2e53f1cfe41b3f8737a10be3cc2b9fe8c",
+        "result": "sha256:8cd61822b26fb42332b2ac37f9fc829c39c669669a4cef54b32ed4c6dcfd1701",
+        "taxonomy": "sha256:68cc52ef6e78d356d923741614b28cc50c876665db4725ec914a6032916c93a4"
+      }
+    },
+    "evidence_package": "sha256:587a06159a5ce3be559a407bf741ac01cc34aff587f958e6bc2f41777ed54aac",
+    "evidence_publication": "sha256:de980187339840d0f623eb8d38162bca0c08f50d32707ae691fd5a4201286dc0",
+    "policy": "sha256:0e0902498acb58bcd7ee5e1ccc706edd53cf08c7850e27f5cd9a8023702e80c8",
+    "prose_package": "sha256:7f4f85f0a4a9b757918ee71be8becc9575f04fe319b29bae910c0dcf80ee1525",
+    "prose_publication": "sha256:beb0d85c4028d6f2d567e9937346d1fce3e4cff17282d69fa5b14389c83727d2",
+    "renderer": "typed-readable/3",
+    "revision": "development-review-combined-20261011",
+    "schema": "exact-review-composition/1"
+  },
+  "bridges": {
+    "recorded": 812,
+    "withheld": 2517
+  },
+  "cases": [
+    {
+      "case_id": "review-01",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 22
+          },
+          "candidate_id": "review-01-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:a6d7fee32c7b3d65c82803e9f9d99e83c9eee286a4dc0333a7157d1d5233cd93",
+          "resolved_original_facts": 8,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 18
+          },
+          "candidate_id": "review-01-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:cc4c6c2f154224362b165ebb584beacc0d80b6fb3be14918b5eaf710cc504288",
+          "resolved_original_facts": 9,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 17
+          },
+          "candidate_id": "review-01-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 15
+          },
+          "pair_id": "sha256:5e21368f2989e6dfb8f625861d5018a48de95b089db38747017da4a6794509dd",
+          "resolved_original_facts": 8,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 23
+          },
+          "candidate_id": "review-01-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 33
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:49dac91efca0dc287f357ca24037512de09635ad7a6a76f632395500702013e5",
+          "resolved_original_facts": 9,
+          "selected_features": 33
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 17
+          },
+          "candidate_id": "review-01-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 25
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:f9867e5338daf663b93afd8ec6b7f952ead9d0bc6c00e53c2ef400c86312b918",
+          "resolved_original_facts": 8,
+          "selected_features": 25
+        }
+      ]
+    },
+    {
+      "case_id": "review-02",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 30
+          },
+          "candidate_id": "review-02-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 45
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 31
+          },
+          "pair_id": "sha256:9c9931a77016bd242f2ed6fbe7e9a0c486fe59e8e814a6dc4b5b7b877b39a495",
+          "resolved_original_facts": 13,
+          "selected_features": 45
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 12,
+            "withheld": 16
+          },
+          "candidate_id": "review-02-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:7d9afcda83e73f3bb6a216136de828ff0dec2db57542825484993b8501f2cb8a",
+          "resolved_original_facts": 11,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 12,
+            "withheld": 16
+          },
+          "candidate_id": "review-02-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:93e4e2b62e92c36d0b98137afbe331603ad2e8a330481c6560e804bd0541e855",
+          "resolved_original_facts": 11,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 15,
+            "withheld": 33
+          },
+          "candidate_id": "review-02-candidate-4",
+          "expression_original_facts": 5,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 50
+          },
+          "origin_resolution": {
+            "resolved": 16,
+            "unresolved": 34
+          },
+          "pair_id": "sha256:e6433652d9cadf926b18fda03c2efa2d6d054b8a2f586901a58a265fa9d172a7",
+          "resolved_original_facts": 15,
+          "selected_features": 50
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 33
+          },
+          "candidate_id": "review-02-candidate-5",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 49
+          },
+          "origin_resolution": {
+            "resolved": 15,
+            "unresolved": 34
+          },
+          "pair_id": "sha256:994ef60c4d812b2fa5bc76b5df0cc36e9ce95b2e425014ff829d405709e7c3f4",
+          "resolved_original_facts": 14,
+          "selected_features": 49
+        }
+      ]
+    },
+    {
+      "case_id": "review-03",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 16
+          },
+          "candidate_id": "review-03-candidate-1",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:fe5ee200205f16cdd1c9e7ad469d45b636ef8304e1332bfec585063d273bfb20",
+          "resolved_original_facts": 8,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 11,
+            "withheld": 18
+          },
+          "candidate_id": "review-03-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:cac7b51eefeb17348994f7997c8cbe745a439cc693106c43d31dac8c7971c122",
+          "resolved_original_facts": 11,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 14
+          },
+          "candidate_id": "review-03-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 20
+          },
+          "origin_resolution": {
+            "resolved": 6,
+            "unresolved": 14
+          },
+          "pair_id": "sha256:c775dd630dd093aa712677a309b6bd601cfd2ea9e019b1d252086bd82c00004d",
+          "resolved_original_facts": 6,
+          "selected_features": 20
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 20
+          },
+          "candidate_id": "review-03-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 27
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 20
+          },
+          "pair_id": "sha256:0f4a320470bab25d6564dd7b15b9ab512764ef19fbc17890a0e1718ec4fafcd3",
+          "resolved_original_facts": 7,
+          "selected_features": 27
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 14
+          },
+          "candidate_id": "review-03-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 15
+          },
+          "pair_id": "sha256:f9bedf8bd1c8128b8c12e6230ed26f32fa137b90a1758e4a31c5c0c6644ce7a3",
+          "resolved_original_facts": 9,
+          "selected_features": 24
+        }
+      ]
+    },
+    {
+      "case_id": "review-04",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-04-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:6e0cba9621fbc580ded96b27b65c313f77f62c66479d2f14f9be4d98d36afb56",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 21
+          },
+          "candidate_id": "review-04-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 5,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:b590eab6976f222a5926b21bd613a3c77051363e67530774630ff9cfbdd93a61",
+          "resolved_original_facts": 5,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 2,
+            "withheld": 22
+          },
+          "candidate_id": "review-04-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 5,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:b2c5f8a2b88f42fc333874f9b6b1829b1e7d143f450155aa870eba9b09a39530",
+          "resolved_original_facts": 5,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 19
+          },
+          "candidate_id": "review-04-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 5,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:34ef117537366007618a1ac5a2b751e30300456fe193396b983c4d681ba58542",
+          "resolved_original_facts": 5,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 22
+          },
+          "candidate_id": "review-04-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 26
+          },
+          "origin_resolution": {
+            "resolved": 5,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:7da908988671cadaa5b56a5e772c878ad12dca2081e3e0dcc5b2e5d4b91d19a4",
+          "resolved_original_facts": 5,
+          "selected_features": 26
+        }
+      ]
+    },
+    {
+      "case_id": "review-05",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-05-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:a5b44204e9a6b22ffe7110d87eb27461af723540645b221fb8f1e98e12c6eff3",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 26
+          },
+          "candidate_id": "review-05-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 22
+          },
+          "pair_id": "sha256:a4f44a38acff5846745e4bc6fba4336a7a2479ab94dc26b78753534a4287ccb5",
+          "resolved_original_facts": 9,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 25
+          },
+          "candidate_id": "review-05-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:19a7a20479824a69a252c8c1f5265bc01ce560f69d6999998a4de7e05ad12343",
+          "resolved_original_facts": 7,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 21
+          },
+          "candidate_id": "review-05-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 26
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:3fee1199133b6da49ea6bb13a3bd62fca6e10651cf547f139be9bf36283741a0",
+          "resolved_original_facts": 8,
+          "selected_features": 26
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 28
+          },
+          "candidate_id": "review-05-candidate-5",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:293c0bfc57fc3c2fe880012ee20f134dec5602e17c611cdbd1c1d9110b57924d",
+          "resolved_original_facts": 14,
+          "selected_features": 39
+        }
+      ]
+    },
+    {
+      "case_id": "review-06",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-06-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:7fe34b4203bf2cd2a1dc29323524ff40114d6147f255fc21ae708c5281333c25",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 27
+          },
+          "candidate_id": "review-06-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 33
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:8273da162b6a371560e5da8ad52df97cc7d08971b0ff41305b6e1f1e98c95581",
+          "resolved_original_facts": 8,
+          "selected_features": 33
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 27
+          },
+          "candidate_id": "review-06-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 34
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:d9230c845df4a1a3030ce01b599a30f722c81966c1ad0d3a6c920fa0dc798a22",
+          "resolved_original_facts": 8,
+          "selected_features": 34
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 27
+          },
+          "candidate_id": "review-06-candidate-4",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 38
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:74398c3bab52769ddfeb303e32399a6e6c21e8a158a791a7fcdf36001bdedde0",
+          "resolved_original_facts": 12,
+          "selected_features": 38
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 22
+          },
+          "candidate_id": "review-06-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:70008c0a2b07a14515b5f52e6ee7f4172239abb098ba3a427dddd999ddf2d2aa",
+          "resolved_original_facts": 8,
+          "selected_features": 29
+        }
+      ]
+    },
+    {
+      "case_id": "review-07",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 29
+          },
+          "candidate_id": "review-07-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 37
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:304d03f5c4fe98fee31d6c9f5e0e94830426d818c0d27588bde8f1ce85129f51",
+          "resolved_original_facts": 11,
+          "selected_features": 37
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 26
+          },
+          "candidate_id": "review-07-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 34
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:17a90028d78c3e6bc6342dc05a86b08cf83688080a94cd55201f513ec5894c32",
+          "resolved_original_facts": 9,
+          "selected_features": 34
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 33
+          },
+          "candidate_id": "review-07-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 31
+          },
+          "pair_id": "sha256:7c6fed7df445982780648ae5dcf4fa01e39bd4a3079554e933493ab6c50d6b00",
+          "resolved_original_facts": 8,
+          "selected_features": 39
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 18
+          },
+          "candidate_id": "review-07-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 15
+          },
+          "pair_id": "sha256:388492c84cc9bafe6a3daf543fc3bcf7493e2ca84286bcea91d905d357cabe11",
+          "resolved_original_facts": 7,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 32
+          },
+          "candidate_id": "review-07-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 42
+          },
+          "origin_resolution": {
+            "resolved": 13,
+            "unresolved": 29
+          },
+          "pair_id": "sha256:5fdb1b93da3a00547564f7b2ae130a64465f731ddc4f9710f549999aa68d3ccf",
+          "resolved_original_facts": 13,
+          "selected_features": 42
+        }
+      ]
+    },
+    {
+      "case_id": "review-08",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-08-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:5452bdd48bfb9c49a1fe09080a6dd285f7bad4ff305c413ba0f92184ab90bec7",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 25
+          },
+          "candidate_id": "review-08-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:711703394e2282fd442d951e92007133c936f1e2cc39151cc9c7dcabbb0e33de",
+          "resolved_original_facts": 9,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 24
+          },
+          "candidate_id": "review-08-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:2fe268702f7f9d0eabeaa7ad631c6064693c76d92e7d7225d54b69f2d5ee9a59",
+          "resolved_original_facts": 9,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 23
+          },
+          "candidate_id": "review-08-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:86fb3f1e6e6c5dfed6249a48ac4937202dbd1c689e99d1590fc6892a02a62df1",
+          "resolved_original_facts": 9,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 34
+          },
+          "candidate_id": "review-08-candidate-5",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 43
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 33
+          },
+          "pair_id": "sha256:274f5a77e4c07d404bb5aec69e05f35ee8cdeb5284bfb2aa27efe704e034cc12",
+          "resolved_original_facts": 10,
+          "selected_features": 43
+        }
+      ]
+    },
+    {
+      "case_id": "review-09",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-09-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:499de7fbfd4df5284c066a9d76f0715126b3af749618a1203ecd763ccabeb962",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 22
+          },
+          "candidate_id": "review-09-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 26
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:02a022fd00b0f4376dc2a3b2c4696e705d5410091b074d6c57082828d5a59349",
+          "resolved_original_facts": 7,
+          "selected_features": 26
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 18
+          },
+          "candidate_id": "review-09-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 28
+          },
+          "origin_resolution": {
+            "resolved": 15,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:5830ddd8aeba46ee10160c47aaa79647949bc3b30b9812be03136fa3b3cd6c55",
+          "resolved_original_facts": 15,
+          "selected_features": 28
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 19
+          },
+          "candidate_id": "review-09-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 27
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:2745d84a78ddea83ec761ba0d4e0b46f034fec85736b496fff5d5936a841b64a",
+          "resolved_original_facts": 9,
+          "selected_features": 27
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 24
+          },
+          "candidate_id": "review-09-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:c5e8b1d574f818b4b7606ae6a2441fcf143df78c517b8f1b1b6c39f69ff23915",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        }
+      ]
+    },
+    {
+      "case_id": "review-10",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 12,
+            "withheld": 18
+          },
+          "candidate_id": "review-10-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:40611cedb41ab544352607b9361e8c9925096ae50d51e46cb85d3bb8062f2b48",
+          "resolved_original_facts": 12,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-10-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 20
+          },
+          "pair_id": "sha256:5f062afec3cb767a5500d63e383cb7133e74c5eda058b5b43870770233920759",
+          "resolved_original_facts": 9,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 19
+          },
+          "candidate_id": "review-10-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 28
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:8dd5781eaa2317af7ceac765f4c8fc7713054af3984e36c7a65f0fd442a41dcf",
+          "resolved_original_facts": 11,
+          "selected_features": 28
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 18
+          },
+          "candidate_id": "review-10-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:325e2b93d9ddff5615f8790f1f377457b932a5acf1f506f4688d112320d8bd5e",
+          "resolved_original_facts": 7,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-10-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:00e72193bd241c6b1f9b23b1b4644f6c0cf31f91af00ed84b4e7b73bf4f38f75",
+          "resolved_original_facts": 8,
+          "selected_features": 29
+        }
+      ]
+    },
+    {
+      "case_id": "review-11",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 16
+          },
+          "candidate_id": "review-11-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 15
+          },
+          "pair_id": "sha256:2ed30ef1c33c8caa407478815bac13f532c4ec7981ede73b2e0ddacce8ae9e26",
+          "resolved_original_facts": 9,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 28
+          },
+          "candidate_id": "review-11-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 35
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:0b780825edbdf11ce36dfb775f143d2bfe5e9cac3695e698624e0f83ba9f58d8",
+          "resolved_original_facts": 12,
+          "selected_features": 35
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 24
+          },
+          "candidate_id": "review-11-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:a6d72c049226595a5e2f2d15f22bc50c8d666a44e7b306b5b0ec3c2d129f522e",
+          "resolved_original_facts": 9,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 24
+          },
+          "candidate_id": "review-11-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:29926ba2ef717789b9538a5e269d10eb06010e0bff0e39eab741140c0286aef4",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 22
+          },
+          "candidate_id": "review-11-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 20
+          },
+          "pair_id": "sha256:d39de0764ddaef0aeca5a9c927628343215b80ee34c433ceb50942fbd3ee43e1",
+          "resolved_original_facts": 10,
+          "selected_features": 30
+        }
+      ]
+    },
+    {
+      "case_id": "review-12",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 18
+          },
+          "candidate_id": "review-12-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 6,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:9e31897143bc3e0e7bbad23f6f1531fc5ae09533922def407e0b7a44c4e835ea",
+          "resolved_original_facts": 6,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 2,
+            "withheld": 22
+          },
+          "candidate_id": "review-12-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 25
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 18
+          },
+          "pair_id": "sha256:0dae18b4a1de5807cdc2c2a0c066fb6dbcaa0ad553e8075dc0cbc2e39b8deb48",
+          "resolved_original_facts": 8,
+          "selected_features": 25
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 25
+          },
+          "candidate_id": "review-12-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 36
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:8b98ffeac9346374683a452326f4dcd63cfe666c9b7f0fdcef6133e8354cf258",
+          "resolved_original_facts": 11,
+          "selected_features": 36
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 34
+          },
+          "candidate_id": "review-12-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 40
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 32
+          },
+          "pair_id": "sha256:5abdbb4c055f4c5bd57ac6cba07aa3feef049ca19c19b850d62b1807363db074",
+          "resolved_original_facts": 8,
+          "selected_features": 40
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 25
+          },
+          "candidate_id": "review-12-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 36
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:f6d2b5fd97fbaf95a0930a0b0b50bf6e6c2e9b9ac24b8818e234c9eacecd8bca",
+          "resolved_original_facts": 11,
+          "selected_features": 36
+        }
+      ]
+    },
+    {
+      "case_id": "review-13",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 24
+          },
+          "candidate_id": "review-13-candidate-1",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:a61a49ca997826f594698f5f68abdd1ca8b289042d035aa5ea44351af66dbf55",
+          "resolved_original_facts": 11,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 23
+          },
+          "candidate_id": "review-13-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:f73ae64a32a3f2b2275f71253e7cf4da88ab7543c5be7f9439435be470afbeb9",
+          "resolved_original_facts": 11,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 25
+          },
+          "candidate_id": "review-13-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 35
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:208ab05f43dc14e4c60c06db9e38f179c6f866721d4b11cc9133c10d6a1e74d6",
+          "resolved_original_facts": 9,
+          "selected_features": 35
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 9,
+            "withheld": 22
+          },
+          "candidate_id": "review-13-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:e0b26ed9d26f575219582e57d1d8e27d5373539e9aa48ea1b07a1dbefeb55086",
+          "resolved_original_facts": 11,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 26
+          },
+          "candidate_id": "review-13-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:54ced9c299af1f6128af44aa87c541e91a0a2010972d56cee9609a0e37b7999a",
+          "resolved_original_facts": 9,
+          "selected_features": 32
+        }
+      ]
+    },
+    {
+      "case_id": "review-14",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 15
+          },
+          "candidate_id": "review-14-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 18
+          },
+          "origin_resolution": {
+            "resolved": 5,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:d4bf6b2f5ef6f48f6134b98e049090fe6c3f42d19206664a18ad722ff260b109",
+          "resolved_original_facts": 5,
+          "selected_features": 18
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 16
+          },
+          "candidate_id": "review-14-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 14
+          },
+          "pair_id": "sha256:f2aee189819905be71761b4d6c3360b218123c820f9ece2e498e6a998fce9790",
+          "resolved_original_facts": 8,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 15
+          },
+          "candidate_id": "review-14-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:eb47282235cacf1c39180ab93427da68dc9b5599554bf80d7bb0fdbcb27399ef",
+          "resolved_original_facts": 8,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 19
+          },
+          "candidate_id": "review-14-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 27
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:08d245344782c98e8e823263fee74011899efc8501f2bf6e6bb0eda2fe36357e",
+          "resolved_original_facts": 8,
+          "selected_features": 27
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 14
+          },
+          "candidate_id": "review-14-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 20
+          },
+          "origin_resolution": {
+            "resolved": 6,
+            "unresolved": 14
+          },
+          "pair_id": "sha256:f160b377fbe3e377b453477fbe5be1b2471aa04cac80a4862281a7b2ef4d5d06",
+          "resolved_original_facts": 6,
+          "selected_features": 20
+        }
+      ]
+    },
+    {
+      "case_id": "review-15",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-15-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:ffe4b114174796a047b4f4fdfcbd74aaf53adbbab50ad0e82b3dc383b93720fa",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 26
+          },
+          "candidate_id": "review-15-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 35
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:01db7ad5515b69556a7b23102694d4086f7d09768df076a2ceb4948f31303a53",
+          "resolved_original_facts": 9,
+          "selected_features": 35
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 18
+          },
+          "candidate_id": "review-15-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 23
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:3085b2a13a684bb9914eed1467065694d7b7121f58ad6535004041e3fa7933dd",
+          "resolved_original_facts": 7,
+          "selected_features": 23
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 15
+          },
+          "candidate_id": "review-15-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 20
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:2db714fe45c53794f2b3662a0e0c755208cc1725cb15af77aab44da371ff6c9d",
+          "resolved_original_facts": 7,
+          "selected_features": 20
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 27
+          },
+          "candidate_id": "review-15-candidate-5",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 27
+          },
+          "pair_id": "sha256:fd9b736d2519d53ba5cbe6b5bad128f19bc7cc4c63281ae5b9552c159aaca514",
+          "resolved_original_facts": 12,
+          "selected_features": 39
+        }
+      ]
+    },
+    {
+      "case_id": "review-16",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 14
+          },
+          "candidate_id": "review-16-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:cebdc9764f9ae0cb18f3da538df8b3c30297aa2d370496ceb8634696f2662592",
+          "resolved_original_facts": 9,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 16
+          },
+          "candidate_id": "review-16-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:9f920555f939491e1c1ab2eb7ba22d503e3ff2952804f40777aecb3a03012282",
+          "resolved_original_facts": 9,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 15
+          },
+          "candidate_id": "review-16-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:bd89f309004ab07e3f93290621aaa31202c9c5ebf85e2fc3a231127296dca7e5",
+          "resolved_original_facts": 9,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 15
+          },
+          "candidate_id": "review-16-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:ccfc5e31b52483845767ce39a25584751f5ceef425bb3bd7eb9675cdb84a8ef9",
+          "resolved_original_facts": 9,
+          "selected_features": 22
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 15
+          },
+          "candidate_id": "review-16-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 22
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 13
+          },
+          "pair_id": "sha256:ae5d2f9ea625c097a67568c9285a9f34d37e4f6fd23034f71a110164725abd6d",
+          "resolved_original_facts": 9,
+          "selected_features": 22
+        }
+      ]
+    },
+    {
+      "case_id": "review-17",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-17-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:a1bddc92428d8259de2fa0a55904ab6146b2237331c6cd6d417ee761e770ea7f",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 15,
+            "withheld": 23
+          },
+          "candidate_id": "review-17-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 40
+          },
+          "origin_resolution": {
+            "resolved": 17,
+            "unresolved": 23
+          },
+          "pair_id": "sha256:036d1f1ea001a71887da7617f186a192b864a0fa06e79c0af61315e9b1e851c1",
+          "resolved_original_facts": 17,
+          "selected_features": 40
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-17-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 20
+          },
+          "pair_id": "sha256:44fe6a2a0bd4036a250fc34ea762f70944e109fa401c9bb35f7f182d4102c5ba",
+          "resolved_original_facts": 10,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 30
+          },
+          "candidate_id": "review-17-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 42
+          },
+          "origin_resolution": {
+            "resolved": 13,
+            "unresolved": 29
+          },
+          "pair_id": "sha256:9f3a9fa638baa6ff628ee9e9b871876f016976a493e9b4c2d51920259fc75e6b",
+          "resolved_original_facts": 13,
+          "selected_features": 42
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 11,
+            "withheld": 27
+          },
+          "candidate_id": "review-17-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 40
+          },
+          "origin_resolution": {
+            "resolved": 13,
+            "unresolved": 27
+          },
+          "pair_id": "sha256:040f6be8fac1715f021639519d84892b54f822a5ffbd60c442ea4992f691d1d3",
+          "resolved_original_facts": 13,
+          "selected_features": 40
+        }
+      ]
+    },
+    {
+      "case_id": "review-18",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 16
+          },
+          "candidate_id": "review-18-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 26
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 15
+          },
+          "pair_id": "sha256:731d94049ab964fb717adecbb9553c1608c11d8268760aa635cc5ba7bc88cd03",
+          "resolved_original_facts": 10,
+          "selected_features": 26
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 22
+          },
+          "candidate_id": "review-18-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 29
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:b8214401df3555991819d8f5ec69b0e66ae18d86161ec728885555014bd1afe8",
+          "resolved_original_facts": 7,
+          "selected_features": 29
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 18
+          },
+          "candidate_id": "review-18-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 24
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:56d5ac568c45bd91fb827881afbdf390503002a6bac2c4f3765d7da1b94d32d7",
+          "resolved_original_facts": 7,
+          "selected_features": 24
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 27
+          },
+          "candidate_id": "review-18-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 33
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:c5e223f0bdce8a0a520df4aa7652a5748070034e668503c067d086742789d096",
+          "resolved_original_facts": 7,
+          "selected_features": 33
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 30
+          },
+          "candidate_id": "review-18-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 41
+          },
+          "origin_resolution": {
+            "resolved": 12,
+            "unresolved": 29
+          },
+          "pair_id": "sha256:dd06d5cff981bb90e5c583d3e2e59ba418b7cc614101eefe818421d80e6d5651",
+          "resolved_original_facts": 11,
+          "selected_features": 41
+        }
+      ]
+    },
+    {
+      "case_id": "review-19",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 6,
+            "withheld": 27
+          },
+          "candidate_id": "review-19-candidate-1",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 34
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:b413dde3e2ae3dc24ed5b241df60d12e4b2eeefd11953b31dbc0693a365f5de7",
+          "resolved_original_facts": 8,
+          "selected_features": 34
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 25
+          },
+          "candidate_id": "review-19-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 33
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 24
+          },
+          "pair_id": "sha256:ea7d790edd68599af477eabcce6c0bd3be527b70bb26fc709951bf73a9bd16c0",
+          "resolved_original_facts": 9,
+          "selected_features": 33
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 27
+          },
+          "candidate_id": "review-19-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 36
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 27
+          },
+          "pair_id": "sha256:1f83b1102d21a91f37fc69f2547d778d81e686f98c157080f50692e9ce247eb4",
+          "resolved_original_facts": 9,
+          "selected_features": 36
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 28
+          },
+          "candidate_id": "review-19-candidate-4",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 36
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 27
+          },
+          "pair_id": "sha256:619b06ee67eebe5effa5cd62681ed780216ed8bf885f94d6999bbdcb3d6b6914",
+          "resolved_original_facts": 9,
+          "selected_features": 36
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 27
+          },
+          "candidate_id": "review-19-candidate-5",
+          "expression_original_facts": 4,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 36
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 27
+          },
+          "pair_id": "sha256:ced8cc40daed05fe46e316e75dd114a4214fee3e295eece018c8fd9e4ed46cf5",
+          "resolved_original_facts": 9,
+          "selected_features": 36
+        }
+      ]
+    },
+    {
+      "case_id": "review-20",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-20-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:fd441b41d9c9b4b86611daddb2b5ca4ee35fd3faeae5cb5245923bc86f863c12",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 21
+          },
+          "candidate_id": "review-20-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:8bdeba58e64d01c164ac7f83ac640f48aabb5e1174857f397d7e5a99b01cc6a1",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 24
+          },
+          "candidate_id": "review-20-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:68b7c1ad0cad6de037b05a63ca8998fb5eead3ef764c87c9a4fe1fad03534e75",
+          "resolved_original_facts": 14,
+          "selected_features": 39
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 23
+          },
+          "candidate_id": "review-20-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:431f87e2654afa8d07e4d78a5a80209201d31bb8e004cf36bd679a54c1af665a",
+          "resolved_original_facts": 11,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-20-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:73831f26ad29b029ad4e7b315f877cc5c8fadf35b8842b4677dda499ea254bc3",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        }
+      ]
+    },
+    {
+      "case_id": "review-21",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-21-candidate-1",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:e920a9013ccd4961e47cdc5f55154497f781538328f35ef8edaa1a350fa81041",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-21-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:b5becd062a682a2afcf137a7175b1bf8d46b5dda9180326871ca7721de611fa0",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 24
+          },
+          "candidate_id": "review-21-candidate-3",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:f0a7caa915b1a6b11463b18644c39b51ce785a1da93d0bb18b4731679f6b95a8",
+          "resolved_original_facts": 14,
+          "selected_features": 39
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 21
+          },
+          "candidate_id": "review-21-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:b31c844b9860c7bdddf5f01ba497c034066a8dc39a55cc6a04b46214017189ea",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 8,
+            "withheld": 21
+          },
+          "candidate_id": "review-21-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:2f52a66b3855068b2e86cf37c60c7f8d1dca2ec453278f5d5e05d668388a7702",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        }
+      ]
+    },
+    {
+      "case_id": "review-22",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-22-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:028544554580f613aa3c0b522ab35b325932e9017de3fdc46c05c14cecf36d99",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 24
+          },
+          "candidate_id": "review-22-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:c0192eddbbe26940c7afd61e87390b28e4608aaa958466948f1c0cc67145c48e",
+          "resolved_original_facts": 14,
+          "selected_features": 39
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-22-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:4e056bdc0cccab0ab147da4e35971e3370b579d68f5ddc2dce4c51d959671a8d",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 24
+          },
+          "candidate_id": "review-22-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 39
+          },
+          "origin_resolution": {
+            "resolved": 14,
+            "unresolved": 25
+          },
+          "pair_id": "sha256:78d13450a66079905496a5ddbde34d7b54a1c48dfcbfc188229359f6906610d0",
+          "resolved_original_facts": 14,
+          "selected_features": 39
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 22
+          },
+          "candidate_id": "review-22-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 10,
+            "unresolved": 21
+          },
+          "pair_id": "sha256:918256d58af727ea4fff4707f360c4fc83b9dad7fa723f5d5a0cb6f960a10038",
+          "resolved_original_facts": 10,
+          "selected_features": 31
+        }
+      ]
+    },
+    {
+      "case_id": "review-23",
+      "pairs": [
+        {
+          "bridge_statuses": {},
+          "candidate_id": "review-23-candidate-1",
+          "expression_original_facts": 0,
+          "feature_sides": [],
+          "graph_projection": {},
+          "origin_resolution": {},
+          "pair_id": "sha256:548fce6438ba04d54a9a73479178f8ff88597dd5b8450de6830b0cbbab0d029b",
+          "resolved_original_facts": 0,
+          "selected_features": 0
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 21
+          },
+          "candidate_id": "review-23-candidate-2",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 26
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 19
+          },
+          "pair_id": "sha256:51aeccfce90109eaf40ea3f831e54b6d2763de91f1b3eb80ea32dc3cefb6e96a",
+          "resolved_original_facts": 7,
+          "selected_features": 26
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 7,
+            "withheld": 26
+          },
+          "candidate_id": "review-23-candidate-3",
+          "expression_original_facts": 5,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 33
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 24
+          },
+          "pair_id": "sha256:b4e9412cb7676f291d10db17ff0796f7230e60459d8c0c57ddc62443bb101d15",
+          "resolved_original_facts": 9,
+          "selected_features": 33
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 13,
+            "withheld": 19
+          },
+          "candidate_id": "review-23-candidate-4",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 32
+          },
+          "origin_resolution": {
+            "resolved": 15,
+            "unresolved": 17
+          },
+          "pair_id": "sha256:dd0d09643bcc3b2d4cc229c087041f3df2eb9737061843a44353f046566502b1",
+          "resolved_original_facts": 15,
+          "selected_features": 32
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 5,
+            "withheld": 17
+          },
+          "candidate_id": "review-23-candidate-5",
+          "expression_original_facts": 3,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 23
+          },
+          "origin_resolution": {
+            "resolved": 7,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:af64aead65ec65b214e5f01bc7c54836f3c0814482e6a3715d6ea7809abfbc10",
+          "resolved_original_facts": 7,
+          "selected_features": 23
+        }
+      ]
+    },
+    {
+      "case_id": "review-24",
+      "pairs": [
+        {
+          "bridge_statuses": {
+            "recorded": 10,
+            "withheld": 21
+          },
+          "candidate_id": "review-24-candidate-1",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 31
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 20
+          },
+          "pair_id": "sha256:acd0b918c72ff2131de5ce5f1ce505f4c1f5331b1f86586f04e87c382134561a",
+          "resolved_original_facts": 11,
+          "selected_features": 31
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 21
+          },
+          "candidate_id": "review-24-candidate-2",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 25
+          },
+          "origin_resolution": {
+            "resolved": 9,
+            "unresolved": 16
+          },
+          "pair_id": "sha256:5a83e191d382423d35066191f80cbc96b9c72f559e754dae0bf39f801e9d20b8",
+          "resolved_original_facts": 9,
+          "selected_features": 25
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 27
+          },
+          "candidate_id": "review-24-candidate-3",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 30
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 22
+          },
+          "pair_id": "sha256:6ea161f8758448e3c51a47eb5c9bba4638d1042997a4cdcb2e1a50c6cd057677",
+          "resolved_original_facts": 8,
+          "selected_features": 30
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 3,
+            "withheld": 31
+          },
+          "candidate_id": "review-24-candidate-4",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 34
+          },
+          "origin_resolution": {
+            "resolved": 8,
+            "unresolved": 26
+          },
+          "pair_id": "sha256:27da0edb6f1b632150dcaa252d210f8c991eb4afa90b464120f7fbb87b77787d",
+          "resolved_original_facts": 8,
+          "selected_features": 34
+        },
+        {
+          "bridge_statuses": {
+            "recorded": 4,
+            "withheld": 31
+          },
+          "candidate_id": "review-24-candidate-5",
+          "expression_original_facts": 2,
+          "feature_sides": [
+            "source",
+            "target"
+          ],
+          "graph_projection": {
+            "not_recorded": 35
+          },
+          "origin_resolution": {
+            "resolved": 11,
+            "unresolved": 24
+          },
+          "pair_id": "sha256:90e18c156a62b04e99d4dc72140ab258d0d4f958f2c0d6928a658bdc77dbd5e3",
+          "resolved_original_facts": 11,
+          "selected_features": 35
+        }
+      ]
+    }
+  ],
+  "composition_receipt": {
+    "bytes": 96846,
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/composition.json",
+    "sha256": "0790ddcf420bc98278c1f898c884c0fab3b924b094650487277eeae05054e230"
+  },
+  "matcher_preservation": {
+    "counts": {
+      "pairs": 30374,
+      "selected_features": 1027952,
+      "sources": 300
+    },
+    "matcher_identity": "sha256:0f1e4345d0b8f42f928bdfa560eb484f5aea818e67ceb1870d431d6b9c044afb"
+  },
+  "retained_graph_projection": {
+    "not_recorded": 3443
+  },
+  "schema": "exact-postmigration-preservation/1",
+  "selected_features": {
+    "resolved": 1079,
+    "unresolved": 2364
+  },
+  "taxonomy": [
+    {
+      "additional_partial_direct_pairs": 4,
+      "asserted_pairs_absent_from_partial": 2,
+      "limitation": "Directness is relative to the returned partial taxonomy; differences imply no biomedical equivalence or contradiction.",
+      "literal_named_edges": 17222,
+      "name": "doid",
+      "native_group_edges": 35333,
+      "native_taxonomy_sha256": "sha256:8563d5690fd1a52669f76460c57f4e12e69e65b5910c333d7e22dd838c3d1cd5",
+      "nontrivial_native_equivalence_groups": 0,
+      "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "served_named_edges": 17224,
+      "structural_named_edges": 17774,
+      "unrepresented_classes": [
+        "http://purl.obolibrary.org/obo/SO_0000135",
+        "http://purl.obolibrary.org/obo/SO_0001745",
+        "http://purl.obolibrary.org/obo/SO_0001746",
+        "http://purl.obolibrary.org/obo/SO_0001775",
+        "http://purl.obolibrary.org/obo/SO_1000029",
+        "http://purl.obolibrary.org/obo/SO_1000044"
+      ],
+      "useful_difference_examples": [
+        {
+          "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+          "child_label": {
+            "fact_id": "sha256:f92770a4c7683bb825449ba31a56a73b8b211bf3ca298775414511d86330fa10",
+            "value": "malignant fibrous histiocytoma of bone"
+          },
+          "entity": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3352",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "parent_label": {
+            "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+            "value": "osteosarcoma"
+          }
+        },
+        {
+          "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+          "child_label": {
+            "fact_id": "sha256:0b53d387c6d75be3bbaf85e64ca7ed739c9fe0f1e3e059e98ce2561bae47aa23",
+            "value": "liposarcoma of bone"
+          },
+          "entity": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_3381",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "parent_label": {
+            "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+            "value": "osteosarcoma"
+          }
+        },
+        {
+          "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+          "child_label": {
+            "fact_id": "sha256:c67e71283e517f8f93a2d1d89ddbcce88c08d9b13a09a8d22bfe7dbf2066a40e",
+            "value": "mediastinal osteogenic sarcoma"
+          },
+          "entity": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_6208",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "parent_label": {
+            "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+            "value": "osteosarcoma"
+          }
+        }
+      ]
+    },
+    {
+      "additional_partial_direct_pairs": 37573,
+      "asserted_pairs_absent_from_partial": 161,
+      "limitation": "Directness is relative to the returned partial taxonomy; differences imply no biomedical equivalence or contradiction.",
+      "literal_named_edges": 209562,
+      "name": "ncit",
+      "native_group_edges": 421430,
+      "native_taxonomy_sha256": "sha256:68cc52ef6e78d356d923741614b28cc50c876665db4725ec914a6032916c93a4",
+      "nontrivial_native_equivalence_groups": 0,
+      "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "served_named_edges": 246974,
+      "structural_named_edges": 247123,
+      "unrepresented_classes": [],
+      "useful_difference_examples": [
+        {
+          "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385",
+          "child_label": {
+            "fact_id": "sha256:4490268e8af7871c2f55d434aae3e7e32e647ecf3bdb1fbd424a8e9370f2f5e0",
+            "value": "Renal Cell Carcinoma Associated with Neuroblastoma"
+          },
+          "entity": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100051",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "parent_label": {
+            "fact_id": "sha256:9bf2fe9caa23b79ad9719c54aab411ac4da095f2e51458fb8e18dbba9b4b1621",
+            "value": "Renal Cell Carcinoma"
+          }
+        },
+        {
+          "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977",
+          "child_label": {
+            "fact_id": "sha256:0c62cc6fc58556edd4bf6c84941babf1fee95535cf37ae30184967d2aed81e55",
+            "value": "Conjunctival Melanocytic Intraepithelial Lesion"
+          },
+          "entity": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100054",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "parent_label": {
+            "fact_id": "sha256:3000035965680bdb2cc40e3f57fa82ec3c7c4c4d6a8663d6f7d2fafd4a4f6561",
+            "value": "Conjunctival Melanocytic Neoplasm"
+          }
+        },
+        {
+          "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "child_label": {
+            "fact_id": "sha256:c4c9d3aa6b240ed70c3438bd9dbffc15bcd55c5af2cdb9ac06b8a81786eb39d4",
+            "value": "Central Nervous System Nongerminomatous Germ Cell Tumor"
+          },
+          "entity": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100093",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "parent_label": {
+            "fact_id": "sha256:22766d990101d03eb64dcbac4a8bb72b6ffff4c8e2a85e82289fc2ce8fb935e8",
+            "value": "Nongerminomatous Germ Cell Tumor"
+          }
+        }
+      ]
+    }
+  ]
+}
