@@ -475,7 +475,7 @@ def aggregate(manifest_path, report_paths, output):
     )
 
 
-def annotate_report(report_path, output):
+def annotate_report(report_path, output, *, interface_manifest=None, interface_state=None):
     """CPU-only completion of saved DEV comparisons; never regenerate a repair."""
     from exact.repair.api import write_artifact
     from exact.repair.protocol import load_protocol_v3, training_projection_v3
@@ -494,6 +494,27 @@ def annotate_report(report_path, output):
         )
     )
     annotation_manifest = authenticate(manifest["annotation_manifest"])
+    if interface_manifest is not None:
+        from tools.repair.dev_semantic_interface import validate_amendment
+
+        declaration = read(interface_manifest)
+        amendment = validate_amendment(declaration)
+        if (
+            manifest["annotation_manifest"] != amendment["previous_manifest"]
+            or binding(report_path) not in amendment["source_reports"]
+            or not interface_state
+        ):
+            raise ValueError("Interface recovery changed its source DEV report")
+        annotation_manifest = Path(interface_manifest)
+        immutable(
+            output / "interface-binding.json",
+            dict(
+                manifest=binding(interface_manifest),
+                state_directory=str(Path(interface_state).resolve()),
+            ),
+        )
+    elif interface_state is not None:
+        raise ValueError("Interface state requires its frozen annotation manifest")
     if manifest.get("test_allowed") is not False or report["expected_rows"] != 32:
         raise ValueError("Primary annotation requires the full fixed DEV denominator")
     declaration = read(annotation_manifest)
@@ -544,16 +565,22 @@ def annotate_report(report_path, output):
         if decoded.get("annotation_pending") and decoded.get("annotation_request"):
             source_request = Path(decoded["annotation_request"])
             request = read(source_request)
-            request_path = (
-                Path(manifest["annotation_state_directory"])
-                / request["request_identity"]
-                / "request.json"
-            )
-            immutable(request_path, request)
-            immutable(
-                request_path.with_name("origin.json"),
-                dict(source=binding(source_request), decoded_row=reference),
-            )
+            if interface_manifest is not None:
+                from tools.repair.dev_semantic_interface import rebind_request
+
+                request_path = rebind_request(source_request, annotation_manifest, interface_state)
+                request = read(request_path)
+            else:
+                request_path = (
+                    Path(manifest["annotation_state_directory"])
+                    / request["request_identity"]
+                    / "request.json"
+                )
+                immutable(request_path, request)
+                immutable(
+                    request_path.with_name("origin.json"),
+                    dict(source=binding(source_request), decoded_row=reference),
+                )
             if (
                 request["selection_slot"] != source["selection_slot"]
                 or request["model_hash"] != recovery["artifact"]["model_hash"]
@@ -632,6 +659,14 @@ def annotate_report(report_path, output):
         epoch=recovery["epoch"],
         selection_rule_unchanged=True,
         prior_epoch5_outcomes_preserved=True,
+        **(
+            dict(
+                annotation_manifest=binding(annotation_manifest),
+                interface_amendment=declaration["dev_interface_amendment"],
+            )
+            if interface_manifest is not None
+            else {}
+        ),
         test_opened=False,
         costs_reset=False,
     )
@@ -650,12 +685,19 @@ def main():
     parser.add_argument("--native-probe", action="store_true")
     parser.add_argument("--annotate-report", action="store_true")
     parser.add_argument("--gpu-uuid")
+    parser.add_argument("--interface-manifest")
+    parser.add_argument("--interface-state")
     parser.add_argument("--aggregate", nargs="+")
     args = parser.parse_args()
     if args.aggregate:
         aggregate(args.manifest, args.aggregate, args.output)
     elif args.annotate_report:
-        annotate_report(args.manifest, args.output)
+        annotate_report(
+            args.manifest,
+            args.output,
+            interface_manifest=args.interface_manifest,
+            interface_state=args.interface_state,
+        )
     elif args.native_probe:
         native_probe(args.manifest, args.output)
     else:

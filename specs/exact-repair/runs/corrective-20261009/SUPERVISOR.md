@@ -1,5 +1,50 @@
 # October corrective repair campaign
 
+## 11 October: corrected DEV evidence interface
+
+The latest explicit user instruction, "Please fix", authorizes the concrete
+DEV evidence-interface correction recorded in
+`learning/dev-interface-recovery-20261011-001/amendment.json`. This supersedes
+the previous readiness incident's claim that no request-content fix remained.
+That investigation missed native query/non-vacuity results without citable evidence
+IDs, ambiguous shared-theory block presentation, local input caps below the fixed
+cohort's complete packets, and exclusion of identical decoded/counterpart plans.
+Read the bound plan, qualification receipt, admission measurements and new batch.
+
+Use one versioned observation revision over all 32 original final-epoch DEV slots
+and their six original swap audits. Preserve all old observations, including the
+seven eligible ones; do not combine whichever old/new scores look preferable.
+The four prespecified interface controls reuse their exact five presentations in
+the full cohort. Complete theories are inline; native evidence is plan/proof/query
+bound. The prompt makes authored fictional meaning assessable only within its
+already declared scope. Identical plans permit grounded equal scores/ties, never
+automatic perfect or neutral labels. Genuine ambiguity still abstains. Keep the
+strict original selection rule, all 192 verified repairs, weights, counterpart
+assignments and TEST boundary. No retraining or new candidate search is required.
+
+The measured profile permits 131072 input tokens / 393216 bytes and 3000 output
+tokens on the same pinned MiniMax M3/Together endpoint. The full revision's 38
+presentations reserve at most $1.6310208, within the existing $35 / 704 request
+ceiling and DEV96 quota. Actual old charges and any authenticated429 attempts
+remain cumulative. The explicit DEV elapsed-window amendment permits this CPU
+recovery through the existing learning deadline, 12 October 18:03:24 UTC; the
+learning clock and original start times are unchanged. Charge learning and
+DEV worker time; retain all old model-stage charges. Do not reapply an expired
+per-fit elapsed window to this separately declared CPU-only interface correction.
+
+After the fixed qualification panel passes, run paired seed13 annotation consumers,
+then paired seed37/73 consumers and the consolidated readiness review. Reuse the
+saved native plans under exact dependency identities. All request/response artifacts
+are resumable; do not repay completed qualification observations or replay new
+terminal scientific abstentions. If qualification fails, inspect the saved exact
+responses and identify whether a technical defect remains before escalating.
+If adequate labels still cannot be established, record the scientific limitation
+and a concrete protocol decision; do not silently accept an arbitrary checkpoint.
+Finish routine batch preparation and TEST packaging autonomously, preserving the
+14 October 17:00 UTC TEST opening and deadline priorities below. The same existing
+five-minute deterministic supervisor, ChatGPT login, gpt-6-astra/xhigh, action-only
+notification policy and two-unsuccessful-technical-repair rule remain authoritative.
+
 ## 11 October: user-authorized validation recovery
 
 Latest recovery handoff is `qualification/validation-recovery-20261011-001/handoff.json`

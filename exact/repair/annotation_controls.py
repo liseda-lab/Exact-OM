@@ -7,6 +7,10 @@ import hashlib
 from pathlib import Path
 from functools import lru_cache
 from collections.abc import Mapping
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from exact.llm.routing import OpenRouterClient
 from exact.repair.records import canonical_json
 
 SCHEMA_VERSION = "semantic-fidelity-response/v1"
@@ -24,7 +28,14 @@ def response_format(packet, swapped=False):
         )
 
     text = dict(type="string")
-    decision = dict(type="string", enum=["A", "B", "tie", "abstain"])
+    decision = dict(
+        type="string",
+        enum=(
+            ["tie", "abstain"]
+            if packet.plan_a.plan_id == packet.plan_b.plan_id
+            else ["A", "B", "tie", "abstain"]
+        ),
+    )
     citation = dict(type="string", enum=sorted(packet.evidence))
     criterion = obj(
         dict(
@@ -82,7 +93,9 @@ def validate_wire_controls(controls):
     return json.loads(canonical_json(controls))
 
 
-def controlled_completion(client, profile, messages, max_tokens, role, controls):
+def controlled_completion(
+    client: OpenRouterClient, profile, messages, max_tokens, role, controls
+) -> dict[str, Any]:
     """Reuse durable shared generation, without modifying its public chat API."""
     controls = validate_wire_controls(controls)
     if (

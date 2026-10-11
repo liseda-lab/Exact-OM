@@ -1,0 +1,38 @@
+{
+  "amendment": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-001/amendment.json",
+    "sha256": "5fc28468d7fa4a2de395a94688d78e64e260356d13bbc31f8422047060c33419"
+  },
+  "checks": [
+    {
+      "kind": "semantic/interface/transport/regression",
+      "passed": 191
+    },
+    {
+      "kind": "final-entrypoint/readiness-followup",
+      "passed": 27
+    },
+    {
+      "kind": "mypy",
+      "source_files": 6
+    },
+    {
+      "contracts": 5,
+      "kind": "import-boundaries"
+    }
+  ],
+  "contracts": [
+    "Native query and non-vacuity citations bind the exact plan, theory, query basis, policy and consequence proof; false entailment is not entailed negation.",
+    "Complete theories inline, legacy prompt and packet encodings replay unchanged.",
+    "Identical assignment may receive evidence-supported equal scores; missing evidence remains unknown.",
+    "Whole original final-DEV cohort, one explicit correction revision; original observations, splits, weights and shared charges preserved.",
+    "Qualified teacher and runtime guard authorize only declared interface/input changes; no silent provider, rubric or selection change."
+  ],
+  "plan": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-001/plan.json",
+    "sha256": "78e81801e5c2058b1a8063efde25ebaa49c23a353d05b5df462303d3968485e7"
+  },
+  "schema": "exact-repair/implementation-correction/v1",
+  "selection_rule_unchanged": true,
+  "test_opened": false
+}
