@@ -241,11 +241,16 @@ def _mapping_axioms(raw, left, right):
 
 
 def construct_native(manifest, pair_id):
+    return construct_row_native(train_row(manifest, pair_id))
+
+
+def construct_row_native(row):
+    """Construct an already admitted public row; callers own split admission."""
     import pyowl_core as owl
     from exact.repair.candidates import make_candidate, replacement_cost_features
     from exact.repair.records import PolicyV2, RepairInputV2, RevisionObjectV2, promote_input_v3
 
-    row = train_row(manifest, pair_id)
+    pair_id = row["id"]
     snapshots, route = [], []
     for item in row["ontology_bindings"]:
         bound_bytes(item)
