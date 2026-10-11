@@ -1,0 +1,30 @@
+{
+  "activation": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-004/activation-final.json",
+    "sha256": "88c338c849ba172822ac99b1846c7d32ba16c9091837143158ce96573856771a"
+  },
+  "costs_reset": false,
+  "handoff": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-interface-recovery-20261011-004/handoff.json",
+    "sha256": "a450f8c3909fe296687b8a8e404ce706ebaabdd076e2f5d132c9629d9c940ddb"
+  },
+  "implemented": [
+    "plan-bound native query and non-vacuity citations",
+    "inline complete theories and deterministic full asserted-text contrast",
+    "measured full-cohort input profile",
+    "identical-plan anchored ties without fabricated quality",
+    "exact mandatory criteria wire shape and citation-only output",
+    "whole-cohort immutable annotation revision, shared budgets and compatible resume"
+  ],
+  "limitation": "One final control response contradicts native evidence and remains invalid. The primary selection gate is unchanged. Remaining fixed slots continue independently; do not declare all six models selected or the teacher semantically correct.",
+  "recorded_epoch": 1791758862.110479,
+  "schema": "exact-repair/committed-campaign-handoff/v1",
+  "source_commit": "a18e6b2540000ed001bce27d8699d136d93bc901",
+  "test_opened": false,
+  "validation": {
+    "final_schema_and_interface_tests": 82,
+    "final_typed_source_files": 5,
+    "import_boundary_contracts": 5,
+    "initial_regression_tests": 191
+  }
+}
