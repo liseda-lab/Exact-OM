@@ -127,7 +127,7 @@ def merge_evidence(recovered, latest):
     """Preserve exact feature identity, recorded numbers and producer projection flags."""
     old = {x["evidence_id"]: x for x in recovered}
     new = {x["evidence_id"]: x for x in latest}
-    if len(old) != len(recovered) or old.keys() != new.keys():
+    if len(old) != len(recovered) or len(new) != len(latest) or old.keys() != new.keys():
         raise ValueError("Selected feature identities differ")
     mutable = {
         "fact_ids",

@@ -1079,7 +1079,8 @@
             "schema": {
               "enum": [
                 "parents",
-                "children"
+                "children",
+                "ancestors"
               ],
               "type": "string",
               "default": "parents",

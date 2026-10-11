@@ -509,3 +509,69 @@ def test_partial_cursor_cannot_reuse_unavailable_complete_only_basis(fixture):
         context.hierarchy(
             ent(context), basis="reasoner_inferred", policy=policy, cursor=page["next_cursor"]
         )
+
+
+@pytest.mark.parametrize("basis", ["literal_asserted", "elk_inferred_partial"])
+def test_scoped_ancestor_graph_uses_same_bounded_artifact(fixture, tmp_path, basis):
+    from tests.explanation_study_workspace_test import Store, client_for
+    from exact_inspect.study.workspace import build_workspace_scope
+
+    context, policy, args = fixture
+    data, binding = admit(context, **args)
+    context = materialize(context, policy=policy, data=data, binding=binding)
+    case = {
+        "case_id": "case-a",
+        "source": ent(context).model_dump(),
+        "candidates": [
+            {"candidate_id": "candidate-b", "entity": ent(context, "urn:B").model_dump()}
+        ],
+        "explanation_refs": [],
+    }
+    scope = build_workspace_scope(
+        tmp_path,
+        scope_id="opaque-workspace",
+        kind="case",
+        case=case,
+        contexts={context.ontology_version_id: context},
+        policy=policy,
+        reuse_prepared_contexts=True,
+    )
+    study = {
+        "contract_version": "exact-study/1.0",
+        "study_revision": "revision-a",
+        "cases": [case],
+        "policy_hash": policy.policy_hash.removeprefix("sha256:"),
+        "visibility_policy": policy.model_dump(mode="json"),
+        "workspace_scopes": [scope.model_dump(mode="json")],
+    }
+    store = Store(tmp_path, study)
+    with client_for(store) as client:
+        query = {**ent(context).model_dump(), "basis": basis, "direction": "ancestors", "limit": 5}
+        response = client.get("/api/v1/study/workspace/opaque-workspace/hierarchy", params=query)
+        assert response.status_code == 200, response.text
+        page = response.json()
+        original = context.hierarchy(
+            ent(context), basis=basis, direction="ancestors", limit=5, policy=policy
+        )
+        assert page["items"] == original["items"] and page["nodes"] == original["nodes"]
+        assert len(page["nodes"]) <= 5 and ent(context).model_dump() in page["nodes"]
+        if basis == "elk_inferred_partial":
+            assert page["status"] == "partial" and page["next_cursor"]
+            rejected = client.get(
+                "/api/v1/study/workspace/opaque-workspace/hierarchy",
+                params={**query, "limit": 4, "cursor": page["next_cursor"]},
+            )
+            assert rejected.status_code == 409 and rejected.json()["code"] == "stale_cursor"
+        store.current["condition"] = "ontology_baseline"
+        assert (
+            client.get(
+                "/api/v1/study/workspace/opaque-workspace/hierarchy", params=query
+            ).status_code
+            == 403
+        )
+
+
+def test_composition_refuses_duplicate_latest_evidence_identity():
+    saved = {"evidence_id": "same", "fact_ids": ["admitted"]}
+    with pytest.raises(ValueError, match="identities"):
+        merge_evidence([saved], [saved, saved])

@@ -1056,7 +1056,7 @@ def install_workspace_routes(router, store, participant_dependency):
         ontology_version_id: str,
         iri: str = Query(..., min_length=1, max_length=2048),
         kind: EntityKind = "class",
-        direction: Literal["parents", "children"] = "parents",
+        direction: Literal["parents", "children", "ancestors"] = "parents",
         basis: Literal[
             "literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"
         ] = "literal_asserted",
