@@ -690,8 +690,16 @@ def test_controlled_entrypoint_distinguishes_input_tokens_from_full_packet_bytes
     settings["teacher_panel"] = {"test_only": True}
     monkeypatch.setattr(runner, "_request_budget", lambda m: (runner.PHASE_LIMITS, None))
     if context_bytes > 32768:
-        with pytest.raises(ValueError, match="independent byte cap"):
-            runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=300)
+        assert (
+            runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=300) is None
+        )
+        receipt = runner.read(tmp_path / "out/receipt.json")
+        assert receipt["status"] == "input_byte_bound"
+        assert receipt["retry_permitted"] is False
+        assert (
+            runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=300) is None
+        )
+        assert runner.read(tmp_path / "out/receipt.json") == receipt
         assert calls == []
         assert not (tmp_path / "ledger/phase-reservations.json").exists()
     else:

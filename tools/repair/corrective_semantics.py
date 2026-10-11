@@ -1005,8 +1005,8 @@ def annotate_packet(
     # Bound the ENTIRE message, not just evidence, before spending. UTF-8 bytes
     # plus framing is conservative for all shortlisted text tokenizers.
     messages = schedule.slots[0]["parameters"]["messages"]
-    if (
-        input_token_bound(
+    try:
+        tokens = input_token_bound(
             messages,
             (
                 {
@@ -1020,8 +1020,26 @@ def annotate_packet(
             controls["tokenizer"] if controls else None,
             byte_cap,
         )
-        > token_cap
-    ):
+    except ValueError as error:
+        router.hosted.close()
+        # A complete packet can exceed the independent frozen wire-byte cap
+        # even after lossless encoding. This is terminal input unavailability,
+        # not a provider failure or permission to truncate/resample evidence.
+        # Integrity/configuration errors must still fail for diagnosis.
+        if str(error) != "Annotation input exceeds independent byte cap":
+            raise
+        write_artifact(
+            receipt_path,
+            dict(
+                identity=identity,
+                status="input_byte_bound",
+                max_input_bytes=byte_cap,
+                retry_permitted=False,
+                costs_reset=False,
+            ),
+        )
+        return None
+    if tokens > token_cap:
         write_artifact(
             receipt_path,
             dict(
