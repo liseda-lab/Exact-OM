@@ -1419,7 +1419,9 @@ def prepare_decoded_packet(request_path: Path, manifest_path: Path, *, seconds: 
     if manifest.get("dev_interface_amendment"):
         from tools.repair.dev_semantic_interface import native_evidence
 
-        evidence = native_evidence(case.probes, plans, evidence)
+        evidence = native_evidence(
+            case.probes, plans, evidence, compare_text=manifest.get("theory_text_comparison", False)
+        )
     packet = SemanticEvidencePacketV3(
         case.case_id,
         case.structural_parent,

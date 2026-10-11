@@ -1,5 +1,27 @@
 # October corrective repair campaign
 
+## 11 October: complete-theory contrast
+
+Version002 passed structural eligibility on all four controls, but manual review
+found rationales that called different rendered theories identical. Its report is
+operational qualification, not semantic truth. Version003 in
+`learning/dev-interface-recovery-20261011-003` adds THEORY_COMPARISON: a deterministic,
+plan-bound identity boolean and the complete literal line differences, alongside
+both complete theories. This supplies the missing readable contrast without a
+model-generated summary, a desired preference, a score or an edit-count reward.
+Prompt v3.5 distinguishes asserted differences from logical equivalence and forbids
+inferring unqueried preservation from an unrelated witness outcome. The strict
+citation, quote and boolean validator remains unchanged. Preserve all ten earlier
+qualification presentations and rationales; do not mix labels across revisions.
+This is the final technical qualification of the declared input presentation. If
+the teacher still cannot reliably interpret it, report that real scientific blocker
+with a concrete protocol decision; do not keep resampling or changing prompts until
+scores become convenient. The fixed revision needs 38 presentations, still within
+DEV96 / total704 / $35. Format revisions share their fixed pair identity but every
+wire request has a distinct charged presentation identity. Only version003 consumers
+may be released. All earlier consumer descriptors remain held, and the original
+absolute learning/DEV recovery deadline stays unchanged.
+
 ## 11 October: quotation-format follow-up
 
 The first interface panel admitted every full packet and produced three usable

@@ -132,7 +132,26 @@ result is false; include the corresponding evidence ID in symbolic_claims.
 This changes request presentation, not evidence, scores or abstention rules.
 """
 )
+CONTRAST_PROMPT_VERSION = "semantic-fidelity-prompt/v3.5"
+CONTRAST_PROMPT = (
+    CITATION_PROMPT
+    + """
+THEORY_COMPARISON is a deterministic comparison of the complete rendered theories,
+identified by their plan IDs. It states whether their full text is identical and
+lists EVERY line present only in each theory. These are literal asserted-content
+differences, not edit costs, model scores, or claims about logical equivalence.
+Use this comparison instead of guessing equality from the long shared background.
+A false THEORY_COMPARISON value forbids describing the theories as identical.
+Both full theories remain in the packet. An assertion absent from one theory may
+still be entailed, but claim that only when its native query evidence establishes
+it. A different query about a witness or an unwanted consequence does not prove
+retention of an unqueried intended range/domain assertion. Do not invent the
+missing entailment; assess asserted content using the declared meaning evidence,
+and retain unknown where the missing result is necessary for the judgment.
+"""
+)
 PROMPTS = {
+    CONTRAST_PROMPT_VERSION: CONTRAST_PROMPT,
     CITATION_PROMPT_VERSION: CITATION_PROMPT,
     PROMPT_VERSION: PROMPT,
     INTERFACE_PROMPT_VERSION: INTERFACE_PROMPT,
