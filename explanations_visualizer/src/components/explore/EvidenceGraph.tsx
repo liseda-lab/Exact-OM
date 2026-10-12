@@ -1013,6 +1013,7 @@ export function EvidenceGraph({
                           <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
                             {relationText(edge)}
                             {record.bridge.level === "feature_correspondence" && <span className="meta"> · {correspondenceEnds(record.bridge)}</span>}
+                            {record.copies > 1 && <span className="meta"> · recorded {record.copies}×</span>}
                           </button>
                         </li>
                       );
@@ -1024,8 +1025,9 @@ export function EvidenceGraph({
                   Also recorded, not drawn:{" "}
                   {(["not_drawn", "withheld"] as const)
                     .map((status) => {
-                      const of = base.bridges.filter((record) => record.status === status);
-                      return of.length ? `${of.length} ${status === "withheld" ? "with withheld records" : "pairing a feature that is not drawn"} (${countsByChannel(of.map((record) => record.bridge.channel))})` : null;
+                      // Record counts, so identical repeated records still count individually.
+                      const channels = base.bridges.filter((record) => record.status === status).flatMap((record) => Array<string>(record.copies).fill(record.bridge.channel));
+                      return channels.length ? `${channels.length} ${status === "withheld" ? "with withheld records" : "pairing a feature that is not drawn"} (${countsByChannel(channels)})` : null;
                     })
                     .filter(Boolean)
                     .join(" · ")}{" "}
@@ -1047,7 +1049,7 @@ export function EvidenceGraph({
                           </button>
                         ) : (
                           <span className="graph-item graph-item-static">
-                            {name} <span className="meta">· {record.status === "withheld" ? "its records are withheld in this view" : "a feature it pairs is not drawn"}</span>
+                            {name} <span className="meta">· {record.status === "withheld" ? "its records are withheld in this view" : "a feature it pairs is not drawn"}{record.copies > 1 ? ` · recorded ${record.copies}×` : ""}</span>
                           </span>
                         )}
                       </li>

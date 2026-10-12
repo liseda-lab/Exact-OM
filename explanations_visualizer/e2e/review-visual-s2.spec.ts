@@ -86,7 +86,10 @@ for (const scheme of SCHEMES) {
           await page.waitForTimeout(1500);
           // The whole graph panel (canvas, legend and item list), then the canvas in the viewport.
           const panel = page.getByRole("tabpanel");
+          // Element captures scroll the page: keep the sticky app header out of the stitched image.
+          await page.locator(".app-header").evaluate((header) => ((header as HTMLElement).style.position = "static"));
           await panel.screenshot({ path: join(out!, `main-graph-${name}-${width}-${scheme}-panel.png`) });
+          await page.locator(".app-header").evaluate((header) => ((header as HTMLElement).style.position = ""));
           await page.locator(".graph-canvas, .graph-empty").first().scrollIntoViewIfNeeded();
           await shot(page, `main-graph-${name}-${width}-${scheme}`);
         }

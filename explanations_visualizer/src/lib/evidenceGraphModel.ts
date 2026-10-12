@@ -67,6 +67,8 @@ export interface BridgeRecord {
   bridge: EvidenceBridge;
   status: "drawn" | "not_drawn" | "withheld";
   edgeId?: string;
+  /** Identical recorded comparisons (everything but their IDs) shown once; at least 1. */
+  copies: number;
 }
 
 /** Where one selected record ended up in the graph. */
@@ -230,20 +232,36 @@ export function buildGraphModel(
   // Recorded comparisons only. A feature correspondence is drawn between the two feature nodes
   // it names, when both features are drawn; otherwise it stays listed with its status.
   const featureNode = (evidenceIds: string[], side: GraphSide) => edges.find((edge) => edge.kind === "feature" && edge.side === side && edge.evidenceId && evidenceIds.includes(edge.evidenceId))?.target ?? null;
-  const bridges: BridgeRecord[] = (options.metadata?.bridges ?? []).map((bridge) => {
-    if (bridge.status === "withheld") return { bridge, status: "withheld" };
-    if (bridge.level === "channel_comparison") {
-      const id = `bridge:${bridge.bridge_id}`;
-      edges.push({ id, source: focal.source, target: focal.target, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
-      return { bridge, status: "drawn", edgeId: id };
+  // The same comparison can be recorded more than once with only its ID differing: it is one
+  // line and one row, and keeps its multiplicity so every record is still counted.
+  const seen = new Map<string, BridgeRecord>();
+  const bridges: BridgeRecord[] = [];
+  for (const bridge of options.metadata?.bridges ?? []) {
+    const { bridge_id: _id, ...content } = bridge;
+    // The service serialises bridges in one field order, so equal content gives equal text.
+    const key = JSON.stringify(content);
+    const earlier = seen.get(key);
+    if (earlier) {
+      earlier.copies += 1;
+      continue;
     }
-    const from = featureNode(bridge.source_evidence_ids, "source");
-    const to = featureNode(bridge.target_evidence_ids, "target");
-    if (!from || !to) return { bridge, status: "not_drawn" };
-    const id = `corr:${bridge.bridge_id}`;
-    edges.push({ id, source: from, target: to, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
-    return { bridge, status: "drawn", edgeId: id };
-  });
+    const record = ((): BridgeRecord => {
+      if (bridge.status === "withheld") return { bridge, status: "withheld", copies: 1 };
+      if (bridge.level === "channel_comparison") {
+        const id = `bridge:${bridge.bridge_id}`;
+        edges.push({ id, source: focal.source, target: focal.target, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
+        return { bridge, status: "drawn", edgeId: id, copies: 1 };
+      }
+      const from = featureNode(bridge.source_evidence_ids, "source");
+      const to = featureNode(bridge.target_evidence_ids, "target");
+      if (!from || !to) return { bridge, status: "not_drawn", copies: 1 };
+      const id = `corr:${bridge.bridge_id}`;
+      edges.push({ id, source: from, target: to, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
+      return { bridge, status: "drawn", edgeId: id, copies: 1 };
+    })();
+    seen.set(key, record);
+    bridges.push(record);
+  }
   return { nodes: Array.from(nodes.values()), edges, records, omitted, oneSided, bridges, bridgeStatus: options.metadata ? options.metadata.bridge_status : "unknown" };
 }
 

@@ -43,6 +43,15 @@ test("comparison lines come only from recorded matcher comparisons, never from c
   assert.ok(lines.every((edge: { evidenceId?: string; factId?: string }) => !edge.evidenceId && !edge.factId), "a bridge is not an original fact");
 });
 
+test("a comparison recorded twice with only its ID differing is one line that keeps its count", () => {
+  const axioms = { f1: sub(source.iri, named("https://s#P")), f2: sub(target.iri, named("https://t#Q")) };
+  const items = [item("e1", "source", "hierarchy", ["f1"]), item("e2", "target", "hierarchy", ["f2"])] as never;
+  const twice = [bridge("b1", "feature_correspondence", "hierarchy", "recorded", ["e1"], ["e2"]), bridge("b2", "feature_correspondence", "hierarchy", "recorded", ["e1"], ["e2"])];
+  const model = buildGraphModel(source, target, items, axioms, { metadata: { bridge_status: "recorded", bridges: twice } as never });
+  assert.equal(model.edges.filter((edge: { kind: string }) => edge.kind === "bridge").length, 1);
+  assert.deepEqual(model.bridges.map((record: { copies: number }) => record.copies), [2], "both records are still counted");
+});
+
 test("node identity keeps side, ontology, kind and IRI: punned entities and shared IRIs never merge", () => {
   const punned = "https://s#X";
   const axioms = {
