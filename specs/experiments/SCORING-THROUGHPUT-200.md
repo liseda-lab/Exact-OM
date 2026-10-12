@@ -6,10 +6,13 @@ Implementation evidence (updated 2026-10-10): [handoff](THROUGHPUT-IMPLEMENTATIO
 748 CPU regression tests passed on the final frozen source. Experimental H0
 batching measured 12.103 cold unique pairs/s on an RTX 2060 SUPER and failed discrete evidence parity; it is
 blocked from scientific use. Final fitted recipes and RTX 4090 verification remain
-pending, with 4090 checks deferred by the user until active G4 finishes. The
-acceptance criteria below are unchanged.
+pending. On October 12 the user requested a G4 checkpoint pause and optimization
+review before continuing. The [updated review](THROUGHPUT-REVIEW-20261010.md)
+identifies repeated multi-GB fitted-artifact hashing, a mandatory-validation
+exception gap, and additional batching checks. No optimized GPU throughput is
+claimed; the numerical and scientific acceptance criteria remain binding.
 
-Inspected checkout: `328b9c5a`. Running G4 source:
+Original October 9 inspection: checkout `328b9c5a`, then-running G4 source:
 `035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f`, frozen under
 `data/experiments-v2/runtime/g4-freeze-code-20261008-02/`. These are separate
 execution identities. This document changes neither source tree used by G4 nor its
@@ -235,6 +238,13 @@ inventory explicitly identifies retained public-input fixes and their tests.
 - Rebuild immutable scope inputs once per batch and once after a relevant mutation.
   The typed reversal diagnostic can mutate relation interpretation; `tau` and all
   other channel-affecting changes must produce the appropriate new identity.
+- Include fitted retrieval artifacts in the performance regression. Dataset
+  fingerprint access must not repeatedly hash multi-GB weights per channel or
+  pair. Verify contents at admission/resume and reuse the verified binding within
+  the batch; explicitly validate mandatory inputs outside optional-cache fallback
+  handling. Changed, missing or unreadable required artifacts must fail even with
+  caching disabled or a cached score available. Any inventory/stat optimization
+  must preserve byte validation and mutation/replacement detection.
 - Group bounded local cache writes into transactions. Flush and release any write
   transaction before network waits, long training or yielding ownership. A
   per-batch context is not permission to hold a shared SQLite writer through a
@@ -284,6 +294,9 @@ round trips and transfers without growing an unbounded resident cache.
 
 Implement one bounded execution path around the existing channel semantics:
 
+Look up compatible channel results before constructing blocks or encoding their
+contexts. A cache hit must not repeat the numerical work that produced it.
+
 1. Gather unique entity pools and relevant label/item texts for a chunk. Encode
    missing label/item vectors in bounded batches. Assemble support matrices in
    shape buckets or padded masked batches; padding never contributes to maxima,
@@ -313,6 +326,14 @@ selected evidence, tie ordering, routing, acceptance and final mappings. Numeric
 tolerances cannot justify changed discrete decisions. If discrepancies exist,
 preserve legacy computation for affected cases under a validated detection rule
 or reject the optimization; a guessed epsilon is not a universal parity proof.
+
+After the observed GPU failure, isolate encoder rebatching, matrix-kernel changes
+and CPU/GPU arithmetic separately. The first transfer/cache optimization must
+retain legacy encoder padding/call boundaries and arithmetic. Check exact hosted
+packet bytes as well as selected facts: score formatting can change prompts even
+when fact membership stays constant. Larger batching remains conditional on this
+proof; no tolerance or new numerical convention is approved by the performance
+target.
 
 **Done when:** adversarial fixtures and real-data parity satisfy section 5, all
 source groups remain complete, and measurements show actual larger context

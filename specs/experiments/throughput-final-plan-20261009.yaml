@@ -2,8 +2,41 @@ schema_version: 1
 kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
-updated_at: '2026-10-10'
+updated_at: '2026-10-12'
 status: implemented_with_failed_gpu_batching_acceptance_not_deployed
+review_20261012:
+  handoff: specs/experiments/THROUGHPUT-REVIEW-20261010.md
+  evidence_root: data/experiments-v2/g4-performance-audit-20261012-01
+  authorization: checkpoint_pause_and_optimization_review_before_scientific_resumption
+  inspected_development_commit: 7e14916a
+  frozen_G4_commit: 42b27c06e3e669d7907e7ebf86cb6e75b7e8af62
+  dominant_observed_bottleneck: repeated_fitted_cross_encoder_content_hashing_in_channel_cache_scope
+  actual_artifact_hash_seconds: 1.3566
+  actual_artifact_hash_logical_bytes: 2261814284
+  representative_scope_reproduction:
+    forwards: 2
+    pairs_per_forward: 16
+    channel_lookups_per_pair: 16
+    frozen_identity_checks: 512
+    prepared_identity_checks: 2
+    outputs_equal: true
+    GPU_throughput_measurement: false
+  required_before_scientific_resumption:
+    - mandatory_artifact_validation_outside_optional_cache_exception_handling
+    - fitted_artifact_read_count_and_mutation_regressions
+    - actual_fitted_G4_recipe_parity_and_performance_receipt
+    - safe_checkpoint_cache_and_fit_compatibility_binding
+  additional_batching_work:
+    - skip_structural_block_preparation_for_channel_cache_hits
+    - isolate_encoder_matrix_kernel_and_CPU_GPU_reduction_changes
+    - exact_evidence_provenance_prompt_routing_and_fitted_selector_parity
+    - bounded_local_cache_placement_and_whole_run_forecast
+  existing_focused_tests_passed: 52
+  actual_4090_optimized_throughput: pending
+  full_dataset_elapsed_target_hours: 24
+  elapsed_target_is_kill_timer: false
+  new_scientific_runs_launched: false
+  historical_post_G4_completion_dependencies_rewritten: false
 review_20261010:
   handoff: specs/experiments/THROUGHPUT-REVIEW-20261010.md
   authorization: review_and_supervisor_managed_post_G4_checks_only
