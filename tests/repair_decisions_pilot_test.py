@@ -79,6 +79,14 @@ def test_unknown_never_becomes_numeric_training_label():
     assert row["training_eligible"] is False and row["selection_eligible"] is False
 
 
+def test_choice_only_followup_preserves_unknown_without_forcing_a_score():
+    wire = pilot.payload(cases(), include_scores=False)
+    assert all(q["type"] != "score" for q in wire["questions"].values())
+    row = pilot.assess(response(wire, unknown=True), wire, cases())[0]
+    assert row["scores"] == [None, None] and row["derived_preference"] == "abstain"
+    assert row["preference_consistent"]
+
+
 @pytest.mark.parametrize(
     "mutation", ["missing", "nan", "mass", "wrong_score", "wrong_model", "legend"]
 )

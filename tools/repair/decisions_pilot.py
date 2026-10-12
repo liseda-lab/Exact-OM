@@ -46,7 +46,7 @@ PREFERENCE = {
 RUBRIC = pilot.PROMPT.split("Return a preference")[0]
 
 
-def payload(cases, swapped=False):
+def payload(cases, swapped=False, *, include_scores=True):
     state, questions = {}, {}
     for case in cases:
         name, content = case["id"], case["payload"]
@@ -71,11 +71,12 @@ def payload(cases, swapped=False):
                 questions[key + ":anchor"] = dict(
                     type="choice", instructions=instructions, criteria=ANCHORS
                 )
-                questions[key + ":score"] = dict(
-                    type="score",
-                    instructions=instructions,
-                    criteria=[f"{k}: {v}" for k, v in ANCHORS.items() if k != "unknown"],
-                )
+                if include_scores:
+                    questions[key + ":score"] = dict(
+                        type="score",
+                        instructions=instructions,
+                        criteria=[f"{k}: {v}" for k, v in ANCHORS.items() if k != "unknown"],
+                    )
     return dict(
         model=MODEL,
         state=state,
@@ -155,7 +156,9 @@ def assess(response, wire, cases, swapped=False):
                     anchor=anchor,
                     value=pilot.ANCHORS[anchor],
                     expected_score=(
-                        None if anchor == "unknown" else answers[key + ":score"]["score"] / 4
+                        None
+                        if anchor == "unknown" or key + ":score" not in answers
+                        else answers[key + ":score"]["score"] / 4
                     ),
                     confidence=answers[key + ":anchor"]["confidence"],
                 )
@@ -211,16 +214,25 @@ def validate(plan):
         plan["schema"] != VERSION
         or plan["semantic_role"] != ROLE
         or plan["budget_phase"] != "development"
-        or plan["max_requests"] != 2
-        or len(plan["slots"]) != 2
-        or [s["swapped"] for s in plan["slots"]] != [False, True]
-        or len({s["id"] for s in plan["slots"]}) != 2
+        or plan["max_requests"] != (1 if plan.get("single_case_followup") else 2)
+        or len(plan["slots"]) != plan["max_requests"]
+        or [s["swapped"] for s in plan["slots"]]
+        != ([False] if plan.get("single_case_followup") else [False, True])
+        or len({s["id"] for s in plan["slots"]}) != plan["max_requests"]
         or not plan["authorization"]["user_text"]
         or plan["profile"]["api_base"] != BASE
         or plan["profile"]["model"] != MODEL
     ):
         raise ValueError("Invalid isolated Decisions qualification plan")
     cases = bound(plan["cases"])
+    if plan.get("single_case_followup") and (
+        len(cases) != 1
+        or cases[0]["role"] != "authored_control"
+        or plan.get("include_scores") is not False
+    ):
+        raise ValueError(
+            "The isolated follow-up requires one authored control and choice-only questions"
+        )
     if len({c["id"] for c in cases}) != len(cases) or any(
         c["role"] not in ("authored_control", "dev_diagnostic") for c in cases
     ):
@@ -251,7 +263,7 @@ def validate(plan):
     costs = {}
     for slot in plan["slots"]:
         wire = bound(slot["packet"])
-        if wire != payload(cases, slot["swapped"]):
+        if wire != payload(cases, slot["swapped"], include_scores=plan.get("include_scores", True)):
             raise ValueError("Frozen wire differs from cases/rubric/order")
         tokens = len(json.dumps(wire, ensure_ascii=True).encode()) + 4096
         if tokens > route[0]["context_length"] or len(wire["questions"]) > 200:
@@ -391,7 +403,7 @@ def summarize(plan, records):
         plan_identity=canonical_hash(plan),
         status=(
             "complete"
-            if len(records) == 2 and all("assessments" in r for r in records)
+            if len(records) == len(plan["slots"]) and all("assessments" in r for r in records)
             else "partial"
         ),
         records=records,
@@ -406,7 +418,7 @@ def summarize(plan, records):
         selection_eligible=False,
         heldout_test_opened=False,
         limitations=[
-            "Two independent HTTP requests share seven case contexts; exploratory qualification only.",
+            "Exploratory qualification only; the plan records request count, shared contexts and any single-case follow-up.",
             "Typed Decisions outputs contain no written rationale or evidence citations.",
             "Do not replace existing DEV labels, select checkpoints or tune thresholds from these diagnostics.",
         ],
