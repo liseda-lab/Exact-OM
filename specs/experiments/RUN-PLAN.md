@@ -7,6 +7,10 @@ defines the 200 cold unique pairs/second implementation target and acceptance wo
 Apply them only through a new reviewed design/execution revision; this notice changes no
 active G4 or final runtime lock. Historical matrix/cap text below remains the design history.
 
+**Optional diagnostic, 2026-10-12:** [E07 Luna sensitivity](E07-LUNA-COMPARISON-20261012.md)
+prepares a CPU/API replay on liseda-t2 using saved development evidence and the
+OpenRouter alpha Decisions endpoint. It does not change the active G4 or final-study recipe.
+
 **Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
 supersedes time caps, full qualification repeats and the old dispatch dates below.
 Runtime figures are advisory forecasts; they neither terminate work nor prevent admission.

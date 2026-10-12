@@ -42,7 +42,11 @@ At most **7 distinct treatment configurations/cells as specified below** before 
 - retrieved_listwise: at most two extra evidence packets then one judgment.
 - second_model: extended-only sensitivity of the frozen comparison.
 
-All generative roles use OpenRouter. Local non-generative encoders/heads use the single RTX 5090.
+All generative roles use OpenRouter. The isolated, optional
+[Luna Decisions sensitivity](E07-LUNA-COMPARISON-20261012.md) requested on 2026-10-12
+uses its alpha Decisions endpoint.
+That CPU/API replay does not change the selected judge or active G4. Local
+non-generative encoders/heads use the allocated GPU.
 Separate target-label-free, in-pair supervised and transferred results. A named diagnostic may
 use development reference information only under its explicit oracle/diagnostic role.
 
