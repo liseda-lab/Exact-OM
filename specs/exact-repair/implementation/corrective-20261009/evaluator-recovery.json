@@ -3,9 +3,14 @@
     "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/amendment.json",
     "sha256": "aeca50ed0efc00cc8a9afdaf58d08f6487433136a4694a4bbbafe63d8efee1bd"
   },
+  "consumers_released": false,
   "evaluator_profile": {
     "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/evaluator-profile-amendment.json",
     "sha256": "e6aa5d85567d75426bcce00ef242263df30b402caa367dbd52ac74d547df1f3a"
+  },
+  "handoff": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/handoff.json",
+    "sha256": "938b13584e7707116ce74aace01586b149e5b361f6c00e624e24134955685f6b"
   },
   "historical_labels_unchanged": true,
   "plan": {
@@ -23,6 +28,7 @@
   },
   "schema": "exact-repair/dev-evaluator-implementation/v1",
   "selection_rule_unchanged": true,
+  "status": "blocked_evaluator_qualification",
   "test_opened": false,
   "training_unchanged": true
 }
