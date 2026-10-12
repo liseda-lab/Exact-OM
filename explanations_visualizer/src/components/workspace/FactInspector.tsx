@@ -12,12 +12,12 @@ import { SideMarker } from "@/components/common/Icons";
 import { EmptyReason } from "@/components/common/StatusText";
 import { Expression, hasReading } from "@/components/owl/Expression";
 import { OriginalAxiom } from "@/components/owl/AxiomBlock";
-import { curie, predicateName, shortHash } from "@/lib/iri";
+import { curie, KIND_NAMES, predicateName, shortHash } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import { axiomRelation } from "@/lib/owl";
 import { interpretationText } from "@/lib/workspace/interpretation";
 import type { FactRef, ResolvedFact } from "@/lib/workspace/types";
-import { useResolvedFact, useSideOf, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
+import { useResolvedFact, useSideOf, useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
 /**
  * Why a record is being opened. Opening a citation under prepared generated text is a
@@ -56,6 +56,7 @@ export function FactInspectorProvider({ children }: { children: React.ReactNode 
 
 function SubjectLine({ fact }: { fact: ResolvedFact }) {
   const sideOf = useSideOf();
+  const workspace = useWorkspace();
   const first = fact.subjects[0]?.entity.ontology_version_id ?? null;
   const label = useLabelLookup(first, fact.subjects.filter((subject) => subject.entity.ontology_version_id === first).map((subject) => subject.entity.iri));
   if (!fact.subjects.length) return <p className="meta">Subject not recorded with this reference.</p>;
@@ -67,9 +68,13 @@ function SubjectLine({ fact }: { fact: ResolvedFact }) {
           const side = sideOf(subject.entity.ontology_version_id) ?? subject.side;
           const name = subject.entity.ontology_version_id === first ? label(subject.entity.iri)?.value : null;
           return (
-            <li key={`${subject.entity.ontology_version_id}|${subject.entity.kind}|${subject.entity.iri}`}>
+            // The exact typed subject: entity, kind and ontology (R2).
+            <li key={`${subject.entity.ontology_version_id}|${subject.entity.kind}|${subject.entity.iri}`} data-subject-iri={subject.entity.iri} data-subject-kind={subject.entity.kind} data-subject-ontology={subject.entity.ontology_version_id}>
               {side && <SideMarker side={side} size="0.875rem" />}
               <span>{name ?? curie(subject.entity.iri)}</span>
+              <span className="meta">
+                {KIND_NAMES[subject.entity.kind]} · {workspace.ontologyName(subject.entity.ontology_version_id) ?? shortHash(subject.entity.ontology_version_id, 12)}
+              </span>
               <span className="iri">{subject.entity.iri}</span>
             </li>
           );

@@ -1343,6 +1343,64 @@
   gap: 0.75rem;
 }
 
+/* Context beyond the visible canvas (narrow panels, enlarged text): edge cues pan to it. */
+.graph-canvas-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+/* Soft edge shading where the drawing continues beyond the canvas (non-interactive). */
+.graph-edge-shade {
+  position: absolute;
+  pointer-events: none;
+  border-radius: 0.625rem;
+}
+
+.graph-edge-shade-left,
+.graph-edge-shade-right {
+  top: 1px;
+  bottom: 1px;
+  width: 1.75rem;
+}
+
+.graph-edge-shade-up,
+.graph-edge-shade-down {
+  left: 1px;
+  right: 1px;
+  height: 1.75rem;
+}
+
+.graph-edge-shade-left {
+  left: 1px;
+  background: linear-gradient(to right, var(--graph-shade), transparent);
+}
+
+.graph-edge-shade-right {
+  right: 1px;
+  background: linear-gradient(to left, var(--graph-shade), transparent);
+}
+
+.graph-edge-shade-up {
+  top: 1px;
+  background: linear-gradient(to bottom, var(--graph-shade), transparent);
+}
+
+.graph-edge-shade-down {
+  bottom: 1px;
+  background: linear-gradient(to top, var(--graph-shade), transparent);
+}
+
+.graph-outside {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem 0.5rem;
+}
+
+.graph-outside .meta {
+  flex: 1 1 14rem;
+}
+
 .graph-stage {
   display: flex;
   flex-direction: column;
@@ -1456,7 +1514,8 @@
 
 .graph-items {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  /* One column whenever two would not fit, at any text size (no horizontal page scroll at 320 px / 200%). */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
   gap: 0.75rem 1.25rem;
 }
 
@@ -1704,6 +1763,21 @@
   border: 1px solid var(--line-strong);
   background: var(--surface);
   flex-shrink: 0;
+}
+
+/* A cycle or depth-limit row keeps the column of the toggle it does not offer (R6). */
+.tree-toggle-spacer {
+  width: 2.25rem;
+  flex-shrink: 0;
+}
+
+.tree-label-static {
+  padding: 0.25rem 0;
+  font-weight: 500;
+}
+
+.tree-limit {
+  margin: 0.25rem 0 0 2.75rem;
 }
 
 .tree-toggle[aria-expanded="true"] {

@@ -55,7 +55,12 @@ function axiomSubject(ast: Record<string, unknown>, ontology: string): FactRef["
 /** Describe a stored axiom as a resolved original record without reinterpreting it. */
 export function resolvedFromAxiom(ref: FactRef, axiom: Axiom): ResolvedFact {
   const ast = axiom.ast as Record<string, unknown>;
-  const subject = ref.subject ?? axiomSubject(ast, axiom.ontology_version_id);
+  // The original record decides what it is about. A supplied typed subject is kept when it is
+  // the same IRI in the same ontology (its kind disambiguates punning); a different entity is
+  // never shown as the subject of this record (R2).
+  const own = axiomSubject(ast, axiom.ontology_version_id);
+  const supplied = ref.subject && ref.subject.ontology_version_id === axiom.ontology_version_id ? ref.subject : null;
+  const subject = own ? (supplied && supplied.iri === own.iri ? supplied : own) : supplied;
   const value = ast.type === "AnnotationAssertion" ? (ast.value as Record<string, unknown> | undefined) : undefined;
   const property = ast.type === "AnnotationAssertion" ? (ast.property as { iri?: { value?: string } } | undefined)?.iri?.value ?? null : null;
   return {

@@ -348,7 +348,7 @@ export interface GeneratedExplanation {
   presentation?: DescriptionPresentation | null;
   independent_review?: { reviewer_kind?: string; reviewer_id?: string; contract_version?: string } | null;
   /** The admitted facts the text was prepared from; only cited labels of referenced entities are read. */
-  support_packet?: { selection?: { referenced_labels?: { fact_id: string; subject?: EntityRef }[] } } | null;
+  support_packet?: { facts?: { fact_id: string; subject?: EntityRef }[]; selection?: { referenced_labels?: { fact_id: string; subject?: EntityRef }[] } } | null;
 }
 
 export type PresentationKind = "reviewed_profile" | "necessary_conditions" | "available_facts" | "reviewed_comparison" | "paired_context" | "source_only_profile" | "target_only_profile" | "unavailable";

@@ -42,12 +42,33 @@ function Empty({ page, basis, what }: { page: HierarchyPage; basis: Basis; what:
   return <EmptyReason status={page.status} what={what} reason={page.reason} absent={emptyText(basis, what)} />;
 }
 
+/** Typed identity of a node in an ancestry path (punned IRIs of different kinds are distinct). */
+export const typedKey = (entity: { ontology_version_id: string; kind: string; iri: string }) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`;
+
+/** Levels of ancestors shown under one focus; deeper levels continue by refocusing (R6). */
+export const MAX_ANCESTOR_DEPTH = 12;
+
+/**
+ * Move keyboard focus to the earlier occurrence of a class in this ancestry path: `levelsUp`
+ * tree items above this row, or the focused entity's card when `levelsUp` is null.
+ */
+function focusEarlier(from: HTMLElement, levelsUp: number | null) {
+  let item: HTMLElement | null = levelsUp === null ? null : from.closest("li.tree-item");
+  for (let step = 0; levelsUp !== null && step < levelsUp && item; step += 1) item = item.parentElement?.closest<HTMLElement>("li.tree-item") ?? null;
+  const target = item?.querySelector<HTMLElement>(":scope > .tree-row .tree-label") ?? from.closest(".browser")?.querySelector<HTMLElement>(".focus-card") ?? null;
+  if (!target) return;
+  target.scrollIntoView({ block: "center" });
+  if (target.tabIndex < 0 && !target.matches("button")) target.setAttribute("tabindex", "-1");
+  target.focus({ preventScroll: true });
+}
+
 function ParentBranch({
   ontology,
   iri,
   kind,
   basis,
   depth,
+  path,
   onFocus,
   side,
 }: {
@@ -56,40 +77,75 @@ function ParentBranch({
   kind: EntityKind;
   basis: Basis;
   depth: number;
+  /** Typed keys from the focused entity down to this node's child: the ancestry this node extends. */
+  path: string[];
   onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void;
   side: "source" | "target";
 }) {
   const workspace = useWorkspace();
   const report = useWorkspaceAction();
   const [open, setOpen] = useState(false);
-  const state = useAsync(open ? `${workspace.key}|parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) =>
+  const key = typedKey({ ontology_version_id: ontology, kind, iri });
+  // A class already on this path is a cycle (possible in partial or asserted data): no further
+  // reads, and an explicit way back to where it first appears (21 F06).
+  const earlier = path.indexOf(key);
+  const atLimit = depth >= MAX_ANCESTOR_DEPTH;
+  const state = useAsync(open && earlier < 0 && !atLimit ? `${workspace.key}|parents|${ontology}|${kind}|${iri}|${basis}` : null, (signal) =>
     workspace.hierarchy({ ontology_version_id: ontology, iri, kind }, "parents", basis, null, signal),
   );
   const loadMore = useCallback((cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri, kind }, "parents", basis, cursor, signal), [workspace, ontology, iri, kind, basis]);
   const pages = useContinuation(state.data, loadMore, edgeKey);
-  const parents = pages.items.filter((edge) => edge.child.iri === iri);
+  const parents = pages.items.filter((edge) => edge.child.iri === iri && edge.child.kind === kind);
   const label = useLabelLookup(ontology, [iri, ...parents.map((edge) => edge.parent.iri)]);
+  const name = label(iri)?.value ?? curie(iri);
+  if (earlier >= 0) {
+    return (
+      <li className="tree-item tree-cycle">
+        <div className="tree-row">
+          <span className="tree-toggle-spacer" aria-hidden="true" />
+          <span className={`tree-label-static text-${side}`}>{name}</span>
+          <span className="iri">{curie(iri)}</span>
+          <span className="meta">· already in this path</span>
+          {/* path[0] is the focused entity (its card); path[i] is the ancestor at depth i - 1. */}
+          <button type="button" className="link-btn" onClick={(event) => focusEarlier(event.currentTarget, earlier === 0 ? null : depth - (earlier - 1))}>
+            Show where it appears
+          </button>
+        </div>
+      </li>
+    );
+  }
   return (
     <li className="tree-item">
       <div className="tree-row">
-        <button
-          type="button"
-          className="tree-toggle"
-          aria-expanded={open}
-          aria-label={`${open ? "Hide" : "Show"} parents of ${label(iri)?.value ?? curie(iri)}`}
-          onClick={() => {
-            report({ type: open ? "hierarchy_collapse" : "hierarchy_expand", side, iri });
-            setOpen((value) => !value);
-          }}
-          disabled={depth > 12}
-        >
-          {open ? <IconChevronDown /> : <IconChevronUp />}
-        </button>
+        {atLimit ? (
+          <span className="tree-toggle-spacer" aria-hidden="true" />
+        ) : (
+          <button
+            type="button"
+            className="tree-toggle"
+            aria-expanded={open}
+            aria-label={`${open ? "Hide" : "Show"} parents of ${name}`}
+            onClick={() => {
+              report({ type: open ? "hierarchy_collapse" : "hierarchy_expand", side, iri });
+              setOpen((value) => !value);
+            }}
+          >
+            {open ? <IconChevronDown /> : <IconChevronUp />}
+          </button>
+        )}
         <button type="button" className={`tree-label tree-${side}`} data-tour={depth === 0 ? `parent-${side}` : undefined} onClick={() => onFocus(iri, kind, "parent")}>
           {label(iri)?.value ?? <span className="muted">{curie(iri)}</span>}
         </button>
         <span className="iri">{curie(iri)}</span>
       </div>
+      {atLimit && (
+        <p className="meta tree-limit">
+          {MAX_ANCESTOR_DEPTH} levels are shown under one focus.{" "}
+          <button type="button" className="link-btn" onClick={() => onFocus(iri, kind, "parent")}>
+            Continue from {name}
+          </button>
+        </p>
+      )}
       {open && (
         <div className="tree-children">
           {state.error ? <ErrorNote error={state.error} onRetry={state.reload} /> : null}
@@ -98,7 +154,7 @@ function ParentBranch({
           {parents.length > 0 && (
             <ul>
               {parents.map((edge) => (
-                <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={basis} depth={depth + 1} onFocus={onFocus} side={side} />
+                <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={basis} depth={depth + 1} path={[...path, key]} onFocus={onFocus} side={side} />
               ))}
             </ul>
           )}
@@ -113,6 +169,7 @@ const edgeKey = (edge: HierarchyEdge) => edge.id;
 const PARENT_NOUN = { one: "parent", many: "parents" };
 const CHILD_NOUN = { one: "child", many: "children" };
 const ENTRY_NOUN = { one: "top-level entry", many: "top-level entries" };
+const EQUIVALENT_NOUN = { one: "equivalent class", many: "equivalent classes" };
 
 /** A page that continues on request; failures stay local and keep what is shown. */
 function EdgeContinuation<T>({ state, noun }: { state: Continued<T>; noun: { one: string; many: string } }) {
@@ -210,23 +267,45 @@ function EntryPoints({ ontology, kind, basis, side, onFocus, onSingle }: { ontol
 }
 
 /** Members of the focused class's equivalence group in the partial result, when there are several. */
-function Equivalents({ focus, count, basis }: { focus: EntityRef; count: number; basis: Basis }) {
+/**
+ * Members of the focused class's equivalence group in the partial result (R4): bounded pages
+ * with the service's cursor, a shown/total count, typed links that refocus this side, and
+ * local loading, failure and Retry. A new focus, scope or basis starts from the first page; an
+ * unlisted class is unknown, not "not equivalent".
+ */
+function Equivalents({ focus, count, basis, side, onFocus, Sub }: { focus: EntityRef; count: number; basis: Basis; side: "source" | "target"; onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void; Sub: "h3" | "h4" }) {
   const workspace = useWorkspace();
-  const page = useAsync(workspace.equivalents ? `${workspace.key}|eq|${focus.ontology_version_id}|${focus.kind}|${focus.iri}|${basis}` : null, (signal) => workspace.equivalents!(focus, basis, null, signal));
-  const others = (page.data?.items ?? []).filter((item) => item.iri !== focus.iri);
+  const first = useAsync(workspace.equivalents ? `${workspace.key}|eq|${focus.ontology_version_id}|${focus.kind}|${focus.iri}|${basis}` : null, (signal) => workspace.equivalents!(focus, basis, null, signal));
+  const loadMore = useCallback((cursor: string, signal: AbortSignal) => workspace.equivalents!(focus, basis, cursor, signal), [workspace, focus, basis]);
+  const pages = useContinuation(first.data, workspace.equivalents ? loadMore : null, (item: EntityRef) => `${item.ontology_version_id}|${item.kind}|${item.iri}`);
+  const others = pages.items.filter((item) => !(item.iri === focus.iri && item.kind === focus.kind && item.ontology_version_id === focus.ontology_version_id));
   const label = useLabelLookup(focus.ontology_version_id, others.map((item) => item.iri));
+  // The group's size counts the focused class itself.
+  const total = Math.max(0, (first.data?.total_count ?? count) - 1);
+  const shown = others.length;
   return (
-    <div className="browser-section">
-      <p className="meta">
-        Equivalent in the ELK result: {count - 1} other {count - 1 === 1 ? "class" : "classes"}
-        {others.length ? ": " : ""}
-        {others.map((item, index) => (
-          <span key={item.iri}>
-            {index ? ", " : ""}
-            {label(item.iri)?.value ?? curie(item.iri)}
-          </span>
-        ))}
-      </p>
+    <div className="browser-section equivalents" aria-busy={first.loading || pages.loading || undefined}>
+      <div className="section-head">
+        <Sub className="eyebrow">Equivalent in the ELK result</Sub>
+        <span className="meta">{first.data ? (pages.hasMore || shown < total ? `${shown} of ${total} shown` : `${total} other ${total === 1 ? "class" : "classes"}`) : `${total} other ${total === 1 ? "class" : "classes"}`}</span>
+      </div>
+      {first.error ? <ErrorNote error={first.error} onRetry={first.reload} what="Equivalent classes" /> : null}
+      {!first.data && !first.error ? <Skeleton lines={1} title={false} /> : null}
+      {shown > 0 && (
+        <ul className="child-list">
+          {others.map((item) => (
+            <li key={`${item.kind}|${item.iri}`}>
+              <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(item.iri, item.kind, "search")}>
+                {label(item.iri)?.value ?? <span className="muted">{curie(item.iri)}</span>}
+              </button>
+              <span className="iri">{curie(item.iri)}</span>
+              {item.kind !== "class" && <span className="meta">· {KIND_NAMES[item.kind]}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <EdgeContinuation state={pages} noun={EQUIVALENT_NOUN} />
+      <p className="meta">Equivalence returned by ELK for the parts it supports; a class not listed may still be equivalent.</p>
     </div>
   );
 }
@@ -286,8 +365,8 @@ export function HierarchyBrowser({
   const loadMoreChildren = useCallback((cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri!, kind }, "children", effective, cursor, signal), [workspace, ontology, focusIri, kind, effective]);
   const parentPages = useContinuation(parents.data, focusIri ? loadMoreParents : null, edgeKey);
   const childPages = useContinuation(children.data, focusIri ? loadMoreChildren : null, edgeKey);
-  const parentEdges = parentPages.items.filter((edge) => edge.child.iri === focusIri);
-  const childEdges = childPages.items.filter((edge) => edge.parent.iri === focusIri);
+  const parentEdges = parentPages.items.filter((edge) => edge.child.iri === focusIri && edge.child.kind === kind);
+  const childEdges = childPages.items.filter((edge) => edge.parent.iri === focusIri && edge.parent.kind === kind);
   const label = useLabelLookup(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childEdges.map((edge) => edge.child.iri)].filter(Boolean));
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const Sub = headingLevel === 2 ? "h3" : "h4";
@@ -432,7 +511,7 @@ export function HierarchyBrowser({
             {parentEdges.length > 0 && (
               <ul className="tree">
                 {parentEdges.map((edge) => (
-                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={effective} depth={0} onFocus={onFocus} side={side} />
+                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={effective} depth={0} path={[typedKey({ ontology_version_id: ontology, kind, iri: focusIri })]} onFocus={onFocus} side={side} />
                 ))}
               </ul>
             )}
@@ -442,7 +521,7 @@ export function HierarchyBrowser({
 
           <div className={`focus-card focus-${side}`} tabIndex={-1} aria-label={`Focused ${KIND_NAMES[kind]}: ${label(focusIri)?.value ?? curie(focusIri)}`}>
             <span className={`eyebrow text-${side}`}>Focused {KIND_NAMES[kind]}{pinnedIri && !away ? " · compared" : ""}</span>
-            <span className="focus-label">{label(focusIri)?.value ?? <span className="muted">No label in scope</span>}</span>
+            <span className="focus-label">{label(focusIri)?.value ?? <span className="muted">{label(focusIri)?.status === "loading" ? "Loading label…" : "No label in scope"}</span>}</span>
             <span className="iri">{focusIri}</span>
             {onOpenContext && (
               <div className="focus-actions">
@@ -452,7 +531,7 @@ export function HierarchyBrowser({
               </div>
             )}
           </div>
-          {isPartial(effective) && focus && semantics && semantics.equivalent_entity_count > 1 && <Equivalents focus={focus} count={semantics.equivalent_entity_count} basis={effective} />}
+          {isPartial(effective) && focus && semantics && semantics.equivalent_entity_count > 1 && <Equivalents focus={focus} count={semantics.equivalent_entity_count} basis={effective} side={side} onFocus={onFocus} Sub={Sub} />}
 
           <div className="browser-section">
             <div className="section-head">

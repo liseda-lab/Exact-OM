@@ -1,10 +1,11 @@
 "use client";
 
 // The prepared pair comparison, presented as what it declares itself to be (23 C03, 21 F05).
-// A reviewed comparison is grouped by what each claim asserts; paired definition excerpts and
-// one-sided information are laid out under the concept they describe, resolved by entity
-// identity rather than column position. Nothing here is proof of equivalence or
-// incompatibility, and one-sided text is never presented as a difference.
+// A reviewed comparison is grouped by what each claim asserts; paired descriptions or excerpts
+// and one-sided information are laid out under the concept they describe, resolved by entity
+// identity rather than column position. Quotation styling follows the artifact's declared
+// preparation, never the claim category or the layout. Nothing here is proof of equivalence
+// or incompatibility, and one-sided text is never presented as a difference.
 
 import { useMemo, useState } from "react";
 
@@ -69,9 +70,9 @@ export function ComparisonPanel({ source, target, cite, headingLevel = 2 }: { so
             <>
               {view.intro && <p className="meta">{view.intro}</p>}
               {view.bySide ? (
-                <SideClaims claims={claims} sidesOf={sidesOf} covered={covered} names={names} ontologies={data.factOntologies} cite={citeFact} Group={Group} quote={view.tag.tone === "original"} />
+                <SideClaims claims={claims} sidesOf={sidesOf} covered={covered} names={names} ontologies={data.factOntologies} cite={citeFact} Group={Group} quote={view.quote} />
               ) : (
-                <GroupedClaims claims={claims} ontologies={data.factOntologies} cite={citeFact} Group={Group} showExcerpts={showExcerpts} setShowExcerpts={setShowExcerpts} />
+                <GroupedClaims claims={claims} ontologies={data.factOntologies} cite={citeFact} Group={Group} quote={view.quote} showExcerpts={showExcerpts} setShowExcerpts={setShowExcerpts} />
               )}
               {explanation.presentation?.scope_note && <p className="meta comparison-scope">{explanation.presentation.scope_note}</p>}
               <ProvenanceDetails provenance={data.provenance} limitations={explanation.limitations} note="Prepared without Exact's score or verdict." />
@@ -136,12 +137,17 @@ function SideClaims({
   );
 }
 
-/** A reviewed (or historical) comparison grouped by what each claim asserts. */
+/**
+ * A reviewed (or historical) comparison grouped by what each claim asserts. Meaning and key-fact
+ * claims of generated prose are the comparison itself and are shown first; only exact original
+ * quotations (by the artifact's preparation) are folded into "Original statements it quotes".
+ */
 function GroupedClaims({
   claims,
   ontologies,
   cite,
   Group,
+  quote,
   showExcerpts,
   setShowExcerpts,
 }: {
@@ -149,14 +155,26 @@ function GroupedClaims({
   ontologies: string[];
   cite: (factId: string) => CitedFact | undefined;
   Group: "h3" | "h4";
+  quote: boolean;
   showExcerpts: boolean;
   setShowExcerpts: (update: (value: boolean) => boolean) => void;
 }) {
   const byGroup = (categories: string[]) => claims.filter((claim) => categories.includes(claim.category));
-  const excerpts = claims.filter((claim) => ["meaning", "key_fact"].includes(claim.category));
+  const summary = claims.filter((claim) => ["meaning", "key_fact"].includes(claim.category));
+  const grouped = GROUPS.some((group) => byGroup(group.categories).length);
+  // Quotations fold away only beside categorised claims; otherwise they are the content.
+  const excerpts = quote && grouped ? summary : [];
   return (
     <>
+      {!(quote && grouped) && summary.length > 0 && (
+        <ul className="claim-list comparison-summary">
+          {summary.map((claim, index) => (
+            <ClaimItem key={claim.claim_id ?? index} claim={claim} ontologies={ontologies} cite={cite} quote={quote} />
+          ))}
+        </ul>
+      )}
       {/* Only groups with claims take space; the empty ones are named once (21 F04). */}
+      {grouped && (
       <div className="comparison-grid">
         {GROUPS.filter((group) => byGroup(group.categories).length).map((group) => (
           <div key={group.key} className={`comparison-group tone-${group.tone}`}>
@@ -172,7 +190,8 @@ function GroupedClaims({
           </div>
         ))}
       </div>
-      {GROUPS.some((group) => !byGroup(group.categories).length) && (
+      )}
+      {grouped && GROUPS.some((group) => !byGroup(group.categories).length) && (
         <p className="meta">
           Nothing recorded for: {GROUPS.filter((group) => !byGroup(group.categories).length).map((group) => group.title.toLowerCase()).join(" · ")}.
         </p>

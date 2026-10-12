@@ -15,6 +15,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ErrorNote } from "@/components/common/ErrorNote";
 import { IconZoomIn, IconZoomOut } from "@/components/common/Icons";
 import { channelName, type EvidenceBundle } from "@/components/explore/evidenceData";
 import { useFactInspector } from "@/components/workspace/FactInspector";
@@ -77,6 +78,21 @@ export const EDGE_MEANING: Record<EdgeKind, string> = {
 };
 
 /** "4 attributes · 2 hierarchy": counts per channel, in first-seen order. */
+type Direction = "left" | "right" | "up" | "down";
+const DIRECTIONS: Direction[] = ["left", "right", "up", "down"];
+const NONE_OUTSIDE: Record<Direction, number> = { left: 0, right: 0, up: 0, down: 0 };
+const DIRECTION_WORDS: Record<Direction, string> = { left: "to the left", right: "to the right", up: "above", down: "below" };
+const DIRECTION_ARROWS: Record<Direction, string> = { left: "←", right: "→", up: "↑", down: "↓" };
+
+/** Which edge of the canvas a node lies wholly beyond, if any (a partly visible node is in view). */
+function outsideDirection(box: { x1: number; x2: number; y1: number; y2: number }, width: number, height: number): Direction | null {
+  if (box.x2 < 0) return "left";
+  if (box.x1 > width) return "right";
+  if (box.y2 < 0) return "up";
+  if (box.y1 > height) return "down";
+  return null;
+}
+
 function countsByChannel(channels: string[]): string {
   const counts = new Map<string, number>();
   for (const channel of channels) counts.set(channel, (counts.get(channel) ?? 0) + 1);
@@ -193,6 +209,24 @@ export function EvidenceGraph({
   const [expandError, setExpandError] = useState<string | null>(null);
   // Bumped once the canvas exists, so restored selections and reveals are applied to it.
   const [ready, setReady] = useState(0);
+  // Items wholly outside the visible canvas, by direction: narrow study panels and enlarged
+  // text leave context off screen at a readable zoom, so the canvas says where it is.
+  const [outside, setOutside] = useState<Record<Direction, number>>(NONE_OUTSIDE);
+  const measureFrame = useRef(0);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const measureOutside = useCallback((cy: any) => {
+    cancelAnimationFrame(measureFrame.current);
+    measureFrame.current = requestAnimationFrame(() => {
+      if (cy.destroyed?.()) return;
+      const counts = { ...NONE_OUTSIDE };
+      cy.nodes().forEach((node: { renderedBoundingBox: () => { x1: number; x2: number; y1: number; y2: number } }) => {
+        const direction = outsideDirection(node.renderedBoundingBox(), cy.width(), cy.height());
+        if (direction) counts[direction] += 1;
+      });
+      setOutside((current) => (DIRECTIONS.every((direction) => current[direction] === counts[direction]) ? current : counts));
+    });
+  }, []);
+  useEffect(() => () => cancelAnimationFrame(measureFrame.current), []);
   const themeVersion = useThemeVersion();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const scale = useMemo(() => textScale(), [themeVersion]);
@@ -583,7 +617,10 @@ export function EvidenceGraph({
           keepInView(cy, focusEdgeRef.current);
         }
       } else initialView(cy);
-      const view = () => save({ zoom: cy.zoom(), pan: { ...cy.pan() }, scale: drawnScale.current, size: { w: cy.width(), h: cy.height() } });
+      const view = () => {
+        save({ zoom: cy.zoom(), pan: { ...cy.pan() }, scale: drawnScale.current, size: { w: cy.width(), h: cy.height() } });
+        measureOutside(cy);
+      };
       cy.on("viewport", view);
       view();
       cy.on("tap", "node", (event: { target: { id: () => string } }) => chooseRef.current(null, modelRef.current.nodes.find((node) => node.id === event.target.id()) ?? null));
@@ -638,7 +675,8 @@ export function EvidenceGraph({
       cy.pan({ x: cy.width() / 2 - centre.x * ratio * cy.zoom(), y: cy.height() / 2 - centre.y * ratio * cy.zoom() });
       keepInView(cy, focusEdgeRef.current);
     }
-  }, [elements, styles, themeVersion, scale, keepInView]);
+    measureOutside(cy);
+  }, [elements, styles, themeVersion, scale, keepInView, measureOutside]);
 
   // Selection highlights its line or node and de-emphasises the rest; the view never moves.
   useEffect(() => {
@@ -672,6 +710,21 @@ export function EvidenceGraph({
     cyRef.current?.fit(undefined, 32);
     report({ type: "graph_fit" });
   };
+  /** Bring the items beyond one edge of the canvas into view at the current zoom. */
+  const reveal = (direction: Direction) => {
+    const cy = cyRef.current;
+    if (!cy) return;
+    const hidden = cy.nodes().filter((node: { renderedBoundingBox: () => { x1: number; x2: number; y1: number; y2: number } }) => outsideDirection(node.renderedBoundingBox(), cy.width(), cy.height()) === direction);
+    if (hidden.empty()) return;
+    const box = hidden.renderedBoundingBox();
+    const across = direction === "left" || direction === "right";
+    cy.panBy({
+      x: across ? cy.width() / 2 - (box.x1 + box.x2) / 2 : 0,
+      y: !across || box.y1 < 0 || box.y2 > cy.height() ? cy.height() / 2 - (box.y1 + box.y2) / 2 : 0,
+    });
+    report({ type: "graph_zoom" });
+  };
+  const hiddenCount = DIRECTIONS.reduce((sum, direction) => sum + outside[direction], 0);
   const reset = () => {
     const cy = cyRef.current;
     if (!cy) return;
@@ -915,7 +968,25 @@ export function EvidenceGraph({
       </div>
       <div className="graph-body">
         <div className="graph-stage">
-          <div ref={container} className="graph-canvas" role="img" aria-label={`Evidence graph with ${model.nodes.length} nodes and ${model.edges.length} lines. The item list below it has the same items.`} />
+          {/* Context beyond the canvas edge is named and one press away; it never covers the drawing. */}
+          {hiddenCount > 0 && (
+            <div className="graph-outside" role="status">
+              <span className="meta">
+                {hiddenCount} of {model.nodes.length} items are outside this view; the item list has every item.
+              </span>
+              {DIRECTIONS.filter((direction) => outside[direction] > 0).map((direction) => (
+                <button key={direction} type="button" className="btn btn-sm graph-cue" aria-label={`Show ${outside[direction]} ${outside[direction] === 1 ? "item" : "items"} ${DIRECTION_WORDS[direction]}`} onClick={() => reveal(direction)}>
+                  <span aria-hidden="true">{DIRECTION_ARROWS[direction]}</span> {outside[direction]} {DIRECTION_WORDS[direction]}
+                </button>
+              ))}
+            </div>
+          )}
+          <div className="graph-canvas-wrap">
+            <div ref={container} className="graph-canvas" role="img" aria-label={`Evidence graph with ${model.nodes.length} nodes and ${model.edges.length} lines. The item list below it has the same items.`} />
+            {DIRECTIONS.filter((direction) => outside[direction] > 0).map((direction) => (
+              <div key={direction} className={`graph-edge-shade graph-edge-shade-${direction}`} aria-hidden="true" />
+            ))}
+          </div>
           <div className="graph-legend" aria-hidden="true">
             {legendKinds.map((kind) => (
               <span key={kind}>
@@ -999,8 +1070,11 @@ export function EvidenceGraph({
                 </section>
               );
             })}
-            <section>
+            <section aria-busy={metadata.loading || undefined}>
               <h4>Recorded comparisons</h4>
+              {/* A failed read is not an absence (21 F04): features stay drawn; Retry keeps the view (R3). */}
+              {metadata.error ? <ErrorNote error={metadata.error} onRetry={metadata.reload} what="Recorded comparisons" /> : null}
+              {metadata.loading && !metadata.data && <p className="meta">Loading recorded comparisons…</p>}
               {base.bridges.length > 0 && (
                 <ul>
                   {base.bridges
@@ -1057,7 +1131,9 @@ export function EvidenceGraph({
                   })}
                 </ul>
               ) : null}
-              {!base.bridges.length && <p className="meta">{base.bridgeStatus === "unknown" ? "No comparison record is available for this pair." : "No comparison was recorded for this pair."}</p>}
+              {!base.bridges.length && !metadata.error && !metadata.loading && (
+                <p className="meta">{base.bridgeStatus === "unknown" ? "No comparison record is available for this view." : "No comparison was recorded for this pair."}</p>
+              )}
               {base.oneSided.length > 0 && <p className="meta">Features on one side only: {base.oneSided.map((item) => `${channelName(item.channel)} (${item.side})`).join(" · ")}.</p>}
             </section>
             {added.length > 0 && (

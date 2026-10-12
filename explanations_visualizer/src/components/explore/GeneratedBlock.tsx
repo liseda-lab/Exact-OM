@@ -7,7 +7,7 @@
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/common/ErrorNote";
-import { profileView, referencedLabelSubjects } from "@/lib/descriptionPresentation";
+import { citedSubjects, profileView, referencedLabelSubjects } from "@/lib/descriptionPresentation";
 import { useFactInspector } from "@/components/workspace/FactInspector";
 import { useSideOf } from "@/lib/workspace/WorkspaceContext";
 import { curie, shortHash } from "@/lib/iri";
@@ -16,8 +16,11 @@ import type { AsyncState } from "@/lib/useAsync";
 import type { ExplanationProvenance, ExplanationResult } from "@/lib/workspace/types";
 
 export interface CitedFact {
-  label: string;
+  /** Short name of the record; the claim's own "cited fact" wording is used when absent. */
+  label?: string;
   side?: "source" | "target";
+  /** The cited record's exact typed subject (ontology, kind, IRI); the inspector opens it about this entity. */
+  subject?: EntityRef | null;
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -54,8 +57,14 @@ export function Citations({
       {claim.fact_ids.map((factId, index) => {
         const fact = cite(factId);
         const label = fact?.label ?? (claim.fact_ids.length > 1 ? `cited fact ${index + 1}` : "cited fact");
-        // Look the record up in the ontology of the side it was cited from first.
-        const ordered = fact?.side ? [...ontologies].sort((a, b) => Number(sideOf(b) === fact.side) - Number(sideOf(a) === fact.side)) : ontologies;
+        // The record's own typed subject wins; the block's subject is only a fallback (R2).
+        const about = fact?.subject ?? subject ?? null;
+        // Look the record up in its subject's ontology first, then the side it was cited from.
+        const ordered = about
+          ? [about.ontology_version_id, ...ontologies.filter((ontology) => ontology !== about.ontology_version_id)]
+          : fact?.side
+            ? [...ontologies].sort((a, b) => Number(sideOf(b) === fact.side) - Number(sideOf(a) === fact.side))
+            : ontologies;
         return (
           <button
             key={factId}
@@ -64,7 +73,7 @@ export function Citations({
             data-tour="citation"
             aria-label={`Open the cited original record: ${label}`}
             title={`Reference ${shortHash(factId, 12)}`}
-            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: subject ?? null }, label, "citation")}
+            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: about }, label, "citation")}
             disabled={!inspector}
           >
             {label}
@@ -75,15 +84,20 @@ export function Citations({
   );
 }
 
-/** Resolve citations to labels of referenced entities from the artifact itself ("Label of DOID:7505"). */
+/**
+ * Citations of one artifact with their exact typed subjects from its support packet, and labels
+ * of referenced entities named as such ("Label of DOID:7505", R2).
+ */
 export function withReferencedLabels(cite: (factId: string) => CitedFact | undefined, explanation: GeneratedExplanation): (factId: string) => CitedFact | undefined {
   const referenced = referencedLabelSubjects(explanation);
-  if (!referenced.size) return cite;
+  const subjects = citedSubjects(explanation);
   return (factId) => {
     const known = cite(factId);
-    if (known) return known;
-    const subject = referenced.get(factId);
-    return subject ? { label: `Label of ${curie(subject.iri)}` } : undefined;
+    const subject = subjects.get(factId) ?? known?.subject ?? null;
+    if (known) return { ...known, subject };
+    const other = referenced.get(factId);
+    if (other) return { label: `Label of ${curie(other.iri)}`, subject: other };
+    return subject ? { subject } : undefined;
   };
 }
 

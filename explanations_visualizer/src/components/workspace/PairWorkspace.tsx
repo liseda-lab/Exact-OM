@@ -116,7 +116,9 @@ export function citationIndex(source: EntityContext | undefined, target: EntityC
   ] as const) {
     if (!ctx) continue;
     const prefix = side === "source" ? "Source" : "Target";
-    const add = (items: { fact_id: string }[], name: string) => items.forEach((fact) => { if (!index.has(fact.fact_id)) index.set(fact.fact_id, { label: `${prefix} ${name}`, side }); });
+    // Each record keeps its own typed subject (shared or punned records name theirs exactly).
+    const add = (items: { fact_id: string; subject?: EntityRef }[], name: string) =>
+      items.forEach((fact) => { if (!index.has(fact.fact_id)) index.set(fact.fact_id, { label: `${prefix} ${name}`, side, subject: fact.subject ?? ctx.entity }); });
     add(ctx.definitions.items, "definition");
     add(ctx.synonyms.items, "synonym");
     add(ctx.parents.items, "parent");

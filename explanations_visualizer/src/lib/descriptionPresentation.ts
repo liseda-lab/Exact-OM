@@ -21,6 +21,21 @@ export interface PresentationView {
   bySide: boolean;
   /** The artifact declares that nothing usable was prepared. */
   unavailable: boolean;
+  /** Claim text is exact original wording (quotation styling; "original" labels apply). */
+  quote: boolean;
+}
+
+/**
+ * Where an artifact's claim wording comes from, from its declared preparation and support only
+ * (never from claim categories or the layout): exact original text, a fixed reading of original
+ * axioms, or generated prose. Reviewed generated prose is never presented as a quotation.
+ */
+export function textOrigin(explanation: GeneratedExplanation): "original" | "derived" | "generated" {
+  if (explanation.support_status === "independently_reviewed") return "generated";
+  if (explanation.preparation_kind === "fact_extract" || explanation.preparation_kind === "factual_fallback") return "original";
+  if (explanation.support_status === "exact_support" || explanation.support_status === "fallback") return "original";
+  if (explanation.support_status === "typed_template_support") return "derived";
+  return "generated";
 }
 
 function tagFor(explanation: GeneratedExplanation): PresentationView["tag"] {
@@ -45,7 +60,7 @@ const sideWord = (side: Side) => (side === "source" ? "source" : "target");
 export function profileView(explanation: GeneratedExplanation): PresentationView {
   const kind = explanation.presentation?.kind ?? null;
   const tag = tagFor(explanation);
-  const base = { tag, grouped: false, bySide: false, unavailable: false };
+  const base = { tag, grouped: false, bySide: false, unavailable: false, quote: textOrigin(explanation) === "original" };
   switch (kind) {
     case "reviewed_profile":
       return { ...base, title: "Description", intro: null };
@@ -65,12 +80,16 @@ export function profileView(explanation: GeneratedExplanation): PresentationView
 export function comparisonView(explanation: GeneratedExplanation, coveredWorkspaceSides: Side[]): PresentationView {
   const kind = explanation.presentation?.kind ?? null;
   const tag = tagFor(explanation);
-  const base = { tag, grouped: false, bySide: false, unavailable: false };
+  const origin = textOrigin(explanation);
+  const base = { tag, grouped: false, bySide: false, unavailable: false, quote: origin === "original" };
   switch (kind) {
     case "reviewed_comparison":
       return { ...base, title: "How the two descriptions compare", intro: null, grouped: true };
     case "paired_context":
-      return { ...base, title: "Definitions side by side", intro: "Quoted from each ontology. Showing them together does not say whether they match.", bySide: true };
+      // The layout pairs the two concepts; what the text is comes from its preparation (R1).
+      if (origin === "original") return { ...base, title: "Definitions side by side", intro: "Quoted from each ontology. Showing them together does not say whether they match.", bySide: true };
+      if (origin === "derived") return { ...base, title: "Original facts side by side", intro: "Fixed readings of each concept's original axioms. Showing them together does not say whether they match.", bySide: true };
+      return { ...base, title: "Descriptions side by side", intro: "Generated descriptions of each concept, checked against the cited records. Showing them together does not say whether they match.", bySide: true };
     case "source_only_profile":
     case "target_only_profile": {
       const side = coveredWorkspaceSides[0];
@@ -126,5 +145,17 @@ export function coveredSides(explanation: GeneratedExplanation, roles: Record<Si
 export function referencedLabelSubjects(explanation: GeneratedExplanation): Map<string, EntityRef> {
   const result = new Map<string, EntityRef>();
   for (const fact of explanation.support_packet?.selection?.referenced_labels ?? []) if (fact.subject) result.set(fact.fact_id, fact.subject);
+  return result;
+}
+
+/**
+ * The exact typed subject of every record the artifact cites, from its own support packet: the
+ * admitted facts and the labels of referenced entities (R2). A citation is opened about this
+ * entity, never about the profile's or comparison's focal entity by default.
+ */
+export function citedSubjects(explanation: GeneratedExplanation): Map<string, EntityRef> {
+  const result = new Map<string, EntityRef>();
+  for (const fact of explanation.support_packet?.facts ?? []) if (fact.subject && !result.has(fact.fact_id)) result.set(fact.fact_id, fact.subject);
+  for (const fact of explanation.support_packet?.selection?.referenced_labels ?? []) if (fact.subject && !result.has(fact.fact_id)) result.set(fact.fact_id, fact.subject);
   return result;
 }

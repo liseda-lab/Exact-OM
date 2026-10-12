@@ -8,6 +8,7 @@
   --paper: #f6f4f0;
   --surface: #ffffff;
   --surface-2: #faf8f4;
+  --graph-shade: rgba(70, 58, 44, 0.18);
   --surface-3: #f3f0ea;
   --line: #e2dcd2;
   --line-soft: #eee9e1;
@@ -51,6 +52,7 @@
   --paper: #121619;
   --surface: #191e22;
   --surface-2: #1d2328;
+  --graph-shade: rgba(0, 0, 0, 0.5);
   --surface-3: #22292f;
   --line: #2c353c;
   --line-soft: #252d33;
@@ -90,6 +92,7 @@
     --paper: #121619;
     --surface: #191e22;
     --surface-2: #1d2328;
+    --graph-shade: rgba(0, 0, 0, 0.5);
     --surface-3: #22292f;
     --line: #2c353c;
     --line-soft: #252d33;

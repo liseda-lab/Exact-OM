@@ -80,3 +80,30 @@ test("remote label batches stay inside the active participant scope and session"
     await rm(directory, { recursive: true });
   }
 });
+
+test("an original record is shown about its own subject, keeping a matching typed subject (R2)", async () => {
+  const { module, cleanup } = await loadSource();
+  try {
+    const doid = "sha256:doid";
+    const ileum = { ontology_version_id: doid, iri: "http://purl.obolibrary.org/obo/DOID_10153", kind: "class" };
+    const label = (subject: string) => ({
+      ontology_version_id: doid, availability: "available", category: "labels", interpretation: { kind: "asserted" }, origins: [],
+      ast: { type: "AnnotationAssertion", property: { type: "AnnotationProperty", iri: { type: "IRI", value: "http://www.w3.org/2000/01/rdf-schema#label" } }, subject: { type: "IRI", value: subject }, value: { type: "Literal", lexical_form: "small intestine cancer" } },
+    });
+    // A focal entity supplied for a referenced entity's label never becomes its "About".
+    const wrong = module.resolvedFromAxiom({ factId: "f", ontologies: [doid], subject: ileum }, label("http://purl.obolibrary.org/obo/DOID_10154"));
+    assert.equal(wrong.subjects[0].entity.iri, "http://purl.obolibrary.org/obo/DOID_10154");
+    assert.equal(wrong.literal.text, "small intestine cancer");
+    // A punned subject with the record's own IRI keeps its declared kind.
+    const pun = { ontology_version_id: doid, iri: "http://purl.obolibrary.org/obo/X", kind: "individual" };
+    assert.deepEqual(module.resolvedFromAxiom({ factId: "p", ontologies: [doid], subject: pun }, label(pun.iri)).subjects[0].entity, pun);
+    // A shared axiom whose structure names no single subject keeps the contextual typed subject.
+    const shared = { ontology_version_id: doid, availability: "available", category: "axioms", origins: [], ast: { type: "EquivalentClasses", expressions: [] } };
+    assert.deepEqual(module.resolvedFromAxiom({ factId: "s", ontologies: [doid], subject: ileum }, shared).subjects[0].entity, ileum);
+    // A supplied subject from another ontology is not attached to this record.
+    const other = { ...ileum, ontology_version_id: "sha256:ncit" };
+    assert.equal(module.resolvedFromAxiom({ factId: "o", ontologies: [doid], subject: other }, label(ileum.iri)).subjects[0].entity.ontology_version_id, doid);
+  } finally {
+    await cleanup();
+  }
+});
