@@ -76,7 +76,7 @@ locking access before sending; copying/resetting that store is prohibited.
 ## Readiness and continuation
 
 Offline tests and successful control replay establish implementation/preparation
-readiness only. Real endpoint access, a usable direct credential, frozen launch
+readiness only. Real endpoint access, a usable OpenRouter credential, frozen launch
 inputs and supervised ownership are separate dispatch gates. A lightweight real
 14372 coordination step owns the separate t2 `srun`, propagates its exit and
 verified completion, and is registered with the existing supervisor. Record the
@@ -96,3 +96,32 @@ The OpenRouter alpha wire contract is separately backed by the saved
 `data/exact-repair-corrective-20261009/qualification/decisions-pilot-20261012-001`
 endpoint metadata and successful raw responses; do not substitute the direct
 API's schema for it.
+
+## Verification and launch, 2026-10-12
+
+Implementation: `44b63fdc` introduced the bounded adapter; `a0a6ecf8` bound it to
+the observed OpenRouter alpha contract; `e411274e` froze the replay and remote
+ownership implementation. All 150 transport/accounting/pilot, 17 replay and
+9 launch tests passed, with relevant lint/type checks and independent review.
+The offline real-data check matched all 1,000 historical requests/probabilities,
+all 4,000 scores and all 197 emitted mappings (reference F1 0.8232044199).
+
+The frozen package is
+`data/experiments-v2/e07-luna-comparison-20261012-01/`, with a 14 MB input panel
+and 5 MB source archive footprint; no ontology/cache copies are required.
+Estimated input is 4,167,983 tokens (~$0.417 at the captured route rate), not an
+actual bill. Maximum request admission is 9,646 tokens/26,533 bytes, within the
+unchanged prompt limits. Native usage/cost is recorded in the durable ledger.
+
+The live t2 worker is `14466.0`, owned by supervised coordination step
+`14372.274`; initial health was healthy and 51/1,000 judgments were complete at
+21:13 UTC. G4 remains `14372.273`, supervisor `14372.269`. This is live launch/API
+verification, not a completed sensitivity result or scientific promotion.
+Read the package's `HANDOFF.md` and `dispatch-01/supervisor-handoff.json` for
+actual ownership, safe continuation and current artifact paths.
+
+An initial automatic launch review classified the evidence as sensitive. Before
+resubmission, local provenance established public NCIT/DOID inputs and verified
+that every payload's evidence exactly matched its historical OpenRouter/OpenAI
+request. No reference labels or private test data are sent. Review then accepted
+the launch; the earlier rejected command made no submissions or paid calls.
