@@ -18,7 +18,32 @@ from exact.runs.store import ExplanationStore, _atomic_json
 from exact.utils.provenance import sha256_file
 
 
-def compare_records(left, right, *, tolerance=1e-5):
+SYNTHETIC_DIAGNOSTIC_PATHS = (
+    "experiment_diagnostics.difference.controlled_perturbations",
+    "experiment_diagnostics.difference_replay",
+)
+
+
+def ordinary_records(records):
+    """Exclude only T07's synthetic replays; retain every natural evidence field."""
+    result = []
+    for record in records:
+        row = dict(record)
+        if isinstance(row.get("experiment_diagnostics"), dict):
+            diagnostics = row["experiment_diagnostics"] = dict(row["experiment_diagnostics"])
+            diagnostics.pop("difference_replay", None)
+            if isinstance(diagnostics.get("difference"), dict):
+                difference = diagnostics["difference"] = dict(diagnostics["difference"])
+                difference.pop("controlled_perturbations", None)
+        result.append(row)
+    return result
+
+
+def compare_records(left, right, *, tolerance=1e-5, ordinary_only=False):
+    if not math.isfinite(tolerance) or tolerance < 0:
+        raise ValueError("Parity tolerance must be finite and nonnegative")
+    if ordinary_only:
+        left, right = ordinary_records(left), ordinary_records(right)
     numeric = []
     discrete = []
     max_error = 0.0
@@ -40,8 +65,8 @@ def compare_records(left, right, *, tolerance=1e-5):
             compared_floats += 1
             error = abs(a - b)
             if not math.isfinite(a) or not math.isfinite(b):
-                if not (math.isnan(a) and math.isnan(b)) and a != b:
-                    numeric.append(path + ": nonfinite mismatch")
+                # Equal NaNs/infinities do not establish usable numerical output.
+                numeric.append(path + ": nonfinite value")
             else:
                 max_error = max(max_error, error)
                 if error > tolerance:
@@ -70,6 +95,7 @@ def compare_records(left, right, *, tolerance=1e-5):
             if rankings[0] != rankings[1]:
                 discrete.append(f"{field} ranking:{source}")
     return {"compared_rows": len(left), "compared_floats": compared_floats,
+            "excluded_diagnostic_paths": list(SYNTHETIC_DIAGNOSTIC_PATHS) if ordinary_only else [],
             "absolute_tolerance": tolerance, "max_absolute_error": max_error,
             "numeric_mismatch_count": len(numeric), "discrete_mismatch_count": len(discrete),
             "numeric_mismatches_sample": numeric[:100], "discrete_mismatches_sample": discrete[:100],
@@ -77,7 +103,7 @@ def compare_records(left, right, *, tolerance=1e-5):
             "status": "passed" if not discrete and not numeric else "failed"}
 
 
-def compare(left_path, right_path, output):
+def compare(left_path, right_path, output, *, ordinary_only=False):
     left_receipt = json.loads((left_path / "cold.json").read_text())
     right_receipt = json.loads((right_path / "cold.json").read_text())
     count = sum(chunk["rows"] for chunk in left_receipt["chunks"])
@@ -107,7 +133,7 @@ def compare(left_path, right_path, output):
                 for row in records[start:start + chunk["rows"]]:
                     row["original_query_id"] = by_source[row["src_iri"]]
                 start += chunk["rows"]
-    receipt = {**compare_records(left, right), "schema_version": 1,
+    receipt = {**compare_records(left, right, ordinary_only=ordinary_only), "schema_version": 1,
                "namespace": "qualification_only", "query_boundaries_equal": boundaries,
                "baseline": {"path": str(left_path), "cold_sha256": sha256_file(left_path / "cold.json")},
                "candidate": {"path": str(right_path), "cold_sha256": sha256_file(right_path / "cold.json")},
@@ -122,8 +148,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("baseline", "candidate", "output"):
         parser.add_argument("--" + name, type=Path, required=True)
+    parser.add_argument("--ordinary-only", action="store_true",
+                        help="Exclude only the two declared synthetic-diagnostic payload paths")
     args = parser.parse_args()
-    result = compare(args.baseline, args.candidate, args.output)
+    result = compare(args.baseline, args.candidate, args.output, ordinary_only=args.ordinary_only)
     print(json.dumps({k: result[k] for k in ("status", "compared_rows", "max_absolute_error", "numeric_mismatch_count", "discrete_mismatch_count")}, indent=2))
     if result["status"] != "passed":
         raise SystemExit(1)

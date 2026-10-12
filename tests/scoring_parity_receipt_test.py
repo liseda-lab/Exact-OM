@@ -11,6 +11,45 @@ def rows():
             for t in ("a", "b")]
 
 
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+def test_identical_nonfinite_outputs_cannot_pass_parity(value):
+    baseline, changed = rows(), rows()
+    # S_final can remain finite while an evidence support becomes invalid.
+    baseline[0]["support"] = changed[0]["support"] = value
+    result = compare_records(baseline, changed)
+    assert result["status"] == "failed"
+    assert result["numeric_mismatch_count"] == 1
+
+
+@pytest.mark.parametrize("tolerance", [float("nan"), float("inf"), -1.0])
+def test_invalid_tolerance_cannot_disable_numeric_checks(tolerance):
+    with pytest.raises(ValueError, match="finite and nonnegative"):
+        compare_records(rows(), rows(), tolerance=tolerance)
+
+
+def test_ordinary_only_excludes_synthetic_replays_without_hiding_natural_evidence():
+    baseline = rows()
+    baseline[0]["experiment_diagnostics"] = {
+        "difference": {"natural_support": 0.25, "controlled_perturbations": {"synthetic": 0.4}},
+        "difference_replay": [{"synthetic": 0.5}],
+        "other_diagnostic": "retained",
+    }
+    changed = copy.deepcopy(baseline)
+    del changed[0]["experiment_diagnostics"]["difference"]["controlled_perturbations"]
+    del changed[0]["experiment_diagnostics"]["difference_replay"]
+    original = copy.deepcopy(baseline)
+    assert compare_records(baseline, changed)["status"] == "failed"
+    result = compare_records(baseline, changed, ordinary_only=True)
+    assert result["status"] == "passed"
+    assert len(result["excluded_diagnostic_paths"]) == 2
+    assert baseline == original  # Normalization never edits the saved evidence.
+    changed[0]["experiment_diagnostics"]["difference"]["natural_support"] = 0.3
+    assert compare_records(baseline, changed, ordinary_only=True)["status"] == "failed"
+    changed = copy.deepcopy(baseline)
+    changed[0]["experiment_diagnostics"]["other_diagnostic"] = "changed"
+    assert compare_records(baseline, changed, ordinary_only=True)["status"] == "failed"
+
+
 def test_tolerance_does_not_hide_changed_winner_or_fact_order():
     baseline, changed = rows(), rows()
     changed[1]["confidences"]["S_final"] += 1e-7
