@@ -331,3 +331,54 @@ Read the immutable `learning/dev-evaluator-recovery-20261012-004/handoff.json`. 
 No evaluator configuration passed the required semantic/operational qualification. All consumers remain held. Stable readiness incident `readiness-corrective-primary-validation` owns this outcome; preserve its unsuccessful-attempt history, do not create a replacement incident to restart the same unsuccessful repair loop, and do not mark the primary study complete. No further paid model/prompt search or qualification-bypassing release is authorized by these frozen plans. Deterministic monitoring continues; no repeated model calls are needed to rediscover these results.
 
 The actual remaining decision is a revised finite evaluator/adjudication protocol or an explicitly incomplete primary semantic comparison. A bounded logged correction under SF-014 is a possible next protocol, not an already approved/executable batch. Current accounting is calibration91/TRAIN251/DEV143 attempted/reserved, TEST0. DEV has27 requests left against26 unattempted presentations plus3 currently unavailable presentations. Preserving one additional attempt for every fixed presentation would require an explicit request-budget amendment704→741; $35 and TEST192 would stay unchanged. The provider reports$5.48763536 in campaign costs where available, with one unknown delivery; conservative phase reservations are$14.8494218. These are different accounting measures. Preserve both and every old receipt. Send at most the action-needed notification for this stable decision; do not send routine progress or premature idle-success emails.
+
+## 12 October: explicitly authorized four-model judge pilot
+
+The latest user instruction authorizes a small matched test of GPT-6 Luna,
+Claude Haiku 5.5, MiniMax M3 and Gemini, then expansion if qualified. This
+supersedes the previous no-further-model-search instruction only for this
+concrete pilot. Read the frozen plan at
+`data/exact-repair-corrective-20261009/qualification/judge-pilot-20261012-001/plan.json`
+and its preflight/receipts. Root owns preparation and semantic review while
+`MANUAL_CONTROL` exists; dispatcher may continue independently.
+
+There are five newly authored controls and one swapped long-context control per
+model: 24 requests total, each with a 180-second timeout, 6,000 output tokens,
+no retries and a pinned provider route. These cases belong to no study split.
+The complete theories and consequence/non-vacuity facts were natively verified.
+The prompt requests SF-010 categories plus cited explanations; code computes
+numeric scores. The construction gold allows documented rubric ambiguity and
+rejects factual/ordering contradictions. Formatting, preference accuracy,
+anchor validity, consistency and latency/cost are separate measurements.
+Require manual review of explanations before admitting a winning candidate.
+Passing five constructions is operational qualification, not proof of general
+semantic expertise or independent expert validity.
+
+Luna, Haiku and MiniMax alone are eligible for future TRAIN/DEV teacher selection.
+Gemini is assessor-only. Its answers cannot select a teacher, generate TRAIN
+labels or choose HGT checkpoints; they qualify the separately frozen assessor
+against independent construction truth. No existing TRAIN/DEV output pairs or
+TEST data were used. TEST stays closed until 14 October at 17:00 UTC. Existing
+104 accepted weak comparisons, six trained models, 192 verified DEV repairs and
+all failed evaluator observations remain unchanged.
+
+This newly authorized diagnostic spends 24 unused DEV engineering request slots;
+its semantic role is isolated qualification, never actual DEV model selection.
+The $35 and 704-request ceilings and all phase limits remain unchanged. The
+complete panel reserves under the existing phase-ledger lock before any call,
+including a conservative allowance for reasoning tokens. Every historical row,
+unknown-delivery charge and same-incident counter is retained. A new finite
+`judge_qualification` stage ends 12 October at 22:30 UTC; it does not reset or
+reopen expired learning clocks. Raw HTTP responses are committed in the existing
+SQLite ledger, and per-presentation receipts permit replay without new charges.
+A transmission claim without a completed response cannot be resent by a
+replacement job. A failed judge does not stop the other three candidates.
+
+Prepare any expansion as a separately versioned protocol with a complete input
+and cumulative-budget preflight. Do not silently relabel previous models or
+substitute a teacher. The original readiness incident remains unresolved until
+full actual-run DEV coverage passes; do not clear or reset its two unsuccessful
+attempts. This explicit new pilot authorization is not a daily repair allowance.
+Continue to send email only when a concrete user decision/intervention is needed,
+including an idle queue with no independent eligible work. Do not email routine
+pilot progress or ask again for permission to run these 24 authorized calls.
