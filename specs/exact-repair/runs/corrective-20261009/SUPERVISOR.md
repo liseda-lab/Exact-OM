@@ -2,6 +2,29 @@
 
 ## 12 October: qualify Luna Decisions before further experiment changes
 
+Outcome: the screen and one isolated diagnostic completed as steps14451.186
+and14451.187. Read `qualification/decisions-pilot-20261012-001/review.json`.
+The original bundled request returned502 because OpenAI refused a mandatory
+numeric score for an insufficient-evidence control. The swapped bundle returned
+all98 typed answers, but only3/5 authored preferences and2/5 complete criterion
+profiles matched their gold; only3/7 preferences agreed with their categorical
+totals. The paired order audit is incomplete. An unchanged identical-plan
+control, sent alone with eight choice/assessability questions and no forced
+numeric score, passed all six categorical anchors and the tie decision.
+Context and question types both changed in that diagnostic: it does not isolate
+which change caused the improvement or qualify the interface for study labels.
+
+The additional diagnostic consumed the last unused TEST retry slot, recorded in
+`qualification/decisions-pilot-20261012-002/amendment.json`. Final quotas are
+91/251/208/154; all128 TEST comparisons and26 swaps remain. Three attempted
+requests have confirmed provider cost$0.0244505 plus one failed request with
+unknown cost; all three conservative reservations ($0.3320348) remain charged.
+Slurm and worker receipts were consolidated without reducing historical costs.
+Do not silently expand annotations or reduce TEST to create retry capacity.
+The recommended next comparison is per-case, categorical-only, with unknowns
+masked and preferences derived from criterion ratings in code. Explanatory
+grounding still needs its own explicit design; no current labels were replaced.
+
 The user requested a test of the Decisions interface before other work. The
 isolated plan is `qualification/decisions-pilot-20261012-001/plan.json`. Use
 `openai/gpt-6-luna-decisions` through OpenRouter `/api/alpha/decisions`, with the
