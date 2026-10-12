@@ -20,6 +20,7 @@ from exact.repair.semantic_fidelity import (
     COMPLETE_PROMPT_VERSION,
     REFERENCE_PROMPT_VERSION,
     ANCHORED_PROMPT_VERSION,
+    CRITERION_PROMPT_VERSION,
     consequence_basis_from_probes,
 )
 from tools.repair.batch import read, sha
@@ -141,6 +142,7 @@ def validate_amendment(manifest):
             COMPLETE_PROMPT_VERSION,
             REFERENCE_PROMPT_VERSION,
             ANCHORED_PROMPT_VERSION,
+            CRITERION_PROMPT_VERSION,
         }
         or manifest.get("no_verbatim_quotes", False)
         != (
@@ -151,6 +153,7 @@ def validate_amendment(manifest):
                 COMPLETE_PROMPT_VERSION,
                 REFERENCE_PROMPT_VERSION,
                 ANCHORED_PROMPT_VERSION,
+                CRITERION_PROMPT_VERSION,
             }
         )
         or manifest.get("theory_text_comparison", False)
@@ -161,17 +164,29 @@ def validate_amendment(manifest):
                 COMPLETE_PROMPT_VERSION,
                 REFERENCE_PROMPT_VERSION,
                 ANCHORED_PROMPT_VERSION,
+                CRITERION_PROMPT_VERSION,
             }
         )
         or manifest.get("complete_criteria", False)
         != (
             manifest.get("prompt_version")
-            in {COMPLETE_PROMPT_VERSION, REFERENCE_PROMPT_VERSION, ANCHORED_PROMPT_VERSION}
+            in {
+                COMPLETE_PROMPT_VERSION,
+                REFERENCE_PROMPT_VERSION,
+                ANCHORED_PROMPT_VERSION,
+                CRITERION_PROMPT_VERSION,
+            }
         )
         or manifest.get("intended_commitment_evidence", False)
-        != (manifest.get("prompt_version") in {REFERENCE_PROMPT_VERSION, ANCHORED_PROMPT_VERSION})
+        != (
+            manifest.get("prompt_version")
+            in {REFERENCE_PROMPT_VERSION, ANCHORED_PROMPT_VERSION, CRITERION_PROMPT_VERSION}
+        )
         or manifest.get("fact_references", False)
-        != (manifest.get("prompt_version") in {REFERENCE_PROMPT_VERSION, ANCHORED_PROMPT_VERSION})
+        != (
+            manifest.get("prompt_version")
+            in {REFERENCE_PROMPT_VERSION, ANCHORED_PROMPT_VERSION, CRITERION_PROMPT_VERSION}
+        )
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])

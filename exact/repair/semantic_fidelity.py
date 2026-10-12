@@ -29,6 +29,7 @@ CRITERIA = ("meaning_retention", "assertion_fidelity", "collateral_fidelity")
 PARSER_VERSION = "semantic-fidelity-validator/v3.1"
 REFERENCE_PARSER_VERSION = "semantic-fidelity-validator/v3.2-references"
 ANCHORED_PARSER_VERSION = "semantic-fidelity-validator/v3.3-anchors"
+CRITERION_PARSER_VERSION = "semantic-fidelity-validator/v3.4-criteria"
 PROMPT_VERSION = "semantic-fidelity-prompt/v3.1"
 AGGREGATION_REVISION = "exact-repair/semantic-fidelity-aggregate/v3.3"
 FIDELITY_TRAINING_SCHEMA = "exact-repair/fidelity-training/v3.3"
@@ -233,15 +234,52 @@ criterion preferences and weighted overall decision for agreement before output.
 )
 
 
+CRITERION_PROMPT_VERSION = "semantic-fidelity-prompt/v3.9"
+CRITERION_PROMPT = (
+    REFERENCE_PROMPT
+    + """
+Use the three DISTINCT criterion definitions in the frozen rubric (SF-008):
+* assertion_fidelity: Are retained/introduced directions, endpoints, scope,
+  quantifiers and qualifiers justified by the supplied meanings and evidence?
+  Unsupported new assertions damage this criterion. A missing intended axiom is
+  not itself an incorrect asserted axiom; do not automatically copy its retention
+  penalty into assertion_fidelity. Deletion does not make this criterion unknown
+  or inapplicable. Judge the assertions/effects that the complete plan leaves.
+* collateral_fidelity: Does the repair avoid unsupported conceptual commitments
+  and unjustified loss of independently supported within/cross-ontology knowledge?
+  Identical fixed axioms do not guarantee identical consequences or perfect
+  collateral fidelity. Consider unsupported added relationships and their effects.
+* meaning_retention: Which independently supported intended relationships are
+  preserved or restored, and which useful relationships are lost? D2 lists
+  POSITIVE intended commitments: every listed axiom is required to follow.
+  INTENDED_ENTAILS=false means that required commitment is MISSING. It does not
+  mean that non-entailment was intended. Passing witness/nonvacuity checks cannot
+  replace a missing general D2 commitment. Cite EVERY INTENDED_ENTAILS fact for
+  both plans in this criterion. A perfect meaning_retention score is invalid if
+  any required commitment is missing. Losing the entire sole editable commitment
+  is loss of that editable meaning; shared fixed background cannot replace it.
+
+Score each plan independently before comparing them. Equal failure is a tie at
+justified low scores, never automatically perfect scores. Distinguish partial
+from complete retention when D2 has multiple commitments. Do not reward raw edit
+counts or penalize the same missing relationship automatically in all criteria.
+Ground every rating in the particular criterion. A supported trade-off can favor
+either plan; never force a preference simply because one retains more D2 axioms.
+"""
+)
+
+
 def parser_for_prompt(version):
     return {
         REFERENCE_PROMPT_VERSION: REFERENCE_PARSER_VERSION,
         ANCHORED_PROMPT_VERSION: ANCHORED_PARSER_VERSION,
+        CRITERION_PROMPT_VERSION: CRITERION_PARSER_VERSION,
     }.get(version, PARSER_VERSION)
 
 
 PROMPTS = {
     ANCHORED_PROMPT_VERSION: ANCHORED_PROMPT,
+    CRITERION_PROMPT_VERSION: CRITERION_PROMPT,
     REFERENCE_PROMPT_VERSION: REFERENCE_PROMPT,
     COMPLETE_PROMPT_VERSION: COMPLETE_PROMPT,
     CONTRAST_PROMPT_VERSION: CONTRAST_PROMPT,
@@ -655,7 +693,11 @@ def validate_comparison(
     """
     value = _strict_json(raw)
     parser = (annotator or {}).get("parser_version", PARSER_VERSION)
-    reference_contract = parser in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
+    reference_contract = parser in {
+        REFERENCE_PARSER_VERSION,
+        ANCHORED_PARSER_VERSION,
+        CRITERION_PARSER_VERSION,
+    }
     if reference_contract:
         # Normalize only explicitly supplied references, never a truth value or
         # score. The original wire bytes remain in the authenticated receipt.
@@ -754,10 +796,10 @@ def validate_comparison(
         b = _number(criterion["b_score"], "criterion score")
         if max(a, b) > 1:
             raise ValueError("Criterion score exceeds one")
-        if parser == ANCHORED_PARSER_VERSION and name in {
-            "assertion_fidelity",
-            "meaning_retention",
-        }:
+        if (
+            parser == ANCHORED_PARSER_VERSION
+            and name in {"assertion_fidelity", "meaning_retention"}
+        ) or (parser == CRITERION_PARSER_VERSION and name == "meaning_retention"):
             for side, score in (("a", a), ("b", b)):
                 plan_id = context[f"plan_{side}_id"]
                 plan = next(p for p in (packet.plan_a, packet.plan_b) if p.plan_id == plan_id)
@@ -1335,7 +1377,7 @@ def _validated_observation(
     if parser not in schedule.parser_versions:
         raise ValueError("Parser revision is outside the frozen aggregation schedule")
     if (
-        parser in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
+        parser in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION, CRITERION_PARSER_VERSION}
         or parser_for_prompt(context["prompt_version"]) != PARSER_VERSION
     ) and parser != parser_for_prompt(context["prompt_version"]):
         raise ValueError("Checked-reference parser differs from the frozen prompt contract")
@@ -2139,7 +2181,8 @@ class SemanticAnnotationAdapter:
         if parser_version is None:
             parser_version = parser_for_prompt(self.run.prompt_version)
         if (
-            parser_version in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
+            parser_version
+            in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION, CRITERION_PARSER_VERSION}
             or parser_for_prompt(self.run.prompt_version) != PARSER_VERSION
         ) and parser_version != parser_for_prompt(self.run.prompt_version):
             raise ValueError("Checked-reference parser requires its frozen prompt contract")
