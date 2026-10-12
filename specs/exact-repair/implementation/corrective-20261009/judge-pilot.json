@@ -1,4 +1,8 @@
 {
+  "expansion": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/qualification/judge-pilot-20261012-001/expansion-plan.json",
+    "sha256": "be0c3653b6fc66a4fe3624e4326c83f4d8958e587db3e13c3dc1bcfd664dce99"
+  },
   "hard_campaign_cap_usd": 35,
   "heldout_test_opened": false,
   "models": [
@@ -16,8 +20,15 @@
     "sha256": "fcde44d11285b4a05690ecc1e4c2930ba2525954cfee5aef695f4c31c3952a61"
   },
   "previous_supervision_replaced": false,
+  "qualified_assessor": "google/gemini-2.5-pro",
+  "reported_cost_usd": 0.65409812,
   "request_count": 24,
+  "review": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/qualification/judge-pilot-20261012-001/review.json",
+    "sha256": "5ebffa72bdfddef844b04bb3c7d7904fa25bfccead0a77ae89b6f6009b582cc9"
+  },
   "schema": "exact-repair/isolated-judge-pilot-handoff/v1",
-  "status": "prepared",
+  "selected_teacher": "openai/gpt-6-luna",
+  "status": "complete_reviewed",
   "tests": "9 targeted transport, budget, crash/replay, scoring and native-control tests; strict mypy on both new modules."
 }
