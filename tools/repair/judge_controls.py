@@ -37,7 +37,16 @@ from tools.repair.shared_release import immutable
 NAMESPACE = "isolated_judge_qualification_20261012"
 
 
-def controls(directory, *, background_count=1600, names=None):
+def controls(
+    directory,
+    *,
+    background_count=1600,
+    names=None,
+    vocabulary=None,
+    namespace=NAMESPACE,
+    definitions=None,
+    gold_overrides=None,
+):
     """Build full theories and native consequence/non-vacuity evidence offline."""
     directory = Path(directory)
     result = []
@@ -47,8 +56,10 @@ def controls(directory, *, background_count=1600, names=None):
             "ontology_collateral": "c902",
             "partial_evidence": "c903",
         }.get(name, name)
-        iri = "urn:" + NAMESPACE + ":" + scenario + ":"
-        cls = lambda label: owl.Class(owl.IRI(iri + label))
+        vocabulary = vocabulary or {}
+        iri = "urn:" + namespace + ":" + scenario + ":"
+        term = lambda label: vocabulary.get(label, label)
+        cls = lambda label: owl.Class(owl.IRI(iri + term(label)))
         a, b = (
             (cls("ConceptX"), cls("ConceptY"))
             if name == "insufficient"
@@ -96,7 +107,7 @@ def controls(directory, *, background_count=1600, names=None):
             allowed["meaning_retention"]["a"] = ["none"]
         elif name == "range_context":
             paper, person, agent = cls("Paper"), cls("Person"), cls("Agent")
-            prop = owl.ObjectProperty(owl.IRI(iri + "authoredBy"))
+            prop = owl.ObjectProperty(owl.IRI(iri + term("authoredBy")))
             axiom = owl.ObjectPropertyRange(prop, person)
             candidates = (
                 make_candidate("range", (axiom,), ("keep",)),
@@ -144,7 +155,7 @@ def controls(directory, *, background_count=1600, names=None):
             allowed = {k: dict(a=["unknown"], b=["unknown"]) for k in CRITERIA}
         elif name == "unsupported_qualifier":
             a, b, english = cls("AccreditedResearcher"), cls("Researcher"), cls("English")
-            speaks = owl.ObjectProperty(owl.IRI(iri + "speaks"))
+            speaks = owl.ObjectProperty(owl.IRI(iri + term("speaks")))
             fixed = tuple(owl.Declaration(x) for x in (a, b, english, speaks))
             qualifier = owl.ObjectSomeValuesFrom(speaks, english)
             good = owl.SubClassOf(a, b)
@@ -222,6 +233,20 @@ def controls(directory, *, background_count=1600, names=None):
             allowed["collateral_fidelity"] = dict(a=["unknown"], b=["unknown"])
         elif name not in ("direction", "meaning_loss", "range_context", "tie"):
             raise ValueError("Unknown authored control: " + name)
+        # Substitute simultaneously before native verification. New vocabulary
+        # instantiations are fresh presentations, not independent task families.
+        if vocabulary:
+            import re
+
+            definition = re.sub(
+                "|".join(re.escape(k) for k in sorted(vocabulary, key=len, reverse=True)),
+                lambda match: vocabulary[match.group()],
+                definition,
+            )
+        if definitions and name in definitions:
+            definition = definitions[name]
+        if gold_overrides and name in gold_overrides:
+            allowed = gold_overrides[name]
         problem = promote_input_v3(RepairInputV2(fixed, (obj,), PolicyV2(monitored)))
         problem = replace(problem, policy=freeze_public_policy(problem))
         basis = consequence_basis_from_probes(probes)
@@ -230,7 +255,7 @@ def controls(directory, *, background_count=1600, names=None):
             D1=dict(
                 kind="authored_definition",
                 text=definition,
-                source_id=NAMESPACE + "/" + scenario,
+                source_id=namespace + "/" + scenario,
                 release="v1",
             )
         )
@@ -299,7 +324,7 @@ def controls(directory, *, background_count=1600, names=None):
                     **outcomes[probe.probe_id],
                 )
         packet = dict(
-            namespace=NAMESPACE,
+            namespace=namespace,
             study_split=None,
             case=name,
             native_verified=True,

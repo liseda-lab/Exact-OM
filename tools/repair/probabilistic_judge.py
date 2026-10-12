@@ -379,7 +379,7 @@ def parse_response(response, wire, stage, model):
     return answer
 
 
-def one(plan, slot, directory, gate=None):
+def one(plan, slot, directory, gate=None, *, parser=parse_response, score_filter=score_packet):
     directory = Path(directory) / slot["id"]
     with locked(directory / "receipt.lock"):
         wire = bound(slot["packet"])
@@ -388,7 +388,7 @@ def one(plan, slot, directory, gate=None):
             expected = canonical_hash((plan, parent, bound(parent["packet"]), None))
             if gate is None or gate.get("identity") != expected:
                 raise ValueError("Score dependencies changed or evidence gate is foreign")
-            wire = score_packet(wire, gate)
+            wire = score_filter(wire, gate)
         identity = canonical_hash((plan, slot, wire, gate))
         receipt = directory / "receipt.json"
         model = plan["models"][slot["model"]]
@@ -425,7 +425,7 @@ def one(plan, slot, directory, gate=None):
                     or json.loads(raw) != response
                 ):
                     raise ValueError("Saved HTTP evidence changed")
-                if record.get("valid") and record["answers"] != parse_response(
+                if record.get("valid") and record["answers"] != parser(
                     response, wire, slot["stage"], model
                 ):
                     raise ValueError("Saved parsed judgment changed")
@@ -475,7 +475,7 @@ def one(plan, slot, directory, gate=None):
                 raw_sha256=hashlib.sha256(raw).hexdigest(),
                 usage=response.get("usage", {}),
             )
-            record["answers"] = parse_response(response, wire, slot["stage"], model)
+            record["answers"] = parser(response, wire, slot["stage"], model)
             record["valid"] = True
         except Exception as exc:
             record["error"] = type(exc).__name__ + ": " + str(exc)[:400]
