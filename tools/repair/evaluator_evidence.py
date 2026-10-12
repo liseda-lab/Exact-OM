@@ -67,6 +67,51 @@ def original_request_limits(manifest):
     return manifest["request_limits"]
 
 
+def evaluator_profile(manifest):
+    """A DEV-only model change never changes the qualified TRAIN teacher or TEST."""
+    from copy import deepcopy
+    from tools.repair.shared_release import bound
+    from tools.repair.annotation_profile import request_profile
+
+    amendment = bound(manifest["dev_evaluator_profile_amendment"])
+    previous = bound(amendment["previous_manifest"])
+    interface = bound(manifest["dev_interface_amendment"])
+    name = amendment["profile"]
+    if not (
+        amendment.get("schema") == "exact-repair/dev-evaluator-profile-amendment/v1"
+        and amendment.get("authorized") is True
+        and amendment.get("user_instruction")
+        and amendment.get("costs_reset") is False
+        and amendment.get("previous_manifest") == interface["previous_annotation_manifest"]
+        and manifest["phase"] == previous["phase"] == "development"
+        and name != previous["test_profile"]
+        and name in previous["profiles"]
+        and previous["profiles"][name]["model"] in previous["selection_model_ids"]
+        and previous["profiles"][name]["model"]
+        != previous["profiles"][previous["test_profile"]]["model"]
+    ):
+        raise ValueError("Unapproved DEV evaluator profile or TEST contamination")
+    expected = deepcopy(previous)
+    expected["profile"] = name
+    expected["profiles"][name]["provider"]["require_parameters"] = True
+    expected["request_profiles"] = {name: amendment["request_profile"]}
+    expected["reserve_input_bound"] = True
+    for key in (
+        "dev_interface_amendment",
+        "dev_evaluator_profile_amendment",
+        "evaluator_request_amendment",
+        "request_limits",
+    ):
+        expected[key] = manifest[key]
+    if canonical_hash(expected) != canonical_hash(manifest):
+        raise ValueError("DEV evaluator profile amendment changed another frozen dependency")
+    controls = request_profile(manifest, name)
+    control_amendment = bound(controls["input_amendment"])
+    if control_amendment.get("authorization") != manifest["dev_interface_amendment"]:
+        raise ValueError("DEV evaluator controls lack the exact interface authorization")
+    return previous
+
+
 def intentions(case):
     import pyowl_core as owl
 

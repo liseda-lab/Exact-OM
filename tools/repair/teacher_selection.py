@@ -208,6 +208,13 @@ def qualified_contract(manifest):
     """Use the approved panel's exact selected profile without reopening its clock."""
     from tools.repair.teacher_panel import panel_contract
 
+    if manifest.get("dev_evaluator_profile_amendment"):
+        from tools.repair.evaluator_evidence import evaluator_profile
+        from tools.repair.dev_semantic_interface import validate_amendment
+
+        previous = evaluator_profile(manifest)
+        validate_amendment(manifest)
+        return qualified_contract(previous)
     selected = bound(manifest["qualified_teacher"])
     gate, review = bound(selected["gate"]), bound(selected["review"])
     source, phase = bound(selected["manifest"]), bound(selected["phase_state"])

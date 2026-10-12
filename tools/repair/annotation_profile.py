@@ -105,6 +105,13 @@ def request_profile(manifest, name):
         if provider.get("max_price", {}).get(param) != prices[price]:
             raise ValueError("Provider max_price and reservation differ")
     tokenizer = controls["tokenizer"]
+    if tokenizer == {"kind": "utf8_byte_bound"}:
+        if (
+            "input_amendment" not in controls
+            or amendment.get("token_counting") != "utf8_byte_bound"
+        ):
+            raise ValueError("Byte token bound requires an explicit input amendment")
+        return controls
     if sha(tokenizer["path"]) != tokenizer["sha256"]:
         raise ValueError("Input tokenizer immutable bytes changed")
     if tokenizer.get("kind") == "openai_o200k_base":

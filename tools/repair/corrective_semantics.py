@@ -129,6 +129,8 @@ def validate_manifest(value):
     if value["phase"] not in PHASE_LIMITS:
         raise ValueError("Unregistered annotation phase")
     _request_budget(value)
+    if value.get("reserve_input_bound") and not value.get("dev_evaluator_profile_amendment"):
+        raise ValueError("Measured conservative reservation needs its DEV profile amendment")
     if value.get("no_verbatim_quotes") and not value.get("dev_interface_amendment"):
         raise ValueError("Quotation interface requires its explicit DEV amendment")
     if value.get("dev_interface_amendment"):
@@ -1100,6 +1102,15 @@ def annotate_packet(
     if _remaining_seconds(seconds - (time.monotonic() - started), manifest) < 92:
         router.hosted.close()
         return None
+    if manifest.get("reserve_input_bound"):
+        from dataclasses import replace
+
+        # Reserve the actual immutable request's conservative token upper bound,
+        # not the larger admission ceiling. Both ledgers use the same amount.
+        cost = (tokens * prices["input"] + output_cap * prices["output"]) / 1_000_000
+        run = replace(run, max_cost_per_request_usd=cost)
+        adapter = SemanticAnnotationAdapter(router, run, Path(manifest["ledger_directory"]))
+        schedule = adapter.schedule(packet, role=role, quorum=1, presentation_orders=(swapped,))
     try:
         reserve = _reserve_phase(
             manifest, slot_id, packet.content_hash, cost, comparison_id=comparison_id

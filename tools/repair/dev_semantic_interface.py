@@ -190,6 +190,11 @@ def validate_amendment(manifest):
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])
+    profile_revision = bool(manifest.get("dev_evaluator_profile_amendment"))
+    if profile_revision:
+        from tools.repair.evaluator_evidence import evaluator_profile
+
+        evaluator_profile(manifest)
     for key in (
         "profiles",
         "profile",
@@ -204,6 +209,8 @@ def validate_amendment(manifest):
         "test_profile",
         "selection_model_ids",
     ):
+        if profile_revision and key in {"profile", "profiles"}:
+            continue
         if manifest[key] != previous[key]:
             raise ValueError("DEV interface amendment changed frozen design: " + key)
     if manifest.get("evaluator_request_amendment"):
