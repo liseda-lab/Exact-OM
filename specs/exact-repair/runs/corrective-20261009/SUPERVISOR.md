@@ -1,5 +1,33 @@
 # October corrective repair campaign
 
+## 12 October: qualify Luna Decisions before further experiment changes
+
+The user requested a test of the Decisions interface before other work. The
+isolated plan is `qualification/decisions-pilot-20261012-001/plan.json`. Use
+`openai/gpt-6-luna-decisions` through OpenRouter `/api/alpha/decisions`, with the
+existing repository key and OpenAI route. A direct OpenAI key is unnecessary.
+Five unchanged authored controls and two already observed DEV disagreements are
+included in two complete case bundles, one per A/B ordering. Each request has
+98 independent typed questions. Bundled context is an exploratory screen, not a
+claim of equivalence with the previous per-case Chat Completions protocol.
+
+The user-authorized pilot transfers two unused TEST retry slots to DEV engineering:
+91 calibration / 251 TRAIN / 207 DEV / 155 TEST, still 704 total. Preserve all
+547 historical reservations, the $35 ceiling, all 128 planned TEST comparisons
+and 26 swap audits, and the remaining TEST retry slot. The conservative new
+reservation is $0.3267384. No TEST content is opened. Two HTTP attempts only;
+unknown delivery is retained and cannot be automatically resent.
+
+Keep categorical unknowns masked. Separately inspect native probability-weighted
+scores, categorical anchors, direct preference consistency and order sensitivity.
+No confidence threshold is tuned on these controls. Decisions does not produce
+written explanations/citations, so this pilot cannot itself satisfy or waive
+that part of the study's semantic-supervision contract. Do not replace existing
+DEV labels, release TEST, retrain models, or reset technical-failure counters.
+Root owns this qualification while `supervisor/MANUAL_CONTROL` exists; the
+existing deterministic dispatcher may run only its prepared pilot. Record the
+outcome and next-step implications before any expansion. No routine pilot email.
+
 ## 11 October: require the complete criteria array on the wire
 
 The complete-theory contrast removed the observed false identity explanations on
