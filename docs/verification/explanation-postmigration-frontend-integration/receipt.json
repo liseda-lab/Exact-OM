@@ -1,0 +1,736 @@
+{
+  "schema": "exact-frontend-s2-handoff/1",
+  "date": "2026-10-12",
+  "commits": {
+    "implementation": "441cd3d",
+    "browser_specs": "9d36719",
+    "card_gutter": "0f38a5f",
+    "sticky_bars": "129e862",
+    "repeated_comparisons": "885f551"
+  },
+  "frontend_source_tree": "a19632077d68b798ed4a15dea4114b0b25996139",
+  "frontend_output": "~/Library/Caches/exact-om-review/postmigration-20261011/frontend-s2-885f551",
+  "environment": {
+    "root": "~/Library/Caches/exact-om-review/postmigration-20261011/environment-s2e",
+    "source_checkout": "~/Library/Caches/exact-om-dev/s2dev/source-885f551 (clean detached worktree)",
+    "ports": {
+      "postgres": 19493,
+      "study": 19494,
+      "exploration": 19495
+    },
+    "study_revision": "review-20261012T205640-ace4cb08bd",
+    "hashes": {
+      "frontend": "b5511d27dabb4ba8d439580db5b4dda258493d87882ab6fcbe3dbd68fe21fc87",
+      "package": "1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+      "publication": "ae6c0cf09ab6595ea37f85df1060614268fb703a98e30e169f930b71d791e980",
+      "source_publication": "5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a"
+    },
+    "backend_source_sha256": "bb771d7fa8e40032af39771c62cadac4d4e5b343a9b9eb66348e665f088f811d"
+  },
+  "superseded_environments": {
+    "environment-s2": "build of 9d36719; stopped, data retained",
+    "environment-s2b": "build of 0f38a5f; stopped, data retained",
+    "environment-s2c": "build of 129e862; stopped, data retained",
+    "environment-s2d": "build of 885f551 with another session's uncommitted backend edits (fingerprint c87ce0b9...); stopped, data retained, not used for evidence"
+  },
+  "unit": {
+    "command": "npm run test:unit",
+    "passed": 122,
+    "failed": 0
+  },
+  "browser": {
+    "journey_and_hierarchy_final_environment": {
+      "counts": {
+        "passed": 3
+      },
+      "not_passed": [],
+      "passed": [
+        "review-hierarchy.spec.ts \u203a asserted and ELK children page to their recorded totals; a basis change restarts paging",
+        "review-hierarchy.spec.ts \u203a discovered entry points page and focus one side",
+        "study-review-journey.spec.ts \u203a review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports"
+      ]
+    },
+    "visual_captures_final_environment": {
+      "counts": {
+        "passed": 6
+      },
+      "not_passed": [],
+      "passed": [
+        "review-visual-s2.spec.ts \u203a main app \u00b7 light \u203a graphs on real pairs at 1280\u00d7720 and 1440\u00d7900",
+        "review-visual-s2.spec.ts \u203a main app \u00b7 light \u203a description kinds, ELK hierarchy and Decision trace",
+        "review-visual-s2.spec.ts \u203a study and tutorial \u00b7 light \u203a explanation case, baseline case and graph lesson side by side, desktop, phone and 200% text",
+        "review-visual-s2.spec.ts \u203a main app \u00b7 dark \u203a graphs on real pairs at 1280\u00d7720 and 1440\u00d7900",
+        "review-visual-s2.spec.ts \u203a main app \u00b7 dark \u203a description kinds, ELK hierarchy and Decision trace",
+        "review-visual-s2.spec.ts \u203a study and tutorial \u00b7 dark \u203a explanation case, baseline case and graph lesson side by side, desktop, phone and 200% text"
+      ]
+    },
+    "complete_suite_final_environment": {
+      "counts": {
+        "passed": 68,
+        "skipped": 56,
+        "failed": 23,
+        "timedOut": 3
+      },
+      "not_passed": [
+        {
+          "file": "exploration.spec.ts",
+          "title": "prepared comparison, evidence, graph and saved pair navigation",
+          "status": "failed"
+        },
+        {
+          "file": "exploration.spec.ts",
+          "title": "every generated-text citation opens its exact original record and returns focus (C03)",
+          "status": "failed"
+        },
+        {
+          "file": "exploration.spec.ts",
+          "title": "the graph keeps its view across tabs and draws only supported, legend-matched lines (C07, C08)",
+          "status": "failed"
+        },
+        {
+          "file": "exploration.spec.ts",
+          "title": "ontology search, independent focus, hierarchy and keyboard dialog",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R1 relationships sharing a target keep their own meaning \u203a graph, item list, inspector and original record agree before and after selection, tab and theme changes",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R1 relationships sharing a target keep their own meaning \u203a an unlabelled property is drawn by its local name; parallel and wrapped labels never overlap each other or a node",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R3 Show in graph reveals the exact requested record \u203a every grouped record, a multi-record feature, and undrawable records, after a previous selection and a tab restore",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R4 graph labels stay readable during selection \u203a light, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R4 graph labels stay readable during selection \u203a light, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R4 graph labels stay readable during selection \u203a dark, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R4 graph labels stay readable during selection \u203a dark, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R4 graph labels stay readable during selection \u203a each larger text size keeps the zoom and the selected relation in view, and both compared concepts whenever they fit (21 F01)",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-R1/R4 rich synthetic shapes render readably \u203a dense columns with long labels: no overlaps, readable start zoom, full text in the list",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0-followup.spec.ts",
+          "title": "S0-C1 score caveats are on request \u203a trace and scores panel show concise labels; meanings open from accessible disclosures",
+          "status": "failed"
+        },
+        {
+          "file": "product-review-s0.spec.ts",
+          "title": "U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 1280\u00d7720",
+          "status": "timedOut"
+        },
+        {
+          "file": "product-review-s0.spec.ts",
+          "title": "U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 1440\u00d7900",
+          "status": "timedOut"
+        },
+        {
+          "file": "product-review-s0.spec.ts",
+          "title": "U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 375\u00d7812",
+          "status": "timedOut"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R06/R07 study full context and fact pagination (19 F16, F17) \u203a a searched non-focal entity's full context pages every category; closing keeps the case",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R06/R07 study full context and fact pagination (19 F16, F17) \u203a a focal entity's full context shows its description; a citation opens and returns; a parent navigates",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R09 readiness follows the admitted components (19 F19) \u203a pair_comparison only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R09 readiness follows the admitted components (19 F19) \u203a original_context only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R09 readiness follows the admitted components (19 F19) \u203a entity_description only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R09 readiness follows the admitted components (19 F19) \u203a hierarchy + evidence_table + evidence_graph only: usable once exactly its content renders; a failure blocks and Retry recovers",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R09 readiness follows the admitted components (19 F19) \u203a comparison only: a recorded absence is usable (diagnostic)",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R11 continued parents keep their entity type (19 F21) \u203a study: a object property's later-page superproperty opens as a object property; the case is kept",
+          "status": "failed"
+        },
+        {
+          "file": "study-v2-integration.spec.ts",
+          "title": "R11 continued parents keep their entity type (19 F21) \u203a study: a data property's later-page superproperty opens as a data property; the case is kept",
+          "status": "failed"
+        }
+      ],
+      "passed": [
+        "accessibility.spec.ts \u203a desktop, light \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a desktop, light \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a desktop, dark \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a desktop, dark \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, light \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, light \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, dark \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, dark \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a dialog keyboard focus wraps and returns to its trigger",
+        "accessibility.spec.ts \u203a detail tabs support arrow-key navigation and activation",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+        "exploration.spec.ts \u203a run-discovery failures remain errors and can be retried",
+        "exploration.spec.ts \u203a a capped candidate list declares incomplete ranking coverage",
+        "exploration.spec.ts \u203a responsive comparison and persistent theme/text preferences",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a offline: answer, Next, Previous keeps the answer; after reconnecting it is saved and still shown",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a immediate Next/Back before the debounce, and a delayed save, keep a multi-part answer",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a reload with queued work shows the queued answer and saves it",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a competing tabs: each tab's conflicting draft stays visible, is saved, and does not overwrite the other's",
+        "product-review-s0.spec.ts \u203a U01/Q01 graph lesson: interaction is not evidence \u203a one-sided channels draw no comparison line; added ontology context saves nothing; a feature saves its exact record for the inspected candidate",
+        "product-review-s0.spec.ts \u203a U02/Q02 rejected evidence recovers without reload \u203a a rejected action is dropped, never resent, and the next valid action, help, navigation and reload all work",
+        "product-review-s0.spec.ts \u203a U02/Q02 rejected evidence recovers without reload \u203a offline evidence shows Saving\u2026 without a tick and saves after reconnecting",
+        "product-review-s0.spec.ts \u203a U03/Q03 lesson 2: the instructed return is possible and acknowledged \u203a search \u2192 a child that is the compared concept counts as the return; Back appears whenever focus is away",
+        "product-review-s0.spec.ts \u203a F02 guided task \u203a Show me reveals and focuses the control without doing the step",
+        "product-review-s0.spec.ts \u203a U05/Q04 explicit navigation reveals and focuses its destination \u203a at 200% text the trace still reveals below the sticky header",
+        "review-hierarchy.spec.ts \u203a asserted and ELK children page to their recorded totals; a basis change restarts paging",
+        "review-hierarchy.spec.ts \u203a discovered entry points page and focus one side",
+        "study-review-journey.spec.ts \u203a review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a lesson 1 \u2192 2 then reload without any lesson-2 action restores lesson 2, with focus on the new heading",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a the assessment landing, a partial draft and a focused question all survive reload",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a rapid Next/Back while saves are delayed keeps the last destination, on screen and on the server",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a navigation while offline is kept in this tab and saved after reconnecting",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a a stale second tab adopts the server's position after its conflicting navigation",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a opening tutorial help during a scored case keeps completion, assignment and the case",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a the scored case reads its scoped workspace: six contexts, admitted descriptions and comparisons, then one case_ready",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a v2 explanation case without its workspace descriptor is blocked, never served from prepared excerpts",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a capabilities for another scope are incompatible and block the case",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a target-context failure blocks ranking and case_ready until a retry succeeds, reusing valid reads",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a slow fifth candidate keeps the case loading; case_ready and case timing start only after it",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a comparison failure blocks with its own label; a profile failure likewise",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a 200 response describing another entity is an invalid binding and blocks readiness",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a an optional hierarchy failure stays local and does not block submission",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a blocking failure keeps a saved partial ranking and its order through retry",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a replacing the session aborts the old case: nothing from it becomes ready",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a second tab loads its own readiness and reports its own ready observation (J05)",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a pause and resume never reopen case timing before the content is usable again",
+        "study-v2-integration.spec.ts \u203a J02 participant boundaries (browser subset) \u203a a baseline case reads no workspace, and a previous explanation scope is denied after advancing",
+        "study-v2-integration.spec.ts \u203a J08 researcher export (browser) \u203a v2 exports request and verify the derived analysis in JSON and CSV",
+        "study-v2-integration.spec.ts \u203a J08 researcher export (browser) \u203a a returned schema other than the requested analysis is reported and not saved (diagnostic)",
+        "study-v2-integration.spec.ts \u203a J10 layout and accessibility on the real service \u203a setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (light)",
+        "study-v2-integration.spec.ts \u203a J10 layout and accessibility on the real service \u203a setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (dark)",
+        "study-v2-integration.spec.ts \u203a R08 retry refetches unusable responses (19 F18) \u203a a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place",
+        "study-v2-integration.spec.ts \u203a R08 retry refetches unusable responses (19 F18) \u203a a slow required read finishing after another failed cannot unblock the case",
+        "study-v2-integration.spec.ts \u203a Optional reads refused with 403 (19 F18) \u203a a refused optional read stays local; only a refused scope blocks the case",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a delayed check failure cannot undo a successful retry; the draft and cached contexts survive",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a check still in flight from a submitted presentation cannot affect the next case",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a check still in flight from a replaced session cannot affect the new session",
+        "study-v2-integration.spec.ts \u203a R12 tutorial card parents keep their recorded type (19 F21) \u203a lesson 1's source card opens both parents as typed classes; lesson 2 saves a typed parent action",
+        "typed-browse.spec.ts \u203a NCIT property search preserves kind in hierarchy, URL, reload and full context",
+        "typed-browse.spec.ts \u203a an old in-flight search cannot replace the new term's real results"
+      ]
+    },
+    "complete_suite_synthetic_s0_harness": {
+      "counts": {
+        "passed": 101,
+        "failed": 19,
+        "skipped": 30
+      },
+      "not_passed": [
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, light \u203a study welcome accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, light \u203a study case, evidence and per-case report accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, light \u203a researcher sign-in accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, dark \u203a study welcome accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, dark \u203a study case, evidence and per-case report accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "desktop, dark \u203a researcher sign-in accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, light \u203a study welcome accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, light \u203a study case, evidence and per-case report accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, light \u203a researcher sign-in accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, dark \u203a study welcome accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, dark \u203a study case, evidence and per-case report accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "mobile enlarged text, dark \u203a researcher sign-in accessibility",
+          "status": "failed"
+        },
+        {
+          "file": "accessibility.spec.ts",
+          "title": "a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)",
+          "status": "failed"
+        },
+        {
+          "file": "study-recovery.spec.ts",
+          "title": "a stale tab cannot save into another equal-revision session sharing the cookie",
+          "status": "failed"
+        },
+        {
+          "file": "study-recovery.spec.ts",
+          "title": "failed explanation content blocks ranking and pending submission does not claim success",
+          "status": "failed"
+        },
+        {
+          "file": "study.spec.ts",
+          "title": "complete HTTPS/PostgreSQL participant journey, pause, reload, timing and condition isolation",
+          "status": "failed"
+        },
+        {
+          "file": "study.spec.ts",
+          "title": "v1 explanation cases open card parents with their recorded type (19 F21)",
+          "status": "failed"
+        },
+        {
+          "file": "study.spec.ts",
+          "title": "offline answers survive reload and reconnect before submission",
+          "status": "failed"
+        },
+        {
+          "file": "study.spec.ts",
+          "title": "researcher browser authentication, publication, links, progress, exports and closure",
+          "status": "failed"
+        }
+      ],
+      "passed": [
+        "accessibility.spec.ts \u203a desktop, light \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a desktop, light \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a desktop, light \u203a bundle library accessibility",
+        "accessibility.spec.ts \u203a desktop, dark \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a desktop, dark \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a desktop, dark \u203a bundle library accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, light \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, light \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, light \u203a bundle library accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, dark \u203a comparison accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, dark \u203a ontology browsing accessibility",
+        "accessibility.spec.ts \u203a mobile enlarged text, dark \u203a bundle library accessibility",
+        "accessibility.spec.ts \u203a dialog keyboard focus wraps and returns to its trigger",
+        "accessibility.spec.ts \u203a detail tabs support arrow-key navigation and activation",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+        "assessment-recovery.spec.ts \u203a S0-FU-R1 an older same-question answer never overwrites a newer saved one \u203a independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+        "assessment-recovery.spec.ts \u203a S0-FU-R2 the latest answer stays visible throughout restored outbox replay \u203a a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+        "exploration.spec.ts \u203a prepared comparison, evidence, graph and saved pair navigation",
+        "exploration.spec.ts \u203a every generated-text citation opens its exact original record and returns focus (C03)",
+        "exploration.spec.ts \u203a the graph keeps its view across tabs and draws only supported, legend-matched lines (C07, C08)",
+        "exploration.spec.ts \u203a run-discovery failures remain errors and can be retried",
+        "exploration.spec.ts \u203a a capped candidate list declares incomplete ranking coverage",
+        "exploration.spec.ts \u203a ontology search, independent focus, hierarchy and keyboard dialog",
+        "exploration.spec.ts \u203a responsive comparison and persistent theme/text preferences",
+        "exploration.spec.ts \u203a local library rejects corrupt input and opens a verified ZIP",
+        "exploration.spec.ts \u203a public demo keeps exploration and excludes private/import routes",
+        "fact-pagination.spec.ts \u203a main app: full context pages every category beyond its first page, without repeats or false completeness",
+        "fact-pagination.spec.ts \u203a main app: a object property's later-page superproperty opens as a object property (R11)",
+        "fact-pagination.spec.ts \u203a main app: a data property's later-page superproperty opens as a data property (R11)",
+        "product-review-s0-followup.spec.ts \u203a S0-R1 relationships sharing a target keep their own meaning \u203a graph, item list, inspector and original record agree before and after selection, tab and theme changes",
+        "product-review-s0-followup.spec.ts \u203a S0-R1 relationships sharing a target keep their own meaning \u203a an unlabelled property is drawn by its local name; parallel and wrapped labels never overlap each other or a node",
+        "product-review-s0-followup.spec.ts \u203a S0-R3 Show in graph reveals the exact requested record \u203a every grouped record, a multi-record feature, and undrawable records, after a previous selection and a tab restore",
+        "product-review-s0-followup.spec.ts \u203a S0-R4 graph labels stay readable during selection \u203a light, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+        "product-review-s0-followup.spec.ts \u203a S0-R4 graph labels stay readable during selection \u203a light, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+        "product-review-s0-followup.spec.ts \u203a S0-R4 graph labels stay readable during selection \u203a dark, text size 100%: every label keeps at least 4.5:1 when a feature is selected",
+        "product-review-s0-followup.spec.ts \u203a S0-R4 graph labels stay readable during selection \u203a dark, text size 200%: every label keeps at least 4.5:1 when a feature is selected",
+        "product-review-s0-followup.spec.ts \u203a S0-R4 graph labels stay readable during selection \u203a each larger text size keeps the zoom and the selected relation in view, and both compared concepts whenever they fit (21 F01)",
+        "product-review-s0-followup.spec.ts \u203a S0-R1/R4 rich synthetic shapes render readably \u203a dense columns with long labels: no overlaps, readable start zoom, full text in the list",
+        "product-review-s0-followup.spec.ts \u203a S0-C1 score caveats are on request \u203a trace and scores panel show concise labels; meanings open from accessible disclosures",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a offline: answer, Next, Previous keeps the answer; after reconnecting it is saved and still shown",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a immediate Next/Back before the debounce, and a delayed save, keep a multi-part answer",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a reload with queued work shows the queued answer and saves it",
+        "product-review-s0-followup.spec.ts \u203a S0-R2 visible assessment drafts survive navigation and recovery \u203a competing tabs: each tab's conflicting draft stays visible, is saved, and does not overwrite the other's",
+        "product-review-s0.spec.ts \u203a U01/Q01 graph lesson: interaction is not evidence \u203a one-sided channels draw no comparison line; added ontology context saves nothing; a feature saves its exact record for the inspected candidate",
+        "product-review-s0.spec.ts \u203a U02/Q02 rejected evidence recovers without reload \u203a a rejected action is dropped, never resent, and the next valid action, help, navigation and reload all work",
+        "product-review-s0.spec.ts \u203a U02/Q02 rejected evidence recovers without reload \u203a offline evidence shows Saving\u2026 without a tick and saves after reconnecting",
+        "product-review-s0.spec.ts \u203a U03/Q03 lesson 2: the instructed return is possible and acknowledged \u203a search \u2192 a child that is the compared concept counts as the return; Back appears whenever focus is away",
+        "product-review-s0.spec.ts \u203a F02 guided task \u203a Show me reveals and focuses the control without doing the step",
+        "product-review-s0.spec.ts \u203a U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 1280\u00d7720",
+        "product-review-s0.spec.ts \u203a U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 1440\u00d7900",
+        "product-review-s0.spec.ts \u203a U05/Q04 explicit navigation reveals and focuses its destination \u203a Open decision trace, card parent and Show in graph at 375\u00d7812",
+        "product-review-s0.spec.ts \u203a U05/Q04 explicit navigation reveals and focuses its destination \u203a at 200% text the trace still reveals below the sticky header",
+        "study-v2-backend.spec.ts \u203a fresh browser journey: training, both conditions, reports and completion over the scoped workspace",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a lesson 1 \u2192 2 then reload without any lesson-2 action restores lesson 2, with focus on the new heading",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a the assessment landing, a partial draft and a focused question all survive reload",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a an incorrect attempt gives feedback, a retry passes on the server, and both receipts survive reload",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a rapid Next/Back while saves are delayed keeps the last destination, on screen and on the server",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a navigation while offline is kept in this tab and saved after reconnecting",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a a stale second tab adopts the server's position after its conflicting navigation",
+        "study-v2-integration.spec.ts \u203a R03 tutorial position (J06) \u203a opening tutorial help during a scored case keeps completion, assignment and the case",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a the scored case reads its scoped workspace: six contexts, admitted descriptions and comparisons, then one case_ready",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a v2 explanation case without its workspace descriptor is blocked, never served from prepared excerpts",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a capabilities for another scope are incompatible and block the case",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a target-context failure blocks ranking and case_ready until a retry succeeds, reusing valid reads",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a slow fifth candidate keeps the case loading; case_ready and case timing start only after it",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a comparison failure blocks with its own label; a profile failure likewise",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a an authorized, recorded absence is a usable terminal status, not a failure (diagnostic)",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a 200 response describing another entity is an invalid binding and blocks readiness",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a an optional hierarchy failure stays local and does not block submission",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a blocking failure keeps a saved partial ranking and its order through retry",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a replacing the session aborts the old case: nothing from it becomes ready",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a a second tab loads its own readiness and reports its own ready observation (J05)",
+        "study-v2-integration.spec.ts \u203a R01/R02 scored explanation case (J01, J04, J05) \u203a pause and resume never reopen case timing before the content is usable again",
+        "study-v2-integration.spec.ts \u203a J02 participant boundaries (browser subset) \u203a a baseline case reads no workspace, and a previous explanation scope is denied after advancing",
+        "study-v2-integration.spec.ts \u203a J08 researcher export (browser) \u203a v2 exports request and verify the derived analysis in JSON and CSV",
+        "study-v2-integration.spec.ts \u203a J08 researcher export (browser) \u203a a returned schema other than the requested analysis is reported and not saved (diagnostic)",
+        "study-v2-integration.spec.ts \u203a J10 layout and accessibility on the real service \u203a setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (light)",
+        "study-v2-integration.spec.ts \u203a J10 layout and accessibility on the real service \u203a setup, a tutorial lesson and an explanation case reflow from 320 to 2560 px at 100% and 200% text (dark)",
+        "study-v2-integration.spec.ts \u203a R06/R07 study full context and fact pagination (19 F16, F17) \u203a a searched non-focal entity's full context pages every category; closing keeps the case",
+        "study-v2-integration.spec.ts \u203a R06/R07 study full context and fact pagination (19 F16, F17) \u203a a focal entity's full context shows its description; a citation opens and returns; a parent navigates",
+        "study-v2-integration.spec.ts \u203a R08 retry refetches unusable responses (19 F18) \u203a a malformed 200 context injected once blocks the case; Retry refetches it and restores usability in place",
+        "study-v2-integration.spec.ts \u203a R08 retry refetches unusable responses (19 F18) \u203a a slow required read finishing after another failed cannot unblock the case",
+        "study-v2-integration.spec.ts \u203a Optional reads refused with 403 (19 F18) \u203a a refused optional read stays local; only a refused scope blocks the case",
+        "study-v2-integration.spec.ts \u203a R09 readiness follows the admitted components (19 F19) \u203a pair_comparison only: usable once exactly its content renders; a failure blocks and Retry recovers",
+        "study-v2-integration.spec.ts \u203a R09 readiness follows the admitted components (19 F19) \u203a original_context only: usable once exactly its content renders; a failure blocks and Retry recovers",
+        "study-v2-integration.spec.ts \u203a R09 readiness follows the admitted components (19 F19) \u203a entity_description only: usable once exactly its content renders; a failure blocks and Retry recovers",
+        "study-v2-integration.spec.ts \u203a R09 readiness follows the admitted components (19 F19) \u203a hierarchy + evidence_table + evidence_graph only: usable once exactly its content renders; a failure blocks and Retry recovers",
+        "study-v2-integration.spec.ts \u203a R09 readiness follows the admitted components (19 F19) \u203a comparison only: a recorded absence is usable (diagnostic)",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a delayed check failure cannot undo a successful retry; the draft and cached contexts survive",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a check still in flight from a submitted presentation cannot affect the next case",
+        "study-v2-integration.spec.ts \u203a R10 access checks belong to the attempt that issued them (19 F20) \u203a a check still in flight from a replaced session cannot affect the new session",
+        "study-v2-integration.spec.ts \u203a R11 continued parents keep their entity type (19 F21) \u203a study: a object property's later-page superproperty opens as a object property; the case is kept",
+        "study-v2-integration.spec.ts \u203a R11 continued parents keep their entity type (19 F21) \u203a study: a data property's later-page superproperty opens as a data property; the case is kept",
+        "study-v2-integration.spec.ts \u203a R12 tutorial card parents keep their recorded type (19 F21) \u203a lesson 1's source card opens both parents as typed classes; lesson 2 saves a typed parent action",
+        "typed-browse.spec.ts \u203a NCIT property search preserves kind in hierarchy, URL, reload and full context",
+        "typed-browse.spec.ts \u203a an old in-flight search cannot replace the new term's real results"
+      ]
+    }
+  },
+  "not_passed_on_real_publication_reason": "Specs built on the synthetic S0 fixture (its pairs, paged facts, property fixtures and variant publications do not exist in the review publication); each passes on the synthetic harness with this build.",
+  "real_data": {
+    "presented_pairs": 120,
+    "selected_evidence_status": {
+      "available": 112,
+      "not_exported": 8
+    },
+    "selected_records": 3443,
+    "records_without_graph_form": 31,
+    "comparisons": {
+      "recorded": 812,
+      "drawn_records": 494,
+      "drawn_lines": 464,
+      "channel_drawn": 211,
+      "feature_drawn_records": 283,
+      "not_drawn_records": 318,
+      "not_drawn_rows": 260,
+      "withheld_records": 2517
+    },
+    "repeated_identical_recorded": {
+      "pairs": 62,
+      "extra_records": 88
+    },
+    "max_graph": {
+      "nodes": 12,
+      "edges": 17
+    },
+    "comparison_presentation": {
+      "paired_context": 104,
+      "source_only_profile": 12,
+      "target_only_profile": 1,
+      "reviewed_comparison": 3
+    },
+    "profiles": {
+      "reviewed_profile": 56,
+      "necessary_conditions": 84
+    },
+    "decision_trace_pairs_with_recorded_stage_events": 0,
+    "hierarchy_continuation": {
+      "DOID_0080015_asserted_children": 103,
+      "NCIT_C9305_elk_children": 72
+    },
+    "asserted_entry_points": {
+      "DOID": 4189,
+      "NCIT": 23868
+    }
+  },
+  "storage_bytes": {
+    "backend_delivery": 48626000000,
+    "first_s2_measurement_2026-10-12T13:17Z": 48926146075,
+    "final_2026-10-12T21:36Z": 49965873025,
+    "s2_attributable_estimate": {
+      "environments_s2_to_s2e": 378000000,
+      "frontend_outputs": 9200000,
+      "dev_directory_including_worktree": 99200000,
+      "next_build_cache": 171500000
+    },
+    "note": "Measured points, not an instantaneous peak; a concurrent session also wrote during this interval."
+  },
+  "captures": [
+    {
+      "file": "journey-setup.png",
+      "sha256": "b1f0ae5f6ed31f5c0ae0237ad8844c382a07932b7da0846bd1a35b1b0b114dc9",
+      "bytes": 72644
+    },
+    {
+      "file": "journey-background.png",
+      "sha256": "16493d2b69ffba28cfff7f1527d79f823cec43342178fa7b34cadba7439de320",
+      "bytes": 80063
+    },
+    {
+      "file": "journey-tutorial-lesson1.png",
+      "sha256": "06887406b098f24b0360e724badb8a0b00d2da55e7c2b2cf1da804fe8cece6a0",
+      "bytes": 192521
+    },
+    {
+      "file": "journey-tutorial-rejection.png",
+      "sha256": "f1af40695abf7c61778f3b185be681193ea030db12f54983dbf0268b19b090e7",
+      "bytes": 146962
+    },
+    {
+      "file": "journey-tutorial-lesson6.png",
+      "sha256": "7c3d991f730d392e4a99e323cc0e52c8bd36fabe8f173b80a9efea1edd3f3aa1",
+      "bytes": 137976
+    },
+    {
+      "file": "journey-case-explanation.png",
+      "sha256": "07f8c5c2e71db6f89079efb44674d5973130cfbd206f67ad2d07bb1cd94f47fc",
+      "bytes": 199446
+    },
+    {
+      "file": "journey-case-elk.png",
+      "sha256": "b386bbd7ba42da5a9c2498f3fb52e9dfc6a522a0e419150018baba8eafcb076a",
+      "bytes": 131676
+    },
+    {
+      "file": "journey-case-graph.png",
+      "sha256": "d94c0ca2b62132bd472c74fd09f014bc673d8343473c4472573e97117424008f",
+      "bytes": 146513
+    },
+    {
+      "file": "journey-case-baseline.png",
+      "sha256": "40618d7f683b0d0f10f3240eeb17ed22e2edbe8087183e3fee037a9ea15889f4",
+      "bytes": 168910
+    },
+    {
+      "file": "journey-consultation.png",
+      "sha256": "ff566d3c0ce67471373a492de2d457ef02740ec7b5eff8c072fae6a988734baf",
+      "bytes": 100330
+    },
+    {
+      "file": "journey-complete.png",
+      "sha256": "f93ca886b85b7164f57c86f1a3553ca8fb195b98da591d13336b41d68db3071f",
+      "bytes": 52693
+    },
+    {
+      "file": "main-graph-not-exported-1440-light-panel.png",
+      "sha256": "ee366b4542960c453ac8f3a9635d8859ab43ca3f15b9dae77e21bc5880d83d01",
+      "bytes": 16858
+    },
+    {
+      "file": "main-graph-sparsest-1440-light-panel.png",
+      "sha256": "a90f60d305b27ae44120343d1f30e630f06cc79f6bceb242df5cbc3d780ab1e2",
+      "bytes": 191375
+    },
+    {
+      "file": "main-graph-dense-1440-light-panel.png",
+      "sha256": "e5ba0c3cfaa02e7838c4f9fe1f7cfab4d59c1a75bea83aa7516e9790a3d47367",
+      "bytes": 237177
+    },
+    {
+      "file": "main-graph-dense-1440-dark-panel.png",
+      "sha256": "8e9da79d47fb63fc577514e8da73df11c08f3bbcc268cc19047639347bf9962b",
+      "bytes": 236185
+    },
+    {
+      "file": "main-graph-long-labels-1440-light-panel.png",
+      "sha256": "a1d921254c28baa8d5743d345a6275a25d4a40a5f2a7546b939f4873c99fad63",
+      "bytes": 261256
+    },
+    {
+      "file": "main-graph-long-labels-1440-dark-panel.png",
+      "sha256": "e62c14756217871cd1b823d53e7138392f2aafd12476e48546d75d46d360f870",
+      "bytes": 259038
+    },
+    {
+      "file": "main-graph-dense-1280-dark.png",
+      "sha256": "e4f579cddbde37208021e160939b8900000e40173d5cbbea100b498a625deaf2",
+      "bytes": 179072
+    },
+    {
+      "file": "main-description-reviewed-comparison-comparison-light.png",
+      "sha256": "05ec27b3f268a85ffbc5facdf354b37b8d09328ef8a82e07818396e20aa2a6a3",
+      "bytes": 7632
+    },
+    {
+      "file": "main-description-paired-excerpts-comparison-light.png",
+      "sha256": "05ec27b3f268a85ffbc5facdf354b37b8d09328ef8a82e07818396e20aa2a6a3",
+      "bytes": 7632
+    },
+    {
+      "file": "main-description-target-only-comparison-light.png",
+      "sha256": "05ec27b3f268a85ffbc5facdf354b37b8d09328ef8a82e07818396e20aa2a6a3",
+      "bytes": 7632
+    },
+    {
+      "file": "main-description-source-only-necessary-conditions-cards-light.png",
+      "sha256": "ef30025d8f8e47ced7c58d783c6286ffa6feb7372d83b3fc8d31fc4ab097a8f5",
+      "bytes": 26911
+    },
+    {
+      "file": "main-description-source-only-necessary-conditions-comparison-dark.png",
+      "sha256": "337718a3f6920b7f286a614a72c9432eba7e1fd8e0b724fd74215f25d909723b",
+      "bytes": 7611
+    },
+    {
+      "file": "main-trace-reveal-1440-light.png",
+      "sha256": "f9d0368875da845e8e6bf77286aa5a81141296cc45c3cfab4ec029c3607029ed",
+      "bytes": 202318
+    },
+    {
+      "file": "main-trace-reveal-375-dark.png",
+      "sha256": "367dac0e8d116c2669d9d516f323c6de8977f05d3f0b1e9e63a768299dae7cc8",
+      "bytes": 59581
+    },
+    {
+      "file": "main-browse-elk-entry-points-light.png",
+      "sha256": "279a86f67bdff0ca0d5e8b3b3795e941327c3770e8ef666afebd7c54ca3ee1e7",
+      "bytes": 193309
+    },
+    {
+      "file": "study-explanation-case-1440-light.png",
+      "sha256": "90fb505b104ed08613abe6e111a533921fa89805a694df3984d10aedb3a0b4ce",
+      "bytes": 278904
+    },
+    {
+      "file": "study-explanation-case-1440-dark.png",
+      "sha256": "d0489c9a4d442f2d5f03cbe6778f3a3b098f4e6a8dc317f0e824fa64a715372e",
+      "bytes": 254673
+    },
+    {
+      "file": "study-explanation-case-375-light.png",
+      "sha256": "a211cb3b00591a2fae4ee9454f8a8179fadaff3c14d92900deffbdcf83ecd12a",
+      "bytes": 66948
+    },
+    {
+      "file": "study-explanation-case-320-200pct-light.png",
+      "sha256": "59e1c9a9e13c5543a5c423782a52a47ae5a77ee441d0174a30d175d6640b40df",
+      "bytes": 33378
+    },
+    {
+      "file": "study-explanation-elk-1440-dark.png",
+      "sha256": "9932c617610bc2e2eb67b332445d8ba11346a7e35b017fc163edd5a90154211a",
+      "bytes": 200721
+    },
+    {
+      "file": "study-explanation-graph-1440-light.png",
+      "sha256": "b9b09aeac9cb69953c26cfcd926a7309e459eb2e7ca04db2893fff8b8a95a570",
+      "bytes": 207126
+    },
+    {
+      "file": "study-baseline-case-1440-dark.png",
+      "sha256": "3c31216c6c45fb5f67dd2b06f0cb49fbdbaa59d13d407e8321246f755002f972",
+      "bytes": 224963
+    },
+    {
+      "file": "study-baseline-case-375-dark.png",
+      "sha256": "c2aafd21c38bb644361d4cf009f4ef4893483bc3eb29b48dc96516a730864e0e",
+      "bytes": 66586
+    },
+    {
+      "file": "tutorial-graph-lesson-1440-light.png",
+      "sha256": "16556414a30df0f05adf69b32a6147421487677cb3eff764bfdb7a01d98e3e0a",
+      "bytes": 171664
+    },
+    {
+      "file": "tutorial-graph-lesson-1440-dark.png",
+      "sha256": "51494ce3ec2e63a2a49679f293d4552e1688db9f8d4966c36023ad58cc415ea6",
+      "bytes": 169695
+    },
+    {
+      "file": "tutorial-graph-lesson-375-light.png",
+      "sha256": "ac4bbe4857f14b78fe63e21bcdd98c24d1fc1ed84b47656ee7c86cc5572d53c6",
+      "bytes": 49568
+    },
+    {
+      "file": "tutorial-graph-lesson-320-200pct-dark.png",
+      "sha256": "164ada9053b8efaea2c948740764010c58a61b2e91b1b96bd88f30fb04874b36",
+      "bytes": 22672
+    }
+  ]
+}
