@@ -439,6 +439,43 @@
   background: var(--surface);
 }
 
+/* A fixed reading of original axioms: neither original text nor generated prose. */
+.origin-derived {
+  border-style: dotted;
+  background: var(--surface);
+}
+
+.origin-original {
+  background: var(--surface);
+}
+
+/* Without an original definition, a prepared description is the first thing read (21 F05). */
+.generated-primary {
+  margin-top: 0;
+}
+
+/* One-sided information and paired excerpts, laid out per side. */
+.side-claims {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+}
+
+@container (min-width: 46rem) {
+  .side-claims.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.side-claims h3,
+.side-claims h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  margin: 0 0 0.375rem;
+  font-size: 0.875rem;
+}
+
 .card-pair {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -2283,4 +2320,13 @@ button.citation:hover {
 
 .copy-fallback .input {
   font-size: 0.875rem;
+}
+
+/* A pair with no selected features: say so once and offer the hierarchy (21 F08). */
+.graph-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem 0;
 }

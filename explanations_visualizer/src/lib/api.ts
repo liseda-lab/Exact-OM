@@ -6,13 +6,16 @@ export class ApiError extends Error {
   code: string;
   retryable: boolean;
   currentRevision: number | null;
+  /** The study service's typed validation failure, naming the refused requirements/actions. */
+  validation: { code?: string; requirement_ids?: string[]; action_ids?: string[] } | null;
 
-  constructor(status: number, code: string, message: string, retryable = false, currentRevision: number | null = null) {
+  constructor(status: number, code: string, message: string, retryable = false, currentRevision: number | null = null, validation: ApiError["validation"] = null) {
     super(message);
     this.status = status;
     this.code = code;
     this.retryable = retryable;
     this.currentRevision = currentRevision;
+    this.validation = validation;
   }
 }
 
@@ -49,7 +52,8 @@ async function parseError(response: Response): Promise<ApiError> {
   const detail = record.detail;
   const message = typeof detail === "string" ? detail : "Request failed";
   const revision = typeof record.current_revision === "number" ? record.current_revision : null;
-  return new ApiError(response.status, `http_${response.status}`, message, response.status >= 500 || response.status === 429, revision);
+  const validation = record.validation && typeof record.validation === "object" && !Array.isArray(record.validation) ? (record.validation as ApiError["validation"]) : null;
+  return new ApiError(response.status, `http_${response.status}`, message, response.status >= 500 || response.status === 429, revision, validation);
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

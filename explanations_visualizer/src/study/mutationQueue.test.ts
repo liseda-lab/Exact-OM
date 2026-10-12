@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { DiscardedMutation, MutationQueue, OUTBOX_ROUTE, ReplacedMutation, type PendingMutation, type QueueState } from "./mutationQueue.ts";
+import { DiscardedMutation, MutationQueue, OUTBOX_ROUTE, ReplacedMutation, unjudgedWrites, type PendingMutation, type QueueState } from "./mutationQueue.ts";
 
 const state = { session_id: "session-a", revision: 0 };
 const draft = (value: string) => ({ method: "PUT" as const, path: "/api/v1/study/cases/c/draft", body: { value }, coalesce: "draft:c" });
@@ -197,4 +197,11 @@ test("a coalesced draft is told it was replaced, not that it failed", async () =
   void f.queue.enqueue(draft("newer")).catch(() => undefined);
   assert.ok((await older) instanceof ReplacedMutation);
   f.queue.stop();
+});
+
+test("a write refused as invalid is not archived as unsaved work; unjudged writes are (P3)", () => {
+  const outbox = (values: string[]) => JSON.stringify({ session_id: "s", entries: values.map((value) => ({ path: "/api/v1/study/tutorial/progress", body: { value } })) });
+  assert.equal(unjudgedWrites(outbox(["refused"])), null);
+  assert.deepEqual(JSON.parse(unjudgedWrites(outbox(["refused", "later"]))!).entries.map((entry: { body: { value: string } }) => entry.body.value), ["later"]);
+  assert.equal(unjudgedWrites("{not json"), "{not json");
 });

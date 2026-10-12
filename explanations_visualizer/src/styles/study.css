@@ -159,6 +159,12 @@
   border-top: 1px solid var(--warn-line);
 }
 
+.study-recovery {
+  margin: 0;
+  padding: 0.375rem 2rem;
+  border-top: 1px solid var(--line);
+}
+
 .banner-bad {
   background: var(--bad-tint);
   color: var(--bad);
@@ -313,6 +319,8 @@
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 0.625rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .download-name {
@@ -1319,7 +1327,8 @@
   }
   .study-header-row,
   .study-steps,
-  .study-banner {
+  .study-banner,
+  .study-recovery {
     padding-left: 1rem;
     padding-right: 1rem;
   }

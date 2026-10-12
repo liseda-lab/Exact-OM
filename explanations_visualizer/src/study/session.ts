@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { ApiError, getJson, request } from "@/lib/api";
-import { MutationQueue, type Mutation } from "@/study/mutationQueue";
-import type { StudyState } from "@/study/types";
+import { MutationQueue, unjudgedWrites, type Mutation } from "@/study/mutationQueue";
+import { REVIEW_CLIENT_CONTRACT, type StudyState } from "@/study/types";
 
 export type SaveStatus =
   | { kind: "idle" }
@@ -13,7 +13,8 @@ export type SaveStatus =
   | { kind: "offline"; pending: number }
   | { kind: "conflict"; message: string; at: number }
   | { kind: "error"; message: string };
-export type Phase = "booting" | "no_link" | "link_unusable" | "rate_limited" | "ready" | "unreachable";
+/** `incompatible_build`: the service refused this page's protocol (not an invalid invitation). */
+export type Phase = "booting" | "no_link" | "link_unusable" | "incompatible_build" | "rate_limited" | "ready" | "unreachable";
 
 export function uuid(): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
@@ -83,7 +84,8 @@ export function useStudySession() {
     (async () => {
       try {
         const next = invite
-          ? await request<StudyState>("/api/v1/study/session", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: invite }) })
+          ? // Declare the review protocol this build implements; older publications ignore it (23 C04).
+            await request<StudyState>("/api/v1/study/session", { method: "POST", signal: controller.signal, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ secret: invite, client_contract: REVIEW_CLIENT_CONTRACT }) })
           : await getJson<StudyState>("/api/v1/study/state", undefined, controller.signal);
         if (controller.signal.aborted || generation !== bootGeneration.current) return;
         pendingInvite.current = null;
@@ -97,7 +99,14 @@ export function useStudySession() {
           snapshot: read(key),
           key: uuid,
           save: (snapshot) => write(key, snapshot),
-          recover: (snapshot) => {
+          recover: (snapshot, refused) => {
+            // A write the server refused as invalid (not a conflict) is reported by the page that
+            // made it; keep only the writes the server never judged (P3: no false "unsaved" copy).
+            if (refused !== undefined && !(refused instanceof ApiError && refused.status === 409)) {
+              const unjudged = unjudgedWrites(snapshot);
+              if (!unjudged) return;
+              snapshot = unjudged;
+            }
             const previous = read(recoveryKey);
             let attempts: unknown[] = [];
             let discarded = 0;
@@ -137,7 +146,7 @@ export function useStudySession() {
             if (error instanceof ApiError && error.status === 409) {
               let restored = false;
               try { await refresh(); restored = true; } catch { /* Recovery remains available. */ }
-              setSave({ kind: "conflict", message: restored ? "Your study changed in another tab or device. The latest saved version is shown. Unsaved changes are available below for recovery." : "Your study changed in another tab or device. The latest version could not be loaded. Reconnect and reload; unsaved changes are available below for recovery.", at: Date.now() });
+              setSave({ kind: "conflict", message: restored ? "Your study changed in another tab or device. The latest saved version is shown; this tab's unsaved changes can be downloaded." : "Your study changed in another tab or device. The latest version could not be loaded. Reconnect and reload; this tab's unsaved changes can be downloaded.", at: Date.now() });
             } else if (error instanceof ApiError && error.status === 401) setPhase("no_link");
             else setSave({ kind: "error", message: error instanceof Error ? error.message : "The change could not be saved." });
           },
@@ -147,7 +156,14 @@ export function useStudySession() {
       } catch (error) {
         if (controller.signal.aborted || generation !== bootGeneration.current) return;
         if (error instanceof ApiError && error.status === 401) setPhase(invite ? "link_unusable" : "no_link");
-        else if (error instanceof ApiError && error.status === 429) setPhase("rate_limited");
+        // A valid invitation for a publication this build does not implement: keep the link.
+        else if (error instanceof ApiError && error.status === 409 && invite) {
+          // Put the private link back (fragment only, never sent to a server) so a reload of an
+          // updated page can continue; nothing was started or changed.
+          pendingInvite.current = invite;
+          window.history.replaceState(null, "", `${window.location.pathname}#invite=${encodeURIComponent(invite)}`);
+          setPhase("incompatible_build");
+        } else if (error instanceof ApiError && error.status === 429) setPhase("rate_limited");
         else if (error instanceof ApiError && error.status > 0 && error.status < 500) setPhase(invite ? "link_unusable" : "no_link");
         else setPhase("unreachable");
       }

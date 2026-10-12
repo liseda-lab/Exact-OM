@@ -37,7 +37,8 @@ import { assessmentPosition, followAcknowledged, lessonPosition, restoredPositio
 import { AssessmentDrafts, canonical, type KeptConflict } from "@/study/assessmentDrafts";
 import { DiscardedMutation, ReplacedMutation, type QueueState } from "@/study/mutationQueue";
 import { LessonEvidence, evidenceFor, type LessonSignal } from "@/study/tutorialProgress";
-import type { AssessmentItem, AssessmentResponse, ExplanationResource, LessonRequirement, RequirementAction, StudyState, TutorialLesson, TutorialPosition, TutorialPublic } from "@/study/types";
+import { isReviewProtocol, type AssessmentItem, type AssessmentResponse, type ExplanationResource, type LessonRequirement, type RequirementAction, type StudyState, type TutorialLesson, type TutorialPosition, type TutorialPublic } from "@/study/types";
+import { orderedEntries, orderedKeys } from "@/study/formOrder";
 
 const PRACTICE_KEY = "practice-case";
 
@@ -239,7 +240,10 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
             return;
           }
           if (error.status < 400 || error.status >= 500 || error.status === 401) return;
-          const removed = evidence.current.reject(sent);
+          // The server names the refused requirements; valid evidence sent with them is kept and resent.
+          const refused = new Set(error.validation?.requirement_ids ?? []);
+          const named = sent.filter((item) => refused.has(item.requirement_id));
+          const removed = evidence.current.reject(named.length ? named : sent);
           setPending(evidence.current.pending());
           session.clearNotice();
           setNotice({
@@ -568,7 +572,7 @@ function LessonWorkspace({
           <p>This view shows no explanations. You can inspect the practice ontologies in any way you choose, or not at all.</p>
           <ResourceList resources={resources} compact onDownload={() => record({ kind: "downloads" })} />
         </section>
-        <PracticeReports record={record} />
+        <PracticeReports record={record} methods={practiceMethods(state)} />
       </div>
     ) : (
       <WorkspaceProvider source={source} onAction={onAction}>
@@ -630,12 +634,12 @@ function LessonWorkspace({
   );
 }
 
-function PracticeReports({ record }: { record: (signal: LessonSignal | null) => void }) {
+function PracticeReports({ record, methods }: { record: (signal: LessonSignal | null) => void; methods: [string, string][] }) {
   const tasks = [
     { id: "multi", title: "Practice report 1", situation: "Suppose that for a case you looked the source up in Protégé and also searched the ontology files in a text editor." },
     { id: "none", title: "Practice report 2", situation: "Suppose that for another case you used only the study pages and nothing outside them." },
   ] as const;
-  const [answers, setAnswers] = useState<Record<string, { consulted: boolean | null; methods: string[] }>>({ multi: { consulted: null, methods: [] }, none: { consulted: null, methods: [] } });
+  const [answers, setAnswers] = useState<Record<string, { consulted: boolean | null; methods: string[]; other: string }>>({ multi: { consulted: null, methods: [], other: "" }, none: { consulted: null, methods: [], other: "" } });
   const [feedback, setFeedback] = useState<Record<string, string>>({});
   return (
     <section className="study-card practice-reports" aria-labelledby="practice-reports-h">
@@ -666,7 +670,7 @@ function PracticeReports({ record }: { record: (signal: LessonSignal | null) => 
             </div>
             {answer.consulted && (
               <div className="option-grid option-grid-column" role="group" aria-label="Methods used">
-                {METHOD_LABELS.map(([code, label]) => (
+                {methods.map(([code, label]) => (
                   <label key={code} className={answer.methods.includes(code) ? "option on" : "option"}>
                     <input type="checkbox" checked={answer.methods.includes(code)} onChange={() => set({ methods: answer.methods.includes(code) ? answer.methods.filter((item) => item !== code) : [...answer.methods, code] })} />
                     <span>{label}</span>
@@ -674,13 +678,21 @@ function PracticeReports({ record }: { record: (signal: LessonSignal | null) => 
                 ))}
               </div>
             )}
+            {answer.consulted && answer.methods.includes("other_method") && (
+              <div className="field">
+                <label htmlFor={`practice-other-${task.id}`}>Which other methods? <span className="meta">Practice only · short names</span></label>
+                <input id={`practice-other-${task.id}`} className="input" maxLength={160} value={answer.other} onChange={(event) => set({ other: event.target.value })} />
+              </div>
+            )}
             <button
               type="button"
               className="btn btn-sm"
               onClick={() => {
                 if (task.id === "multi") {
-                  if (answer.consulted && answer.methods.length >= 2) {
-                    record({ kind: "report", methods: answer.methods.length, methodCodes: answer.methods, consulted: true });
+                  if (answer.consulted && answer.methods.includes("other_method") && !answer.other.trim()) {
+                    setFeedback((current) => ({ ...current, multi: "You selected Other method: name it, or clear Other method." }));
+                  } else if (answer.consulted && answer.methods.length >= 2) {
+                    record({ kind: "report", methods: answer.methods.length, methodCodes: answer.methods, consulted: true, otherMethod: answer.methods.includes("other_method") ? answer.other : null });
                     setFeedback((current) => ({ ...current, multi: "That is how you report two methods for one case: Yes, with every method you used selected." }));
                   } else setFeedback((current) => ({ ...current, multi: "In this situation you used two methods: answer Yes and select both of them." }));
                 } else if (answer.consulted === false) {
@@ -814,6 +826,13 @@ function Assessment({
 }
 
 const PROGRESS_PATH = "/api/v1/study/tutorial/progress";
+
+/** The per-case method list in the publication's own order (study-methods/3), else the legacy list. */
+function practiceMethods(state: StudyState): [string, string][] {
+  const question = state.forms.consultation.find((item) => item.id === "methods");
+  if (isReviewProtocol(state) && question?.options) return orderedEntries(question.options, orderedKeys(question, "options", state.forms.version));
+  return METHOD_LABELS;
+}
 
 /** Conflicts kept from before a reload in this tab, for this tutorial's questions only. */
 function readConflicts(key: string, tutorial: TutorialPublic): KeptConflict[] {

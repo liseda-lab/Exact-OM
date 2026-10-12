@@ -116,20 +116,30 @@ export function StudyHeader({
           </p>
         </nav>
       )}
-      {session.hasRecovery && (
-        <div className="study-banner banner-warn" role="status">
-          <span>Unsaved changes from an earlier conflict remain in this tab. Download them to review alongside the server’s saved answer.</span>
-          <button type="button" className="btn btn-sm" onClick={session.downloadRecovery}>Download unsaved changes</button>
-        </div>
-      )}
-      {session.save.kind === "conflict" && (
+      {/* One notice per conflict, carrying its recovery download (P3). Once it is dismissed or a
+          later save succeeds, the retained copy is history, not an unresolved answer: a quiet line. */}
+      {session.save.kind === "conflict" ? (
         <div className="study-banner banner-warn" role="alert">
           <IconWarning />
           <span>{session.save.message}</span>
+          {session.hasRecovery && (
+            <button type="button" className="btn btn-sm" onClick={session.downloadRecovery}>
+              Download unsaved changes
+            </button>
+          )}
           <button type="button" className="btn btn-sm" onClick={session.clearNotice}>
             Dismiss
           </button>
         </div>
+      ) : (
+        session.hasRecovery && (
+          <p className="study-recovery meta">
+            A copy of changes this tab could not save is kept in this browser.{" "}
+            <button type="button" className="link-btn" onClick={session.downloadRecovery}>
+              Download the copy
+            </button>
+          </p>
+        )
       )}
       {session.save.kind === "error" && (
         <div className="study-banner banner-bad" role="alert">

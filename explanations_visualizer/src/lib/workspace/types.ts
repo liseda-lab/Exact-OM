@@ -4,9 +4,47 @@
 // that cannot do something says so through its capabilities and availability statuses;
 // it never returns an empty answer for missing preparation.
 
-import type { Availability, Axiom, EntityContext, EntityKind, EntityRef, Fact, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
+import type { Availability, Axiom, EntityContext, EntityKind, EntityRef, EntryPointPage, Fact, GeneratedExplanation, HierarchyPage, Page, PairEvidenceMetadata, SearchItem, SelectedEvidence } from "../types";
 
-export type Basis = "literal_asserted" | "structural_navigation" | "reasoner_inferred";
+/**
+ * Hierarchy bases. `reasoner_inferred` is the complete-only contract (may be failed or absent);
+ * `elk_inferred_partial` is the separately admitted partial ELK taxonomy (23 C02): positive,
+ * direct-in-the-returned-result edges only, where a missing relationship is unknown.
+ */
+export type Basis = "literal_asserted" | "structural_navigation" | "reasoner_inferred" | "elk_inferred_partial";
+
+/** exact-partial-hierarchy/1 metadata for one ontology's ELK result. Usable when `status` is `partial`. */
+export interface PartialInference {
+  status: string;
+  reason?: string | null;
+  reasoner?: string;
+  versions?: Record<string, string>;
+  supported_kinds?: string[];
+  completion?: string;
+  directness?: string;
+  consistency?: { value?: boolean | null; complete?: boolean };
+  unsupported_constructs?: { constructors?: string[]; features?: string[]; polarities?: string[]; task?: string }[];
+  negative_entailment?: string;
+  full_ontology_entailment?: string;
+  justifications?: string;
+  satisfiability?: string;
+  scope?: string;
+  source_imports_complete?: boolean;
+  served_direct_edge_count?: number;
+  unrepresented_class_count?: number;
+  class_count?: number;
+  artifact_sha256?: string;
+}
+
+/** What one ontology's prepared navigation offers, normalized from the main API or a study scope. */
+export interface OntologyNavigation {
+  /** `available` when typed entry points were prepared. */
+  entryPoints: string | null;
+  /** The complete-only reasoner contract (often failed for large ontologies). */
+  inference: { status: string; reason?: string | null } | null;
+  /** The partial ELK taxonomy; never disabled by the complete-only status above. */
+  partial: PartialInference | null;
+}
 export type Side = "source" | "target";
 
 export interface EvidenceBundle {
@@ -53,6 +91,12 @@ export interface ResolvedFact {
 
 export interface ExplanationProvenance {
   kind: "manifest" | "study";
+  /** exact-description/2 + presentation/1 metadata, when the artifact declares it (23 C03). */
+  preparationKind?: string | null;
+  supportStatus?: string | null;
+  supportReasons?: string[];
+  reviewerKind?: string | null;
+  renderRevision?: string | null;
   requestedModel?: string;
   returnedModel?: string | null;
   provider?: string | null;
@@ -76,10 +120,14 @@ export interface WorkspaceCapabilities {
   navigation: "available" | "partial" | "unsupported";
   bases: Basis[];
   reasoner: string;
+  /** Per-ontology navigation (entry points, complete and partial inference). */
+  navigationByOntology?: Record<string, OntologyNavigation>;
   graphExpansion: boolean;
   profiles: string;
   comparison: string;
   evidence: string;
+  /** Recorded comparison metadata (exact-evidence-metadata/1) can be read for its pairs. */
+  evidenceMetadata?: boolean;
   /** Shown wherever the scope of the information matters. */
   scopeNote: string | null;
   limitations: string[];
@@ -106,6 +154,12 @@ export interface WorkspaceSource {
   fact: (ref: FactRef, signal?: AbortSignal) => Promise<ResolvedFact>;
   explanation: (task: "entity_profile" | "pair_comparison", entities: EntityRef[], signal?: AbortSignal) => Promise<ExplanationResult>;
   hierarchy: (entity: EntityRef, direction: "parents" | "children", basis: Basis, cursor: string | null, signal?: AbortSignal) => Promise<HierarchyPage>;
+  /** Paginated typed entry points of one ontology for a basis (absent when not prepared). */
+  entryPoints?: (ontology: string, kind: EntityKind, basis: Basis, cursor: string | null, signal?: AbortSignal) => Promise<EntryPointPage>;
+  /** Members of an entity's equivalence group in an inferred basis. */
+  equivalents?: (entity: EntityRef, basis: Basis, cursor: string | null, signal?: AbortSignal) => Promise<Page<EntityRef>>;
+  /** Recorded pair-evidence completeness and matcher comparisons (exact-evidence-metadata/1). */
+  evidenceMetadata?: (pair: PairScope, signal?: AbortSignal) => Promise<PairEvidenceMetadata | null>;
   search: (ontology: string, term: string, cursor: string | null, signal?: AbortSignal) => Promise<Page<SearchItem>>;
   /** Later pages of one fact category, continuing an entity context's own cursor. */
   facts?: (entity: EntityRef, category: string, cursor: string, signal?: AbortSignal) => Promise<Page<Fact>>;

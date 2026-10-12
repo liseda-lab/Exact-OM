@@ -27,7 +27,8 @@ interface Options {
   key: () => string;
   send: (entry: PendingMutation, signal: AbortSignal) => Promise<QueueState>;
   save: (snapshot: string | null) => void;
-  recover: (snapshot: string) => void;
+  /** Archive unsaved writes; `refused` is the server's answer to the first (in-flight) entry, if any. */
+  recover: (snapshot: string, refused?: unknown) => void;
   update: (state: QueueState) => void;
   status: (status: QueueStatus, pending: number) => void;
   retryable: (error: unknown) => boolean;
@@ -64,6 +65,20 @@ function settleable(pending: PendingMutation): Entry {
     reject = onReject;
   });
   return { ...pending, resolve, reject, settled };
+}
+
+/**
+ * The writes in an outbox snapshot the server never judged: everything after the first
+ * (in-flight) entry, which it refused as invalid. Null when nothing else is left to keep.
+ */
+export function unjudgedWrites(snapshot: string): string | null {
+  try {
+    const outbox = JSON.parse(snapshot);
+    const entries = Array.isArray(outbox?.entries) ? outbox.entries.slice(1) : [];
+    return entries.length ? JSON.stringify({ ...outbox, entries }) : null;
+  } catch {
+    return snapshot;
+  }
 }
 
 const MAX_ENTRIES = 32;
@@ -197,7 +212,7 @@ export class MutationQueue {
               delay = Math.min(30_000, delay * 2);
               continue;
             }
-            this.options.recover(this.snapshot());
+            this.options.recover(this.snapshot(), error);
             const rejected = this.entries.splice(0);
             this.persist();
             await this.options.failed(error);

@@ -14,13 +14,33 @@ const item = (id: string, side: "source" | "target", channel: string, factIds: s
   evidence_id: id, channel, side, role: side, entity: side === "source" ? source : target, feature_id: null, fact_ids: factIds, source_axiom_refs: [], semantic_terms: {}, historical_item_alias: null, display: {}, values: {}, interpretation: "projected", provenance_status: "recorded", status: "available", reason: null,
 });
 
-test("a channel recorded on one side gets no comparison line; both sides get one channel-level line (U15)", () => {
+const bridge = (id: string, level: "channel_comparison" | "feature_correspondence", channel: string, status: "recorded" | "withheld", sourceIds: string[] = [], targetIds: string[] = []) => ({
+  bridge_id: id, level, status, channel, source, target, source_evidence_ids: sourceIds, target_evidence_ids: targetIds, source_fact_ids: [], target_fact_ids: [], artifact_refs: ["sha256:a"], interpretation: "matcher_comparison", recorded_score: 0.7, comparison_basis: level === "channel_comparison" ? "lexical_score" : "matrix_support",
+});
+
+test("comparison lines come only from recorded matcher comparisons, never from coincident channels (23 C04)", () => {
   const axioms = { f1: sub(source.iri, named("https://s#P")), f2: sub(target.iri, named("https://t#Q")), f3: label(target.iri, "B") };
-  const model = buildGraphModel(source, target, [item("e1", "source", "hierarchy", ["f1"]), item("e2", "target", "hierarchy", ["f2"]), item("e3", "target", "lexical", ["f3"])] as never, axioms);
-  const bridges = model.edges.filter((edge: { kind: string }) => edge.kind === "bridge");
-  assert.deepEqual(bridges.map((edge: { channel?: string }) => edge.channel), ["hierarchy"]);
-  assert.deepEqual(model.oneSided, [{ channel: "lexical", side: "target" }]);
-  assert.ok(bridges.every((edge: { evidenceId?: string; factId?: string }) => !edge.evidenceId && !edge.factId), "a bridge is not an original fact");
+  const items = [item("e1", "source", "hierarchy", ["f1"]), item("e2", "target", "hierarchy", ["f2"]), item("e3", "target", "lexical", ["f3"])] as never;
+  // Without recorded metadata a shared channel draws nothing.
+  const plain = buildGraphModel(source, target, items, axioms);
+  assert.equal(plain.edges.filter((edge: { kind: string }) => edge.kind === "bridge").length, 0);
+  assert.equal(plain.bridgeStatus, "unknown");
+  assert.deepEqual(plain.oneSided, [{ channel: "lexical", side: "target" }]);
+  const metadata = {
+    bridge_status: "withheld" as const,
+    bridges: [bridge("b1", "channel_comparison", "lexical", "recorded"), bridge("b2", "feature_correspondence", "hierarchy", "recorded", ["e1"], ["e2"]), bridge("b3", "feature_correspondence", "hierarchy", "withheld", ["e1"], ["e2"]), bridge("b4", "feature_correspondence", "hierarchy", "recorded", ["e1"], ["missing"])],
+  };
+  const model = buildGraphModel(source, target, items, axioms, { metadata: metadata as never });
+  const lines = model.edges.filter((edge: { kind: string }) => edge.kind === "bridge");
+  assert.deepEqual(lines.map((edge: { id: string }) => edge.id), ["bridge:b1", "corr:b2"]);
+  const channel = lines[0] as { source: string; target: string };
+  assert.equal(channel.source, entityNodeId("source", source));
+  assert.equal(channel.target, entityNodeId("target", target));
+  const correspondence = lines[1] as { source: string; target: string };
+  assert.equal(correspondence.source, entityNodeId("source", { ontology_version_id: S, kind: "class", iri: "https://s#P" }), "joins the two features it names");
+  assert.equal(correspondence.target, entityNodeId("target", { ontology_version_id: T, kind: "class", iri: "https://t#Q" }));
+  assert.deepEqual(model.bridges.map((record: { status: string }) => record.status), ["drawn", "drawn", "withheld", "not_drawn"], "withheld and undrawable comparisons stay listed");
+  assert.ok(lines.every((edge: { evidenceId?: string; factId?: string }) => !edge.evidenceId && !edge.factId), "a bridge is not an original fact");
 });
 
 test("node identity keeps side, ontology, kind and IRI: punned entities and shared IRIs never merge", () => {

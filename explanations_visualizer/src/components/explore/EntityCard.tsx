@@ -280,6 +280,7 @@ export function EntityCard({
       : `${definingCategories.reduce((sum, category) => sum + (ctx?.categories[category]?.items.length ?? 0), 0)} on the first page${definingMore ? " · more exist" : ""}`;
   const partial = ctx ? partialScope(ctx, source.capabilities.navigation) : false;
   const moreCategories = MORE.filter((category) => (ctx?.categories[category]?.items.length ?? 0) > 0);
+  const primaryProfile = Boolean(ctx && ctx.definitions.status !== "available" && !definitions.items.length && profile.data?.status === "available");
 
   return (
     <article className={`entity-card entity-card-${side}${compact ? " compact" : ""}`} aria-label={`${title}${label ? `: ${label}` : ""}`}>
@@ -300,8 +301,15 @@ export function EntityCard({
       {context.error ? <ErrorNote error={context.error} onRetry={context.reload} what="Entity context" /> : null}
       {!ctx && context.loading ? <Skeleton lines={5} /> : null}
 
+      {/* No original definition: a prepared description takes the primary meaning area (21 F05). */}
+      {showProfile && primaryProfile && (
+        <GeneratedProfile state={profile} subject={entity} cite={cite} definitionNote={missingDefinitionNote(ctx?.definitions.status, partial)} />
+      )}
+
       {ctx && showOriginal && (
         <>
+          {/* With the description in the meaning area, its note already says why no definition is shown. */}
+          {!(showProfile && primaryProfile && !alternate.items.length) && (
           <Section title="Definition" meta={definitions.items.length ? `Original · ${predicateName(definitions.items[0].predicate_iri)}` : undefined}>
             {definitions.items.length ? (
               <div className="definitions" data-category="definitions">
@@ -324,6 +332,7 @@ export function EntityCard({
               </div>
             )}
           </Section>
+          )}
 
           <Section title="Also called" meta={synonyms.length ? `${synonyms.length} ${synonyms.length === 1 ? "synonym" : "synonyms"}${synonymPages.complete ? "" : " loaded"}` : undefined}>
             <div data-category="synonyms">
@@ -414,7 +423,13 @@ export function EntityCard({
         </>
       )}
 
-      {showProfile && <GeneratedProfile state={profile} subject={entity} cite={cite} />}
+      {showProfile && !primaryProfile && <GeneratedProfile state={profile} subject={entity} cite={cite} />}
     </article>
   );
+}
+
+/** Why no original definition is shown, worded as EmptyReason words it (absent only when the scope is complete). */
+function missingDefinitionNote(status: string | undefined, partial: boolean): string {
+  if (status === "filtered") return "The original definition is withheld by this view's information policy.";
+  return status === "absent_in_scope" && !partial ? "No original definition in this ontology." : "No original definition is included in this view.";
 }

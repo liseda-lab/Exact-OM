@@ -76,7 +76,24 @@ test("scope status is honest: complete for the frozen filtered scope, no inferen
   assert.doesNotMatch(caps.scopeNote ?? "", /unrestricted|all ontologies/);
   assert.deepEqual(caps.bases, ["literal_asserted", "structural_navigation"]);
   assert.equal(caps.reasoner, "not_run");
-  assert.ok(caps.limitations.some((item: string) => /Inferred hierarchy/.test(item)));
+  assert.ok(caps.limitations.some((item: string) => /No inferred hierarchy was prepared/.test(item)));
+});
+
+test("a failed complete-only reasoner never hides an advertised partial ELK result (23 C02)", () => {
+  const partial = { status: "partial", supported_kinds: ["class"], reason: "Unsupported constructs remain; missing relationships are unknown." };
+  const navigation = Object.fromEntries(capabilities.ontology_versions.map((version: string) => [version, { entry_points: "available", inference: { status: "failed", reason: "Native hierarchy preparation did not complete" }, partial_inference: partial }]));
+  const caps = workspaceCapabilities({ ...capabilities, bases: ["literal_asserted", "structural_navigation", "elk_inferred_partial"], reasoner: "failed", reason: "See each ontology's prepared navigation status", navigation }, () => "Ontology");
+  assert.deepEqual(caps.bases, ["literal_asserted", "structural_navigation", "elk_inferred_partial"]);
+  assert.equal(caps.limitations.some((item: string) => /inferred/i.test(item)), false, "no claim that only asserted relations are shown");
+  const first = caps.navigationByOntology![capabilities.ontology_versions[0]];
+  assert.equal(first.partial?.status, "partial");
+  assert.equal(first.inference?.status, "failed");
+  assert.equal(first.entryPoints, "available");
+});
+
+test("recorded comparison metadata is read only from scopes that declare its contract (22 B05)", () => {
+  assert.equal(workspaceCapabilities(capabilities, () => "Ontology").evidenceMetadata, false, "a historical scope is never asked");
+  assert.equal(workspaceCapabilities({ ...capabilities, evidence_metadata_contract: "exact-evidence-metadata/1" }, () => "Ontology").evidenceMetadata, true);
 });
 
 test("the bounded minimum is six contexts plus admitted descriptions and comparisons (F12)", () => {

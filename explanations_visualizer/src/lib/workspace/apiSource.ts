@@ -4,8 +4,8 @@
 // the capabilities the case validated (see study/caseReadiness.ts).
 
 import { ApiError, buildUrl, request } from "../api";
-import type { Axiom, EntityContext, EntityRef, ExplanationSummary, Fact, GeneratedExplanation, HierarchyPage, Page, SearchItem, SelectedEvidence } from "../types";
-import type { Basis, EvidenceBundle, ExplanationResult, FactRef, PairScope, ResolvedFact, WorkspaceCapabilities, WorkspaceSource } from "./types";
+import type { Axiom, EntityContext, EntityRef, EntryPointPage, ExplanationSummary, Fact, GeneratedExplanation, HierarchyPage, Page, PairEvidenceMetadata, PairTrace, SearchItem, SelectedEvidence } from "../types";
+import type { Basis, EvidenceBundle, ExplanationResult, FactRef, OntologyNavigation, PairScope, ResolvedFact, WorkspaceCapabilities, WorkspaceSource } from "./types";
 
 const axiomCache = new Map<string, Promise<Axiom>>();
 
@@ -106,18 +106,23 @@ export function createApiSource(options: {
   sessionId?: string;
   kind?: WorkspaceSource["kind"];
   capabilities?: WorkspaceCapabilities;
+  /** Exploration: per-ontology navigation from `/api/v1/ontologies` (a scope supplies its own). */
+  navigation?: Record<string, OntologyNavigation>;
 }): WorkspaceSource {
   const base = options.base ?? "/api/v1";
   const read = <T,>(suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal) => scopedRead<T>(base, suffix, params, signal, options.sessionId);
+  const metadataCache = new Map<string, Promise<PairEvidenceMetadata | null>>();
   const capabilities: WorkspaceCapabilities = options.capabilities ?? {
     search: "available",
     navigation: "available",
-    bases: options.sessionId ? ["literal_asserted", "structural_navigation"] : ["literal_asserted", "structural_navigation", "reasoner_inferred"],
+    bases: options.sessionId ? ["literal_asserted", "structural_navigation"] : ["literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"],
     reasoner: options.sessionId ? "not_run" : "per_ontology",
+    navigationByOntology: options.navigation,
     graphExpansion: true,
     profiles: "available",
     comparison: "available",
     evidence: "available",
+    evidenceMetadata: true,
     scopeNote: null,
     limitations: [],
     synthetic: false,
@@ -145,6 +150,11 @@ export function createApiSource(options: {
           provider: item.manifest.provider,
           language: item.manifest.language,
           grounding: item.grounding_status,
+          preparationKind: item.preparation_kind ?? null,
+          supportStatus: item.support_status ?? null,
+          supportReasons: item.support_reasons ?? [],
+          reviewerKind: item.independent_review?.reviewer_kind ?? null,
+          renderRevision: item.presentation?.render_revision ?? null,
         },
       };
     } catch (error) {
@@ -210,6 +220,33 @@ export function createApiSource(options: {
     hierarchy: (entity, direction, basis: Basis, cursor, signal) =>
       read<HierarchyPage>("/hierarchy", { ...entityParams(entity), direction, basis, limit: 50, cursor }, signal),
     search: (ontology, term, cursor, signal) => read<Page<SearchItem>>("/entities", { ontology_version_id: ontology, term, limit: 20, cursor }, signal),
+    // Main API: /ontologies/{version}/entry-points; a study scope: /entry-points?ontology_version_id.
+    entryPoints: (ontology, kind, basis, cursor, signal) =>
+      options.sessionId
+        ? read<EntryPointPage>("/entry-points", { ontology_version_id: ontology, kind, basis, limit: 20, cursor }, signal)
+        : read<EntryPointPage>(`/ontologies/${encodeURIComponent(ontology)}/entry-points`, { kind, basis, limit: 20, cursor }, signal),
+    equivalents: (entity, basis, cursor, signal) =>
+      options.sessionId
+        ? read<Page<EntityRef>>("/equivalents", { ...entityParams(entity), basis, limit: 20, cursor }, signal)
+        : read<Page<EntityRef>>(`/ontologies/${encodeURIComponent(entity.ontology_version_id)}/equivalents`, { iri: entity.iri, kind: entity.kind, basis, limit: 20, cursor }, signal),
+    // Recorded comparisons are immutable per pair: one shared read per pair, not cancelled when
+    // a tab closes, so reopening the graph reuses it instead of aborting and refetching.
+    evidenceMetadata: (pair) => {
+      const scoped = Boolean(options.sessionId && pair.candidateId);
+      // A historical scope that does not declare the metadata contract is never asked for it.
+      if (scoped ? capabilities.evidenceMetadata === false : !pair.runId || !pair.pairId) return Promise.resolve(null);
+      const key = scoped ? `c|${pair.candidateId}` : `p|${pair.runId}|${pair.pairId}`;
+      let promise = metadataCache.get(key);
+      if (!promise) {
+        promise = scoped
+          ? read<{ evidence_metadata: PairEvidenceMetadata }>("/evidence-metadata", { candidate_id: pair.candidateId! }).then((body) => body.evidence_metadata ?? null)
+          : read<PairTrace>(`/runs/${encodeURIComponent(pair.runId!)}/pair`, { pair_id: pair.pairId! }).then((body) => body.evidence_metadata ?? null);
+        promise.catch(() => metadataCache.delete(key));
+        metadataCache.set(key, promise);
+        if (metadataCache.size > 200) metadataCache.delete(metadataCache.keys().next().value!);
+      }
+      return promise;
+    },
     facts: (entity, category, cursor, signal) => read<Page<Fact>>("/entity-facts", { ...entityParams(entity), category, limit: 50, cursor }, signal),
     evidence,
     labels: null,

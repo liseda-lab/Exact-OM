@@ -22,6 +22,8 @@ import { buildGraphModel, entityNodeId, layoutGraph, type GraphSide, type ModelE
 import { curie, KIND_NAMES, localName, predicateName } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import type { EntityRef } from "@/lib/types";
+import { useAsync } from "@/lib/useAsync";
+import type { PairScope } from "@/lib/workspace/types";
 import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
 interface Expansion {
@@ -71,7 +73,21 @@ export const EDGE_MEANING: Record<EdgeKind, string> = {
   asserted: "Added from the ontology on request: an asserted parent. Not one of Exact's selected features.",
   structural: "Added from the ontology on request: a parent reached by a documented structural rule.",
   inferred: "Added from the ontology on request: a relationship computed by the recorded reasoner.",
-  bridge: "Exact compared this kind of feature on both sides when scoring. It does not say that any two features correspond.",
+  bridge: "A comparison Exact recorded when scoring this pair. It is matcher evidence, not a statement in either ontology, and its score is not a probability of a match.",
+};
+
+/** "4 attributes · 2 hierarchy": counts per channel, in first-seen order. */
+function countsByChannel(channels: string[]): string {
+  const counts = new Map<string, number>();
+  for (const channel of channels) counts.set(channel, (counts.get(channel) ?? 0) + 1);
+  return Array.from(counts, ([channel, count]) => `${count} ${channelName(channel).toLowerCase()}`).join(", ");
+}
+
+const COMPARISON_BASIS: Record<string, string> = {
+  lexical_score: "Compared by Exact's lexical scoring",
+  matrix_support: "Recorded in Exact's feature-comparison matrix",
+  attribute_anchor: "Recorded as an attribute anchor",
+  difference_endpoint: "Recorded as a difference endpoint",
 };
 
 function cssVar(name: string): string {
@@ -137,6 +153,7 @@ export function EvidenceGraph({
   source,
   target,
   bundle,
+  pair,
   viewKey,
   selected,
   onSelect,
@@ -146,6 +163,8 @@ export function EvidenceGraph({
   source: EntityRef;
   target: EntityRef;
   bundle: EvidenceBundle;
+  /** The pair, for its recorded comparisons (exact-evidence-metadata/1); none are drawn without it. */
+  pair?: PairScope | null;
   /** Identity of the compared pair in its product and scope; a new key starts a new view. */
   viewKey: string;
   /** Evidence chosen elsewhere (the evidence list); the graph shows exactly its records. */
@@ -169,6 +188,8 @@ export function EvidenceGraph({
   // A feature chosen in the list that has no drawn line (no graph form, or unavailable).
   const [focusEvidence, setFocusEvidence] = useState<string | null>(() => stored?.focusEvidence ?? null);
   const [revealEdge, setRevealEdge] = useState<string | null>(null);
+  const [showUndrawn, setShowUndrawn] = useState<Partial<Record<GraphSide, boolean>>>({});
+  const [showComparisons, setShowComparisons] = useState(false);
   const [expandError, setExpandError] = useState<string | null>(null);
   // Bumped once the canvas exists, so restored selections and reveals are applied to it.
   const [ready, setReady] = useState(0);
@@ -195,7 +216,12 @@ export function EvidenceGraph({
     setExpandError(null);
   }, [viewKey]);
 
-  const base = useMemo(() => buildGraphModel(source, target, bundle.items, bundle.axioms as never, { expandLiterals: new Set(literals) }), [source, target, bundle, literals]);
+  // Recorded comparisons only (23 C04): no metadata, no comparison lines.
+  const metadata = useAsync(pair && workspace.evidenceMetadata ? `${workspace.key}|evidence-metadata|${pair.runId ?? ""}|${pair.pairId ?? ""}|${pair.candidateId ?? ""}` : null, (signal) => workspace.evidenceMetadata!(pair!, signal));
+  const base = useMemo(
+    () => buildGraphModel(source, target, bundle.items, bundle.axioms as never, { expandLiterals: new Set(literals), metadata: metadata.data ?? null }),
+    [source, target, bundle, literals, metadata.data],
+  );
   const baseRef = useRef(base);
   baseRef.current = base;
   const model = useMemo(() => {
@@ -240,7 +266,7 @@ export function EvidenceGraph({
    */
   const relationText = useCallback(
     (edge: ModelEdge, drawn = false) => {
-      if (edge.kind === "bridge") return `${channelName(edge.channel ?? "")} compared`;
+      if (edge.kind === "bridge") return edge.bridge?.level === "feature_correspondence" ? `${channelName(edge.channel ?? "")} correspondence` : `${channelName(edge.channel ?? "")} compared`;
       if (edge.relation.text) return edge.relation.text;
       const ontology = edge.side === "target" ? target.ontology_version_id : source.ontology_version_id;
       const property = edge.relation.property;
@@ -401,6 +427,11 @@ export function EvidenceGraph({
         // A channel-level comparison: a line of round dots, no arrow.
         selector: "edge[kind = 'bridge']",
         style: { "line-style": "dashed", "line-cap": "round", "line-dash-pattern": [0.1, 8], width: 4, "line-color": cssVar("--bridge"), "target-arrow-shape": "none", "control-point-step-size": 26 * scale },
+      },
+      {
+        // A recorded feature correspondence joins two features, not the compared entities.
+        selector: "edge[id ^= 'corr:']",
+        style: { "line-dash-pattern": [6, 4], width: 2, "curve-style": "unbundled-bezier", "control-point-distances": [30 * scale], "control-point-weights": [0.5] },
       },
       // De-emphasis fades geometry only; every label keeps at least 4.5:1 (S0-R4).
       { selector: "node.faded", style: { "border-opacity": 0.4, color: ink2 } },
@@ -686,7 +717,6 @@ export function EvidenceGraph({
   };
 
   const features = model.edges.filter((edge) => edge.kind === "feature");
-  const bridges = model.edges.filter((edge) => edge.kind === "bridge");
   const added = model.edges.filter((edge) => ["asserted", "structural", "inferred"].includes(edge.kind));
   const itemText = (edge: ModelEdge) => {
     const to = nodeById(edge.target);
@@ -695,6 +725,15 @@ export function EvidenceGraph({
     if (edge.kind === "feature") return `${relationText(edge)} ${name}`.trim();
     const from = nodeById(edge.source);
     return `${from ? entityName(from) : ""} ${relationText(edge)} ${name}`.trim();
+  };
+  /** The two drawn features a recorded correspondence pairs, briefly. */
+  const correspondenceEnds = (bridge: NonNullable<ModelEdge["bridge"]>) => {
+    const end = (ids: string[], side: GraphSide) => {
+      const edge = features.find((item) => item.side === side && item.evidenceId && ids.includes(item.evidenceId));
+      const node = edge ? nodeById(edge.target) : null;
+      return node ? (node.role === "literal" ? `“${clip(node.text ?? "", 32)}”` : clip(entityName(node), 32)) : "a feature not drawn";
+    };
+    return `${end(bridge.source_evidence_ids, "source")} ↔ ${end(bridge.target_evidence_ids, "target")}`;
   };
   const legendKinds = (["feature", "bridge", "asserted", "structural", "inferred"] as EdgeKind[]).filter((kind) => kind === "feature" || model.edges.some((edge) => edge.kind === kind));
   const itemOf = (evidenceId: string) => bundle.items.find((item) => item.evidence_id === evidenceId) ?? null;
@@ -740,14 +779,23 @@ export function EvidenceGraph({
     if (focusEdge) {
       const meaning = EDGE_MEANING[(focusEdge.kind === "group" ? "feature" : focusEdge.kind) as EdgeKind];
       if (focusEdge.kind === "bridge") {
-        const count = (side: GraphSide) => features.filter((edge) => edge.side === side && edge.channel === focusEdge.channel).length;
+        const recorded = focusEdge.bridge;
+        const paired = (ids: string[], side: GraphSide) => features.filter((edge) => edge.side === side && edge.evidenceId && ids.includes(edge.evidenceId)).map((edge) => itemText(edge));
         return (
           <>
             <h4 className="graph-inspector-title">{relationText(focusEdge)}</h4>
             <p>{meaning}</p>
-            <p className="meta">
-              Source: {count("source")} {count("source") === 1 ? "record" : "records"} · Target: {count("target")} {count("target") === 1 ? "record" : "records"}
-            </p>
+            {recorded?.level === "feature_correspondence" && (
+              <p className="meta">
+                Pairs source “{paired(recorded.source_evidence_ids, "source").join("; ") || "a feature not drawn"}” with target “{paired(recorded.target_evidence_ids, "target").join("; ") || "a feature not drawn"}”.
+              </p>
+            )}
+            {recorded && (
+              <p className="meta">
+                {COMPARISON_BASIS[recorded.comparison_basis ?? ""] ?? "Recorded comparison"}
+                {recorded.recorded_score != null ? ` · saved matcher value ${recorded.recorded_score.toFixed(2)}` : ""}
+              </p>
+            )}
           </>
         );
       }
@@ -872,7 +920,7 @@ export function EvidenceGraph({
             {legendKinds.map((kind) => (
               <span key={kind}>
                 <EdgeGlyph kind={kind} />
-                {kind === "feature" ? "Feature Exact used (its relation is on the line)" : kind === "bridge" ? "Kind compared on both sides" : kind === "asserted" ? "Added: asserted parent" : kind === "structural" ? "Added: structural" : "Added: inferred"}
+                {kind === "feature" ? "Feature Exact used (its relation is on the line)" : kind === "bridge" ? "Comparison Exact recorded" : kind === "asserted" ? "Added: asserted parent" : kind === "structural" ? "Added: structural" : "Added: inferred"}
               </span>
             ))}
             <span>Rounded = source · cut corners = target</span>
@@ -916,6 +964,17 @@ export function EvidenceGraph({
                     </button>
                   )}
                   {undrawn.length > 0 && (
+                    // Undrawn records stay listed (23 C04) but as one summary until asked for, so
+                    // a dense pair does not bury its drawn features (21 F09).
+                    <p className="meta graph-undrawn-summary">
+                      {undrawn.length} {undrawn.length === 1 ? "record" : "records"} not drawn ({countsByChannel(undrawn.map((record) => record.channel))})
+                      {undrawn.some((record) => record.status === "unavailable") ? " · no original fact resolved in this bundle" : " · no graph form"}{" "}
+                      <button type="button" className="link-btn" aria-expanded={showUndrawn[side] || undrawn.some((record) => record.evidenceId === focusEvidence)} onClick={() => setShowUndrawn((current) => ({ ...current, [side]: !current[side] }))}>
+                        {showUndrawn[side] ? "Hide them" : "List them"}
+                      </button>
+                    </p>
+                  )}
+                  {undrawn.length > 0 && (showUndrawn[side] || undrawn.some((record) => record.evidenceId === focusEvidence)) && (
                     <ul>
                       {undrawn.map((record, index) => (
                         <li key={`${record.evidenceId}-${record.factId ?? index}`}>
@@ -941,21 +1000,63 @@ export function EvidenceGraph({
               );
             })}
             <section>
-              <h4>Compared kinds</h4>
-              {bridges.length ? (
+              <h4>Recorded comparisons</h4>
+              {base.bridges.length > 0 && (
                 <ul>
-                  {bridges.map((edge) => (
-                    <li key={edge.id}>
-                      <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
-                        {relationText(edge)}
-                      </button>
-                    </li>
-                  ))}
+                  {base.bridges
+                    .filter((record) => record.status === "drawn")
+                    .map((record) => {
+                      const edge = model.edges.find((item) => item.id === record.edgeId);
+                      if (!edge) return null;
+                      return (
+                        <li key={record.bridge.bridge_id}>
+                          <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
+                            {relationText(edge)}
+                            {record.bridge.level === "feature_correspondence" && <span className="meta"> · {correspondenceEnds(record.bridge)}</span>}
+                          </button>
+                        </li>
+                      );
+                    })}
                 </ul>
-              ) : (
-                <p className="meta">No kind of feature was recorded on both sides.</p>
               )}
-              {base.oneSided.length > 0 && <p className="meta">{base.oneSided.map((item) => `${channelName(item.channel)}: ${item.side} only`).join(" · ")}. No comparison line for these.</p>}
+              {base.bridges.some((record) => record.status !== "drawn") && (
+                <p className="meta">
+                  Also recorded, not drawn:{" "}
+                  {(["not_drawn", "withheld"] as const)
+                    .map((status) => {
+                      const of = base.bridges.filter((record) => record.status === status);
+                      return of.length ? `${of.length} ${status === "withheld" ? "with withheld records" : "pairing a feature that is not drawn"} (${countsByChannel(of.map((record) => record.bridge.channel))})` : null;
+                    })
+                    .filter(Boolean)
+                    .join(" · ")}{" "}
+                  <button type="button" className="link-btn" aria-expanded={showComparisons} onClick={() => setShowComparisons((value) => !value)}>
+                    {showComparisons ? "Hide the list" : "List them"}
+                  </button>
+                </p>
+              )}
+              {showComparisons && base.bridges.length ? (
+                <ul>
+                  {base.bridges.filter((record) => record.status !== "drawn").map((record) => {
+                    const edge = record.edgeId ? model.edges.find((item) => item.id === record.edgeId) : null;
+                    const name = record.bridge.level === "feature_correspondence" ? `Recorded ${channelName(record.bridge.channel).toLowerCase()} correspondence` : `${channelName(record.bridge.channel)} compared`;
+                    return (
+                      <li key={record.bridge.bridge_id}>
+                        {edge ? (
+                          <button type="button" className={focusEdgeId === edge.id ? "graph-item on" : "graph-item"} aria-pressed={focusEdgeId === edge.id} onClick={() => choose(edge, null, true)}>
+                            {name}
+                          </button>
+                        ) : (
+                          <span className="graph-item graph-item-static">
+                            {name} <span className="meta">· {record.status === "withheld" ? "its records are withheld in this view" : "a feature it pairs is not drawn"}</span>
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+              {!base.bridges.length && <p className="meta">{base.bridgeStatus === "unknown" ? "No comparison record is available for this pair." : "No comparison was recorded for this pair."}</p>}
+              {base.oneSided.length > 0 && <p className="meta">Features on one side only: {base.oneSided.map((item) => `${channelName(item.channel)} (${item.side})`).join(" · ")}.</p>}
             </section>
             {added.length > 0 && (
               <section>

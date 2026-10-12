@@ -14,6 +14,7 @@ import { TextSizeControl, ThemeControl } from "@/components/shell/Preferences";
 import { ApiError } from "@/lib/api";
 import { readStored, writeStored } from "@/lib/prefs";
 import { readZipEntry } from "@/lib/zipManifest";
+import { formsGeneration } from "@/study/types";
 
 /** Researcher-visible publication metadata from the authenticated revision listing. */
 interface RevisionSummary {
@@ -22,15 +23,23 @@ interface RevisionSummary {
   synthetic: boolean;
   closed: boolean;
   tutorial_version: string | null;
+  form_version?: string;
   source_export_version?: string;
   supported_analysis_schemas?: string[];
 }
 
 export const CORRECTED_ANALYSIS = "exact-study-analysis/3";
-const ARCHIVE_SCHEMA: Record<string, string> = { "exact-study-analysis/1": "exact-study-csv/1", "exact-study-analysis/2": "exact-study-csv/2", "exact-study-analysis/3": "exact-study-csv/3" };
+/** forms/3 + study-methods/3 publications (22 B06): codebooks and explicit named-method opt-in. */
+export const METHODS_ANALYSIS = "exact-study-analysis/4";
+const ARCHIVE_SCHEMA: Record<string, string> = { "exact-study-analysis/1": "exact-study-csv/1", "exact-study-analysis/2": "exact-study-csv/2", "exact-study-analysis/3": "exact-study-csv/3", "exact-study-analysis/4": "exact-study-csv/4" };
 
-/** Which derived analysis schema a publication's export requests (19 F14). */
+/** Which derived analysis schema a publication's export requests (19 F14, 22 B06). */
 export function exportPlan(summary: RevisionSummary): { request: string | null; expected: string } | { error: string } {
+  if (summary.contract_version === "exact-study/2.0" && (formsGeneration(summary.form_version) === 3 || summary.source_export_version === METHODS_ANALYSIS)) {
+    if (!summary.supported_analysis_schemas?.includes(METHODS_ANALYSIS))
+      return { error: "This study service cannot derive the methods analysis export (exact-study-analysis/4) for this forms/3 revision. Nothing was exported; update the service first." };
+    return { request: METHODS_ANALYSIS, expected: METHODS_ANALYSIS };
+  }
   if (summary.contract_version === "exact-study/2.0") {
     if (!summary.supported_analysis_schemas?.includes(CORRECTED_ANALYSIS))
       return { error: "This study service cannot derive the corrected analysis export (exact-study-analysis/3) for this revision. Nothing was exported; update the service first." };
@@ -118,6 +127,8 @@ export function AdminApp() {
   const [format, setFormat] = useState<"json" | "csv">("json");
   const [includeTest, setIncludeTest] = useState(false);
   const [includeKeys, setIncludeKeys] = useState(false);
+  /** Restricted analysis only: include participants' short method names (forms/3 collection notice). */
+  const [includeNamedMethods, setIncludeNamedMethods] = useState(false);
   const [message, setMessage] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -450,6 +461,12 @@ export function AdminApp() {
               <input type="checkbox" checked={includeKeys} onChange={(event) => setIncludeKeys(event.target.checked)} />
               <span>Include adjudicated answer keys and scoring</span>
             </label>
+            {selected && exportPlan(selected) && "request" in exportPlan(selected) && (exportPlan(selected) as { request: string | null }).request === METHODS_ANALYSIS && (
+              <label className="check-row">
+                <input type="checkbox" checked={includeNamedMethods} onChange={(event) => setIncludeNamedMethods(event.target.checked)} />
+                <span>Include participants&apos; named Other methods (restricted analysis export)</span>
+              </label>
+            )}
             <button
               type="button"
               className="btn btn-primary"
@@ -460,7 +477,14 @@ export function AdminApp() {
                   if (!summary) throw new ApiError(404, "not_listed", "This revision is not in the service's list of published revisions. Check it, or load the published revisions.");
                   const plan = exportPlan(summary);
                   if ("error" in plan) throw new ApiError(0, "incompatible", plan.error);
-                  const query = new URLSearchParams({ include_test: String(includeTest), include_keys: String(includeKeys), format, ...(plan.request ? { analysis_schema: plan.request } : {}) }).toString();
+                  const query = new URLSearchParams({
+                    include_test: String(includeTest),
+                    include_keys: String(includeKeys),
+                    format,
+                    ...(plan.request ? { analysis_schema: plan.request } : {}),
+                    // Method names are opt-in and only exist in the methods analysis (default exports omit them).
+                    ...(plan.request === METHODS_ANALYSIS && includeNamedMethods ? { include_named_methods: "true" } : {}),
+                  }).toString();
                   const response = await adminRequest<Record<string, unknown>>(token, "POST", `/api/v1/admin/studies/${rev}/exports?${query}`);
                   let manifest: { export_id?: string; schema?: string; archive_schema?: string; source_protocol_versions?: Record<string, string> } | null = null;
                   if (response.blob) {
@@ -492,8 +516,11 @@ export function AdminApp() {
           </div>
           <p className="meta" id="export-version-note">
             {selected
-              ? `Source protocol ${selected.contract_version}${selected.source_export_version ? ` · frozen source export ${selected.source_export_version}` : ""}${selected.supported_analysis_schemas?.length ? ` · derived exports available: ${selected.supported_analysis_schemas.join(", ")}` : ""}. This page requests ${selected.contract_version === "exact-study/2.0" ? CORRECTED_ANALYSIS : "the frozen exact-study-analysis/1"}.`
-              : "exact-study/2.0 revisions are exported as the corrected exact-study-analysis/3; exact-study/1.0 revisions keep their frozen exact-study-analysis/1. The returned manifest is checked before the file is saved."}
+              ? (() => {
+                  const plan = exportPlan(selected);
+                  return `Source protocol ${selected.contract_version}${selected.source_export_version ? ` · frozen source export ${selected.source_export_version}` : ""}${selected.supported_analysis_schemas?.length ? ` · derived exports available: ${selected.supported_analysis_schemas.join(", ")}` : ""}. ${"error" in plan ? plan.error : `This page requests ${plan.expected}.`}`;
+                })()
+              : "forms/3 revisions are exported as exact-study-analysis/4 (method names only on request); other exact-study/2.0 revisions as exact-study-analysis/3; exact-study/1.0 revisions keep their frozen exact-study-analysis/1. The returned manifest is checked before the file is saved."}
           </p>
           <p className="muted">
             Analysis 3 reports page-observation seconds from each page's own clock and leaves unique elapsed coverage unknown; it never subtracts summed page time from elapsed time. Exports never contain invitation links, session cookies or free-text comments. Answer keys are included only when you ask for them.

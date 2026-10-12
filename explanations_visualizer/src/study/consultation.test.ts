@@ -19,7 +19,20 @@ test("Yes keeps several methods and only the names of selected methods", () => {
 });
 
 test("final reports need Yes with a method or No; drafts may be incomplete", () => {
-  assert.match(consultationProblem(EMPTY_CONSULTATION)!, /Yes or No/);
-  assert.match(consultationProblem({ ...EMPTY_CONSULTATION, consulted_external_ontologies: true })!, /at least one method/);
+  assert.match(consultationProblem(EMPTY_CONSULTATION)!.message, /Yes or No/);
+  assert.match(consultationProblem({ ...EMPTY_CONSULTATION, consulted_external_ontologies: true })!.message, /at least one method/);
   assert.equal(consultationProblem({ ...EMPTY_CONSULTATION, consulted_external_ontologies: true, methods: ["reasoner" as const] }), null);
+});
+
+test("consultation/3 carries exactly its own fields; Other needs a name only when selected (22 B06)", () => {
+  const yes = { ...EMPTY_CONSULTATION, consulted_external_ontologies: true, methods: ["protege", "other_method", "reasoner"] as const, other_method: "  owlready2, a SPARQL notebook  ", other_editor: "kept from an old draft", resource_scope: "supplied_only" as const };
+  const normalized = normalizeConsultation({ ...yes, methods: [...yes.methods] }, true);
+  assert.deepEqual(normalized, { consulted_external_ontologies: true, methods: ["protege", "other_method"], other_method: "owlready2, a SPARQL notebook", resource_scope: "supplied_only" });
+  assert.equal("other_editor" in normalized, false, "no consultation/2 field is ever sent to a consultation/3 service");
+  assert.equal(consultationProblem(normalized, true), null);
+  assert.equal(consultationProblem({ ...normalized, other_method: "  " }, true)?.field, "other_method");
+  // Deselecting Other clears its name; No clears every detail.
+  assert.equal(normalizeConsultation({ ...normalized, methods: ["plain_files"] }, true).other_method, null);
+  assert.deepEqual(normalizeConsultation({ ...normalized, consulted_external_ontologies: false }, true), { consulted_external_ontologies: false, methods: [], other_method: null, resource_scope: null });
+  assert.equal(consultationProblem({ consulted_external_ontologies: false, methods: [], other_method: null, resource_scope: null }, true), null);
 });

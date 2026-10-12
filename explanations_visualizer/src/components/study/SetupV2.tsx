@@ -10,8 +10,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { OPEN_HELP, ResourceList, SCOPE_NOTICE } from "@/components/study/Resources";
 import { Paragraphs } from "@/components/study/StudyChrome";
+import { orderedEntries, orderedKeys } from "@/study/formOrder";
 import type { StudySession } from "@/study/session";
-import { isSetupV2, type ResourceAccess, type SetupV2, type StudyState } from "@/study/types";
+import { isReviewProtocol, isSetupV2, type ResourceAccess, type SetupV2, type StudyState } from "@/study/types";
 
 export const METHOD_LABELS: [string, string][] = [
   ["protege", "Protégé"],
@@ -23,6 +24,11 @@ export const METHOD_LABELS: [string, string][] = [
   ["other_method", "Another method"],
 ];
 
+/** study-methods/3 (22 B06): Protégé is a recommendation, never a requirement or an assumed use. */
+export const METHOD_FREEDOM_V3 =
+  "Inspecting the supplied ontologies outside this site is optional. If you want a tool, we recommend Protégé, but you do not need to install or use it; a text editor, another method or no outside inspection at all are equally fine. You can combine methods and change them between cases. After each case we ask which methods, if any, you actually used for that case.";
+
+/** Legacy (setup/2) wording, kept for historical publications. */
 export const METHOD_FREEDOM =
   "You may inspect the supplied ontologies using any method or combination of methods. Protégé is one option; installing or using it is not required. You may also complete a case without external tools. Use the supplied ontology versions and follow the information guidance above. You can change methods between cases. After each ranking, we will ask which methods, if any, you used for that source and its candidates.";
 
@@ -34,11 +40,18 @@ function draftOf(state: StudyState): SetupV2 {
     external_inspection_optional_understood: setup?.external_inspection_optional_understood ?? false,
     resource_access: setup?.resource_access ?? "not_checked",
     familiar_methods: setup?.familiar_methods ?? [],
+    familiar_other_method: setup?.familiar_other_method ?? null,
     submitted: false,
   };
 }
 
 export function SetupStageV2({ state, session }: { state: StudyState; session: StudySession }) {
+  const v3 = isReviewProtocol(state);
+  const familiarQuestion = state.forms.setup?.find((question) => question.id === "familiar_methods") ?? null;
+  const otherQuestion = state.forms.setup?.find((question) => question.id === "familiar_other_method") ?? null;
+  const familiarOptions: [string, string][] = v3 && familiarQuestion ? orderedEntries(familiarQuestion.options, orderedKeys(familiarQuestion, "options", state.forms.version)) : METHOD_LABELS;
+  const otherInput = useRef<HTMLInputElement>(null);
+  const [otherError, setOtherError] = useState<string | null>(null);
   const [draft, setDraft] = useState<SetupV2>(() => draftOf(state));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,8 +73,17 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
     external_inspection_optional_understood: value.external_inspection_optional_understood,
     resource_access: value.resource_access,
     familiar_methods: value.familiar_methods,
+    // setup/3: the named Other methods travel only while Other is selected (the server clears it too).
+    ...(v3 ? { familiar_other_method: value.familiar_methods.includes("other_method") ? value.familiar_other_method?.trim() || null : null } : {}),
     submitted,
   });
+  /** Familiarity choices; "None of these" is exclusive. Familiarity never implies use in a case. */
+  const toggleFamiliar = (code: string) => {
+    const selected = draft.familiar_methods;
+    if (selected.includes(code)) return update({ familiar_methods: selected.filter((item) => item !== code) });
+    if (code === "none") return update({ familiar_methods: ["none"] });
+    update({ familiar_methods: [...selected.filter((item) => item !== "none"), code] });
+  };
   const update = (changes: Partial<SetupV2>) => {
     edited.current = true;
     const next = { ...draft, ...changes };
@@ -70,7 +92,13 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
     void session.mutate({ method: "PUT", path: "/api/v1/study/setup", body: body(next, false), coalesce: "setup", debounceMs: 500 }).catch(() => undefined);
   };
   const ready = draft.instructions_acknowledged && draft.external_inspection_optional_understood && draft.resource_access === "available";
+  const otherMissing = v3 && draft.familiar_methods.includes("other_method") && !draft.familiar_other_method?.trim();
   const submit = async () => {
+    if (otherMissing) {
+      setOtherError("Name the other methods, or clear Other method.");
+      otherInput.current?.focus();
+      return;
+    }
     if (!ready) {
       setError(
         draft.resource_access === "needs_help"
@@ -145,7 +173,7 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
 
       <section className="study-card" aria-labelledby="setup-methods-h">
         <h2 id="setup-methods-h">3 · Inspecting the ontologies outside this site is optional</h2>
-        <p>{METHOD_FREEDOM}</p>
+        <p>{v3 ? METHOD_FREEDOM_V3 : METHOD_FREEDOM}</p>
         <label className="check-row">
           <input type="checkbox" checked={draft.external_inspection_optional_understood} onChange={() => update({ external_inspection_optional_understood: !draft.external_inspection_optional_understood })} />
           <span>I understand that outside inspection is optional, that I can combine and change methods between cases, and that I will be asked about my methods after each case.</span>
@@ -156,19 +184,46 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
         <h2 id="setup-familiar-h">
           4 · Methods you are familiar with <span className="meta">Optional</span>
         </h2>
-        <p className="muted">This only describes your experience. It does not commit you to using anything, and leaving it empty is fine.</p>
-        <div className="option-grid option-grid-column">
-          {METHOD_LABELS.map(([code, label]) => (
-            <label key={code} className={draft.familiar_methods.includes(code) ? "option on" : "option"}>
-              <input
-                type="checkbox"
-                checked={draft.familiar_methods.includes(code)}
-                onChange={() => update({ familiar_methods: draft.familiar_methods.includes(code) ? draft.familiar_methods.filter((item) => item !== code) : [...draft.familiar_methods, code] })}
-              />
-              <span>{label}</span>
-            </label>
-          ))}
-        </div>
+        <p className="muted">This only describes your experience. It does not commit you to using anything, it is not taken as what you used in a case, and leaving it empty is fine.</p>
+        <fieldset className="question">
+          <legend className="sr-only">{familiarQuestion?.label ?? "Methods you are familiar with"}</legend>
+          <div className="option-grid option-grid-column">
+            {familiarOptions.map(([code, label]) => (
+              <label key={code} className={`option${draft.familiar_methods.includes(code) ? " on" : ""}${code === "none" ? " special" : ""}`}>
+                <input type="checkbox" checked={draft.familiar_methods.includes(code)} onChange={() => (v3 ? toggleFamiliar(code) : update({ familiar_methods: draft.familiar_methods.includes(code) ? draft.familiar_methods.filter((item) => item !== code) : [...draft.familiar_methods, code] }))} />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        {v3 && draft.familiar_methods.includes("other_method") && (
+          <div className={otherError ? "field invalid" : "field"}>
+            <label htmlFor="familiar-other-method">{otherQuestion?.label ?? "Which other methods are familiar to you?"}</label>
+            <input
+              id="familiar-other-method"
+              ref={otherInput}
+              className="input"
+              maxLength={otherQuestion?.text_max_length ?? 160}
+              value={draft.familiar_other_method ?? ""}
+              aria-invalid={otherError ? true : undefined}
+              aria-describedby={otherError ? "familiar-other-error" : "familiar-other-hint"}
+              onChange={(event) => {
+                setOtherError(null);
+                update({ familiar_other_method: event.target.value });
+              }}
+            />
+            {otherError ? (
+              <p className="field-error" id="familiar-other-error">
+                {otherError}
+              </p>
+            ) : (
+              <p className="meta" id="familiar-other-hint">
+                Short names only, separated by commas if there are several.
+              </p>
+            )}
+          </div>
+        )}
+        {v3 && state.forms.collection_notice && <p className="meta">{state.forms.collection_notice}</p>}
       </section>
 
       <div className="study-actions">

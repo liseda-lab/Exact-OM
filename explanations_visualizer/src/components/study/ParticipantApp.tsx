@@ -20,7 +20,7 @@ import { getJson } from "@/lib/api";
 import type { Mutation } from "@/study/mutationQueue";
 import { useStudySession } from "@/study/session";
 import { useTelemetry } from "@/study/telemetry";
-import { INTEGRATION_CONTRACT, type StudyCase, type StudyState } from "@/study/types";
+import { formsGeneration, INTEGRATION_CONTRACT, unsupportedProtocol, type StudyCase, type StudyState } from "@/study/types";
 
 const PAUSABLE = new Set(["setup", "background", "practice", "tutorial", "case", "consultation", "final"]);
 const SEEN_KEY = "exact.study.lastSeen";
@@ -179,6 +179,18 @@ export function ParticipantApp() {
         <p className="muted">If you think this is a mistake, contact the study team.</p>
       </MessagePage>
     );
+  } else if (session.phase === "incompatible_build") {
+    body = (
+      <MessagePage title="This page needs to be updated for your study">
+        <p>Your private link is valid, but this copy of the study page is older than your study needs, so nothing was started or changed.</p>
+        <p>Reload the page. If this message stays, close the tab and open your private link again later, or contact the study team.</p>
+        <div className="study-actions">
+          <button type="button" className="btn btn-primary" onClick={() => window.location.reload()}>
+            Reload the page
+          </button>
+        </div>
+      </MessagePage>
+    );
   } else if (session.phase === "rate_limited") {
     body = (
       <MessagePage title="Please wait a moment">
@@ -195,6 +207,13 @@ export function ParticipantApp() {
     body = (
       <MessagePage title="This study version is not supported here">
         <p>This page cannot show study version {state.contract_version}, so it does not collect answers. Nothing you saved earlier is lost.</p>
+        <p className="muted">Please tell the study team; the study may need a matching version of this page.</p>
+      </MessagePage>
+    );
+  } else if (unsupportedProtocol(state).length) {
+    body = (
+      <MessagePage title="This study version is not supported here">
+        <p>This page cannot show some parts of this study ({unsupportedProtocol(state).join(", ")}), so it does not collect answers. Nothing you saved earlier is lost.</p>
         <p className="muted">Please tell the study team; the study may need a matching version of this page.</p>
       </MessagePage>
     );
@@ -220,7 +239,7 @@ export function ParticipantApp() {
             session={session}
             formId="background"
             title="About your background"
-            intro="Broad answers only. “Prefer not to say” is always available and is never read as a lack of experience."
+            intro={formsGeneration(state.forms.version) === 3 ? "Broad answers only. No name, email or institution is asked." : "Broad answers only. “Prefer not to say” is always available and is never read as a lack of experience."}
             submitLabel={protocol === "v2" ? "Continue to the tutorial" : "Continue to practice"}
           />
         );

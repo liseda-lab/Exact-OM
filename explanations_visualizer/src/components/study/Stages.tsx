@@ -116,7 +116,7 @@ export function ResourceDownloads({ state, compact = false }: { state: StudyStat
 
 function serverFieldError(error: unknown): { field: string; message: string } | null {
   if (!(error instanceof ApiError)) return null;
-  const match = /^(?:Required answer|Invalid choice|Invalid choices|Special choice must be exclusive|Complete all ratings|Invalid matrix|Invalid rating|Invalid optional text): (\w+)/.exec(error.message);
+  const match = /^(?:Required answer|Invalid choice|Invalid choices|Special choice must be exclusive|Complete all ratings|Invalid matrix|Invalid rating|Invalid optional text|Invalid text): (\w+)/.exec(error.message);
   return match ? { field: match[1], message: error.message.split(":")[0] } : null;
 }
 
@@ -166,7 +166,14 @@ export function FormStage({
   const submit = async () => {
     const missing = missingRequired(questions, answers);
     if (missing.length) {
-      setErrors(Object.fromEntries(missing.map((question) => [question.id, "Please answer this question. “Prefer not to say” is available where it applies."])));
+      setErrors(
+        Object.fromEntries(
+          missing.map((question) => [
+            question.id,
+            !question.options ? "Please enter a short answer." : question.options.prefer_not_to_say ? "Please answer this question. “Prefer not to say” is available." : "Please answer this question.",
+          ]),
+        ),
+      );
       const first = document.getElementById(`q-${missing[0].id}`);
       first?.scrollIntoView({ block: "center" });
       first?.querySelector<HTMLElement>("input, textarea")?.focus({ preventScroll: true });

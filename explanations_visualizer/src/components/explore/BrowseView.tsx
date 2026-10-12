@@ -3,7 +3,7 @@
 // Two independent ontology browsers. Each side keeps its own focus and history in the URL;
 // changing one side never resets the other.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Dialog } from "@/components/common/Dialog";
 import { useEntityContext } from "@/components/explore/CompareView";
@@ -18,10 +18,23 @@ function entityKind(value: string | null): EntityKind {
   return value === "object_property" || value === "data_property" || value === "individual" ? value : "class";
 }
 
-function reasonerStatus(meta: OntologyMeta | undefined): string {
-  const value = meta?.capabilities.reasoner_inferred;
-  if (!value) return "not_run";
-  return typeof value === "string" ? value : value.status;
+// A deliberate focus is remembered for this exact package, side and ontology (21 F06). An
+// explicit URL focus always wins; the backend's entry points apply when neither exists.
+const FOCUS_KEY = "exact.browse.focus";
+function savedFocus(key: string): { iri: string; kind: EntityKind } | null {
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(key) ?? "null");
+    return value && typeof value.iri === "string" ? { iri: value.iri, kind: entityKind(value.kind) } : null;
+  } catch {
+    return null;
+  }
+}
+function rememberFocus(key: string, iri: string, kind: EntityKind) {
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ iri, kind }));
+  } catch {
+    /* a convenience only */
+  }
 }
 
 /**
@@ -68,6 +81,19 @@ export function BrowseView() {
 
   const contextEntity = contextFor?.entity ?? null;
   const context = useEntityContext(contextEntity);
+  const packageId = state.health?.package_id ?? "none";
+  const focusKey = (side: string, ontology: string) => `${FOCUS_KEY}|${packageId}|${side}|${ontology}`;
+  // Restore a remembered focus only when the URL names none for that side.
+  useEffect(() => {
+    const changes: Record<string, string> = {};
+    for (const [side, ontology, key, kindKey] of [["source", sourceOntology, "s", "sk"], ["target", targetOntology, "t", "tk"]] as const) {
+      if (!ontology || params.get(key)) continue;
+      const saved = savedFocus(focusKey(side, ontology));
+      if (saved) Object.assign(changes, { [key]: saved.iri, [kindKey]: saved.kind });
+    }
+    if (Object.keys(changes).length) setParams(changes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceOntology, targetOntology, packageId]);
 
   return (
     <div className="browse-page" id="main" tabIndex={-1}>
@@ -106,8 +132,10 @@ export function BrowseView() {
                 kind={entityKind(params.get(kindKey))}
                 pinnedIri={side === "source" ? params.get("pin_s") ?? null : params.get("pin_t") ?? null}
                 pinnedKind={entityKind(params.get(side === "source" ? "pin_sk" : "pin_tk"))}
-                onFocus={(iri, kind) => setParams({ [key]: iri, [kindKey]: kind })}
-                reasonerStatus={reasonerStatus(state.ontologies[ontology])}
+                onFocus={(iri, kind) => {
+                  rememberFocus(focusKey(side, ontology), iri, kind);
+                  setParams({ [key]: iri, [kindKey]: kind });
+                }}
                 entityCount={state.ontologies[ontology]?.completeness.entity_count}
                 scopeNote={<ScopeNote meta={state.ontologies[ontology]} />}
                 onOpenContext={(iri, kind) => setContextFor({ side, entity: { ontology_version_id: ontology, iri, kind } })}

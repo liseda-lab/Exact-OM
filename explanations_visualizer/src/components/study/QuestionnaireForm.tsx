@@ -39,7 +39,9 @@ export function pruneHidden(questions: Question[], answers: Answers): Answers {
 }
 
 export function isAnswered(question: Question, value: unknown): boolean {
-  if (value === undefined || value === null || value === "") return false;
+  if (value === undefined || value === null) return false;
+  // The service trims free text (forms/3); blank text is not an answer.
+  if (typeof value === "string") return value.trim().length >= Math.max(1, question.text_min_length ?? 1);
   if (Array.isArray(value)) return value.length > 0;
   if (question.matrix && typeof value === "object") return Object.keys(question.matrix).every((row) => (value as Record<string, unknown>)[row]);
   return true;
@@ -183,13 +185,31 @@ export function QuestionnaireForm({
         const hint = question.required ? null : "Optional";
         const note = revealNote?.(question);
         if (!question.options) {
+          const maximum = question.text_max_length ?? 2000;
+          // A short conditional name (forms/3 Other fields) is one line; longer optional text is a box.
+          const short = maximum <= 160;
+          const describedBy = error ? `${name}-error` : short ? `${name}-hint` : undefined;
           return (
             <div key={question.id} className={error ? "question invalid" : "question"} id={`q-${question.id}`}>
               <label htmlFor={name} className="question-label">
                 {question.label} {hint && <span className="meta">{hint}</span>}
               </label>
-              <textarea id={name} className="textarea" rows={3} maxLength={2000} disabled={disabled} value={typeof value === "string" ? value : ""} onChange={(event) => update(event.target.value)} />
-              {error && <p className="field-error">{error}</p>}
+              {note && <p className="reveal-note">{note}</p>}
+              {short ? (
+                <input id={name} className="input" maxLength={maximum} disabled={disabled} value={typeof value === "string" ? value : ""} aria-invalid={error ? true : undefined} aria-describedby={describedBy} onChange={(event) => update(event.target.value)} />
+              ) : (
+                <textarea id={name} className="textarea" rows={3} maxLength={maximum} disabled={disabled} value={typeof value === "string" ? value : ""} aria-invalid={error ? true : undefined} aria-describedby={describedBy} onChange={(event) => update(event.target.value)} />
+              )}
+              {short && !error && (
+                <p className="meta" id={`${name}-hint`}>
+                  Short names, separated by commas if there are several. No personal names, institutions or web addresses.
+                </p>
+              )}
+              {error && (
+                <p className="field-error" id={`${name}-error`}>
+                  {error}
+                </p>
+              )}
             </div>
           );
         }

@@ -7,9 +7,10 @@
 //   Literal records are scoped by side and fact identity.
 // - Every selected matcher feature becomes one line per original record it rests on, carrying
 //   its evidence ID and fact ID. A record with no supported graph form is counted, not dropped.
-// - A comparison line between the two compared entities is drawn only for a channel with
-//   recorded features on BOTH sides, and it means "this kind of feature was compared", never
-//   that two features correspond. A channel recorded on one side only gets no line.
+// - Comparison lines come only from recorded matcher comparisons (exact-evidence-metadata/1,
+//   23 C04): a recorded channel comparison joins the two compared entities; a recorded feature
+//   correspondence joins the two features it names when both are drawn. Nothing is inferred
+//   from coincident channels or labels; withheld or undrawable comparisons stay listed.
 // - Ontology context added on request is a different kind of line and never a feature.
 //
 // - Each feature line carries its own relation (predicate and qualifier). Entity nodes show only
@@ -24,7 +25,7 @@
 // further columns. Heights come from the label lines, and each column is swept so nothing
 // overlaps (no fixed wide rows). Distances scale with the reader's text size.
 
-import type { EntityKind, EntityRef, OwlNode, SelectedEvidence } from "./types";
+import type { EntityKind, EntityRef, EvidenceBridge, OwlNode, PairEvidenceMetadata, SelectedEvidence } from "./types";
 
 export type GraphSide = "source" | "target";
 export type ModelEdgeKind = "feature" | "asserted" | "structural" | "inferred" | "bridge" | "group";
@@ -57,6 +58,15 @@ export interface ModelEdge {
   factId?: string;
   /** What the line says: a fixed relation, or a property plus quantifier to label later. */
   relation: { text?: string; property?: string; quantifier?: string };
+  /** A recorded matcher comparison (bridge lines only). */
+  bridge?: EvidenceBridge;
+}
+
+/** Where one recorded comparison ended up in the graph. */
+export interface BridgeRecord {
+  bridge: EvidenceBridge;
+  status: "drawn" | "not_drawn" | "withheld";
+  edgeId?: string;
 }
 
 /** Where one selected record ended up in the graph. */
@@ -77,8 +87,12 @@ export interface GraphModel {
   records: ModelRecord[];
   /** Records with no supported graph form, per side (they stay in the evidence list). */
   omitted: { source: number; target: number };
-  /** Channels with features on one side only (no comparison line is drawn for them). */
+  /** Channels with features on one side only. */
   oneSided: { channel: string; side: GraphSide }[];
+  /** Every recorded comparison, drawn or not; empty when the pair has no recorded metadata. */
+  bridges: BridgeRecord[];
+  /** The pair's recorded comparison status; `unknown` when no metadata was supplied. */
+  bridgeStatus: PairEvidenceMetadata["bridge_status"] | "unknown";
 }
 
 export function entityNodeId(side: GraphSide, entity: { ontology_version_id: string; kind: string; iri: string }) {
@@ -123,7 +137,13 @@ function cardinality(node: OwlNode): string | null {
 /** Literal features beyond this many per side are grouped behind an expandable count. */
 export const LITERAL_LIMIT = 3;
 
-export function buildGraphModel(source: EntityRef, target: EntityRef, items: SelectedEvidence[], axioms: Record<string, { ast: unknown } | null>, options: { expandLiterals?: Set<GraphSide> } = {}): GraphModel {
+export function buildGraphModel(
+  source: EntityRef,
+  target: EntityRef,
+  items: SelectedEvidence[],
+  axioms: Record<string, { ast: unknown } | null>,
+  options: { expandLiterals?: Set<GraphSide>; metadata?: Pick<PairEvidenceMetadata, "bridge_status" | "bridges"> | null } = {},
+): GraphModel {
   const nodes = new Map<string, ModelNode>();
   const edges: ModelEdge[] = [];
   const omitted = { source: 0, target: 0 };
@@ -205,10 +225,26 @@ export function buildGraphModel(source: EntityRef, target: EntityRef, items: Sel
   }
   const oneSided: GraphModel["oneSided"] = [];
   for (const channel of new Set([...sides.source, ...sides.target])) {
-    if (sides.source.has(channel) && sides.target.has(channel)) edges.push({ id: `bridge:${channel}`, source: focal.source, target: focal.target, kind: "bridge", channel, relation: {} });
-    else oneSided.push({ channel, side: sides.source.has(channel) ? "source" : "target" });
+    if (!(sides.source.has(channel) && sides.target.has(channel))) oneSided.push({ channel, side: sides.source.has(channel) ? "source" : "target" });
   }
-  return { nodes: Array.from(nodes.values()), edges, records, omitted, oneSided };
+  // Recorded comparisons only. A feature correspondence is drawn between the two feature nodes
+  // it names, when both features are drawn; otherwise it stays listed with its status.
+  const featureNode = (evidenceIds: string[], side: GraphSide) => edges.find((edge) => edge.kind === "feature" && edge.side === side && edge.evidenceId && evidenceIds.includes(edge.evidenceId))?.target ?? null;
+  const bridges: BridgeRecord[] = (options.metadata?.bridges ?? []).map((bridge) => {
+    if (bridge.status === "withheld") return { bridge, status: "withheld" };
+    if (bridge.level === "channel_comparison") {
+      const id = `bridge:${bridge.bridge_id}`;
+      edges.push({ id, source: focal.source, target: focal.target, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
+      return { bridge, status: "drawn", edgeId: id };
+    }
+    const from = featureNode(bridge.source_evidence_ids, "source");
+    const to = featureNode(bridge.target_evidence_ids, "target");
+    if (!from || !to) return { bridge, status: "not_drawn" };
+    const id = `corr:${bridge.bridge_id}`;
+    edges.push({ id, source: from, target: to, kind: "bridge", channel: bridge.channel, relation: {}, bridge });
+    return { bridge, status: "drawn", edgeId: id };
+  });
+  return { nodes: Array.from(nodes.values()), edges, records, omitted, oneSided, bridges, bridgeStatus: options.metadata ? options.metadata.bridge_status : "unknown" };
 }
 
 export interface Size {

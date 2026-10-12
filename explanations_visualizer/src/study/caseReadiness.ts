@@ -5,6 +5,8 @@
 
 import type { EntityRef } from "../lib/types";
 import type { ExplanationResult, WorkspaceCapabilities } from "../lib/workspace/types";
+// @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
+import { navigationFromScope } from "../lib/workspace/navigation.ts";
 import type { PublicAsset, StudyCase, StudyState } from "./types";
 
 /** Components a frozen study condition can display (final-form matrix codes). */
@@ -34,6 +36,10 @@ export interface ScopeCapabilities {
   bases: string[];
   reasoner: string;
   reason: string | null;
+  /** Per-ontology prepared navigation, including `partial_inference` (23 C02). */
+  navigation?: Record<string, Record<string, unknown>>;
+  /** Declared only when the scope serves recorded comparison metadata for its candidates. */
+  evidence_metadata_contract?: string | null;
   completeness: Record<string, { scope?: string; extraction?: string; imports_complete?: boolean; domain_completeness?: string }>;
   coverage: string;
 }
@@ -107,7 +113,10 @@ export function validateCapabilities(caps: ScopeCapabilities, expected: { scopeI
 export function workspaceCapabilities(caps: ScopeCapabilities, ontologyName: (id: string) => string): WorkspaceCapabilities {
   const has = (component: string) => (caps.components.includes(component) ? "available" : "not_exported");
   const limitations: string[] = [];
-  if (caps.reasoner !== "per_ontology" && caps.reason) limitations.push(`Inferred hierarchy: ${caps.reason}. Only asserted and structural relations are shown.`);
+  const navigationByOntology = Object.fromEntries(Object.entries(caps.navigation ?? {}).map(([version, entry]) => [version, navigationFromScope(entry)]));
+  // The complete-only status says nothing about the partial ELK result, which has its own mode.
+  const partial = Object.values(navigationByOntology).some((entry) => entry.partial?.status === "partial");
+  if (!partial && !caps.bases.includes("reasoner_inferred")) limitations.push("No inferred hierarchy was prepared for this case; asserted and structural relations are shown.");
   for (const [version, entry] of Object.entries(caps.completeness ?? {})) {
     if (entry.imports_complete === false) limitations.push(`${ontologyName(version)}: imported ontologies are not complete in this study copy.`);
     if (entry.extraction && entry.extraction !== "complete_for_policy") limitations.push(`${ontologyName(version)}: extraction is ${entry.extraction.replace(/_/g, " ")}.`);
@@ -116,12 +125,14 @@ export function workspaceCapabilities(caps: ScopeCapabilities, ontologyName: (id
   return {
     search: "available",
     navigation: "available",
-    bases: caps.bases.filter((basis): basis is WorkspaceCapabilities["bases"][number] => ["literal_asserted", "structural_navigation", "reasoner_inferred"].includes(basis)),
+    bases: caps.bases.filter((basis): basis is WorkspaceCapabilities["bases"][number] => ["literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"].includes(basis)),
     reasoner: caps.reasoner,
+    navigationByOntology,
     graphExpansion: true,
     profiles: has("profiles"),
     comparison: has("comparison"),
     evidence: has("evidence"),
+    evidenceMetadata: caps.evidence_metadata_contract === "exact-evidence-metadata/1",
     scopeNote:
       caps.coverage === "complete_declared_context_scope"
         ? "Search and browsing cover the complete declared context of the study's frozen, filtered ontology copies. That is the study's scope, not every ontology release."

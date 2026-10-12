@@ -11,7 +11,7 @@ test("the prefilter stage reads as Exact matching and its producer codes map one
   assert.equal(eventMeaning(e("prefilter", "completed", "rejected", "exact_source_prefiltered")).text, "Another candidate was chosen by exact matching");
   assert.equal(eventMeaning(e("prefilter", "completed", "retained", "prefilter_retained")).text, "Continued to scoring");
   assert.equal(eventMeaning(e("prefilter", "not_run", "retained", "prefilter_disabled")).text, "Exact matching not used");
-  assert.equal(eventMeaning(e("prefilter", "not_recorded", "unknown", "historical_stage_record_not_exported")).text, "No record in this run");
+  assert.equal(eventMeaning(e("prefilter", "not_recorded", "unknown", "historical_stage_record_not_exported")).text, "Not recorded in this bundle");
 });
 
 test("a retained event or a selected pair is never read as an exact match", () => {

@@ -1,34 +1,46 @@
 "use client";
 
 // Independent hierarchy browser for one ontology. It never depends on the match graph:
-// every step is a bounded query by entity through the active workspace, with the hierarchy
-// basis stated explicitly. A workspace that holds only part of an ontology says where its
-// information ends instead of showing an empty tree.
+// every step is a bounded, paginated query by typed entity through the active workspace, with
+// the hierarchy basis stated explicitly. A workspace that holds only part of an ontology says
+// where its information ends instead of showing an empty tree. The partial ELK mode (23 C02)
+// shows positive relationships only; an empty partial result is unknown, never a negative.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
+import { Disclosure } from "@/components/common/Disclosure";
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronDown, IconChevronUp, SideMarker } from "@/components/common/Icons";
 import { EmptyReason } from "@/components/common/StatusText";
 import { EntitySearch } from "@/components/explore/EntitySearch";
 import { useContinuation, type Continued } from "@/components/explore/useContinuation";
-import { appendPage, shownText } from "@/lib/continuation";
+import { shownText } from "@/lib/continuation";
 import { curie, KIND_NAMES } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
-import type { EntityKind, HierarchyEdge } from "@/lib/types";
+import type { EntityKind, EntityRef, EntryPointItem, HierarchyEdge, HierarchyPage } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
-import type { Basis } from "@/lib/workspace/types";
+import { BASIS_OPTIONS, basisAvailability, offeredBases, unsupportedConstructs } from "@/lib/workspace/navigation";
+import type { Basis, PartialInference } from "@/lib/workspace/types";
 import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
 export type { Basis } from "@/lib/workspace/types";
 export type FocusVia = "parent" | "child" | "search" | "card" | "return";
 
-// One short meaning per mode (21 F06); unsupported modes say why instead of showing an empty tree.
-const BASES: { value: Basis; label: string; note: string; unavailable: string }[] = [
-  { value: "literal_asserted", label: "Asserted", note: "Relationships written directly in the ontology. Direct parents and children.", unavailable: "Asserted relationships are not available here." },
-  { value: "structural_navigation", label: "Structural", note: "Navigation extracted from class expressions, by a documented rule. Direct links only.", unavailable: "Structural navigation was not prepared for this view." },
-  { value: "reasoner_inferred", label: "Inferred", note: "Relationships computed by the recorded reasoner.", unavailable: "Inferred relationships were not prepared for this bundle, so this mode cannot be shown." },
-];
+// The chosen mode per workspace scope and side survives tab switches and deliberate navigation.
+const chosenModes = new Map<string, Basis>();
+
+const isPartial = (basis: Basis) => basis === "elk_inferred_partial";
+
+function emptyText(basis: Basis, what: "parents" | "children"): string {
+  if (isPartial(basis)) return `ELK returned no ${what} here. Its result is partial, so ${what} may still exist.`;
+  return what === "parents" ? "No parent shown." : "No children shown.";
+}
+
+/** An empty page: a partial ELK result is unknown, stated plainly; anything else keeps its status wording. */
+function Empty({ page, basis, what }: { page: HierarchyPage; basis: Basis; what: "parents" | "children" }) {
+  if (isPartial(basis) && page.status === "partial") return <p className="empty-reason">{emptyText(basis, what)}</p>;
+  return <EmptyReason status={page.status} what={what} reason={page.reason} absent={emptyText(basis, what)} />;
+}
 
 function ParentBranch({
   ontology,
@@ -82,7 +94,7 @@ function ParentBranch({
         <div className="tree-children">
           {state.error ? <ErrorNote error={state.error} onRetry={state.reload} /> : null}
           {!state.data && !state.error ? <Skeleton lines={1} title={false} /> : null}
-          {state.data && !parents.length && <EmptyReason status={state.data.status} what="parents" reason={state.data.reason} absent="No parent shown." />}
+          {state.data && !parents.length && <Empty page={state.data} basis={basis} what="parents" />}
           {parents.length > 0 && (
             <ul>
               {parents.map((edge) => (
@@ -99,9 +111,11 @@ function ParentBranch({
 
 const edgeKey = (edge: HierarchyEdge) => edge.id;
 const PARENT_NOUN = { one: "parent", many: "parents" };
+const CHILD_NOUN = { one: "child", many: "children" };
+const ENTRY_NOUN = { one: "top-level entry", many: "top-level entries" };
 
-/** A hierarchy page that continues on request; failures stay local and keep what is shown. */
-function EdgeContinuation({ state, noun }: { state: Continued<HierarchyEdge>; noun: { one: string; many: string } }) {
+/** A page that continues on request; failures stay local and keep what is shown. */
+function EdgeContinuation<T>({ state, noun }: { state: Continued<T>; noun: { one: string; many: string } }) {
   if (state.complete && !state.error) return null;
   return (
     <div className="continuation">
@@ -119,7 +133,102 @@ function EdgeContinuation({ state, noun }: { state: Continued<HierarchyEdge>; no
 function edgeNote(edge: HierarchyEdge): string | null {
   if (edge.basis === "structural_navigation") return edge.interpretation.rule ? `derived: ${edge.interpretation.rule}` : "derived by structural rule";
   if (edge.basis === "reasoner_inferred") return "inferred";
+  if (edge.basis === "elk_inferred_partial") return "ELK";
   return null;
+}
+
+/** The partial ELK result in one sentence, with the details people may need on request. */
+function PartialDetails({ partial }: { partial: PartialInference }) {
+  const unsupported = unsupportedConstructs(partial);
+  const version = partial.versions ? Object.entries(partial.versions).map(([name, value]) => `${name} ${value}`).join(", ") : partial.reasoner;
+  return (
+    <Disclosure label="About ELK partial results" openLabel="Hide ELK details" className="basis-details">
+      <ul className="plain-list">
+        <li>Each link was returned by the ELK reasoner{version ? ` (${version})` : ""} for the constructs it supports. It is not a proof: no justification was exported for individual links.</li>
+        {unsupported.length > 0 && <li>Not covered: {unsupported.join(", ")}. Relationships that depend on them may be missing.</li>}
+        <li>“Direct” means direct in the returned result; it may skip a level of the complete hierarchy. A missing link, an empty list or a missing equivalence is unknown, not a negative.</li>
+        <li>Classes only{partial.unrepresented_class_count ? `; ${partial.unrepresented_class_count.toLocaleString()} classes are not represented in the result` : ""}.</li>
+        {partial.consistency?.value === true && partial.consistency.complete === false && <li>The reasoner reported no inconsistency, but its check did not cover the unsupported constructs.</li>}
+        {partial.source_imports_complete === false && <li>Imported ontologies were not complete in the reasoner&apos;s input.</li>}
+      </ul>
+    </Disclosure>
+  );
+}
+
+/** How the partial ELK parents differ from the asserted ones for the focused entity. */
+function BasisDifference({ focus, partialParents, complete }: { focus: EntityRef; partialParents: HierarchyEdge[]; complete: boolean }) {
+  const workspace = useWorkspace();
+  const asserted = useAsync(`${workspace.key}|p|${focus.ontology_version_id}|${focus.kind}|${focus.iri}|literal_asserted`, (signal) => workspace.hierarchy(focus, "parents", "literal_asserted", null, signal));
+  if (!asserted.data || asserted.data.next_cursor || !complete) return null;
+  const assertedParents = new Set(asserted.data.items.filter((edge) => edge.child.iri === focus.iri).map((edge) => `${edge.parent.kind}|${edge.parent.iri}`));
+  const partial = new Set(partialParents.map((edge) => `${edge.parent.kind}|${edge.parent.iri}`));
+  const added = [...partial].filter((key) => !assertedParents.has(key)).length;
+  const notReturned = [...assertedParents].filter((key) => !partial.has(key)).length;
+  return (
+    <p className="meta basis-difference" role="note">
+      {added === 0 && notReturned === 0
+        ? "Same parents as Asserted."
+        : [added ? `${added} ${added === 1 ? "parent" : "parents"} not asserted` : null, notReturned ? `${notReturned} asserted ${notReturned === 1 ? "parent" : "parents"} not returned by ELK (unknown, not removed)` : null].filter(Boolean).join(" · ")}
+    </p>
+  );
+}
+
+/** Paginated typed entry points for the current mode; choosing one focuses it. */
+function EntryPoints({ ontology, kind, basis, side, onFocus, onSingle }: { ontology: string; kind: EntityKind; basis: Basis; side: "source" | "target"; onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void; onSingle?: (entity: EntityRef) => void }) {
+  const workspace = useWorkspace();
+  const first = useAsync(`${workspace.key}|entry|${ontology}|${kind}|${basis}`, (signal) => workspace.entryPoints!(ontology, kind, basis, null, signal));
+  // One entry: select it and show its children (21 F06). Several: the list stays the choice.
+  useEffect(() => {
+    if (onSingle && first.data && first.data.items.length === 1 && !first.data.next_cursor) onSingle(first.data.items[0].entity);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [first.data]);
+  const loadMore = useCallback((cursor: string, signal: AbortSignal) => workspace.entryPoints!(ontology, kind, basis, cursor, signal), [workspace, ontology, kind, basis]);
+  const pages = useContinuation(first.data, loadMore, (item: EntryPointItem) => `${item.entity.kind}|${item.entity.iri}`);
+  const label = useLabelLookup(ontology, pages.items.filter((item) => !item.preferred_label?.value).map((item) => item.entity.iri));
+  return (
+    <div className="entry-points">
+      {first.error ? <ErrorNote error={first.error} onRetry={first.reload} what="Top-level entries" /> : null}
+      {!first.data && !first.error ? <Skeleton lines={2} title={false} /> : null}
+      {first.data && !pages.items.length && <EmptyReason status={first.data.status} what="top-level entries" reason={first.data.reason} absent={isPartial(basis) ? "ELK returned no top-level entries here." : "No top-level entries shown."} />}
+      {pages.items.length > 0 && (
+        <ul className="child-list">
+          {pages.items.map((item) => (
+            <li key={`${item.entity.kind}|${item.entity.iri}`}>
+              <button type="button" className={`tree-label tree-${side}`} onClick={() => onFocus(item.entity.iri, item.entity.kind, "search")}>
+                {item.preferred_label?.value ?? label(item.entity.iri)?.value ?? <span className="muted">{curie(item.entity.iri)}</span>}
+              </button>
+              <span className="iri">{curie(item.entity.iri)}</span>
+              {item.entry_kind === "component_entry" && <span className="meta">· entry to a group without a single root</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      <EdgeContinuation state={pages} noun={ENTRY_NOUN} />
+      {isPartial(basis) && first.data && pages.items.length > 0 && <p className="meta">Top-level in the ELK result: some may have parents that ELK did not return.</p>}
+    </div>
+  );
+}
+
+/** Members of the focused class's equivalence group in the partial result, when there are several. */
+function Equivalents({ focus, count, basis }: { focus: EntityRef; count: number; basis: Basis }) {
+  const workspace = useWorkspace();
+  const page = useAsync(workspace.equivalents ? `${workspace.key}|eq|${focus.ontology_version_id}|${focus.kind}|${focus.iri}|${basis}` : null, (signal) => workspace.equivalents!(focus, basis, null, signal));
+  const others = (page.data?.items ?? []).filter((item) => item.iri !== focus.iri);
+  const label = useLabelLookup(focus.ontology_version_id, others.map((item) => item.iri));
+  return (
+    <div className="browser-section">
+      <p className="meta">
+        Equivalent in the ELK result: {count - 1} other {count - 1 === 1 ? "class" : "classes"}
+        {others.length ? ": " : ""}
+        {others.map((item, index) => (
+          <span key={item.iri}>
+            {index ? ", " : ""}
+            {label(item.iri)?.value ?? curie(item.iri)}
+          </span>
+        ))}
+      </p>
+    </div>
+  );
 }
 
 export function HierarchyBrowser({
@@ -131,7 +240,6 @@ export function HierarchyBrowser({
   pinnedIri,
   pinnedKind = "class",
   onFocus,
-  reasonerStatus,
   entityCount,
   scopeNote,
   onOpenContext,
@@ -145,7 +253,6 @@ export function HierarchyBrowser({
   pinnedIri?: string | null;
   pinnedKind?: EntityKind;
   onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void;
-  reasonerStatus?: string;
   entityCount?: number;
   scopeNote?: React.ReactNode;
   onOpenContext?: (iri: string, kind: EntityKind) => void;
@@ -153,52 +260,43 @@ export function HierarchyBrowser({
 }) {
   const workspace = useWorkspace();
   const report = useWorkspaceAction();
-  const [basis, setBasis] = useState<Basis>("literal_asserted");
+  const modeKey = `${workspace.key}|${side}|${ontology}`;
+  const [basis, setBasisState] = useState<Basis>(() => chosenModes.get(modeKey) ?? "literal_asserted");
+  const setBasis = (value: Basis) => {
+    chosenModes.set(modeKey, value);
+    setBasisState(value);
+  };
   const [modeNote, setModeNote] = useState<string | null>(null);
-  const [childPages, setChildPages] = useState<HierarchyEdge[]>([]);
-  const [childCursor, setChildCursor] = useState<string | null>(null);
-  const [childMoreError, setChildMoreError] = useState<unknown>(null);
+  const [entriesOpen, setEntriesOpen] = useState(false);
   const focus = focusIri ? { ontology_version_id: ontology, iri: focusIri, kind } : null;
-
-  const parents = useAsync(focus ? `${workspace.key}|p|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => workspace.hierarchy(focus!, "parents", basis, null, signal));
-  const children = useAsync(focus ? `${workspace.key}|c|${ontology}|${kind}|${focusIri}|${basis}` : null, (signal) => workspace.hierarchy(focus!, "children", basis, null, signal));
+  const available = (value: Basis) => basisAvailability(workspace.capabilities, ontology, kind, value);
+  const offered = offeredBases(workspace.capabilities, ontology);
+  const partialInfo = workspace.capabilities.navigationByOntology?.[ontology]?.partial ?? null;
+  // A mode chosen for a class may not apply to a property: fall back to Asserted, saying why.
+  const effective: Basis = available(basis).available ? basis : "literal_asserted";
   useEffect(() => {
-    setChildPages(children.data?.items ?? []);
-    setChildCursor(children.data?.next_cursor ?? null);
-    setChildMoreError(null);
-  }, [children.data]);
+    if (effective !== basis && focusIri) setModeNote(available(basis).reason);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [effective, basis, focusIri]);
 
-  const moreController = useRef<AbortController | null>(null);
-  useEffect(() => () => moreController.current?.abort(), [ontology, focusIri, kind, basis]);
-  const loadMoreChildren = useCallback(async () => {
-    if (!focusIri || !childCursor) return;
-    moreController.current?.abort();
-    const controller = new AbortController();
-    moreController.current = controller;
-    try {
-      const page = await workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri, kind }, "children", basis, childCursor, controller.signal);
-      if (controller.signal.aborted) return;
-      setChildPages((list) => appendPage(list, page.items, edgeKey));
-      setChildCursor(page.next_cursor);
-    } catch (error) {
-      if (!controller.signal.aborted) setChildMoreError(error);
-    }
-  }, [basis, childCursor, focusIri, kind, ontology, workspace]);
-
-  const loadMoreParents = useCallback(
-    (cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri!, kind }, "parents", basis, cursor, signal),
-    [workspace, ontology, focusIri, kind, basis],
-  );
+  const parents = useAsync(focus ? `${workspace.key}|p|${ontology}|${kind}|${focusIri}|${effective}` : null, (signal) => workspace.hierarchy(focus!, "parents", effective, null, signal));
+  const children = useAsync(focus ? `${workspace.key}|c|${ontology}|${kind}|${focusIri}|${effective}` : null, (signal) => workspace.hierarchy(focus!, "children", effective, null, signal));
+  // Cursors are bound to their query and basis; each base page starts its own continuation.
+  const loadMoreParents = useCallback((cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri!, kind }, "parents", effective, cursor, signal), [workspace, ontology, focusIri, kind, effective]);
+  const loadMoreChildren = useCallback((cursor: string, signal: AbortSignal) => workspace.hierarchy({ ontology_version_id: ontology, iri: focusIri!, kind }, "children", effective, cursor, signal), [workspace, ontology, focusIri, kind, effective]);
   const parentPages = useContinuation(parents.data, focusIri ? loadMoreParents : null, edgeKey);
+  const childPages = useContinuation(children.data, focusIri ? loadMoreChildren : null, edgeKey);
   const parentEdges = parentPages.items.filter((edge) => edge.child.iri === focusIri);
-  const label = useLabelLookup(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childPages.map((edge) => edge.child.iri)].filter(Boolean));
-  const prepared = (value: Basis) =>
-    workspace.kind === "exploration" ? value !== "reasoner_inferred" || reasonerStatus === "available" : workspace.capabilities.bases.includes(value);
+  const childEdges = childPages.items.filter((edge) => edge.parent.iri === focusIri);
+  const label = useLabelLookup(ontology, [focusIri ?? "", pinnedIri ?? "", ...parentEdges.map((edge) => edge.parent.iri), ...childEdges.map((edge) => edge.child.iri)].filter(Boolean));
   const Heading = headingLevel === 2 ? "h2" : "h3";
   const Sub = headingLevel === 2 ? "h3" : "h4";
   const sideName = side === "source" ? "Source" : "Target";
   const partialScope = workspace.capabilities.navigation === "partial";
   const away = Boolean(pinnedIri && focusIri && (pinnedIri !== focusIri || pinnedKind !== kind));
+  const entryPoints = Boolean(workspace.entryPoints) && workspace.capabilities.navigationByOntology?.[ontology]?.entryPoints === "available";
+  const semantics = (parents.data as HierarchyPage | null)?.entity_semantics ?? null;
+  const optionNote = BASIS_OPTIONS.find((option) => option.value === effective)?.note;
 
   return (
     <section className={`card browser browser-${side}`} aria-label={`${sideName} ontology browser`}>
@@ -232,33 +330,60 @@ export function HierarchyBrowser({
             onFocus(item.entity.iri, item.entity.kind, "search");
           }}
         />
-        <div className="basis-group" role="radiogroup" aria-label="Relationships shown">
-          {BASES.map((option) => {
-            const disabled = !prepared(option.value);
+        <div
+          className="basis-group"
+          role="radiogroup"
+          aria-label="Relationships shown"
+          onKeyDown={(event) => {
+            // The ARIA radio pattern: arrows move between modes and choose an available one.
+            const step = event.key === "ArrowRight" || event.key === "ArrowDown" ? 1 : event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 0;
+            if (!step) return;
+            event.preventDefault();
+            const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("[role=radio]"));
+            const at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+            const next = buttons[(Math.max(0, at) + step + buttons.length) % buttons.length];
+            next?.focus();
+            next?.click();
+          }}
+        >
+          {offered.map((value) => {
+            const option = BASIS_OPTIONS.find((item) => item.value === value)!;
+            const state = available(value);
             return (
               <button
-                key={option.value}
+                key={value}
                 type="button"
                 role="radio"
-                aria-checked={basis === option.value}
-                aria-disabled={disabled}
-                className={basis === option.value ? "basis-option on" : disabled ? "basis-option unavailable" : "basis-option"}
+                aria-checked={effective === value}
+                aria-disabled={!state.available}
+                tabIndex={effective === value || (!offered.includes(effective) && value === offered[0]) ? 0 : -1}
+                className={effective === value ? "basis-option on" : !state.available ? "basis-option unavailable" : "basis-option"}
                 onClick={() => {
-                  if (disabled) {
-                    setModeNote(option.unavailable);
+                  if (!state.available) {
+                    setModeNote(state.reason);
                     return;
                   }
                   setModeNote(null);
-                  setBasis(option.value);
+                  setBasis(value);
                 }}
               >
                 {option.label}
-                {disabled ? <span className="sr-only"> (not prepared)</span> : null}
+                {!state.available ? <span className="sr-only"> (not available: {state.reason})</span> : null}
               </button>
             );
           })}
         </div>
-        <p className="meta" aria-live="polite">{modeNote ?? BASES.find((option) => option.value === basis)?.note}</p>
+        <p className="meta" aria-live="polite">
+          {modeNote ?? optionNote}
+        </p>
+        {isPartial(effective) && partialInfo && <PartialDetails partial={partialInfo} />}
+        {entryPoints && (
+          <div className="entry-toggle">
+            <button type="button" className="btn btn-quiet btn-sm" aria-expanded={entriesOpen} onClick={() => setEntriesOpen((value) => !value)}>
+              {entriesOpen ? "Hide top-level classes" : kind === "class" ? "Top-level classes" : `Top-level ${KIND_NAMES[kind]}s`}
+            </button>
+          </div>
+        )}
       </div>
       {scopeNote}
       {partialScope && (
@@ -266,10 +391,28 @@ export function HierarchyBrowser({
           {workspace.capabilities.scopeNote ?? "Only part of this ontology is available here."}
         </p>
       )}
-      {!focusIri ? (
-        <div className="browser-body">
-          <p className="note">Search for an entity to start browsing this ontology.</p>
+      {entryPoints && (entriesOpen || !focusIri) && (
+        <div className="browser-section">
+          <Sub className="eyebrow">Top-level {kind === "class" ? "classes" : `${KIND_NAMES[kind]}s`}</Sub>
+          <EntryPoints
+            ontology={ontology}
+            kind={kind}
+            basis={effective}
+            side={side}
+            onFocus={(iri, entityKind, via) => {
+              setEntriesOpen(false);
+              onFocus(iri, entityKind, via);
+            }}
+            onSingle={!focusIri ? (entity) => onFocus(entity.iri, entity.kind, "search") : undefined}
+          />
         </div>
+      )}
+      {!focusIri ? (
+        !entryPoints && (
+          <div className="browser-body">
+            <p className="note">Search for an entity to start browsing this ontology.</p>
+          </div>
+        )
       ) : (
         <div className="browser-body">
           <div className="browser-section">
@@ -278,22 +421,23 @@ export function HierarchyBrowser({
               {parents.data && (
                 <span className="meta">
                   {parentEdges.length
-                    ? `${parentEdges.length}${parentPages.complete ? "" : parentPages.total != null ? ` of ${parentPages.total}` : " shown"}${parentEdges.length > 1 || (parentPages.total ?? 0) > 1 ? " · multiple inheritance" : ""}${parents.data.status === "partial" ? " · more may exist" : ""}`
+                    ? `${parentEdges.length}${parentPages.complete ? "" : parentPages.total != null ? ` of ${parentPages.total}` : " shown"}${parentEdges.length > 1 || (parentPages.total ?? 0) > 1 ? " · multiple inheritance" : ""}${parents.data.status === "partial" && !isPartial(effective) ? " · more may exist" : ""}`
                     : ""}
                 </span>
               )}
             </div>
             {parents.error ? <ErrorNote error={parents.error} onRetry={parents.reload} what="Parents" /> : null}
             {!parents.data && !parents.error ? <Skeleton lines={2} title={false} /> : null}
-            {parents.data && !parentEdges.length && <EmptyReason status={parents.data.status} what="parents" reason={parents.data.reason} absent="No parent shown." />}
+            {parents.data && !parentEdges.length && <Empty page={parents.data} basis={effective} what="parents" />}
             {parentEdges.length > 0 && (
               <ul className="tree">
                 {parentEdges.map((edge) => (
-                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={basis} depth={0} onFocus={onFocus} side={side} />
+                  <ParentBranch key={edge.id} ontology={ontology} iri={edge.parent.iri} kind={edge.parent.kind} basis={effective} depth={0} onFocus={onFocus} side={side} />
                 ))}
               </ul>
             )}
             <EdgeContinuation state={parentPages} noun={PARENT_NOUN} />
+            {isPartial(effective) && focus && parents.data && <BasisDifference focus={focus} partialParents={parentEdges} complete={parentPages.complete} />}
           </div>
 
           <div className={`focus-card focus-${side}`} tabIndex={-1} aria-label={`Focused ${KIND_NAMES[kind]}: ${label(focusIri)?.value ?? curie(focusIri)}`}>
@@ -308,22 +452,19 @@ export function HierarchyBrowser({
               </div>
             )}
           </div>
+          {isPartial(effective) && focus && semantics && semantics.equivalent_entity_count > 1 && <Equivalents focus={focus} count={semantics.equivalent_entity_count} basis={effective} />}
 
           <div className="browser-section">
             <div className="section-head">
               <Sub className="eyebrow">Children</Sub>
-              {children.data && (
-                <span className="meta">
-                  {childPages.length ? (children.data.total_count != null ? `${childPages.length} of ${children.data.total_count}` : `${childPages.length} shown${children.data.status === "partial" ? " · more may exist" : ""}`) : ""}
-                </span>
-              )}
+              {children.data && childEdges.length > 0 && <span className="meta">{shownText(childEdges.length, childPages.total, childPages.hasMore, CHILD_NOUN)}</span>}
             </div>
             {children.error ? <ErrorNote error={children.error} onRetry={children.reload} what="Children" /> : null}
             {!children.data && !children.error ? <Skeleton lines={2} title={false} /> : null}
-            {children.data && !childPages.length && <EmptyReason status={children.data.status} what="children" reason={children.data.reason} absent="No children shown." />}
-            {childPages.length > 0 && (
+            {children.data && !childEdges.length && <Empty page={children.data} basis={effective} what="children" />}
+            {childEdges.length > 0 && (
               <ul className="child-list">
-                {childPages.map((edge) => (
+                {childEdges.map((edge) => (
                   <li key={edge.id}>
                     <button type="button" className={`tree-label tree-${side}`} data-tour={`child-${side}`} onClick={() => onFocus(edge.child.iri, edge.child.kind, "child")}>
                       {label(edge.child.iri)?.value ?? <span className="muted">{curie(edge.child.iri)}</span>}
@@ -335,12 +476,7 @@ export function HierarchyBrowser({
                 ))}
               </ul>
             )}
-            {childMoreError ? <ErrorNote error={childMoreError} onRetry={loadMoreChildren} /> : null}
-            {childCursor && (
-              <button type="button" className="btn btn-sm" onClick={loadMoreChildren}>
-                Load next 50 children
-              </button>
-            )}
+            <EdgeContinuation state={childPages} noun={CHILD_NOUN} />
           </div>
         </div>
       )}

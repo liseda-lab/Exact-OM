@@ -18,6 +18,9 @@ export interface Question {
   /** exact-study/2.0: explicit presentation order of option and matrix-row codes (16 B5). */
   option_order?: string[];
   row_order?: string[];
+  /** exact-study-forms/3: bounds for a free-text answer (a required Other name needs ≥ 1). */
+  text_min_length?: number;
+  text_max_length?: number;
 }
 
 export interface Forms {
@@ -26,6 +29,45 @@ export interface Forms {
   consultation: Question[];
   final: Question[];
   experience_note?: string;
+  /** exact-study-forms/3 (22 B06): setup familiarity questions and the study-methods/3 codebook. */
+  setup?: Question[];
+  method_version?: string;
+  method_dictionary?: Record<string, string>;
+  collection_notice?: string;
+}
+
+/** The negotiated review protocol this build implements (23 C04, 22 B06). */
+export const REVIEW_CLIENT_CONTRACT = "study-review/1";
+export const FORMS_V3 = "exact-study-forms/3";
+
+/**
+ * The forms generation of a version: `exact-study-forms/N`, or a component variant of it
+ * (`exact-study-forms/N-<variant>`, frozen per publication from its admitted components).
+ */
+export function formsGeneration(version: string | null | undefined): number | null {
+  const match = /^exact-study-forms\/(\d+)(?:-[A-Za-z0-9._-]+)?$/.exec(version ?? "");
+  return match ? Number(match[1]) : null;
+}
+
+/** Protocol versions this build can render; anything else fails visibly before collecting answers. */
+export const SUPPORTED_PROTOCOL: Record<string, (version: string | undefined) => boolean> = {
+  forms: (version) => version === undefined || [1, 2, 3].includes(formsGeneration(version) ?? 0),
+  setup: (version) => [undefined, "setup/2", "setup/3"].includes(version),
+  consultation: (version) => [undefined, "consultation/3"].includes(version),
+  methods: (version) => [undefined, "study-methods/3"].includes(version),
+};
+
+/** A study-review/1 session: forms/3 (or a variant of it) with setup/3, consultation/3 and study-methods/3. */
+export function isReviewProtocol(state: Pick<StudyState, "forms" | "protocol_versions">): boolean {
+  return formsGeneration(state.forms?.version) === 3 && state.protocol_versions?.methods === "study-methods/3";
+}
+
+/** Unsupported protocol versions in a state, as readable names; empty when this build can render it. */
+export function unsupportedProtocol(state: Pick<StudyState, "forms" | "protocol_versions">): string[] {
+  const versions: Record<string, string | undefined> = { ...(state.protocol_versions ?? {}), forms: state.forms?.version ?? state.protocol_versions?.forms };
+  return Object.entries(SUPPORTED_PROTOCOL)
+    .filter(([key, supported]) => !supported(versions[key]))
+    .map(([key]) => `${key} ${versions[key]}`);
 }
 
 export interface RankingResponse {
@@ -116,6 +158,22 @@ export interface StudyState extends StudyStateV2Fields {
   integration_contract?: string | null;
   /** Event types and scopes the service accepts (16 B7). */
   telemetry?: { event_types?: string[]; scopes?: string[] };
+  /** Development-review publications (22 B02): never research data. */
+  purpose?: "development_review" | null;
+  correctness_metrics?: "disabled" | null;
+  review_bundle?: ReviewBundleSummary | null;
+}
+
+/** Public About summary of a development-review bundle (exact-review-about/1). */
+export interface ReviewBundleSummary {
+  schema_version: string;
+  purpose: string;
+  title: string;
+  prepared_at: string;
+  source_count: number;
+  presented_pairs: number;
+  correctness_metrics: string;
+  [key: string]: unknown;
 }
 
 /** The runtime extension this frontend implements for exact-study/2.0 sessions. */
@@ -271,8 +329,10 @@ export interface SetupV2 {
   instructions_acknowledged: boolean;
   external_inspection_optional_understood: boolean;
   resource_access: ResourceAccess;
-  /** Optional, descriptive only: methods the participant is familiar with or expects to use. */
+  /** Optional, descriptive only: methods the participant is familiar with. Never implies use. */
   familiar_methods: string[];
+  /** setup/3: the named Other familiar methods (required only when Other is selected). */
+  familiar_other_method?: string | null;
   submitted: boolean;
   saved_at?: string;
 }
@@ -400,10 +460,13 @@ export type ResourceScope = "supplied_only" | "different_or_additional" | "unsur
 export interface ConsultationDraftV2 {
   presentation_id: string;
   form_version: string;
+  /** consultation/3 drafts and receipts carry their own version; consultation/2 omits it. */
+  consultation_version?: string;
   consulted_external_ontologies: boolean | null;
   methods: ConsultationMethod[];
-  other_editor: string | null;
-  other_resource: string | null;
+  /** consultation/2 only (historical publications). */
+  other_editor?: string | null;
+  other_resource?: string | null;
   other_method: string | null;
   resource_scope: ResourceScope | null;
   saved_at?: string;

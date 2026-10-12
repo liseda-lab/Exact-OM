@@ -6,6 +6,7 @@ import { Skeleton } from "@/components/common/ErrorNote";
 import { ExploreProvider, useExplore } from "@/components/explore/ExploreContext";
 import { AppHeader, type NavKey } from "@/components/shell/AppHeader";
 import { createApiSource } from "@/lib/workspace/apiSource";
+import { navigationFromOntology } from "@/lib/workspace/navigation";
 import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
 
 /** The exploration app reads its shared workspace from the open bundle's API. */
@@ -13,7 +14,16 @@ function ExplorationWorkspace({ children }: { children: React.ReactNode }) {
   const state = useExplore();
   const packageId = state.health?.package_id ?? "none";
   const ontologies = state.ontologies;
-  const source = useMemo(() => createApiSource({ key: `exploration|${packageId}`, ontologyName: (id) => ontologies[id]?.name ?? null }), [packageId, ontologies]);
+  const source = useMemo(
+    () =>
+      createApiSource({
+        key: `exploration|${packageId}`,
+        ontologyName: (id) => ontologies[id]?.name ?? null,
+        // Per-ontology navigation: entry points, complete-only and partial ELK inference (23 C02).
+        navigation: Object.fromEntries(Object.values(ontologies).map((meta) => [meta.ontology_version_id, navigationFromOntology(meta.capabilities as Record<string, unknown>)])),
+      }),
+    [packageId, ontologies],
+  );
   return <WorkspaceProvider source={source}>{children}</WorkspaceProvider>;
 }
 

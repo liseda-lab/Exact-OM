@@ -34,7 +34,8 @@ const UNRECORDED = "historical_stage_record_not_exported";
 /** Short meaning of one recorded event, and whether the code was recognised. */
 export function eventMeaning(event: TraceEventLike): { text: string; known: boolean } {
   const { stage, status, outcome, reason_code: code } = event;
-  if (status === "not_recorded" || code === UNRECORDED) return { text: "No record in this run", known: true };
+  // The bundle's decision log has no record of the stage: never claimed as something the run did not do.
+  if (status === "not_recorded" || code === UNRECORDED) return { text: "Not recorded in this bundle", known: true };
   if (stage === "prefilter") {
     if (code === "exact_match_protected") return { text: "Matched by exact matching", known: true };
     if (code === "exact_source_prefiltered") return { text: "Another candidate was chosen by exact matching", known: true };
@@ -79,11 +80,11 @@ export function routeSummary(events: TraceEventLike[]): { route: TraceRoute; tex
   const skipped = events.some((event) => event.stage !== "prefilter" && event.reason_code === "exact_match_protected");
   if (events.some((event) => event.stage === "prefilter" && event.reason_code === "exact_match_protected"))
     return { route: "exact", text: skipped ? "Matched by exact matching. The scoring stages were skipped for this pair, as intended for an exact match." : "Matched by exact matching." };
-  if (!prefilter) return { route: "unknown", text: "This run has no exact-matching record for this pair." };
+  if (!prefilter) return { route: "unknown", text: "This bundle has no exact-matching record for this pair." };
   if (prefilter.reason_code === "exact_source_prefiltered") return { route: "exact_other", text: "Not scored: exact matching chose another candidate for this source." };
   if (prefilter.reason_code === "prefilter_retained") return { route: "scored", text: "Scored route: no exact match was used, and this pair continued to scoring." };
   if (prefilter.reason_code === "prefilter_disabled" || prefilter.status === "not_run") return { route: "exact_not_used", text: "Exact matching was not used in this run; the pair was scored." };
-  if (prefilter.status === "not_recorded" || prefilter.reason_code === UNRECORDED) return { route: "unrecorded", text: "This run kept no record of exact matching for this pair." };
+  if (prefilter.status === "not_recorded" || prefilter.reason_code === UNRECORDED) return { route: "unrecorded", text: "This bundle has no record of exact matching for this pair." };
   return { route: "unknown", text: "The exact-matching record for this pair has an unrecognised code; see the technical details." };
 }
 
@@ -113,7 +114,7 @@ export function groupTrace<E extends TraceEventLike>(events: E[]): TraceItem<E>[
 }
 
 export const GROUP_TEXT: Record<"unrecorded" | "skipped_exact" | "removed_exact", string> = {
-  unrecorded: "No record in this run",
+  unrecorded: "Not recorded in this bundle",
   skipped_exact: "Skipped: matched by exact matching",
   removed_exact: "Not run: another candidate was chosen by exact matching",
 };

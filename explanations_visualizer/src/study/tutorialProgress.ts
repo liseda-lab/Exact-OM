@@ -19,13 +19,14 @@ export type LessonSignal =
   | { kind: "workspace"; action: WorkspaceAction; entity?: EntityRef; candidateId?: string | null }
   | { kind: "practice_check"; partial: boolean }
   | { kind: "downloads" }
-  | { kind: "report"; consulted: boolean; methods: number; methodCodes?: string[] };
+  /** `otherMethod`: the named Other methods (study-methods/3 practice reports need one when Other is selected). */
+  | { kind: "report"; consulted: boolean; methods: number; methodCodes?: string[]; otherMethod?: string | null };
 
 export interface TutorialActionEvidence {
   requirement_id: string; action: RequirementAction;
   candidate_id?: string; entity?: EntityRef; fact_id?: string;
   ranked_candidate_ids?: string[]; response_type?: string | null;
-  methods?: string[]; asset_ids?: string[];
+  methods?: string[]; other_method?: string; asset_ids?: string[];
 }
 
 const FACT_ACTIONS = new Set<RequirementAction>(["open_citation", "open_original_axiom", "locate_in_evidence_list", "inspect_graph_or_list"]);
@@ -76,7 +77,15 @@ export function evidenceFor(lesson: TutorialLesson, signal: LessonSignal, tutori
       evidence.response_type = (practice?.response_type as string | null | undefined) ?? null;
     }
     if (signal.kind === "downloads") evidence.asset_ids = tutorial.case.ontology_resources.map((asset) => asset.asset_id);
-    if (signal.kind === "report") evidence.methods = signal.methodCodes ?? [];
+    if (signal.kind === "report") {
+      evidence.methods = signal.methodCodes ?? [];
+      const named = signal.otherMethod?.trim();
+      if (evidence.methods.includes("other_method")) {
+        // The service rejects a practice report naming no Other method; never send one.
+        if (!named) return [];
+        evidence.other_method = named.slice(0, 160);
+      }
+    }
     if (signal.kind === "workspace") {
       const event = signal.action;
       if (event.type === "hierarchy_focus") {

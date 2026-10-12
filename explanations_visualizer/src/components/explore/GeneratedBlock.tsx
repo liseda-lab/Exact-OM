@@ -7,10 +7,11 @@
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/common/ErrorNote";
+import { profileView, referencedLabelSubjects } from "@/lib/descriptionPresentation";
 import { useFactInspector } from "@/components/workspace/FactInspector";
 import { useSideOf } from "@/lib/workspace/WorkspaceContext";
-import { shortHash } from "@/lib/iri";
-import type { Claim, EntityRef } from "@/lib/types";
+import { curie, shortHash } from "@/lib/iri";
+import type { Claim, EntityRef, GeneratedExplanation } from "@/lib/types";
 import type { AsyncState } from "@/lib/useAsync";
 import type { ExplanationProvenance, ExplanationResult } from "@/lib/workspace/types";
 
@@ -74,6 +75,25 @@ export function Citations({
   );
 }
 
+/** Resolve citations to labels of referenced entities from the artifact itself ("Label of DOID:7505"). */
+export function withReferencedLabels(cite: (factId: string) => CitedFact | undefined, explanation: GeneratedExplanation): (factId: string) => CitedFact | undefined {
+  const referenced = referencedLabelSubjects(explanation);
+  if (!referenced.size) return cite;
+  return (factId) => {
+    const known = cite(factId);
+    if (known) return known;
+    const subject = referenced.get(factId);
+    return subject ? { label: `Label of ${curie(subject.iri)}` } : undefined;
+  };
+}
+
+const SUPPORT_NAMES: Record<string, string> = {
+  independently_reviewed: "Generated text, independently reviewed sentence by sentence",
+  typed_template_support: "A fixed reading of the original axioms (no language model)",
+  exact_support: "Exact quotations of original records",
+  fallback: "Original facts only; no description could be prepared",
+};
+
 /** One "Sources and preparation" disclosure per generated block: model, checks and limits (21 F04). */
 export function ProvenanceDetails({ provenance, limitations = [], note }: { provenance: ExplanationProvenance; limitations?: string[]; note?: string }) {
   const [open, setOpen] = useState(false);
@@ -96,25 +116,45 @@ export function ProvenanceDetails({ provenance, limitations = [], note }: { prov
               <dd>{limitations.join(" ")}</dd>
             </div>
           )}
+          {provenance.supportStatus && (
+            <div>
+              <dt>Prepared as</dt>
+              <dd>{SUPPORT_NAMES[provenance.supportStatus] ?? provenance.supportStatus.replace(/_/g, " ")}</dd>
+            </div>
+          )}
+          {provenance.supportReasons && provenance.supportReasons.length > 0 && (
+            <div>
+              <dt>Notes</dt>
+              <dd>{provenance.supportReasons.join(" ")}</dd>
+            </div>
+          )}
           {provenance.kind === "manifest" ? (
-            <>
+            // A deterministic rendering names its renderer, not a model it never used.
+            provenance.provider ? (
+              <>
+                <div>
+                  <dt>Model</dt>
+                  <dd>
+                    {provenance.returnedModel ?? provenance.requestedModel ?? "not recorded"} · {provenance.provider}
+                  </dd>
+                </div>
+                {provenance.reviewerKind && (
+                  <div>
+                    <dt>Review</dt>
+                    <dd>Each sentence was checked against its cited original records by an independent reviewer ({provenance.reviewerKind.replace(/_/g, " ")}); rejected sentences are not shown.</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>Language</dt>
+                  <dd>{provenance.language || "not recorded"}</dd>
+                </div>
+              </>
+            ) : (
               <div>
-                <dt>Model requested</dt>
-                <dd>{provenance.requestedModel || "not recorded"}</dd>
+                <dt>Renderer</dt>
+                <dd>{provenance.renderRevision ?? provenance.requestedModel ?? "not recorded"} · no language model</dd>
               </div>
-              <div>
-                <dt>Model returned</dt>
-                <dd>{provenance.returnedModel ?? "not recorded"}</dd>
-              </div>
-              <div>
-                <dt>Provider</dt>
-                <dd>{provenance.provider ?? "not recorded"}</dd>
-              </div>
-              <div>
-                <dt>Language</dt>
-                <dd>{provenance.language || "not recorded"}</dd>
-              </div>
-            </>
+            )
           ) : (
             <>
               <div>
@@ -152,10 +192,13 @@ export function GeneratedProfile({
   state,
   subject,
   cite,
+  definitionNote = null,
 }: {
   state: AsyncState<ExplanationResult>;
   subject: EntityRef;
   cite: (factId: string) => CitedFact | undefined;
+  /** No original definition is shown for this entity: this description is the primary meaning area (21 F05). */
+  definitionNote?: string | null;
 }) {
   if (state.error) return <ErrorNote error={state.error} onRetry={state.reload} what="Generated description" />;
   if (!state.data) return <div className="generated generated-loading" aria-busy="true" />;
@@ -176,22 +219,27 @@ export function GeneratedProfile({
     );
   }
   const explanation = data.explanation;
+  const view = profileView(explanation);
+  const citeFact = withReferencedLabels(cite, explanation);
   return (
-    <section className="generated" aria-label="Generated description">
+    <section className={definitionNote ? "generated generated-primary" : "generated"} aria-label={view.title}>
       <div className="generated-head">
-        <h3 className="generated-title">Generated description</h3>
-        <span className="origin-tag origin-generated">Generated</span>
+        <h3 className="generated-title">{view.title}</h3>
+        <span className={`origin-tag origin-${view.tag.tone}`}>{view.tag.text}</span>
       </div>
-      {explanation.claims.length === 0 && <p className="meta">The generator made no claim it could support from the available facts.</p>}
+      {definitionNote && <p className="meta">{definitionNote}</p>}
+      {view.intro && <p className="meta">{view.intro}</p>}
+      {view.unavailable && <p className="meta">No description was prepared.{explanation.support_reasons?.length ? ` ${explanation.support_reasons.join(" ")}` : ""}</p>}
+      {!view.unavailable && explanation.claims.length === 0 && <p className="meta">No statement could be supported from the available facts.</p>}
       <ul className="claim-list">
         {explanation.claims.map((claim, index) => (
           <li key={claim.claim_id ?? index} className="claim">
             <span className="claim-text">{claim.text}</span>
-            <Citations claim={claim} ontologies={data.factOntologies} subject={subject} cite={cite} />
+            <Citations claim={claim} ontologies={data.factOntologies} subject={subject} cite={citeFact} />
           </li>
         ))}
       </ul>
-      <ProvenanceDetails provenance={data.provenance} limitations={explanation.limitations} />
+      <ProvenanceDetails provenance={data.provenance} limitations={explanation.limitations} note={explanation.presentation?.scope_note} />
     </section>
   );
 }

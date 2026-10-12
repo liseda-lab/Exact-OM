@@ -53,7 +53,7 @@ export function ResourceList({
           <span className="download-name">{asset.title || asset.asset_id}</span>
           <span className="meta">
             {roleText(asset)}
-            {asset.version_label ? ` · version ${asset.version_label}` : ""} · {FORMATS[asset.media_type] ?? asset.media_type} · {formatBytes(asset.size_bytes)}
+            {asset.version_label ? ` · version ${/^sha256:[0-9a-f]{64}$/.test(asset.version_label) ? shortHash(asset.version_label, 12) : asset.version_label}` : ""} · {FORMATS[asset.media_type] ?? asset.media_type} · {formatBytes(asset.size_bytes)}
           </span>
           {!compact && (
             <span className="download-hash">

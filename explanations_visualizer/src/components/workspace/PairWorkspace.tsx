@@ -56,26 +56,55 @@ export interface RevealRequest {
   nonce: number;
 }
 
-const prefersReducedMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-
 /**
  * Reveal-and-focus for explicit cross-section actions (21 F03): wait until the destination is
  * mounted, scroll it into view below the sticky headers (scroll-padding) and move focus there.
+ * Content above it (cards, descriptions) may still be loading, so the destination is held in
+ * place until the page settles or the person scrolls, clicks, touches or types.
  * Never called for async data, label refreshes or autosaves.
  */
 export function revealElement(element: HTMLElement | null, focusTarget?: HTMLElement | null) {
   if (!element) return false;
-  element.scrollIntoView({ block: "start", behavior: prefersReducedMotion() ? "auto" : "smooth" });
+  element.scrollIntoView({ block: "start", behavior: "auto" });
   const target = focusTarget ?? element;
   if (target.tabIndex < 0 && !target.matches("a[href], button, input, select, textarea, [tabindex]")) target.setAttribute("tabindex", "-1");
   target.focus({ preventScroll: true });
+  holdInView(element);
   return true;
+}
+
+const HOLD_MS = 3000;
+const INTERACTIONS = ["wheel", "touchstart", "pointerdown", "keydown"] as const;
+
+/** Keep a revealed element where it was placed while late content shifts the layout. */
+function holdInView(element: HTMLElement) {
+  const placed = element.getBoundingClientRect().top;
+  const deadline = performance.now() + HOLD_MS;
+  let frame = 0;
+  const stop = () => {
+    cancelAnimationFrame(frame);
+    INTERACTIONS.forEach((name) => window.removeEventListener(name, stop, true));
+  };
+  INTERACTIONS.forEach((name) => window.addEventListener(name, stop, { capture: true, passive: true }));
+  const tick = () => {
+    if (!element.isConnected || performance.now() > deadline) return stop();
+    if (Math.abs(element.getBoundingClientRect().top - placed) > 4) element.scrollIntoView({ block: "start", behavior: "auto" });
+    frame = requestAnimationFrame(tick);
+  };
+  frame = requestAnimationFrame(tick);
 }
 
 export interface ExtraTab {
   key: string;
   label: string;
   render: () => React.ReactNode;
+}
+
+/** Why the graph is empty, by the evidence status; an unexported selection is not "no features" (22 B05). */
+export function emptyGraphText(status: string | null | undefined): string {
+  if (status === "not_exported" || status === "not_requested") return "Exact's selected evidence for this pair was not exported, so there is nothing to draw. Whether features were selected is not recorded here.";
+  if (status === "filtered") return "This view's information policy withholds the selected evidence, so there is nothing to draw.";
+  return "Exact selected no features for this pair, so there is nothing to draw.";
 }
 
 /** Map every fact visible in the two contexts to a short citation label. */
@@ -170,11 +199,12 @@ export function PairWorkspace({
     if (!revealing || activeTab !== revealing.tab) return;
     let frames = 0;
     let handle = 0;
-    // The panel and its data mount over a few frames; stop after ~1 s if the target never appears.
+    // The panel and its data mount over a few frames (a real trace can take longer); stop after
+    // ~3 s if the target never appears and reveal the panel itself.
     const attempt = () => {
       const region = details.current;
       const element = revealing.target ? region?.querySelector<HTMLElement>(revealing.target) ?? null : null;
-      if (revealing.target && !element && frames++ < 60) {
+      if (revealing.target && !element && frames++ < 180) {
         handle = requestAnimationFrame(attempt);
         return;
       }
@@ -274,7 +304,6 @@ export function PairWorkspace({
                               pinnedKind={entity.kind}
                               onFocus={focusFrom(side)}
                               onOpenContext={components.has("original_context") ? openContext(side) : undefined}
-                              reasonerStatus={workspace.capabilities.reasoner}
                               headingLevel={3}
                             />
                           );
@@ -306,6 +335,7 @@ export function PairWorkspace({
                           source={source}
                           target={target}
                           bundle={evidence.data}
+                          pair={pair}
                           viewKey={`${workspace.key}|${viewKey}`}
                           selected={selectedEvidence}
                           onSelect={setSelectedEvidence}
@@ -320,7 +350,16 @@ export function PairWorkspace({
                           }
                         />
                       ) : (
-                        <EvidenceList state={evidence} />
+                        // A truthful compact empty state with a way to keep exploring (21 F08).
+                        <div className="graph-empty">
+                          <p className="empty-reason">{emptyGraphText(evidence.data.status)}</p>
+                          {evidence.data.reason && <p className="meta">{evidence.data.reason}</p>}
+                          {components.has("hierarchy") && (
+                            <button type="button" className="btn btn-sm" onClick={() => onTab("hierarchy")}>
+                              Explore both concepts in Hierarchy
+                            </button>
+                          )}
+                        </div>
                       )
                     ) : (
                       <EvidenceList state={evidence} />
