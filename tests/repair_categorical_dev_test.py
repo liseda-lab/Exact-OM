@@ -91,7 +91,8 @@ def record(slot, p, a):
         swapped=slot["swapped"],
         request_id=slot["id"],
         attempt=1,
-        response=dict(sha256=slot["id"]),
+        response=dict(sha256="artifact-" + slot["id"]),
+        raw_sha256="raw-" + slot["id"],
         assessment=dev.assess(a, p, slot["swapped"]),
     )
 
@@ -216,3 +217,42 @@ def test_cache_write_price_is_included(plan, tmp_path):
         cost["input_token_upper_bound"] * (cost["input_usd_per_token"] + 0.000004)
         + cost["reserved_output_tokens"] * cost["output_usd_per_token"]
     )
+
+
+def test_native_rating_range_and_nested_receipt_hashes(plan):
+    p = dev.packet_for(plan["slots"][0])
+    a = answer()
+    b = answer("B")
+    for row in b["criteria"].values():
+        row.update(a="mixed", b="full")
+    b["criteria"]["collateral_fidelity"]["b"] = "limited"
+    policy = dict(revision="per_criterion_median/v1", minimum_ratings=1, max_criterion_range=0.25)
+    rows = [record(plan["slots"][0], p, a), record(plan["slots"][1], p, b)]
+    result = dev.aggregate(plan["slots"], rows, p, policy)
+    assert result["score"] is None
+    assert result["plan_rating_aggregate"]["status"] == "disagreement_abstention"
+    assert result["receipt_hash"] == canonical_hash(
+        {k: v for k, v in result.items() if k != "receipt_hash"}
+    )
+    child = result["plan_rating_aggregate"]
+    assert child["aggregate_hash"] == canonical_hash(
+        {k: v for k, v in child.items() if k != "aggregate_hash"}
+    )
+    assert result["observations"][0]["response_sha256"].startswith("raw-")
+
+
+def test_offline_review_entrypoint_has_no_sending_or_reservation(plan, tmp_path, monkeypatch):
+    path = tmp_path / "plan.json"
+    immutable(path, plan)
+    for s in plan["slots"]:
+        immutable(tmp_path / "old" / "presentations" / s["id"] / "receipt.json", dict(slot=s["id"]))
+    monkeypatch.setattr(dev, "validate", lambda p: {})
+    monkeypatch.setattr(dev, "verify_receipt", lambda p, s, r: r)
+    monkeypatch.setattr(dev, "select_models", lambda p, o, r: dict(count=len(r)))
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError("Offline review must not send/reserve")
+
+    monkeypatch.setattr(dev, "one", forbidden)
+    monkeypatch.setattr(dev, "reserve", forbidden)
+    assert dev.review_receipts(path, tmp_path / "old", tmp_path / "new") == dict(count=2)
