@@ -22,10 +22,42 @@ MAX_INPUT_TOKENS = 12288
 MAX_OUTPUT_TOKENS = 1024
 MAX_INPUT_BYTES = 32768
 COUNTING_METHOD = "pinned_tokenizer_plus_overhead_and_utf8_cap_v1"
+DECISIONS_ENDPOINT = "https://api.openai.com/v1/decisions"
+DECISIONS_MODEL = "gpt-6-luna"
 
 
 class PromptBudgetError(RuntimeError):
     """A local prompt policy rejection; never a sent or unknown hosted request."""
+
+
+def decisions_payload_text(payload: Mapping[str, Any]) -> str:
+    """Validate the supported text predicate and count its complete wire content.
+
+    Only this explicit API contract has no generated output token allowance.
+    Images, extra questions and arbitrary fields are deliberately unsupported.
+    """
+    questions = payload.get("questions")
+    if (
+        set(payload) != {"model", "input", "questions"}
+        or payload.get("model") != DECISIONS_MODEL
+        or not isinstance(payload.get("input"), str)
+        or not payload["input"].strip()
+        or not isinstance(questions, list)
+        or len(questions) != 1
+        or not isinstance(questions[0], dict)
+        or set(questions[0]) != {"type", "name", "instructions"}
+        or questions[0].get("type") != "predicate"
+        or questions[0].get("name") != "equivalent"
+        or not isinstance(questions[0].get("instructions"), str)
+        or not questions[0]["instructions"].strip()
+    ):
+        raise PromptBudgetError("Unsupported Decisions text predicate payload")
+    text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
+    try:
+        text.encode("utf-8")
+    except UnicodeEncodeError as exc:
+        raise PromptBudgetError("Decisions text must be valid UTF-8") from exc
+    return text
 
 
 class TokenizerProfile(Protocol):
@@ -114,7 +146,7 @@ def validate_prompt_budget(
     policy = selected["policy"]
     label = f"role={role or profile.name!r} profile={profile.name!r} endpoint={endpoint!r}"
     try:
-        if endpoint not in {"chat/completions", "completions"}:
+        if endpoint not in {"chat/completions", "completions", "decisions"}:
             raise PromptBudgetError("Unsupported generation endpoint")
         common = {
             "model",
@@ -129,17 +161,25 @@ def validate_prompt_budget(
             "provider",
             "echo",
         }
-        accepted = common | ({"messages"} if endpoint == "chat/completions" else {"prompt"})
+        accepted = (
+            {"model", "input", "questions"}
+            if endpoint == "decisions"
+            else common | ({"messages"} if endpoint == "chat/completions" else {"prompt"})
+        )
         if set(payload) - accepted:
             raise PromptBudgetError("Unsupported generation fields cannot be counted safely")
         if payload.get("model") != profile.model:
             raise PromptBudgetError("Generation model differs from the selected tokenizer profile")
-        output = payload.get("max_tokens")
-        if type(output) is not int or output < 1:
+        output = 0 if endpoint == "decisions" else payload.get("max_tokens")
+        if type(output) is not int or output < (0 if endpoint == "decisions" else 1):
             raise PromptBudgetError("Hosted prompt budget requires positive integer max_tokens")
         messages = None
         prompts: list[str] = []
-        if endpoint == "chat/completions":
+        if endpoint == "decisions":
+            prompts = [decisions_payload_text(payload)]
+            batch_size = 1
+            utf8_bytes = len(prompts[0].encode("utf-8"))
+        elif endpoint == "chat/completions":
             messages = payload.get("messages")
             if not isinstance(messages, list) or not messages:
                 raise PromptBudgetError("Hosted chat budget requires nonempty text messages")
@@ -212,7 +252,7 @@ def validate_prompt_budget(
             counts = [_count_text(tokenizer, prompt, special_tokens=True) for prompt in prompts]
             raw_tokens = sum(count[0] for count in counts)
             estimate = raw_tokens + batch_size * policy["chat_overhead_tokens"]
-            method = "completion_text"
+            method = "decisions_text_predicate" if endpoint == "decisions" else "completion_text"
         if estimate > policy["max_input_tokens"]:
             raise PromptBudgetError(
                 f"Input admission estimate {estimate} exceeds limit {policy['max_input_tokens']} "

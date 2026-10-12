@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterator, Mapping
 
+from exact.llm.prompt_budget import DECISIONS_ENDPOINT, decisions_payload_text
 from exact.llm.spending_admission import (
     HostedSpendingError,
     reserve_attempt,
@@ -126,9 +127,14 @@ class RequestLedger:
 
     def cached(self, key: str) -> bytes | None:
         """Return verified raw bytes from the latest completed wire attempt."""
+        attempt = self.cached_attempt(key)
+        return None if attempt is None else attempt[1]
+
+    def cached_attempt(self, key: str) -> tuple[int, bytes] | None:
+        """Include the attempt number so interrupted usage settlement can resume."""
         with self._transaction() as db:
             row = db.execute(
-                "SELECT raw, sha256 FROM attempts WHERE request_id=? "
+                "SELECT number, raw, sha256 FROM attempts WHERE request_id=? "
                 "AND state='completed' ORDER BY number DESC LIMIT 1",
                 (key,),
             ).fetchone()
@@ -137,7 +143,7 @@ class RequestLedger:
         raw = bytes(row["raw"])
         if hashlib.sha256(raw).hexdigest() != row["sha256"]:
             raise ValueError(f"Corrupted completed OpenRouter response {key}")
-        return raw
+        return int(row["number"]), raw
 
     @contextmanager
     def request_lock(self, key: str) -> Iterator[None]:
@@ -212,7 +218,10 @@ class RequestLedger:
                     ).fetchone()[0]
                 )
                 payload = identity.get("payload", {})
-                if type(payload.get("max_tokens")) is not int or payload["max_tokens"] <= 0:
+                decisions = identity.get("endpoint") == DECISIONS_ENDPOINT
+                if decisions:
+                    decisions_payload_text(payload)
+                elif type(payload.get("max_tokens")) is not int or payload["max_tokens"] <= 0:
                     raise ValueError("Budgeted hosted requests need a finite max_tokens bound")
                 # UTF-8 bytes bound text token counts conservatively; include framing overhead.
                 prompts = payload.get("prompt")
@@ -225,7 +234,7 @@ class RequestLedger:
                 reserved = (
                     len(json.dumps(payload, ensure_ascii=False).encode())
                     + 256 * batch_size
-                    + int(payload["max_tokens"]) * batch_size * choices
+                    + (0 if decisions else int(payload["max_tokens"]) * batch_size * choices)
                 )
                 used = 0
                 for row in rows:
