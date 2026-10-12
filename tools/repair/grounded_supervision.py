@@ -238,6 +238,7 @@ def packet_admission(packet, manifest, swapped):
             swapped,
             verbatim_quotes=not manifest.get("no_verbatim_quotes", False),
             complete_criteria=manifest.get("complete_criteria", False),
+            fact_references=manifest.get("fact_references", False),
         )
     )
     if controls["reasoning"] is not None:

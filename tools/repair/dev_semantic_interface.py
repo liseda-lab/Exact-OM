@@ -18,6 +18,7 @@ from exact.repair.semantic_fidelity import (
     CITATION_PROMPT_VERSION,
     CONTRAST_PROMPT_VERSION,
     COMPLETE_PROMPT_VERSION,
+    REFERENCE_PROMPT_VERSION,
     consequence_basis_from_probes,
 )
 from tools.repair.batch import read, sha
@@ -137,16 +138,29 @@ def validate_amendment(manifest):
             CITATION_PROMPT_VERSION,
             CONTRAST_PROMPT_VERSION,
             COMPLETE_PROMPT_VERSION,
+            REFERENCE_PROMPT_VERSION,
         }
         or manifest.get("no_verbatim_quotes", False)
         != (
             manifest.get("prompt_version")
-            in {CITATION_PROMPT_VERSION, CONTRAST_PROMPT_VERSION, COMPLETE_PROMPT_VERSION}
+            in {
+                CITATION_PROMPT_VERSION,
+                CONTRAST_PROMPT_VERSION,
+                COMPLETE_PROMPT_VERSION,
+                REFERENCE_PROMPT_VERSION,
+            }
         )
         or manifest.get("theory_text_comparison", False)
-        != (manifest.get("prompt_version") in {CONTRAST_PROMPT_VERSION, COMPLETE_PROMPT_VERSION})
+        != (
+            manifest.get("prompt_version")
+            in {CONTRAST_PROMPT_VERSION, COMPLETE_PROMPT_VERSION, REFERENCE_PROMPT_VERSION}
+        )
         or manifest.get("complete_criteria", False)
-        != (manifest.get("prompt_version") == COMPLETE_PROMPT_VERSION)
+        != (manifest.get("prompt_version") in {COMPLETE_PROMPT_VERSION, REFERENCE_PROMPT_VERSION})
+        or manifest.get("intended_commitment_evidence", False)
+        != (manifest.get("prompt_version") == REFERENCE_PROMPT_VERSION)
+        or manifest.get("fact_references", False)
+        != (manifest.get("prompt_version") == REFERENCE_PROMPT_VERSION)
     ):
         raise ValueError("DEV interface correction requires explicit bound authorization")
     previous = bound(amendment["previous_manifest"])
@@ -157,7 +171,6 @@ def validate_amendment(manifest):
         "frozen_annotation_slots",
         "rubric_version",
         "criterion_weights",
-        "request_limits",
         "cost_ceiling_usd",
         "ledger_directory",
         "lineage_id",
@@ -167,6 +180,16 @@ def validate_amendment(manifest):
     ):
         if manifest[key] != previous[key]:
             raise ValueError("DEV interface amendment changed frozen design: " + key)
+    if manifest.get("evaluator_request_amendment"):
+        from tools.repair.evaluator_evidence import request_reallocation
+
+        quota, _, _ = request_reallocation(manifest)
+        if quota["old_limits"] != previous["request_limits"] or quota[
+            "previous_manifest"
+        ] != amendment.get("previous_annotation_manifest"):
+            raise ValueError("Evaluator quota amendment is outside the bound interface lineage")
+    elif manifest["request_limits"] != previous["request_limits"]:
+        raise ValueError("DEV interface amendment changed frozen design: request_limits")
     if set(manifest["cases"]) != set(previous["cases"]):
         raise ValueError("DEV interface amendment changed its case denominator")
     byte_cap = manifest["request_profiles"][manifest["profile"]]["max_input_bytes"]

@@ -214,6 +214,14 @@ def qualified_contract(manifest):
     proposal, _, previous = panel_contract(source)
     profile = selected["selected_profile"]
     revised_interface = bool(manifest.get("dev_interface_amendment"))
+    limits = selected["request_limits"]
+    if manifest.get("evaluator_request_amendment"):
+        from tools.repair.evaluator_evidence import request_reallocation
+
+        quota, _, _ = request_reallocation(manifest)
+        if quota["old_limits"] != limits:
+            raise ValueError("Evaluator quota amendment changed the teacher lineage")
+        limits = quota["new_limits"]
     if revised_interface:
         from tools.repair.dev_semantic_interface import validate_amendment
 
@@ -228,8 +236,8 @@ def qualified_contract(manifest):
         and review["phase_state"] == selected["phase_state"]
         and manifest["phase"] in {"train", "development"}
         and manifest["profile"] == manifest["teacher_profile"] == profile == source["profile"]
-        and manifest["request_limits"] == selected["request_limits"] == proposal["request_limits"]
-        and phase["request_limits"] == manifest["request_limits"]
+        and manifest["request_limits"] == limits
+        and phase["request_limits"] == selected["request_limits"] == proposal["request_limits"]
         and manifest["request_budget_amendment"] == source["request_budget_amendment"]
         and manifest["lineage_id"] == source["lineage_id"]
         and Path(manifest["ledger_directory"]).resolve()
