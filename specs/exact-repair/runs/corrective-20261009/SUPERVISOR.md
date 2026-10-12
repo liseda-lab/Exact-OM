@@ -382,3 +382,46 @@ attempts. This explicit new pilot authorization is not a daily repair allowance.
 Continue to send email only when a concrete user decision/intervention is needed,
 including an idle queue with no independent eligible work. Do not email routine
 pilot progress or ask again for permission to run these 24 authorized calls.
+
+### Reviewed pilot result and authorized successor
+
+The 24-request pilot completed successfully as step `14451.182` in117 seconds;
+all24 HTTP responses were successful. Read the bound `review.json`,
+`teacher-selection.json`, `assessor-qualification.json` and `expansion-plan.json`
+in the pilot directory. All24 preferences match the constructions. Luna and
+Gemini pass6/6 full presentations with exact swapped anchors and sound reasons;
+Haiku passes4/6 and MiniMax3/6. Haiku's zero-versus-quarter contradiction anchor
+is defensible, but its long-context explanation and swap instability are
+independent problems. MiniMax confuses omission with false assertions and one
+response has placeholder explanations. Do not infer that its existing TRAIN
+preferences are therefore all wrong. Keep original automatic results and this
+separate semantic review; do not tune the gold after observing answers.
+
+Select Luna using only the three teacher candidates. Gemini remains assessor-only.
+The pilot reported cost is$0.65409812; the retained conservative reservation is
+$3.5448534. Campaign reservations are509/704 requests and$18.3942752/$35.
+No old row, label, checkpoint or TEST record changed.
+
+The user explicitly requested expansion after qualification. The next eligible
+preparation is `prepare-categorical-dev-successor-001`, with full instructions
+in the frozen expansion plan. Reuse all six existing models and their exact
+verified final-DEV outputs; freeze a new Luna categorical annotation protocol,
+test its formal adapter and run the matched complete DEV schedule. No retraining
+is part of this immediate successor. Preserve the original selection gate.
+
+The concrete within-budget reallocation moves35 unspent TEST retry/repair slots
+to DEV: phase limits91/251/205/157, still704 total. This retains128 TEST comparison
+slots plus26 swaps (154 presentations) and3 spare attempts; it removes no TEST
+case or Conference allocation. Validate actual frozen counts/audits and record
+the quota amendment before submission. This is an operational consequence of
+the current authorized expansion, not a new scientific sample-size reduction
+or increased dollar ceiling. A successor DEV stage must end by14 October17:00UTC,
+with all earlier clocks/costs preserved. Maintain the cumulative$35 admission
+check; no automatic replay of unknown or failed pilot transmissions.
+
+The pilot implementation is small and isolated from the shared matcher router
+and supervisor implementation. Nine targeted tests and strict mypy on its two
+modules pass. All execution and next-stage preparation must continue through
+the existing detached Slurm/300-second deterministic supervisor workflow. Root
+hands back control after registering this next preparation and restarting the
+supervisor with these pinned instructions. No further routine approval is needed.
