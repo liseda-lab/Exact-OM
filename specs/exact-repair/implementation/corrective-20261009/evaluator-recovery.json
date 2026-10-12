@@ -1,17 +1,21 @@
 {
   "amendment": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/amendment.json",
-    "sha256": "c304f160527b501e5f29af89b54efae093ab03b72a1a2c96c96139b7280554f0"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-002/amendment.json",
+    "sha256": "3849a7ff9890564dda3f67641d3bcf7b2f409b50788232d26ab3c73039708c8b"
   },
   "historical_labels_unchanged": true,
   "plan": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/plan.json",
-    "sha256": "aee7e719239fff0f84e44bc06a9cf43c1f75cc30cb06d9cbf6b60e5c6f3b98d2"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-002/plan.json",
+    "sha256": "1ce407067e297fb1bb3712ba46b2124adfd0bdb1f282e64bb8e5698acacbc77c"
+  },
+  "previous_semantic_review": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/semantic-review.json",
+    "sha256": "a1440ad35e6373ba0fcf8401e3f662d7d4bfe53ba5bfb151b21624d0d1b24d3e"
   },
   "qualification_required_before_consumers": true,
   "request_reallocation": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/request-amendment.json",
-    "sha256": "acf506e457726f78d9c9dbcc1a34c808ed47f4bbb80bbc31430c975bfc153548"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-002/request-amendment.json",
+    "sha256": "3a3a9040f96312ecbe21c839ac6a02dbebe7b6e20b594eb543831a1a128cdbd0"
   },
   "schema": "exact-repair/dev-evaluator-implementation/v1",
   "selection_rule_unchanged": true,

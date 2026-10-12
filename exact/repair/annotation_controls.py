@@ -111,6 +111,7 @@ def validate_wire_controls(controls):
     if "reasoning" in controls and dict(reasoning or {}) not in (
         {"effort": "low"},
         {"enabled": False},
+        {"enabled": True},
     ):
         raise ValueError("Unsupported repair reasoning controls")
     form = controls["response_format"]

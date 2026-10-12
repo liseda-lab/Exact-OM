@@ -53,7 +53,7 @@ def wire_client(tmp_path, monkeypatch, effort):
     return fidelity.SemanticAnnotationAdapter(client.router, settings, tmp_path), calls
 
 
-@pytest.mark.parametrize("effort", [{"effort": "low"}, {"enabled": False}, None])
+@pytest.mark.parametrize("effort", [{"effort": "low"}, {"enabled": False}, {"enabled": True}, None])
 def test_actual_worker_serializes_controls_and_replays_without_payment(
     tmp_path, monkeypatch, effort
 ):
