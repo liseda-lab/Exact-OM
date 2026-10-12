@@ -12,7 +12,6 @@ from concurrent.futures import ThreadPoolExecutor
 import hashlib
 from itertools import combinations
 import json
-import math
 import os
 from pathlib import Path
 import time
@@ -26,7 +25,7 @@ from tools.repair.batch import locked, read
 from tools.repair.historical_regression import binding
 from tools.repair.shared_release import bound, immutable
 
-VERSION = "exact-repair/matched-probabilistic-judge/v1"
+VERSION = "exact-repair/matched-probabilistic-judge/v2"
 ROLE = "isolated_matched_probabilistic_qualification"
 COMMON = chat.PROMPT.split("For each plan and criterion")[0]
 TOLERANCE = 0.05  # Below one criterion's single-anchor contribution (0.25 / 3).
@@ -43,7 +42,17 @@ CHAT_PROMPT = chat.PROMPT.replace(
 
 def oriented(case, swapped):
     p = case["payload"]
-    return {**p, "plan_a": p["plan_b"], "plan_b": p["plan_a"]} if swapped else p
+    result = {**p, "plan_a": p["plan_b"], "plan_b": p["plan_a"]} if swapped else dict(p)
+    if "context" in p:
+        context = p["context"]
+        if any(context.get("plan_" + s + "_id") != p["plan_" + s]["plan_id"] for s in ("a", "b")):
+            raise ValueError("Source context identifies different plans")
+        result["context"] = {
+            **context,
+            "plan_a_id": result["plan_a"]["plan_id"],
+            "plan_b_id": result["plan_b"]["plan_id"],
+        }
+    return result
 
 
 def packet(case, stage, swapped, models):
@@ -201,8 +210,10 @@ def assessment(case, slot, receipt, gate=None):
                     r = gate["answers"].get(key, {}) if gate else {}
                     # A refusal/failed gate is unavailable, not a successful
                     # recognition that independent meaning evidence is absent.
-                    allowed_mass[key] = float(
-                        "unknown" in allowed and r.get("choice") in ("missing", "contradictory")
+                    allowed_mass[key] = (
+                        sum(r["probabilities"][k] for k in ("missing", "contradictory"))
+                        if "unknown" in allowed and r.get("choice") in ("missing", "contradictory")
+                        else 0.0
                     )
         anchor_ok = all(p > 0.5 for p in allowed_mass.values())
     canonical_scores = scores[::-1] if slot["swapped"] else scores

@@ -1,5 +1,40 @@
 # October corrective repair campaign
 
+## 12 October: matched pilot completed; neither interface qualifies for expansion
+
+The approved matched pilot completed in Slurm step `14451.191`: 72/72 responses
+received and structurally valid, zero provider failures, actual reported cost
+$0.197053855. The conservative $1.262658 reservation remains charged. The
+campaign retains all 622 reservations, $21.51803635 cumulative reserved exposure,
+the $35 ceiling, 776 total request slots and all 154 TEST slots.
+
+Read `qualification/probabilistic-judge-20261012-001/review.json` and the concise
+[results report](PROBABILISTIC-JUDGE-20261012.md). Chat passes 14/16 full control
+profiles; Decisions passes 2/16. These are strict joint criterion/preference
+checks, not pairwise accuracy rates. Chat gets all 16 control preferences right.
+Decisions assigns materially different scores to identical complete theories.
+Chat still reverses the winner on valid same-order DEV-domain repetitions.
+
+The pilot adapter had a separate defect: swapping DEV plans left the context's
+A/B plan IDs unchanged. All four affected presentations (12 requests, including
+their gates) are excluded from scientific interpretation. The version-2 adapter
+now updates both IDs and rejects inconsistent source context; 35 focused tests
+and mypy pass. Frozen version-1 requests and responses remain untouched. No
+replacement calls were made: unaffected controls already reject expansion, so
+repairing these DEV observations cannot change that qualification decision.
+The new unknown-target audit uses actual missing/contradictory probability mass;
+this changes none of the observed control counts.
+
+Preserve the existing readiness incident and repair history, six trained weights,
+saved DEV labels and TEST hold. No automatic resampling, threshold changes,
+promotion of pilot judgments or further paid annotations. This is a scientific
+qualification outcome, not a failed Slurm job or exhausted monetary budget.
+The stronger starting point is Chat, with explicit per-criterion scope and the
+corrected identity projection. Any successor must freeze its scope and grounding
+contract before calls; it must not reinterpret this pilot's gold after seeing
+responses. Root's handoff and accounting are in the same qualification directory.
+Keep action-only, deduplicated notifications and the existing empty-queue notice.
+
 ## 12 October: approved matched probabilistic evaluator qualification
 
 The user approved the reviewed plan with “Ok lets do this.” Its frozen manifest

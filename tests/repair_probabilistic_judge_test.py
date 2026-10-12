@@ -104,6 +104,45 @@ def response(wire):
     )
 
 
+@pytest.mark.parametrize("stage", ["chat", "gate", "score"])
+@pytest.mark.parametrize("swapped", [False, True])
+def test_orientation_keeps_context_and_complete_plans_consistent(tmp_path, stage, swapped):
+    plan, case, _ = fixture(tmp_path)
+    case["payload"]["plan_a"]["plan_id"] = "first-id"
+    case["payload"]["plan_b"]["plan_id"] = "second-id"
+    case["payload"]["context"] = dict(
+        plan_a_id="first-id", plan_b_id="second-id", packet_hash="source"
+    )
+    plan["models"]["chat"] = dict(profile=dict(model="chat", provider={}), reasoning={})
+    original = copy.deepcopy(case)
+    wire = p.packet(case, stage, swapped, plan["models"])
+    state = json.loads(wire["messages"][1]["content"]) if stage == "chat" else wire["state"]
+    for side in ("a", "b"):
+        assert state["context"]["plan_" + side + "_id"] == state["plan_" + side]["plan_id"]
+    assert state["plan_a"]["plan_id"] == ("second-id" if swapped else "first-id")
+    assert state["context"]["packet_hash"] == "source"
+    assert state["evidence"] == original["payload"]["evidence"]
+    assert case == original
+    case["payload"]["context"]["plan_a_id"] = "foreign"
+    with pytest.raises(ValueError, match="Source context"):
+        p.packet(case, stage, swapped, plan["models"])
+
+
+def test_unknown_gold_requires_majority_missing_or_contradictory_mass(tmp_path):
+    plan, case, slots = fixture(tmp_path)
+    case["gold"]["allowed_anchors"]["collateral_fidelity"]["a"] = ["unknown"]
+    gate_wire = read(slots[0]["packet"]["path"])
+    gate = dict(valid=True, answers=p.validate_decisions(response(gate_wire), gate_wire))
+    gate["answers"]["collateral_fidelity:a"].update(
+        choice="missing", probabilities=dict(sufficient=0.5, missing=0.5, contradictory=0)
+    )
+    wire = p.score_packet(read(slots[1]["packet"]["path"]), gate)
+    rec = dict(valid=True, answers=p.validate_decisions(response(wire), wire))
+    row = p.assessment(case, slots[1], rec, gate)
+    assert row["allowed_gold_mass"]["collateral_fidelity:a"] == 0.5
+    assert not row["anchors_valid"]
+
+
 def test_expected_score_uses_distribution_and_preserves_missing_criteria(tmp_path):
     plan, case, slots = fixture(tmp_path)
     gate_wire = read(slots[0]["packet"]["path"])
