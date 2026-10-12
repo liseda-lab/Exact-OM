@@ -1,0 +1,851 @@
+{
+  "frozen_utc": "2026-10-12T20:14:14Z",
+  "generator_self_approval": false,
+  "human_or_clinical_validation": false,
+  "plan_hash": "sha256:5a979093ad1b1b28face3cf30725d0e6cbf5e11a43c92f48ee0ca64fa4b98d19",
+  "responses": [
+    {
+      "case_id": "case-01",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:0b224fc92d90686def3c79a0e7e95575cfa5cdbb25be8a1d24224d0ffff647fb",
+          "fact_ids": [
+            "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8",
+            "sha256:698b2dd5c46603b6fd8c8311ec383c4708b19437e4f18f94cdf9e6a8ef5cb97a",
+            "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "The cited outgoing subclass axiom and both typed labels establish the necessary class inclusion without adding a clinical definition.",
+          "semantic_supported": true,
+          "text": "Focal chorioretinitis is a type of chorioretinitis.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:de499a234b0734b915007cc53a2a5337264c2fcb65d069c4333ca62633d3949b",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-01",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:4ceff45ecdeb066c529f9797ff5a33b634d7771d7676511d75e0b4b2e9093300",
+          "fact_ids": [
+            "sha256:698b2dd5c46603b6fd8c8311ec383c4708b19437e4f18f94cdf9e6a8ef5cb97a",
+            "sha256:bdfe4a98051b258e9d155e638c35e473a9620215502a08bfe01f3b5432207ea8"
+          ],
+          "issues": [
+            "external_clinical_content",
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "Neither cited fact states localized inflammation of retina and choroid. The parent name is available in a separate label but that label is not cited.",
+          "semantic_supported": false,
+          "text": "Focal chorioretinitis is a subclass of chorioretinitis, which is characterized by localized inflammation of the retina and choroid.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:a5907741658f63c24beaaab0bebdae2951780e9f8dc40dde172373015596f3b6",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-02",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": true,
+          "claim_hash": "sha256:4f9593ee56f2a72c066a454157f561339ca5ac525241bccd915fd7d53535c25d",
+          "fact_ids": [
+            "sha256:be4c752109aeddd40221a05202b77de4e8534d246a20b87e700501756a9545b3",
+            "sha256:036785b6adb447ad75cec4245d69412416f6ebfc3c61183e7c226bca7b698949"
+          ],
+          "issues": [
+            "naming_only"
+          ],
+          "ordinal": 0,
+          "reason": "Faithfully rephrases the recorded malignant-tumor synonym and focal name. It adds no independent description beyond naming; the supplied readable hierarchy was not used. Retain as terminology, not a useful generated description.",
+          "semantic_supported": true,
+          "text": "Jejunal cancer is a malignant tumor of the jejunum.",
+          "useful": false
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:1447e23187c16060c2ea1676181f73810a22b91969e195d75259148484b93946",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-02",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:5267f147a0664962d5d58fc2c84ed71f9fd70ab986c614c4f3cf905c693a7555",
+          "fact_ids": [
+            "sha256:036785b6adb447ad75cec4245d69412416f6ebfc3c61183e7c226bca7b698949",
+            "sha256:be4c752109aeddd40221a05202b77de4e8534d246a20b87e700501756a9545b3"
+          ],
+          "issues": [
+            "external_clinical_content"
+          ],
+          "ordinal": 0,
+          "reason": "The two naming facts do not establish origin in the jejunum or that the jejunum is part of the small intestine. The equivalent-class axiom has unnamed property/filler endpoints and is not cited.",
+          "semantic_supported": false,
+          "text": "Malignant tumor of the jejunum, also known as jejunal cancer, is a type of cancer that originates in the jejunum, part of the small intestine.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:258e0765b916ea05a914018745bfb694762364623c5fa7dead6dc10ea17463f7",
+          "fact_ids": [
+            "sha256:2f9741d93da0e474200a29e21e6d835b9cad3571d2d5eb7fdabd34602a4f2dfc"
+          ],
+          "issues": [
+            "scope_expansion",
+            "missing_label_citation"
+          ],
+          "ordinal": 1,
+          "reason": "The cited subclass edge supports an inclusion only; its readable endpoint labels are not cited. The explanatory expansion into a specific anatomical location is not established by that cited axiom.",
+          "semantic_supported": false,
+          "text": "It is a subclass of small intestine cancer, indicating its specific location within the broader category of cancers affecting the small intestine.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:b146813d3040b0588d5a3ba1b882898b83165a79c0b3c3123f67b8948acfe25b",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-03",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:f2b32fb7b4b41674e9c1631be697e4b12f5652b08e40d3a19c7e94ee2302ff86",
+          "fact_ids": [
+            "sha256:67e1ccef334c7e2edc2d37bd936f61daf48db24079cdfb41caa5fc3a9af7d28a",
+            "sha256:4ec07a1140e8db8efef933a2022e567cf2759496753171db7fa7fc7a45a59bba"
+          ],
+          "issues": [
+            "external_clinical_content",
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "Retinal inflammation is absent from this packet. The correct parent label is supplied but omitted from this claim citations.",
+          "semantic_supported": false,
+          "text": "Retinitis is a class of retinal disease characterized by inflammation of the retina.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:9eb4492c333333ae6eb8c09037e7657a0f0e4d97c2441c1dfccab12d686b7c08",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-03",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:ae911be0216e014e93c23f10c07d84b18d58c053ed1e810e68d6291f1faa1a90",
+          "fact_ids": [
+            "sha256:67e1ccef334c7e2edc2d37bd936f61daf48db24079cdfb41caa5fc3a9af7d28a",
+            "sha256:4ec07a1140e8db8efef933a2022e567cf2759496753171db7fa7fc7a45a59bba",
+            "sha256:ff4f0a52177fe4e26b4c80fcaf03b2f2efde6bd8d2eb3c7bc26fd204dc5db144"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "The outgoing subclass edge and both recorded typed labels support the retinal-disease classification, without inventing inflammation.",
+          "semantic_supported": true,
+          "text": "Retinitis is classified as a retinal disease.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:f4110c2cea0507a45d848ddbfaedb47b64eaf90f1e2d47456639421e08baae8e",
+      "slot": "B",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-04",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:7a756fdf50592486df3ee1bca4ff42428ac86e54e551e7ea4b006d816f309259",
+          "fact_ids": [
+            "sha256:f49e6ee67c9a182552af2925833058373d222f6f63fa95bb6706c6e4b6f4c6f0",
+            "sha256:45b0b3affe3f6372f778eba64b6346792c5e23d4c2e9e4e1dff600e3813da468",
+            "sha256:9c4d1f2ab90970ab4f1bd58766cf341740b5b1a36952a4ce6be11b4aa0efce59"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "Both labels and the outgoing subclass axiom support classification under pleural cancer.",
+          "semantic_supported": true,
+          "text": "A malignant visceral pleura tumor is classified as a pleural cancer.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:660a4f23fe308c213de57782c4bfca424aea1bb20ebd70bbfbc3e7f40e2a4dc7",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-04",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:35c4ce3205dc15e3c3346af2132a4e21f9f3fc70ee0e57c273bf5874e05030c1",
+          "fact_ids": [
+            "sha256:45b0b3affe3f6372f778eba64b6346792c5e23d4c2e9e4e1dff600e3813da468"
+          ],
+          "issues": [
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "The packet supports this subclass statement, but the claim cites only its axiom and omits both readable entity labels.",
+          "semantic_supported": true,
+          "text": "Malignant visceral pleura tumor is a subclass of pleural cancer.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": true,
+          "claim_hash": "sha256:ff48c522077516f7f92921afc433c4c0ef6a5d446eef50e78b1b82732acb0b34",
+          "fact_ids": [
+            "sha256:7c02881804f837faf6f6f574c6cafb1c356d26dd787ed5f1990248c6da8dfd30"
+          ],
+          "issues": [
+            "naming_only"
+          ],
+          "ordinal": 1,
+          "reason": "The synonym fact directly supports this alias, but alias repetition supplies no additional generated meaning.",
+          "semantic_supported": true,
+          "text": "It is also known as primary malignant neoplasm of visceral pleura.",
+          "useful": false
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:cd9e38d9aeffbbf47d9cefa2d5f8ffd68e0113d481597596603977ce11dc87c6",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-05",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": true,
+          "claim_hash": "sha256:32b77841e1c1a3605b4ebd2cb54564f8f213589361defb513b978f84bda70447",
+          "fact_ids": [
+            "sha256:b568a924d96f856c82df78ff3cb3d8a928e87c546894c2ec7e201cb5f5d61e26",
+            "sha256:99423d2ae76accdbaa60de55f6613e70fad2db5bac90c7fd15f1f6c83b33031e"
+          ],
+          "issues": [
+            "malformed_source_copied"
+          ],
+          "ordinal": 0,
+          "reason": "The name and malformed definition are accurately cited and not silently repaired. Copying abnormal growth of located in bone is nevertheless unreadable and not a usable description; the valid bone-remodeling hierarchy could have supplied a conservative alternative.",
+          "semantic_supported": true,
+          "text": "Hyperostosis is defined as a bone remodeling disease that results in an abnormal growth of located in bone.",
+          "useful": false
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:19fed7773010071a0aaec369d907e926dac55cee343ef8fa9ca1d0aed896d39f",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-05",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:9497dc124f8fe0917d4e3b5b5712fabca610c588812f250882210707d67abe89",
+          "fact_ids": [
+            "sha256:99423d2ae76accdbaa60de55f6613e70fad2db5bac90c7fd15f1f6c83b33031e"
+          ],
+          "issues": [
+            "malformed_source_repaired",
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "The source leaves the object of growth absent. Substituting bone silently repairs the malformed text without evidence, and the focal label is not cited.",
+          "semantic_supported": false,
+          "text": "Hyperostosis is a bone remodeling disease that results in an abnormal growth of bone.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": true,
+          "claim_hash": "sha256:1b83547d86f79fc5e5e4d93fc775ed573fb695250c4bb2416b163a79e7139a9c",
+          "fact_ids": [
+            "sha256:7e6e8414b7df3228015baf9b23209cf0342ff8bf785041a27e1e5eb95b1f1b78",
+            "sha256:b1ff2d1859061e4bcc81b0d27ba7cb277633420b5c21c9b9352718d7e651d145"
+          ],
+          "issues": [
+            "naming_only"
+          ],
+          "ordinal": 1,
+          "reason": "The two bone-hypertrophy aliases are faithfully repeated but are not useful synthesized meaning.",
+          "semantic_supported": true,
+          "text": "It is also known as bone hypertrophy or hypertrophy of bone.",
+          "useful": false
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:c5ca1cc91f430578a7a5e0daf34f404341cf8266a0cb3598999b150ef582d5e8",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-06",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:360b0d77dfb6a7043e57d22d69a1bfb50affddd58b91e0a4a79c87ad0b26b463",
+          "fact_ids": [
+            "sha256:5f092182d709432ce87049361b11bc84761ab4d053d25b2305da59263ad7cb1f",
+            "sha256:348eae3a3441c67541cd02b1e2f85ec68e88a0c316814ad2d45e64c8732a9962"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "Preserves the material-basis relation without causation, homozygosity, very severe osteolysis, onset after age two and the explicitly recorded negative findings. Both name and definition are cited.",
+          "semantic_supported": true,
+          "text": "Nestor-Guillermo progeria syndrome is a progeroid syndrome characterized by lipoatrophy, osteoporosis, and very severe osteolysis; it has a material basis in homozygous mutation in BANF1, with onset after age two, and patients have no cardiovascular impairment, diabetes mellitus, or hypertriglyceridemia.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:a330381ff4b2455ecb24a024dfdee8340d2b7f9faffd8f28091cc0155d808ea1",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-06",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:9b9dc98a50c5e7590213b4d7c958a3db2d386bc7323cbae96ac3996ce6955ff6",
+          "fact_ids": [
+            "sha256:348eae3a3441c67541cd02b1e2f85ec68e88a0c316814ad2d45e64c8732a9962",
+            "sha256:5f092182d709432ce87049361b11bc84761ab4d053d25b2305da59263ad7cb1f"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "A supported non-exhaustive summary: severe follows from very severe, onset and homozygous BANF1 genetic basis remain qualified, and both name and definition are cited. Some clinical details are omitted without asserting their absence.",
+          "semantic_supported": true,
+          "text": "Nestor-Guillermo progeria syndrome is a progeroid syndrome characterized by lipoatrophy, osteoporosis, and severe osteolysis, with onset after 2 years of age and a genetic basis in a homozygous mutation in the BANF1 gene on chromosome 11q13.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:11d44bd4e7e99a6eb79fa6acbc8492d053837d0456e210eefdb5eec75229c854",
+      "slot": "B",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-07",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:5197a7086e289aa1a2955b3397b438f82c0582e3eb714dc4bac1fa7f9c4aee4c",
+          "fact_ids": [
+            "sha256:ed6533cf08694b6b89003ef45fa2e230782acef4a46e59d3a62755431c30b004",
+            "sha256:05d1e37e090a4534a7777ad8a8f9ca7fca7da89eff90348b5298fa1e20d47b65"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "The name and definition support the respiratory, pupillary and autonomic findings without adding causal claims.",
+          "semantic_supported": true,
+          "text": "Congenital central hypoventilation syndrome is an autonomic nervous system disease characterized by reduced respiratory-center responsiveness to carbon dioxide, diminished pupillary light responses, and other symptoms related to autonomic nervous system defects.",
+          "useful": true
+        },
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:c0d5df45d9a313f289c440a91e83dcb82cb06bd45d0771b7982e1789d7514c3a",
+          "fact_ids": [
+            "sha256:05d1e37e090a4534a7777ad8a8f9ca7fca7da89eff90348b5298fa1e20d47b65"
+          ],
+          "issues": [],
+          "ordinal": 1,
+          "reason": "The cited definition supplies the material basis, most-common heterozygous PHOX2B mutation and less-frequent alternatives; the claim preserves those qualifications.",
+          "semantic_supported": true,
+          "text": "It is described as having a material basis most commonly in a heterozygous PHOX2B mutation and less frequently in mutations in RET, GDNF, EDN3, BDNF, or ASCL1.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:efecbb9d49ca96d67a0af70d2536a251cfd0e6684fa1ab3ccb56cef35ba24f14",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-07",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:9f27669d5ae5c70977a7afd1dd2db3bbaf866ff2eb5d95fd10c03d68f879190e",
+          "fact_ids": [
+            "sha256:05d1e37e090a4534a7777ad8a8f9ca7fca7da89eff90348b5298fa1e20d47b65"
+          ],
+          "issues": [
+            "causation_strengthened",
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "Commonly due to changes material basis into causation, and drops heterozygous and most-common precision. The focal label is not cited.",
+          "semantic_supported": false,
+          "text": "Congenital central hypoventilation syndrome is an autonomic nervous system disease characterized by reduced responsiveness of the respiratory center to carbon dioxide and diminished pupillary light responses, commonly due to mutations in the PHOX2B gene.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:33737dd0d20cab09147f037a4cd41d1bb6f554ce027a0d5c40f5a720585a7568",
+          "fact_ids": [
+            "sha256:27a4369916e277d2b8ff81869500df09ec526cd3f0394fb5ac1696231c45cec6",
+            "sha256:4e0b601916d0343731035003b165f9dcb8cdbfe260908d0e1ab64e2d4b07e849"
+          ],
+          "issues": [
+            "wrong_evidence_for_claim"
+          ],
+          "ordinal": 1,
+          "reason": "The full definition mentions the listed genetic alternatives, but the claim cites only naming facts. Those aliases do not support its gene-association clause.",
+          "semantic_supported": true,
+          "text": "It is also known as Ondine curse and can be associated with mutations in other genes such as RET, GDNF, EDN3, BDNF, or ASCL1.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:abf5e73933c106af144e729a61c475d375fba87f1e3e0eb86cb498b251c7ce9f",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-08",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:ba3950049385d70824afb39b6b29ceb9b420da978a7f5c072893e38301c3db7c",
+          "fact_ids": [
+            "sha256:6f09bdcaf709bda321a069babb7de82235b8d7cbe4a1174deed16890ebf8fe1b",
+            "sha256:c83552f829530505a8e5ab4f02123d76166580b5979df0612b03e5d83bac8c8e"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "Preserves association for bone-maturation/metabolic abnormalities separately from the characterized findings, as well as variable impairment and unknown cause. The focal name and definition are cited.",
+          "semantic_supported": true,
+          "text": "Neonatal Progeroid Syndrome is a rare autosomal recessive disorder associated with abnormalities in bone maturation and lipid and hormone metabolism, characterized by intrauterine growth retardation, failure to thrive, short stature, a progeroid appearance, hypotonia, variable mental impairment, and death in childhood; its cause is unknown.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:6edef867d58122a854a0e0391a97c550da6665c82eb16464cfc19d31dc4849cb",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-08",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:61f4b681cdedd947c2d5ce1f0bf1d227dfefa1c0b552f475c80cd12ea46e2c2d",
+          "fact_ids": [
+            "sha256:c83552f829530505a8e5ab4f02123d76166580b5979df0612b03e5d83bac8c8e"
+          ],
+          "issues": [
+            "association_strengthened",
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "Changes abnormalities associated with the disorder into characterizing abnormalities. The label is also missing from citations.",
+          "semantic_supported": false,
+          "text": "Neonatal Progeroid Syndrome is a rare autosomal recessive disorder characterized by abnormalities in bone maturation, lipid and hormone metabolism, intrauterine growth retardation, failure to thrive, short stature, a progeroid appearance, hypotonia, variable mental impairment, and childhood mortality.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:4e90106a7752da392a2a5a6ba066fae1069e4dfcb926b901c2fc556670fefbc2",
+          "fact_ids": [
+            "sha256:2b9dc101475b9b421e743850e1c7c7edf4e75c1c490650ed23a93735a427597a"
+          ],
+          "issues": [
+            "missing_label_citation"
+          ],
+          "ordinal": 1,
+          "reason": "The packet supports this parent inclusion, but the claim cites only the edge and neither readable endpoint label.",
+          "semantic_supported": true,
+          "text": "Neonatal Progeroid Syndrome is a subclass of Rare Non-Neoplastic Disorder.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:dfbc2b0a5b8ede15db81322f09b73afb9bafe7f731573bb4e92c83117391b45f",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-09",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:a2feed1f5dc1047c9b5c678e968188726efd49e14adc54d6af0bb26c574c9c1d",
+          "fact_ids": [
+            "sha256:004929bb510b6b38e693b920160ef1f1017f17ecec6b4f3c10dc56f4ba5dfa89",
+            "sha256:3bf9aca2f4259981c84b68e805b88e6bb1b4336494550d1c222bd62e4db67714",
+            "sha256:7168c73779963ccd0ae71012ebaea3a5eb6f6789be68764547369a6b67f477e4",
+            "sha256:102daa93b47df47a2eca6e89b468899ba4d38cde58d28555d0a0f7644606631b"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "Both definitions support cryptophthalmos, syndactyly and the named genes. The claim avoids treating target material basis as causation and cites both names and definitions.",
+          "semantic_supported": true,
+          "text": "The source, Fraser Syndrome, and the target, Fraser syndrome, are both described as involving cryptophthalmos and syndactyly, with mutations in FRAS1, FREM2, or GRIP1 named in each description.",
+          "useful": true
+        },
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:86f20a9e7e224569ea044a7eba32db661efbd90328f88c8c10b7b845547b6ced",
+          "fact_ids": [
+            "sha256:004929bb510b6b38e693b920160ef1f1017f17ecec6b4f3c10dc56f4ba5dfa89",
+            "sha256:3bf9aca2f4259981c84b68e805b88e6bb1b4336494550d1c222bd62e4db67714",
+            "sha256:7168c73779963ccd0ae71012ebaea3a5eb6f6789be68764547369a6b67f477e4",
+            "sha256:102daa93b47df47a2eca6e89b468899ba4d38cde58d28555d0a0f7644606631b"
+          ],
+          "issues": [],
+          "ordinal": 1,
+          "reason": "Explicitly compares details of the definitions rather than ordering disease scope. Each listed feature and mutation qualification appears on its stated side, with both definitions and names cited.",
+          "semantic_supported": true,
+          "text": "Their definitions differ in detail: the source calls it a rare autosomal recessive inherited disorder and lists cutaneous syndactyly and genitourinary abnormalities; the target specifies homozygous or compound heterozygous mutations and also lists ambiguous genitalia, laryngeal malformations, oral clefting, and mental retardation.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:2458b057f92219d7b49ff9f059154ae97f70c2c52c0d61aea1965eadaed861a8",
+      "slot": "A",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-09",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:1d2565efb25a4f845773bb134409632c1126869ae9c52758b78d1dc2dcd329fe",
+          "fact_ids": [
+            "sha256:3bf9aca2f4259981c84b68e805b88e6bb1b4336494550d1c222bd62e4db67714",
+            "sha256:102daa93b47df47a2eca6e89b468899ba4d38cde58d28555d0a0f7644606631b"
+          ],
+          "issues": [
+            "missing_label_citation",
+            "ambiguous_sides",
+            "alignment_framing"
+          ],
+          "ordinal": 0,
+          "reason": "The recorded definitions support the listed overlapping features, but neither name is cited and source/target are not explicit. Which aligns with is less precise than a bounded statement of shared recorded features and should be rewritten.",
+          "semantic_supported": true,
+          "text": "Fraser Syndrome is defined as a rare, autosomal recessive inherited disorder characterized by cryptophthalmos, syndactyly, and genitourinary abnormalities, which aligns with the definition of Fraser syndrome that includes similar features and genetic basis.",
+          "useful": false
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:7dcf56276bee8368ed9283c938b6841af195f2ba90f3241ac732f480e2c4812f",
+          "fact_ids": [
+            "sha256:3bf9aca2f4259981c84b68e805b88e6bb1b4336494550d1c222bd62e4db67714",
+            "sha256:102daa93b47df47a2eca6e89b468899ba4d38cde58d28555d0a0f7644606631b"
+          ],
+          "issues": [
+            "missing_label_citation"
+          ],
+          "ordinal": 1,
+          "reason": "The source and target definitions do list the stated differences in annotation detail, without a stated broader-class relation. However, the named entity is not supported by a label citation and first/second is weaker presentation than the requested source/target.",
+          "semantic_supported": true,
+          "text": "Both entities describe Fraser syndrome, but the first entity emphasizes the genetic mutations involved, while the second entity includes additional clinical features such as ambiguous genitalia and mental retardation.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:32ae620ca4ffad3af369d5e862787cbc53bc3ed60bf24dbf8ff3c7c45c48c880",
+      "slot": "B",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-10",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:d88cb9a75e9aee21adcd6734d5563f227803d6edd1b8fab320a12f17b6ed5008",
+          "fact_ids": [
+            "sha256:c83552f829530505a8e5ab4f02123d76166580b5979df0612b03e5d83bac8c8e",
+            "sha256:22849628a8a84ea75c1f113daaf79adda69b91791bace515e19fe4795e062625"
+          ],
+          "issues": [
+            "unsupported_scope_order",
+            "wrong_evidence_for_claim",
+            "ambiguous_sides"
+          ],
+          "ordinal": 0,
+          "reason": "The target citation is only a plural synonym, not its definition. A broader relation between the two ontology entities is not established by their descriptions or naming; the source association/characterization distinction is also compressed imprecisely.",
+          "semantic_supported": false,
+          "text": "Neonatal Progeroid Syndrome is defined as a rare autosomal recessive disorder characterized by various developmental abnormalities, while progeroid syndromes encompass a broader category of conditions characterized by premature aging features.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:dbc934998d638a69c586981bbd7cf9e5672d33fe791d2967572eb4e4b08280a8",
+          "fact_ids": [
+            "sha256:6f09bdcaf709bda321a069babb7de82235b8d7cbe4a1174deed16890ebf8fe1b",
+            "sha256:6e0510f12d6b546d67721207e260d7a3a096fe33354c833a7a61de0e39569f6f"
+          ],
+          "issues": [
+            "naming_used_as_semantics"
+          ],
+          "ordinal": 1,
+          "reason": "Only the two labels are cited. They do not establish shared clinical accelerated-aging presentation across these two entities.",
+          "semantic_supported": false,
+          "text": "Both entities are associated with progeroid features, indicating a shared clinical presentation of accelerated aging.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:bb375096c85d678fd229a21e0d67bbe204876a467bedc052519671ccf310e2fc",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-10",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:8d715d29326abe1a4691090f03c9a735492e4d89e419d394aea522a5388d7f58",
+          "fact_ids": [
+            "sha256:6f09bdcaf709bda321a069babb7de82235b8d7cbe4a1174deed16890ebf8fe1b",
+            "sha256:c83552f829530505a8e5ab4f02123d76166580b5979df0612b03e5d83bac8c8e",
+            "sha256:6e0510f12d6b546d67721207e260d7a3a096fe33354c833a7a61de0e39569f6f",
+            "sha256:fc773224144bff296ad8e0582694143cdff68895ac835132e4273fc0a10c129b"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "Explicit source/target roles and both labels/definitions support the bounded summaries. Growth, appearance and muscle-tone wording summarizes the supplied features without asserting a cross-ontology scope relation.",
+          "semantic_supported": true,
+          "text": "The source, Neonatal Progeroid Syndrome, is described as a rare autosomal recessive disorder with growth, appearance, muscle-tone, and other features; the target, progeroid syndrome, is defined by the premature onset of age-related pathologies.",
+          "useful": true
+        },
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:dc0199e0e5ee9cbf04724b779f4622a07f3ace920ef9ddc6117c010d2731c5f2",
+          "fact_ids": [
+            "sha256:6f09bdcaf709bda321a069babb7de82235b8d7cbe4a1174deed16890ebf8fe1b",
+            "sha256:edec052b16fbabaf62333c889df6328e5bca34c8b0f808d5fa7051af512f9089",
+            "sha256:1dfe476432ef6398acfc5a6924ccd3db61568d9e44cb676020277d6605d37586",
+            "sha256:876369015cac20eb810323a7f3cdb7568f1f96d26ed2bbcf042c0ab529a2299d"
+          ],
+          "issues": [],
+          "ordinal": 1,
+          "reason": "Correctly follows the target incoming subclass edge and its child label, contrasts the source synonym, and explicitly avoids inferring equivalence from shared naming.",
+          "semantic_supported": true,
+          "text": "The target includes a subclass named Wiedemann-Rautenstrauch syndrome, while the source records Wiedemann-Rautenstrauch Syndrome as a synonym; this shared naming does not establish that the entities are equivalent.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:78af9f3a0a6dc2c8c0b019e619675421e8f4767cc2471fce0334b3d656d8abd3",
+      "slot": "B",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-11",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:c69329362f622d3afc57ffa55e251803b1349ed177f77f29bb83751bdf5cecbb",
+          "fact_ids": [
+            "sha256:66cb8caf301c1e86e407d072d5c5531b0750c853d9fa43751d9e07ebd699f85d"
+          ],
+          "issues": [
+            "missing_label_citation",
+            "ambiguous_sides"
+          ],
+          "ordinal": 0,
+          "reason": "The source definition supports this non-exhaustive summary, but its label is not cited and the claim does not identify it as source-only, which is needed because both concepts have the same name.",
+          "semantic_supported": true,
+          "text": "Chorioretinitis is defined as inflammation of the distal posterior uveal tract (choroid) and its structural and vascular attachments to the retina, usually caused by infection and significant due to potential vision loss.",
+          "useful": false
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:5b11453f489d4d397073c44492e13d2e53d24c012752c415821de41891359515",
+          "fact_ids": [
+            "sha256:5b23716f5df065c5269dc6b57ff7cf930d59de617bb9a0ef357ffcfd0af1530f",
+            "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e"
+          ],
+          "issues": [
+            "naming_used_as_semantics"
+          ],
+          "ordinal": 1,
+          "reason": "Both citations belong to target naming. They do not establish shared meaning with the source entity.",
+          "semantic_supported": false,
+          "text": "Retinochoroiditis is a synonym for chorioretinitis, indicating a shared meaning between the two entities.",
+          "useful": false
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:a95e1a86ec81a5ecaf1661de1fbb91c4f2124d1fdd7b6faffb36aa77bf13ba65",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-11",
+      "claims": [
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:fee8e406cda1d3d8947321ec18defe035c57e3981affb5160bc9ad43b1a73e0d",
+          "fact_ids": [
+            "sha256:69f926ba2b841258950e47fbbd37f8eff77d25e36fa092b5a0110ed993c98d98",
+            "sha256:66cb8caf301c1e86e407d072d5c5531b0750c853d9fa43751d9e07ebd699f85d",
+            "sha256:f188c8c17974a8196da945255280b1c6df0cb75b29fb1871788af2aa1dbc232e"
+          ],
+          "issues": [],
+          "ordinal": 0,
+          "reason": "The source definition and both names support this explicitly one-sided description. Reviewing the complete target packet confirms no target definition; it preserves uncertainty rather than asserting a disease-scope difference.",
+          "semantic_supported": true,
+          "text": "The source, Chorioretinitis, is defined as inflammation of the distal posterior uveal tract and its structural and vascular attachments to the retina; the target is labeled chorioretinitis, but the available information does not establish whether their meanings are shared.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:a4a0a1bb0e3180884edb372853c67e040652bb6eea97f70b27f3dbbe9d5e7959",
+      "slot": "B",
+      "whole_response_usable": true
+    },
+    {
+      "case_id": "case-12",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:da224e5c20d4356a8126bd0b9ca28e07aa95fdfd33285be3d8ff5062170f5e87",
+          "fact_ids": [
+            "sha256:d22122856762526c755e9c2bcad3a82840211fbfa7a93df3ccb0718f84e192c4"
+          ],
+          "issues": [
+            "missing_label_citation"
+          ],
+          "ordinal": 0,
+          "reason": "Accurately retains the source causal statement and separates granulomatous dermatitis from arthritis with synovitis, but omits the source label citation.",
+          "semantic_supported": true,
+          "text": "The source, Blau Syndrome, is defined as an autoinflammatory disease caused by a NOD2 gene mutation, characterized by granulomatous dermatitis, arthritis with synovitis, and uveitis.",
+          "useful": true
+        },
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:a7816e32cef8e8494b908874b5bc8da146b174e449f292ef356888fb75e57937",
+          "fact_ids": [
+            "sha256:5434ce6e1699830e21d1ba73b6491be9eda33e429518139655e368bf1d8764f7"
+          ],
+          "issues": [
+            "missing_label_citation"
+          ],
+          "ordinal": 1,
+          "reason": "Faithfully summarizes the target definition and heterozygous material basis, but omits the target label citation.",
+          "semantic_supported": true,
+          "text": "The target, Blau syndrome, is characterized by familial granulomatous arthritis, uveitis, and skin granulomas, with a material basis in heterozygous mutations in the NOD2 gene.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:7d6252f60e690fc5ead407c7283b6ad5934d8f6161cdcd6dc09527a0daba0846",
+      "slot": "A",
+      "whole_response_usable": false
+    },
+    {
+      "case_id": "case-12",
+      "claims": [
+        {
+          "approved": false,
+          "citations_complete": false,
+          "claim_hash": "sha256:2c80b8d50bef58c66248ebc4913c63d9caf5a1c22da58cb1e73e8b862c83dc33",
+          "fact_ids": [
+            "sha256:1f4cae422bda1de8686013cd77c571cab4a4e690624d359c1727fe29af37a82a",
+            "sha256:d22122856762526c755e9c2bcad3a82840211fbfa7a93df3ccb0718f84e192c4",
+            "sha256:294f13a74881925f44321bb0e4b6c8779cdb119ee5bea24679b1efca361444c7",
+            "sha256:5434ce6e1699830e21d1ba73b6491be9eda33e429518139655e368bf1d8764f7"
+          ],
+          "issues": [
+            "modifier_scope_shift"
+          ],
+          "ordinal": 0,
+          "reason": "The source states granulomatous dermatitis and separately arthritis with synovitis. Only the target says granulomatous arthritis; applying that modifier to both is unsupported despite all citation IDs being valid.",
+          "semantic_supported": false,
+          "text": "The source, Blau Syndrome, and the target, Blau syndrome, both describe a condition involving granulomatous arthritis, uveitis, and NOD2 mutations; the source says the disease is caused by a NOD2 mutation, while the target describes heterozygous NOD2 mutations as its material basis.",
+          "useful": true
+        },
+        {
+          "approved": true,
+          "citations_complete": true,
+          "claim_hash": "sha256:85307259ba62cace854f859de216333fa99e87ba01f3e6e2bb3c15629cd5e4f0",
+          "fact_ids": [
+            "sha256:1f4cae422bda1de8686013cd77c571cab4a4e690624d359c1727fe29af37a82a",
+            "sha256:d22122856762526c755e9c2bcad3a82840211fbfa7a93df3ccb0718f84e192c4",
+            "sha256:294f13a74881925f44321bb0e4b6c8779cdb119ee5bea24679b1efca361444c7",
+            "sha256:5434ce6e1699830e21d1ba73b6491be9eda33e429518139655e368bf1d8764f7"
+          ],
+          "issues": [],
+          "ordinal": 1,
+          "reason": "Preserves the source usual presentation before four and arthritis with synovitis, while attributing familial and skin-granuloma wording to the target. Both definitions and labels are cited.",
+          "semantic_supported": true,
+          "text": "The source definition also notes usual presentation before age four and arthritis with synovitis; the target definition describes the syndrome as familial and specifies skin granulomas.",
+          "useful": true
+        }
+      ],
+      "contract_errors": [],
+      "output_hash": "sha256:b2f9ecce1d20c23329fa2379a58b7c5140b96baa949ebfd94d2d9615df7a560d",
+      "slot": "B",
+      "whole_response_usable": false
+    }
+  ],
+  "review_method": "Manual claim-by-claim AI review of anonymous per-case A/B files against complete frozen packets and exact cited facts; no assignment, model identity, cost or latency read before this file was frozen.",
+  "reviewer": "Codex root agent, separate from the two API generators",
+  "rubric": {
+    "approved": "All three criteria are true; this diagnostic approval is not publication admission.",
+    "citations_complete": "All material clauses and readable entity names are supported by the exact cited facts; valid-ID membership alone is insufficient.",
+    "semantic_supported": "Meaning is supported somewhere in the admitted packet; no invented scope, causal strengthening or qualifier shift.",
+    "useful": "Adds usable description or a carefully scoped comparison; alias repetition and copied malformed definitions fail. Partial summaries may omit details without asserting their absence.",
+    "whole_response_usable": "At least one claim, all claims approved and no contract errors."
+  },
+  "schema": "exact-model-diagnostic-blind-review/1"
+}

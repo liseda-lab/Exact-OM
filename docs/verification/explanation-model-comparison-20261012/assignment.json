@@ -1,0 +1,50 @@
+{
+  "case-01": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-02": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-03": {
+    "A": "openai/gpt-4o-mini-2024-07-18",
+    "B": "openai/gpt-6-luna"
+  },
+  "case-04": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-05": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-06": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-07": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-08": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-09": {
+    "A": "openai/gpt-6-luna",
+    "B": "openai/gpt-4o-mini-2024-07-18"
+  },
+  "case-10": {
+    "A": "openai/gpt-4o-mini-2024-07-18",
+    "B": "openai/gpt-6-luna"
+  },
+  "case-11": {
+    "A": "openai/gpt-4o-mini-2024-07-18",
+    "B": "openai/gpt-6-luna"
+  },
+  "case-12": {
+    "A": "openai/gpt-4o-mini-2024-07-18",
+    "B": "openai/gpt-6-luna"
+  }
+}
