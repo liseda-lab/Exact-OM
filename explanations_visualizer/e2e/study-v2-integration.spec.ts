@@ -5,7 +5,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { chooseContinuedParent, exhaustBrowserParents, exhaustPagedCard, TYPED } from "./factPagination";
-import { harness, newInvitation, ParticipantApi, publishVariant, recordTraffic, scopedPath, seedAdvance, seedCondition, seedToCase, seedToTutorial } from "./v2Harness";
+import { harness, harnessForms, newInvitation, ParticipantApi, publishVariant, recordTraffic, REVIEW_FORMS, scopedPath, seedAdvance, seedCondition, seedToCase, seedToTutorial } from "./v2Harness";
 
 // Integration regressions for specs 17–19 against the real v2 service (HTTPS, PostgreSQL,
 // compiled frontend, normal CSP). Sessions here are seeded through the API to reach fault
@@ -14,6 +14,8 @@ import { harness, newInvitation, ParticipantApi, publishVariant, recordTraffic, 
 // fault evidence only, never acceptance of the happy path.
 test.use({ screenshot: "off", trace: "off", actionTimeout: 20_000, viewport: { width: 1280, height: 900 } });
 test.beforeEach(() => test.skip(!harness, "Set EXACT_E2E_STUDY_V2_CONFIG for the PostgreSQL/HTTPS harness"));
+/** A prepared entity description, named by what it is (exact-description/2, 21 F05). */
+const PROFILE_REGION = /^(Generated description|Description|Available facts|Necessary conditions)$/;
 
 const INJECTED = { code: "injected_test_failure", message: "Injected by the browser test; not a service response", retryable: true };
 const fail = (status = 503) => (route: Route) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(INJECTED) });
@@ -465,7 +467,10 @@ test.describe("J08 researcher export (browser)", () => {
     await page.getByRole("textbox", { name: "Study revision" }).fill(harness!.study_revision);
   }
 
-  test("v2 exports request and verify analysis 3 in JSON and CSV", async ({ page }) => {
+  // forms/3 publications export the methods analysis (exact-study-analysis/4, CSV/4).
+  const generation = () => (harnessForms === REVIEW_FORMS ? "4" : "3");
+
+  test("v2 exports request and verify the derived analysis in JSON and CSV", async ({ page }) => {
     const exports: string[] = [];
     page.on("request", (request) => {
       if (request.url().includes("/exports")) exports.push(new URL(request.url()).search);
@@ -473,20 +478,20 @@ test.describe("J08 researcher export (browser)", () => {
     await signIn(page);
     await page.getByRole("checkbox", { name: "Include test sessions" }).check();
     const [json] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Create export" }).click()]);
-    await expect(page.getByRole("status").filter({ hasText: /derived schema exact-study-analysis\/3/ })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: new RegExp(`derived schema exact-study-analysis/${generation()}`) })).toBeVisible();
     const data = JSON.parse(readFileSync((await json.path())!, "utf8"));
-    expect(data.manifest.schema).toBe("exact-study-analysis/3");
+    expect(data.manifest.schema).toBe(`exact-study-analysis/${generation()}`);
     expect(data.manifest.source_protocol_versions).toBeTruthy();
     const timing = data.data.sessions.flatMap((session: { cases: { timing?: Record<string, unknown> }[] }) => session.cases.map((row) => row.timing)).filter(Boolean);
     for (const summary of timing) expect(summary).toMatchObject({ coverage_status: "not_established", unique_elapsed_coverage_seconds: null, unobserved_elapsed_seconds: null });
     await page.getByRole("radio", { name: "CSV archive" }).click();
     const [csv] = await Promise.all([page.waitForEvent("download"), page.getByRole("button", { name: "Create export" }).click()]);
-    await expect(page.getByRole("status").filter({ hasText: /exact-study-csv\/3/ })).toBeVisible();
+    await expect(page.getByRole("status").filter({ hasText: new RegExp(`exact-study-csv/${generation()}`) })).toBeVisible();
     expect((await csv.suggestedFilename()).endsWith(".zip")).toBe(true);
-    expect(exports.every((search) => search.includes("analysis_schema=exact-study-analysis%2F3"))).toBe(true);
+    expect(exports.every((search) => search.includes(`analysis_schema=exact-study-analysis%2F${generation()}`))).toBe(true);
   });
 
-  test("a returned schema other than analysis 3 is reported and not saved (diagnostic)", async ({ page }) => {
+  test("a returned schema other than the requested analysis is reported and not saved (diagnostic)", async ({ page }) => {
     await signIn(page);
     await page.route("**/exports?*", async (route) => {
       const response = await route.fetch();
@@ -496,7 +501,7 @@ test.describe("J08 researcher export (browser)", () => {
     let downloaded = false;
     page.on("download", () => (downloaded = true));
     await page.getByRole("button", { name: "Create export" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: /returned exact-study-analysis\/2 instead of exact-study-analysis\/3/ })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: new RegExp(`returned exact-study-analysis/2 instead of exact-study-analysis/${generation()}`) })).toBeVisible();
     expect(downloaded).toBe(false);
   });
 });
@@ -581,7 +586,7 @@ test.describe("R06/R07 study full context and fact pagination (19 F16, F17)", ()
     // Facts open as original axioms; no description is read for a non-focal entity.
     await dialog.locator('[data-category="restrictions"]').getByRole("button", { name: "Show original axiom" }).first().click();
     await expect(dialog.locator('[data-category="restrictions"] .original-axiom').first()).toBeVisible();
-    await expect(dialog.getByRole("region", { name: "Generated description" })).toHaveCount(0);
+    await expect(dialog.getByRole("region", { name: PROFILE_REGION })).toHaveCount(0);
     const reads = traffic.requests.slice(mark);
     expect(reads.filter((item) => item.path.includes("/explanations"))).toEqual([]);
     expect(reads.filter((item) => (item.status ?? 0) >= 400)).toEqual([]);
@@ -609,7 +614,8 @@ test.describe("R06/R07 study full context and fact pagination (19 F16, F17)", ()
     const browser = page.getByRole("region", { name: "Source ontology browser" });
     await browser.getByRole("button", { name: "Open full context", exact: true }).click();
     const dialog = page.getByRole("dialog", { name: "Full context" });
-    const citation = dialog.getByRole("region", { name: "Generated description" }).locator("button.citation").first();
+    // exact-description/2 names the prepared text by what it is (a fact extract reads "Available facts").
+    const citation = dialog.getByRole("region", { name: PROFILE_REGION }).locator("button.citation").first();
     await citation.click();
     const cited = page.getByRole("dialog", { name: /^Cited fact/ });
     await expect(cited.locator(".iri").first()).toHaveText(/^urn:source:\d$/);
@@ -723,7 +729,7 @@ test.describe("R09 readiness follows the admitted components (19 F19)", () => {
       await expect(page.locator(".card-pair .entity-card")).toHaveCount(variant.cards);
       await expect(page.locator(".comparison")).toHaveCount(variant.comparison ? 1 : 0);
       await expect(page.getByRole("tab")).toHaveCount(variant.tabs);
-      await expect(page.locator(".card-pair").getByRole("region", { name: "Generated description" })).toHaveCount(variant.profiles ? 2 : 0);
+      await expect(page.locator(".card-pair").getByRole("region", { name: PROFILE_REGION })).toHaveCount(variant.profiles ? 2 : 0);
       const explanations = traffic.requests.filter((item) => item.path.startsWith(`${scopedPath(scope)}/explanations?`));
       expect(explanations.some((item) => item.path.includes("task=entity_profile"))).toBe(variant.profiles);
       expect(explanations.some((item) => item.path.includes("task=pair_comparison"))).toBe(variant.comparison);

@@ -49,7 +49,9 @@ test.describe("U01/Q01 graph lesson: interaction is not evidence", () => {
     const candidate = (await api.state()).tutorial.case.candidates[1].candidate_id;
     await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
     const items = page.locator(".graph-items");
-    await expect(items).toContainText(/only\. No comparison line for these/);
+    // S2: comparison lines come only from recorded comparisons; one-sided channels are named, not bridged.
+    await expect(items).toContainText(/Features on one side only: .+\(target\)/);
+    await expect(page.locator(".graph-items button").filter({ hasText: /correspondence|compared$/ })).toHaveCount(0);
     // Ontology context: add the compared entity's parents and select the added line.
     await items.getByRole("button", { name: /^Compared / }).first().click();
     await page.locator(".graph-inspector").getByRole("button", { name: "Add its parents" }).click();

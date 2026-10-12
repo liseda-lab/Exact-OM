@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "@playwright/test";
 
-import { harness, recordTraffic, scopedPath } from "./v2Harness";
+import { harness, harnessForms, recordTraffic, REVIEW_FORMS, scopedPath } from "./v2Harness";
 
 // The unseeded acceptance journey (specs 17 S3, 19 F15): a new synthetic invitation on the
 // real service (HTTPS, PostgreSQL, compiled frontend, normal CSP) through consent, setup,
@@ -12,6 +12,8 @@ import { harness, recordTraffic, scopedPath } from "./v2Harness";
 const mainApp = process.env.EXACT_E2E_MAIN_APP_URL ?? null;
 test.use({ screenshot: "off", trace: "off", actionTimeout: 20_000, viewport: { width: 1280, height: 720 } });
 test.beforeEach(() => test.skip(!harness, "Set EXACT_E2E_STUDY_V2_CONFIG for the PostgreSQL/HTTPS harness"));
+// This journey asserts the synthetic forms/2 fixture's data; study-review-journey.spec.ts is the forms/3 journey.
+test.beforeEach(() => test.skip(harnessForms === REVIEW_FORMS, "Synthetic forms/2 fixture journey; see study-review-journey.spec.ts for forms/3"));
 
 async function noViolations(page: Page) {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
@@ -269,9 +271,9 @@ test("fresh browser journey: training, both conditions, reports and completion o
         // J03: search outside the focal excerpt, follow multiple parents, exhaust children, open a citation.
         await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
         const studyBrowser = page.getByRole("region", { name: "Source ontology browser" });
-        await expect(studyBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("50 of 65");
-        await studyBrowser.getByRole("button", { name: "Load next 50 children" }).click();
-        await expect(studyBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("65 of 65");
+        await expect(studyBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("50 of 65 children shown");
+        await studyBrowser.getByRole("button", { name: "Load more children" }).click();
+        await expect(studyBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("65 children");
         const children = await studyBrowser.locator(".child-list li .iri").allTextContents();
         expect(new Set(children).size).toBe(65);
         await studyBrowser.getByRole("combobox").fill("Navigation source 012");
@@ -334,7 +336,7 @@ test("fresh browser journey: training, both conditions, reports and completion o
           const other = await browser.newPage();
           await other.goto(`${mainApp}/browse/?so=${encodeURIComponent(entity.ontology_version_id)}&s=${encodeURIComponent(entity.iri)}&sk=class`);
           const mainBrowser = other.getByRole("region", { name: "Source ontology browser" });
-          await expect(mainBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("50 of 65");
+          await expect(mainBrowser.locator(".browser-section .section-head .meta").nth(1)).toHaveText("50 of 65 children shown");
           await mainBrowser.getByRole("combobox").fill("Navigation source 012");
           await expect(mainBrowser.getByRole("listbox").getByRole("option", { name: /^Navigation source 012/ })).toBeVisible();
           await mainBrowser.getByRole("combobox").press("ArrowDown");

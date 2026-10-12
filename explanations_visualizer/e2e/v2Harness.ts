@@ -15,14 +15,20 @@ export interface HarnessConfig {
   researcher_token: string;
   publication: string;
   study_revision: string;
+  /** Directory holding the publication's assets (practice-explanations.json); defaults to the publication's. */
+  assets?: string;
 }
 
 export const harness: HarnessConfig | null = process.env.EXACT_E2E_STUDY_V2_CONFIG ? JSON.parse(readFileSync(process.env.EXACT_E2E_STUDY_V2_CONFIG, "utf8")) : null;
 
-/** The frozen synthetic publication; used only to seed fault scenarios, never sent to the page. */
+/** The review publication's forms (setup/3, consultation/3, methods/3); older harnesses use forms/2. */
+export const REVIEW_FORMS = "exact-study-forms/3";
+
+/** The frozen publication; used only to seed fault scenarios, never sent to the page. */
 function publication() {
   return JSON.parse(readFileSync(harness!.publication, "utf8")) as {
     definition: {
+      form_version: string;
       information_version: string;
       tutorial: {
         version: string;
@@ -71,10 +77,14 @@ export class ParticipantApi {
   }
 }
 
-/** Typed requirement evidence for every frozen lesson, built from the synthetic fixture. */
+/** The harness publication's form version (null without a harness). */
+export const harnessForms: string | null = harness ? publication().definition.form_version : null;
+const reviewForms = () => harnessForms === REVIEW_FORMS;
+
+/** Typed requirement evidence for every frozen lesson, built from the practice fixture. */
 function tutorialActions() {
   const { tutorial } = publication().definition;
-  const resource = JSON.parse(readFileSync(join(dirname(harness!.publication), "practice-explanations.json"), "utf8"));
+  const resource = JSON.parse(readFileSync(join(harness!.assets ?? dirname(harness!.publication), "practice-explanations.json"), "utf8"));
   const candidate = tutorial.case.candidates[1].candidate_id;
   const initial = tutorial.case.candidates.map((item) => item.candidate_id);
   const actions: Record<string, unknown>[] = [];
@@ -90,7 +100,8 @@ function tutorialActions() {
       else if (["choose_none", "choose_insufficient"].includes(kind)) Object.assign(action, { response_type: kind === "choose_none" ? "none_of_these" : "insufficient_evidence", ranked_candidate_ids: [] });
       else if (["add_rank", "move_rank", "remove_rank", "undo_rank", "keep_initial_order", "check_partial_ranking", "rank_with_details_open"].includes(kind))
         Object.assign(action, { response_type: "ranked_candidates", ranked_candidate_ids: kind === "keep_initial_order" ? initial : [candidate] });
-      else if (["report_multiple_methods", "report_no_methods"].includes(kind)) action.methods = kind === "report_multiple_methods" ? ["queries_scripts", "reasoner"] : [];
+      else if (["report_multiple_methods", "report_no_methods"].includes(kind))
+        action.methods = kind === "report_no_methods" ? [] : reviewForms() ? ["protege", "plain_files"] : ["queries_scripts", "reasoner"];
       else if (kind === "locate_downloads") action.asset_ids = tutorial.case.ontology_resources.map((asset) => asset.asset_id);
       actions.push(action);
     }
@@ -122,7 +133,8 @@ export async function seedToTutorial(page: Page, revision?: string) {
   const api = new ParticipantApi(page);
   const { definition } = publication();
   await api.write("PUT", "/consent", { information_version: definition.information_version, accepted: true });
-  await api.write("PUT", "/setup", { setup_version: "setup/2", instructions_acknowledged: true, external_inspection_optional_understood: true, resource_access: "available", familiar_methods: [], submitted: true });
+  const setup = { instructions_acknowledged: true, external_inspection_optional_understood: true, resource_access: "available", familiar_methods: [], submitted: true };
+  await api.write("PUT", "/setup", reviewForms() ? { ...setup, setup_version: "setup/3", familiar_other_method: null } : { ...setup, setup_version: "setup/2" });
   const state = await api.state();
   const answers: Record<string, unknown> = {};
   for (const question of state.forms.background) {
@@ -151,12 +163,13 @@ export async function seedToCase(page: Page, revision?: string) {
 export async function seedAdvance(api: ParticipantApi, current: Record<string, any>) {
   await api.write("POST", `/cases/${encodeURIComponent(current.case_id)}/submit`, { presentation_id: current.presentation_id, response_type: "insufficient_evidence", ranked_candidate_ids: [] });
   const state = await api.state();
-  await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/consultation`, { presentation_id: current.presentation_id, form_version: state.forms.version, consulted_external_ontologies: false, methods: [], other_editor: null, other_resource: null, other_method: null, resource_scope: null });
+  const report = { presentation_id: current.presentation_id, form_version: state.forms.version, consulted_external_ontologies: false, methods: [], other_method: null, resource_scope: null };
+  await api.write("PUT", `/cases/${encodeURIComponent(current.case_id)}/consultation`, reviewForms() ? { ...report, consultation_version: "consultation/3" } : { ...report, other_editor: null, other_resource: null });
 }
 
 /** Advance seeded cases through the API until the current case has the wanted condition. */
 export async function seedCondition(page: Page, api: ParticipantApi, condition: "explanation" | "ontology_baseline") {
-  for (let index = 0; index < 8; index += 1) {
+  for (let index = 0; index < 30; index += 1) {
     const current = await api.currentCase();
     if (current.condition === condition) return current;
     await seedAdvance(api, current);
