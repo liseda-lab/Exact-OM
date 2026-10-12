@@ -85,10 +85,11 @@ actual remote step separately; never pretend it belongs to 14372. Account its
 successors remain eligible. Reuse the existing storage wrapper and shared hard
 spending policy; preserve failed/uncertain ownership before any recovery.
 
-Luna results remain descriptive development sensitivity evidence. Promotion
-requires a separate decision, any necessary training-only recalibration and
-revalidation of the G4 comparisons affected by the changed judge. Neither G4
-nor the three queued GPU throughput checks waits for this optional experiment.
+This E07 replay remains descriptive development sensitivity evidence, not the
+model-selection comparison on the eventual G4 winner. The subsequent approved
+plan below supersedes the earlier proposal to recalibrate for Luna or reopen
+G4 comparisons. Neither G4 nor the three queued GPU throughput checks waits for
+this optional replay.
 
 API contract: [Decisions guide](https://developers.openai.com/api/docs/guides/decisions)
 and [direct request reference](https://developers.openai.com/api/reference/resources/decisions/methods/create).
@@ -125,3 +126,82 @@ resubmission, local provenance established public NCIT/DOID inputs and verified
 that every payload's evidence exactly matched its historical OpenRouter/OpenAI
 request. No reference labels or private test data are sent. Review then accepted
 the launch; the earlier rejected command made no submissions or paid calls.
+
+## Approved continuation: select the configuration, then compare judges
+
+The user approved this sequence on 2026-10-12. Finish the development programme,
+including G4 and its existing correctness/cost corrections, with the historical
+`openai/gpt-4o-mini-2024-07-18` decision model. Retain completed experiments;
+do not repeat them or reopen rejected E07/E21/E25 arms because Luna is available.
+This amendment schedules a prospective comparison before final scientific work;
+it does not change an active configuration, complete G4, or authorize final rollout.
+
+1. Freeze the corrected G4-selected effective configuration, resolved supervision,
+   runtime `deployment-artifacts.json` and actual fitted artifact hashes; a YAML
+   with unpopulated artifact paths is insufficient.
+   Preserve the historical configuration selection and its evidence. If the
+   selected configuration has no active LLM decisions, record that applicability
+   issue; enabling an LLM would be an additional treatment, not a model swap.
+2. Compare exactly two judge arms on that same configuration: the historical
+   GPT-4o mini decision route and Luna's approved Decisions route. Hold ontology
+   evidence, source/query membership, candidates, anchors, all non-decision LLM
+   roles, routing/gating, non-LLM scores, fusion, calibration, fitted weights,
+   thresholds, extraction and seeds fixed. No model-specific refitting, threshold
+   search, prompt/evidence optimization or student retraining is part of this
+   comparison. Recompute downstream outputs that consume changed probabilities
+   with those same weights and rules; they are outputs, not additional factors.
+3. Use the admitted D0/D1 public development cohorts, or deterministic subsets
+   bounded by the pre-call work/token forecast. Freeze exact membership, query
+   pools, permitted evidence, selection endpoints/guards and cost boundaries
+   before examining new judge outcomes. Preserve complete source/query groups
+   and the competing-candidate scope required by ranking and global extraction.
+   Use the existing development selection
+   rules where applicable, record uncertainty and retain mini if no challenger
+   qualifies. Do not substitute the exposed 200-source E07 result for this check,
+   adaptively resample for a better result, inspect private answers, or use final
+   reporting populations to choose the model. Local ranking pools remain local.
+4. Reuse native preparation, embeddings and compatible scores. A cached mini
+   control is valid only when the selected recipe, actual fitted artifacts,
+   population/query pools, prompts, model revision and extraction identities
+   match. Reconstruct its saved probabilities through the comparison path and
+   reproduce scores, rankings and mappings before paying for Luna. Missing
+   matching control requests require declared, accounted mini calls; changing
+   the configuration to fit an available cache is prohibited.
+5. Implement the smallest compatible replay through the actual selected pipeline.
+   The existing `compare_luna_e07.py` supports only its label-free scalar/greedy
+   recipe; it cannot silently stand in for G4's fitted selector/calibration and
+   extraction. Preserve fit provenance. Any explicit evaluation-only binding
+   for the swapped judge must verify identical fitted bytes and authorize only
+   this comparison; never relabel a mini-trained fit as Luna-trained or relax
+   general cache/deployment compatibility checks.
+6. Record both actual model identities, the required wire/predicate adaptation,
+   coverage/refusals, paired quality, correction/harm and cost. Because mini uses
+   chat token probabilities and Luna uses Decisions, this estimates the effect
+   of the deployed judge interface as well as the model. It answers which judge
+   works better with the mini-selected configuration, not which independently
+   optimized system is best. Unlisted reference pairs remain unlabelled; they are
+   not confirmed negatives.
+7. Freeze the resulting judge choice before final scientific runs and rebind
+   their prospective descriptors. Preserve the original G4 decision and report
+   this as a separate model choice; do not overwrite old metrics. A model change
+   alone cannot be credited as an architectural gain: final controls/contrasts
+   must preserve the declared attribution or explicitly delimit the claim.
+   If Luna is chosen, its final application manifest must bind the same unchanged
+   artifacts and inherited training provenance to the chosen judge. The comparison's
+   evaluation-only binding does not itself authorize final deployment.
+
+Preparation belongs after corrected G4 selection/fitting evidence is available.
+The live supervisor has a metadata/code-only preparation successor, not an
+already implemented scientific worker. Its predecessor must replace preparation
+dependencies with real admitted verification/selection successors before retiring
+its row; the comparison preparer must do the same for the actual paired worker
+and final admission. No fictitious completed run satisfies either dependency.
+GPU throughput checks can proceed independently. Keep the old E17 rows held and
+carry the comparison dependency into every corrected final descriptor.
+
+Use the existing E07/campaign spending authority, including all historical spend;
+forecast both arms before dispatch. This approval does not raise the 25M E07 or
+200M campaign pauses, change prompt limits, or reopen the completed t2 run.
+Rationales remain off. Submit admitted workers as detached supervised Slurm steps,
+preserve the interactive allocation and existing storage guards, and hand off
+monitoring without babysitting. No new paid calls are made by plan preparation.

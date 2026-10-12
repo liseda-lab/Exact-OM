@@ -263,6 +263,14 @@ introduced.
 
 ## 6. Correct G4's cost comparison before final freeze
 
+**Approved sequencing amendment, 2026-10-12:** complete this configuration
+selection with GPT-4o mini, then run the two-judge comparison on the unchanged
+selected configuration described in
+[E07 Luna](E07-LUNA-COMPARISON-20261012.md#approved-continuation-select-the-configuration-then-compare-judges).
+Freeze that separate judge decision before final scientific dispatch. No
+per-judge refitting, earlier-arm reopening or historical G4 replacement follows
+from this amendment; the existing final resource and scientific gates remain.
+
 The inspected selected/core configuration enables `diff.enabled`, formulation `off`,
 `dump_components` and `controlled_perturbations`. The difference-channel path performs ten
 synthetic diagnostic replays per pair; the baseline does not enable the same extras. These

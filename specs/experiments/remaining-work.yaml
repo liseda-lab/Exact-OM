@@ -1,6 +1,23 @@
 schema_version: 1
 kind: planning_snapshot_not_campaign_lock
 recorded_at: '2026-09-29T18:28:17.277127+00:00'
+pre_final_judge_comparison:
+  approved_at: '2026-10-12'
+  status: approved_preparation_pending_after_corrected_g4
+  specification: specs/experiments/E07-LUNA-COMPARISON-20261012.md
+  development_judge: openai/gpt-4o-mini-2024-07-18
+  challenger: openai/gpt-6-luna-decisions
+  comparison: two_judges_one_frozen_g4_selected_configuration
+  preparation_id: pre-final-judge-comparison-prepare-20261012
+  preparation_after: T09-fitted-checks-and-admission-prepare-20261010
+  scientific_worker_ready: false
+  refit_per_model: false
+  reopen_development_arms: false
+  required_before_final_scientific_dispatch: true
+  interface_difference_reported: true
+  spending_scope: E07
+  raises_spending_allowances: false
+  historical_inventory_counts_below_preserved: true
 prospective_throughput_final_spec:
   recorded_at: '2026-10-09'
   status: specified_not_implemented_not_deployed

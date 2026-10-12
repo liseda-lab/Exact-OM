@@ -7,9 +7,14 @@ defines the 200 cold unique pairs/second implementation target and acceptance wo
 Apply them only through a new reviewed design/execution revision; this notice changes no
 active G4 or final runtime lock. Historical matrix/cap text below remains the design history.
 
-**Optional diagnostic, 2026-10-12:** [E07 Luna sensitivity](E07-LUNA-COMPARISON-20261012.md)
-prepares a CPU/API replay on liseda-t2 using saved development evidence and the
-OpenRouter alpha Decisions endpoint. It does not change the active G4 or final-study recipe.
+**Approved sequencing, 2026-10-12:** finish development and G4 with GPT-4o mini,
+then freeze the selected configuration and compare mini against Luna before final
+scientific work. Hold fitted weights, thresholds, evidence, candidates and all other
+components fixed; do not reopen earlier arms or refit separately for Luna. The
+[E07 Luna specification](E07-LUNA-COMPARISON-20261012.md#approved-continuation-select-the-configuration-then-compare-judges)
+records the paired comparison, reuse, spending and supervisor handoff requirements.
+The completed small E07 sensitivity is separate evidence, not that final model choice.
+This sequencing changes no active G4 worker or historical result.
 
 **Operational amendment, 2026-09-29:** [RUN-ONCE-EXECUTION.md](RUN-ONCE-EXECUTION.md)
 supersedes time caps, full qualification repeats and the old dispatch dates below.

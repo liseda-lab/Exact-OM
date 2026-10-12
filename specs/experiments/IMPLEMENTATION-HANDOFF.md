@@ -1,5 +1,14 @@
 # Batch implementation handoff
 
+**2026-10-12 approved model-selection order:** finish development/G4 with the
+historical GPT-4o mini judge, freeze the corrected selected configuration and fits,
+then compare mini and Luna with those exact components fixed before final work.
+No per-model refitting or reopening rejected arms. Read the approved continuation in
+[E07 Luna](E07-LUNA-COMPARISON-20261012.md#approved-continuation-select-the-configuration-then-compare-judges)
+and the registry's `pre_final_judge_comparison_20261012` handoff. This is queued
+preparation; the fitted-pipeline comparison worker still requires implementation
+and verified bindings. Keep final admission dependent on its actual result/freeze.
+
 **2026-10-10 current continuation:** read the
 [throughput implementation review](THROUGHPUT-REVIEW-20261010.md) and the live
 registry's `throughput_review_20261010` handoff before acting on the historical
