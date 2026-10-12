@@ -1,0 +1,23 @@
+{
+  "hard_campaign_cap_usd": 35,
+  "heldout_test_opened": false,
+  "models": [
+    "openai/gpt-6-luna",
+    "anthropic/claude-haiku-5.5",
+    "minimax/minimax-m3",
+    "google/gemini-2.5-pro"
+  ],
+  "plan": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/qualification/judge-pilot-20261012-001/plan.json",
+    "sha256": "5c9634443dbf9290ca7a98d644dbcd8c690ce9d8f9e49454194ac3c2c5fd8355"
+  },
+  "preflight": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/qualification/judge-pilot-20261012-001/preflight.json",
+    "sha256": "fcde44d11285b4a05690ecc1e4c2930ba2525954cfee5aef695f4c31c3952a61"
+  },
+  "previous_supervision_replaced": false,
+  "request_count": 24,
+  "schema": "exact-repair/isolated-judge-pilot-handoff/v1",
+  "status": "prepared",
+  "tests": "9 targeted transport, budget, crash/replay, scoring and native-control tests; strict mypy on both new modules."
+}
