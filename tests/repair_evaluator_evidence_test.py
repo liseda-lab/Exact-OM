@@ -336,3 +336,99 @@ def test_incomplete_native_checkpoint_never_becomes_an_annotation_fact(tmp_path,
     )
     with pytest.raises(ValueError, match="native evidence unavailable"):
         evidence.augment(p, record, ((0,), (1,)), tmp_path, seconds=30)
+
+
+@pytest.mark.parametrize("swapped", [False, True])
+def test_anchor_guard_rejects_false_perfection_without_rewriting_scores(swapped):
+    from exact.repair.semantic_fidelity import ANCHORED_PARSER_VERSION
+
+    p = packet()
+    facts = {}
+    for side, plan in (("A", p.plan_a), ("B", p.plan_b)):
+        truth = "true" if side == "A" else "false"
+        facts["INTENDED_" + side] = dict(
+            source_id="native-report",
+            release=evidence.REVISION,
+            kind="native_intended_entailed",
+            symbolic_value=truth,
+            text=json.dumps(
+                dict(
+                    plan_id=plan.plan_id,
+                    theory_hash=plan.theory_hash,
+                    policy_hash=plan.policy_hash,
+                    outcome=truth,
+                )
+            ),
+        )
+    p = replace(p, evidence={**p.evidence, **facts})
+    raw = reference_judgment(p, swapped=swapped, decision="tie", a=1, b=1)
+    for c in raw["criteria"]:
+        c["symbolic_claims"] = [dict(evidence_id=k) for k in facts]
+    value = validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": ANCHORED_PARSER_VERSION}
+    )
+    assert not value.global_target_eligible
+    assert any("perfect_score_with_missing_commitment" in x for x in value.validation_errors)
+    assert all(c["a_score"] == c["b_score"] == 1 for c in value.criteria)
+    assert value.overall_score_a is value.overall_score_b is None
+    # Legacy frozen records retain their exact interpretation.
+    assert validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": REFERENCE_PARSER_VERSION}
+    ).global_target_eligible
+    for c in raw["criteria"]:
+        c.update(a_score=0.5, b_score=0.5)
+    assert validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": ANCHORED_PARSER_VERSION}
+    ).global_target_eligible
+    raw["criteria"][0]["symbolic_claims"] = [dict(evidence_id="INTENDED_A")]
+    invalid = validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": ANCHORED_PARSER_VERSION}
+    )
+    assert not invalid.global_target_eligible
+    assert any("incomplete_intended_evidence" in x for x in invalid.validation_errors)
+
+
+def test_cumulative_quota_amendments_authenticate_the_original_limits(tmp_path):
+    old = dict(calibration=91, train=325, development=96, test=192)
+    previous = dict(
+        request_limits=old,
+        lineage_id="campaign",
+        cost_ceiling_usd=35,
+        ledger_directory=str(tmp_path),
+        phase="development",
+    )
+    for i, amount in enumerate((48, 16)):
+        immutable(tmp_path / f"previous-{i}.json", previous)
+        prior = dict(
+            request_limits=previous["request_limits"],
+            reservations={},
+            lineage="campaign",
+            cost_ceiling_usd=35,
+        )
+        immutable(tmp_path / f"phase-{i}.json", prior)
+        limits = {
+            **previous["request_limits"],
+            "train": previous["request_limits"]["train"] - amount,
+            "development": previous["request_limits"]["development"] + amount,
+        }
+        amendment = dict(
+            schema="exact-repair/dev-evaluator-request-reallocation/v1",
+            authorized=True,
+            user_instruction="Proceed with fix",
+            costs_reset=False,
+            old_limits=previous["request_limits"],
+            new_limits=limits,
+            previous_manifest=binding(tmp_path / f"previous-{i}.json"),
+            phase_before=binding(tmp_path / f"phase-{i}.json"),
+        )
+        immutable(tmp_path / f"amendment-{i}.json", amendment)
+        previous = {
+            **previous,
+            "request_limits": limits,
+            "evaluator_request_amendment": binding(tmp_path / f"amendment-{i}.json"),
+        }
+        assert evidence.original_request_limits(previous) == old
+    assert previous["request_limits"]["development"] == 160
+    (tmp_path / "previous-0.json").write_text("{}")
+    with pytest.raises(ValueError):
+        evidence.original_request_limits(previous)

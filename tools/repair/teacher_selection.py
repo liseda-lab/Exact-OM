@@ -216,10 +216,10 @@ def qualified_contract(manifest):
     revised_interface = bool(manifest.get("dev_interface_amendment"))
     limits = selected["request_limits"]
     if manifest.get("evaluator_request_amendment"):
-        from tools.repair.evaluator_evidence import request_reallocation
+        from tools.repair.evaluator_evidence import request_reallocation, original_request_limits
 
         quota, _, _ = request_reallocation(manifest)
-        if quota["old_limits"] != limits:
+        if original_request_limits(manifest) != limits:
             raise ValueError("Evaluator quota amendment changed the teacher lineage")
         limits = quota["new_limits"]
     if revised_interface:
@@ -286,6 +286,12 @@ def compatible_input_profile(manifest, source, profile):
 
         validate_amendment(manifest)
         optional.add("max_output_tokens")
+        amendment = bound(manifest["dev_interface_amendment"])
+        if amendment.get("reasoning_amendment"):
+            reasoning = amendment["reasoning_amendment"]
+            if reasoning != {"previous": baseline["reasoning"], "current": controls["reasoning"]}:
+                return False
+            optional.add("reasoning")
     if {k: v for k, v in controls.items() if k not in optional} != {
         k: v for k, v in baseline.items() if k not in optional
     }:

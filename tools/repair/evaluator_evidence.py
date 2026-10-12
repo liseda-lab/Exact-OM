@@ -55,6 +55,18 @@ def request_reallocation(manifest):
     return amendment, prior, previous
 
 
+def original_request_limits(manifest):
+    """Authenticate each cumulative amendment back to the original phase quotas."""
+    seen = set()
+    while manifest.get("evaluator_request_amendment"):
+        identity = canonical_hash(manifest["evaluator_request_amendment"])
+        if identity in seen:
+            raise ValueError("Cyclic evaluator quota amendments")
+        seen.add(identity)
+        _, _, manifest = request_reallocation(manifest)
+    return manifest["request_limits"]
+
+
 def intentions(case):
     import pyowl_core as owl
 

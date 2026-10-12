@@ -90,6 +90,9 @@ def request_profile(manifest, name):
     elif reasoning == {"enabled": False}:
         if support.get("mandatory") is not False:
             raise ValueError("Model does not explicitly support reasoning disable")
+    elif reasoning == {"enabled": True}:
+        if not support:
+            raise ValueError("Model does not explicitly support reasoning enable")
     elif reasoning == {"effort": "low"}:
         if "low" not in support.get("supported_efforts", []):
             raise ValueError("Model does not explicitly support low effort")

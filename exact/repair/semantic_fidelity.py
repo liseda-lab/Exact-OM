@@ -28,6 +28,7 @@ ROLES = (TEACHER, EVALUATOR)
 CRITERIA = ("meaning_retention", "assertion_fidelity", "collateral_fidelity")
 PARSER_VERSION = "semantic-fidelity-validator/v3.1"
 REFERENCE_PARSER_VERSION = "semantic-fidelity-validator/v3.2-references"
+ANCHORED_PARSER_VERSION = "semantic-fidelity-validator/v3.3-anchors"
 PROMPT_VERSION = "semantic-fidelity-prompt/v3.1"
 AGGREGATION_REVISION = "exact-repair/semantic-fidelity-aggregate/v3.3"
 FIDELITY_TRAINING_SCHEMA = "exact-repair/fidelity-training/v3.3"
@@ -207,7 +208,40 @@ not be duplicated in evidence_ids. Use evidence_ids for other supporting evidenc
 Do not cite SATISFIABLE for an ENTAILS claim. quotes must be []. Every factual
 claim in the rationale must agree with the cited evidence. Preserve all criteria.
 """
+ANCHORED_PROMPT_VERSION = "semantic-fidelity-prompt/v3.8"
+ANCHORED_PROMPT = (
+    REFERENCE_PROMPT
+    + """
+Apply the anchors to EACH PLAN INDEPENDENTLY before comparing A and B. Equal
+failure is a tie at the justified low scores, never automatically 1 versus 1.
+D2 lists POSITIVE intended commitments: every listed axiom is required to follow.
+INTENDED_ENTAILS=false means that required commitment is MISSING. It does not mean
+that non-entailment was intended. INTENDED_SATISFIABLE=true does not preserve it.
+The noisy original observation and passing witness checks cannot replace D2.
+
+For assertion_fidelity and meaning_retention, explicitly consider and cite EVERY
+INTENDED_ENTAILS fact for both plans. A score of 1 is invalid if any required D2
+commitment is missing. Losing the entire sole D2 commitment is complete loss of
+that editable meaning; shared fixed background alone does not make it preserved.
+For multiple commitments, distinguish partial from complete retention. Assess
+collateral_fidelity separately: do not penalize an unchanged background because
+the editable commitment was lost. Never invent intended negative commitments.
+Keep rationales short, with one statement per plan's retention and the relevant
+collateral effects. Cite checked facts by reference. Check your numeric anchors,
+criterion preferences and weighted overall decision for agreement before output.
+"""
+)
+
+
+def parser_for_prompt(version):
+    return {
+        REFERENCE_PROMPT_VERSION: REFERENCE_PARSER_VERSION,
+        ANCHORED_PROMPT_VERSION: ANCHORED_PARSER_VERSION,
+    }.get(version, PARSER_VERSION)
+
+
 PROMPTS = {
+    ANCHORED_PROMPT_VERSION: ANCHORED_PROMPT,
     REFERENCE_PROMPT_VERSION: REFERENCE_PROMPT,
     COMPLETE_PROMPT_VERSION: COMPLETE_PROMPT,
     CONTRAST_PROMPT_VERSION: CONTRAST_PROMPT,
@@ -620,7 +654,8 @@ def validate_comparison(
     target. Invalid evidence or fabricated quotes raise; callers persist raw bytes.
     """
     value = _strict_json(raw)
-    reference_contract = (annotator or {}).get("parser_version") == REFERENCE_PARSER_VERSION
+    parser = (annotator or {}).get("parser_version", PARSER_VERSION)
+    reference_contract = parser in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
     if reference_contract:
         # Normalize only explicitly supplied references, never a truth value or
         # score. The original wire bytes remain in the authenticated receipt.
@@ -719,6 +754,31 @@ def validate_comparison(
         b = _number(criterion["b_score"], "criterion score")
         if max(a, b) > 1:
             raise ValueError("Criterion score exceeds one")
+        if parser == ANCHORED_PARSER_VERSION and name in {
+            "assertion_fidelity",
+            "meaning_retention",
+        }:
+            for side, score in (("a", a), ("b", b)):
+                plan_id = context[f"plan_{side}_id"]
+                plan = next(p for p in (packet.plan_a, packet.plan_b) if p.plan_id == plan_id)
+                facts = {}
+                for key, fact in packet.evidence.items():
+                    if fact["kind"] != "native_intended_entailed":
+                        continue
+                    detail = _strict_json(fact["text"])
+                    if detail["plan_id"] == plan_id:
+                        if (
+                            detail["theory_hash"] != plan.theory_hash
+                            or detail["policy_hash"] != plan.policy_hash
+                            or detail["outcome"] != fact["symbolic_value"]
+                            or fact["symbolic_value"] not in {"true", "false"}
+                        ):
+                            raise ValueError("Intended fact context mismatch")
+                        facts[key] = fact["symbolic_value"]
+                if not facts or not set(facts) <= set(citations):
+                    errors.append(f"incomplete_intended_evidence:{name}:{side}")
+                if score == 1 and "false" in facts.values():
+                    errors.append(f"perfect_score_with_missing_commitment:{name}:{side}")
         expected = "tie" if abs(a - b) <= tie_tolerance else ("A" if a > b else "B")
         if criterion["preference"] != expected:
             errors.append(f"inconsistent_criterion:{name}")
@@ -738,7 +798,7 @@ def validate_comparison(
         canonical_hash(
             (
                 value,
-                REFERENCE_PARSER_VERSION if reference_contract else PARSER_VERSION,
+                parser if reference_contract else PARSER_VERSION,
                 annotator or {},
                 presentation or {},
             )
@@ -1274,9 +1334,10 @@ def _validated_observation(
     parser = metadata.get("parser_version")
     if parser not in schedule.parser_versions:
         raise ValueError("Parser revision is outside the frozen aggregation schedule")
-    if (parser == REFERENCE_PARSER_VERSION) != (
-        context["prompt_version"] == REFERENCE_PROMPT_VERSION
-    ):
+    if (
+        parser in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
+        or parser_for_prompt(context["prompt_version"]) != PARSER_VERSION
+    ) and parser != parser_for_prompt(context["prompt_version"]):
         raise ValueError("Checked-reference parser differs from the frozen prompt contract")
     if (
         metadata.get("role") != parameters["role"]
@@ -1996,13 +2057,7 @@ class SemanticAnnotationAdapter:
         if role not in self.profiles or packet.content_hash not in self.run.packet_hashes:
             raise ValueError("Annotation schedule is outside the declared run")
         if parser_versions is None:
-            parser_versions = (
-                (
-                    REFERENCE_PARSER_VERSION
-                    if self.run.prompt_version == REFERENCE_PROMPT_VERSION
-                    else PARSER_VERSION
-                ),
-            )
+            parser_versions = (parser_for_prompt(self.run.prompt_version),)
         repeats = tuple(range(self.run.repetitions)) if repetitions is None else tuple(repetitions)
         if len(set(repeats)) != len(repeats) or any(
             type(v) is not int or not 0 <= v < self.run.repetitions for v in repeats
@@ -2082,14 +2137,11 @@ class SemanticAnnotationAdapter:
         if not self.run.authorized:
             raise PermissionError("Annotation requires a separately authorized frozen run manifest")
         if parser_version is None:
-            parser_version = (
-                REFERENCE_PARSER_VERSION
-                if self.run.prompt_version == REFERENCE_PROMPT_VERSION
-                else PARSER_VERSION
-            )
-        if (parser_version == REFERENCE_PARSER_VERSION) != (
-            self.run.prompt_version == REFERENCE_PROMPT_VERSION
-        ):
+            parser_version = parser_for_prompt(self.run.prompt_version)
+        if (
+            parser_version in {REFERENCE_PARSER_VERSION, ANCHORED_PARSER_VERSION}
+            or parser_for_prompt(self.run.prompt_version) != PARSER_VERSION
+        ) and parser_version != parser_for_prompt(self.run.prompt_version):
             raise ValueError("Checked-reference parser requires its frozen prompt contract")
         if role not in self.profiles:
             raise ValueError("Unknown explicit repair annotation role")
