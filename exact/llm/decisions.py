@@ -1,8 +1,8 @@
 """Isolated, durable text-predicate client for the E07 Luna diagnostic.
 
 This does not change the experiment router or selected judge. Paid calls require
-the existing prompt policy and shared hard spending authority. The direct API
-contract is https://developers.openai.com/api/reference/resources/decisions/methods/create.
+the existing prompt policy and shared hard spending authority. The OpenRouter
+alpha contract was verified by the retained 2026-10-12 Decisions pilot responses.
 """
 
 from __future__ import annotations
@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import math
 import os
+from copy import deepcopy
 from pathlib import Path
 from time import monotonic
 from typing import Any
@@ -20,6 +21,7 @@ from exact.llm.ledger import RequestLedger, request_identity
 from exact.llm.prompt_budget import (
     DECISIONS_ENDPOINT,
     DECISIONS_MODEL,
+    DECISIONS_PROVIDER,
     decisions_payload_text,
     load_prompt_budget_policy,
     validate_prompt_budget,
@@ -34,8 +36,9 @@ def predicate_identity(
     """Build the exact request identity without credentials, I/O or admission."""
     payload = {
         "model": DECISIONS_MODEL,
-        "input": input_text,
-        "questions": [{"type": "predicate", "name": "equivalent", "instructions": instructions}],
+        "state": {"evidence": input_text},
+        "questions": {"equivalent": {"type": "noul", "instructions": instructions}},
+        "provider": deepcopy(DECISIONS_PROVIDER),
     }
     decisions_payload_text(payload)
     return {
@@ -43,7 +46,7 @@ def predicate_identity(
         "role": "decision",
         "endpoint": DECISIONS_ENDPOINT,
         "payload": payload,
-        "revision": "openai_decisions_predicate_v1",
+        "revision": "openrouter_decisions_noul_v1",
         "tokenizer": tokenizer,
         "tokenizer_revision": tokenizer_revision,
     }
@@ -90,6 +93,7 @@ class DecisionsClient:
         tokenizer: str,
         tokenizer_revision: str,
         api_key: str | None = None,
+        api_key_path: Path | None = None,
         transport: httpx.BaseTransport | None = None,
         timeout_secs: float = 60.0,
         cache_only: bool = False,
@@ -98,14 +102,20 @@ class DecisionsClient:
             raise ValueError("Decisions timeout must be finite and positive")
         self.ledger = RequestLedger(Path(ledger_dir))
         self.profile = LLMProfile(
-            name="openai_luna_decisions",
-            backend="openai_decisions",
+            name="openrouter_luna_decisions",
+            backend="openrouter",
             model=DECISIONS_MODEL,
-            revision="openai_decisions_predicate_v1",
+            revision="openrouter_decisions_noul_v1",
             tokenizer=tokenizer,
             tokenizer_revision=tokenizer_revision,
+            api_base="https://openrouter.ai/api/alpha",
         )
         self._api_key = api_key
+        self.api_key_path = (
+            Path(api_key_path)
+            if api_key_path is not None
+            else Path(__file__).resolve().parents[2] / "api_key"
+        )
         self.cache_only = cache_only
         self._client = httpx.Client(transport=transport, timeout=timeout_secs)
 
@@ -133,12 +143,18 @@ class DecisionsClient:
                 return self._result(key, cached[0], cached[1], cached=True)
             if cache_only:
                 raise RuntimeError(f"Decisions cached-only request {key} has no saved response")
-            api_key = self._api_key if self._api_key is not None else os.getenv("OPENAI_API_KEY")
+            api_key = (
+                self._api_key if self._api_key is not None else os.getenv("OPENROUTER_API_KEY")
+            )
+            if api_key is None and self.api_key_path.is_file():
+                api_key = self.api_key_path.read_text(encoding="utf-8")
             if not isinstance(api_key, str) or not api_key.strip():
-                raise RuntimeError("Direct Decisions API requires OPENAI_API_KEY")
+                raise RuntimeError(
+                    "OpenRouter Decisions requires OPENROUTER_API_KEY or api_key file"
+                )
             api_key = api_key.strip()
-            if api_key.startswith("sk-or-"):
-                raise RuntimeError("Direct Decisions API cannot use an OpenRouter credential")
+            if not api_key.startswith("sk-or-"):
+                raise RuntimeError("OpenRouter Decisions requires an OpenRouter credential")
             policy = selected_policy()
             if policy is None or policy["policy"]["schema_version"] != 2:
                 raise HostedSpendingError("Decisions requires the bound v2 hosted spending policy")
@@ -146,7 +162,7 @@ class DecisionsClient:
             validate_prompt_budget(
                 self.profile, payload, "decisions", role="decision", binding=prompt_policy
             )
-            number = self.ledger.sent(key)
+            number = self.ledger.sent(key, retry_rejected=False)
             started = monotonic()
             try:
                 response = self._client.post(
@@ -184,21 +200,25 @@ class DecisionsClient:
         # Account credible usage even for refused, malformed or wrong-model answers.
         # Replaying also recovers a crash between raw commit and usage settlement.
         self.ledger.usage(key, number, usage)
-        if not isinstance(data, dict) or data.get("model") != DECISIONS_MODEL:
+        if not isinstance(data, dict) or data.get("model") not in {
+            DECISIONS_MODEL,
+            DECISIONS_MODEL + "-20261006",
+        }:
             raise ValueError("Decisions returned an unexpected or missing model identity")
+        if data.get("provider") != "OpenAI":
+            raise ValueError("Decisions returned an unexpected or missing provider identity")
         answers = data.get("answers")
         if (
-            not isinstance(answers, list)
-            or len(answers) != 1
-            or not isinstance(answers[0], dict)
-            or answers[0].get("name") != "equivalent"
-            or answers[0].get("type") not in {"predicate", "refusal"}
+            not isinstance(answers, dict)
+            or set(answers) != {"equivalent"}
+            or not isinstance(answers["equivalent"], dict)
+            or answers["equivalent"].get("type") not in {"noul", "refusal"}
         ):
             raise ValueError("Decisions returned an invalid or mismatched predicate answer")
-        answer = answers[0]
+        answer = answers["equivalent"]
         refused = answer["type"] == "refusal"
-        probability = None if refused else answer.get("probability")
-        if refused and "probability" in answer:
+        probability = None if refused else answer.get("noul")
+        if refused and "noul" in answer:
             raise ValueError("Decisions refusal cannot include a probability")
         if not refused and (
             not isinstance(probability, (int, float))
@@ -215,6 +235,8 @@ class DecisionsClient:
             "refusal": "model_refusal" if refused else None,
             "request_id": key,
             "response_id": data.get("id"),
+            "model": data["model"],
+            "provider": data["provider"],
             "usage": usage,
             "cached": cached,
         }

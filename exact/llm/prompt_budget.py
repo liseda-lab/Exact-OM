@@ -22,8 +22,14 @@ MAX_INPUT_TOKENS = 12288
 MAX_OUTPUT_TOKENS = 1024
 MAX_INPUT_BYTES = 32768
 COUNTING_METHOD = "pinned_tokenizer_plus_overhead_and_utf8_cap_v1"
-DECISIONS_ENDPOINT = "https://api.openai.com/v1/decisions"
-DECISIONS_MODEL = "gpt-6-luna"
+DECISIONS_ENDPOINT = "https://openrouter.ai/api/alpha/decisions"
+DECISIONS_MODEL = "openai/gpt-6-luna-decisions"
+DECISIONS_PROVIDER = {
+    "only": ["openai"],
+    "allow_fallbacks": False,
+    "require_parameters": True,
+    "max_price": {"prompt": 0.20, "completion": 0},
+}
 
 
 class PromptBudgetError(RuntimeError):
@@ -36,20 +42,22 @@ def decisions_payload_text(payload: Mapping[str, Any]) -> str:
     Only this explicit API contract has no generated output token allowance.
     Images, extra questions and arbitrary fields are deliberately unsupported.
     """
-    questions = payload.get("questions")
+    state, questions = payload.get("state"), payload.get("questions")
     if (
-        set(payload) != {"model", "input", "questions"}
+        set(payload) != {"model", "state", "questions", "provider"}
         or payload.get("model") != DECISIONS_MODEL
-        or not isinstance(payload.get("input"), str)
-        or not payload["input"].strip()
-        or not isinstance(questions, list)
-        or len(questions) != 1
-        or not isinstance(questions[0], dict)
-        or set(questions[0]) != {"type", "name", "instructions"}
-        or questions[0].get("type") != "predicate"
-        or questions[0].get("name") != "equivalent"
-        or not isinstance(questions[0].get("instructions"), str)
-        or not questions[0]["instructions"].strip()
+        or payload.get("provider") != DECISIONS_PROVIDER
+        or not isinstance(state, dict)
+        or set(state) != {"evidence"}
+        or not isinstance(state["evidence"], str)
+        or not state["evidence"].strip()
+        or not isinstance(questions, dict)
+        or set(questions) != {"equivalent"}
+        or not isinstance(questions["equivalent"], dict)
+        or set(questions["equivalent"]) != {"type", "instructions"}
+        or questions["equivalent"].get("type") != "noul"
+        or not isinstance(questions["equivalent"].get("instructions"), str)
+        or not questions["equivalent"]["instructions"].strip()
     ):
         raise PromptBudgetError("Unsupported Decisions text predicate payload")
     text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"), allow_nan=False)
@@ -162,7 +170,7 @@ def validate_prompt_budget(
             "echo",
         }
         accepted = (
-            {"model", "input", "questions"}
+            {"model", "state", "questions", "provider"}
             if endpoint == "decisions"
             else common | ({"messages"} if endpoint == "chat/completions" else {"prompt"})
         )
@@ -252,7 +260,7 @@ def validate_prompt_budget(
             counts = [_count_text(tokenizer, prompt, special_tokens=True) for prompt in prompts]
             raw_tokens = sum(count[0] for count in counts)
             estimate = raw_tokens + batch_size * policy["chat_overhead_tokens"]
-            method = "decisions_text_predicate" if endpoint == "decisions" else "completion_text"
+            method = "decisions_text_noul" if endpoint == "decisions" else "completion_text"
         if estimate > policy["max_input_tokens"]:
             raise PromptBudgetError(
                 f"Input admission estimate {estimate} exceeds limit {policy['max_input_tokens']} "

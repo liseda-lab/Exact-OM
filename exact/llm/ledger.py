@@ -164,7 +164,7 @@ class RequestLedger:
             finally:
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
-    def sent(self, key: str, *, retry_unknown: bool = False) -> int:
+    def sent(self, key: str, *, retry_unknown: bool = False, retry_rejected: bool = True) -> int:
         """Claim one wire attempt; duplicate active writers and unapproved retries fail."""
         policy = selected_policy()
         with self._transaction() as db:
@@ -181,6 +181,10 @@ class RequestLedger:
             if last is not None:
                 if last["state"] == "completed":
                     raise RuntimeError("Request completed concurrently; reload its cached response")
+                if last["state"] == "rejected" and not retry_rejected:
+                    raise RuntimeError(
+                        "Rejected paid request retained; automatic resend prohibited"
+                    )
                 if grant is not None and grant["consumed_by"] is not None:
                     raise RuntimeError(
                         "Approved paid retry already used; another attempt requires authorization"
