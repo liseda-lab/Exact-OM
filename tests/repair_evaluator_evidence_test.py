@@ -11,6 +11,9 @@ from exact.repair.annotation_controls import response_format
 from exact.repair.semantic_fidelity import (
     REFERENCE_PARSER_VERSION,
     REFERENCE_PROMPT_VERSION,
+    ANCHORED_PARSER_VERSION,
+    CRITERION_PARSER_VERSION,
+    CRITERION_PROMPT_VERSION,
     TEACHER,
     aggregate_comparisons,
     validate_comparison,
@@ -96,29 +99,65 @@ def test_reference_schema_prevents_value_copy_and_keeps_unknowns():
     assert criterion["quotes"]["maxItems"] == 0
 
 
-def test_reference_wire_replay_and_swap_aggregation_keep_unique_provenance(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    "prompt_version,parser_version",
+    [
+        (REFERENCE_PROMPT_VERSION, REFERENCE_PARSER_VERSION),
+        (CRITERION_PROMPT_VERSION, CRITERION_PARSER_VERSION),
+    ],
+)
+def test_reference_wire_replay_and_swap_aggregation_keep_unique_provenance(
+    tmp_path, monkeypatch, prompt_version, parser_version
+):
     p = packet()
+    facts = {
+        "I"
+        + side: dict(
+            source_id="native",
+            release=evidence.REVISION,
+            kind="native_intended_entailed",
+            symbolic_value="true",
+            text=json.dumps(
+                dict(
+                    plan_id=plan.plan_id,
+                    theory_hash=plan.theory_hash,
+                    policy_hash=plan.policy_hash,
+                    outcome="true",
+                )
+            ),
+        )
+        for side, plan in (("A", p.plan_a), ("B", p.plan_b))
+    }
+    p = replace(p, evidence={**p.evidence, **facts})
 
     def handler(**kwargs):
         wire = json.loads(kwargs["content"])
         context = json.loads(wire["messages"][1]["content"])
         swap = context["swapped"]
-        return response(
-            reference_judgment(
-                p,
-                swapped=swap,
-                decision="B" if swap else "A",
-                a=0.25 if swap else 0.75,
-                b=0.75 if swap else 0.25,
-            )
+        raw = reference_judgment(
+            p,
+            swapped=swap,
+            decision="B" if swap else "A",
+            a=0.25 if swap else 0.75,
+            b=0.75 if swap else 0.25,
         )
+        for c in raw["criteria"]:
+            c["symbolic_claims"] = [dict(evidence_id=k) for k in facts]
+        return response(raw)
 
     annotator, calls = adapter(tmp_path, monkeypatch, handler=handler)
-    annotator.run = replace(annotator.run, prompt_version=REFERENCE_PROMPT_VERSION)
+    from exact.repair.records import canonical_hash
+
+    annotator.run = replace(
+        annotator.run,
+        prompt_version=prompt_version,
+        packet_hashes=(p.content_hash,),
+        evidence_manifest_hash=canonical_hash((p.content_hash,)),
+    )
     schedule = annotator.schedule(
         p, role=TEACHER, quorum=2, repetitions=(0,), presentation_orders=(False, True)
     )
-    assert schedule.parser_versions == (REFERENCE_PARSER_VERSION,)
+    assert schedule.parser_versions == (parser_version,)
     a = annotator.annotate(p, role=TEACHER)
     b = annotator.annotate(p, role=TEACHER, swapped=True)
     result = aggregate_comparisons([a, b], schedule=schedule)
@@ -432,3 +471,46 @@ def test_cumulative_quota_amendments_authenticate_the_original_limits(tmp_path):
     (tmp_path / "previous-0.json").write_text("{}")
     with pytest.raises(ValueError):
         evidence.original_request_limits(previous)
+
+
+@pytest.mark.parametrize("swapped", [False, True])
+def test_distinct_criteria_do_not_turn_omission_into_a_false_assertion(swapped):
+    p = packet()
+    facts = {}
+    for side, plan in (("A", p.plan_a), ("B", p.plan_b)):
+        facts["I" + side] = dict(
+            source_id="native",
+            release=evidence.REVISION,
+            kind="native_intended_entailed",
+            symbolic_value="false",
+            text=json.dumps(
+                dict(
+                    plan_id=plan.plan_id,
+                    theory_hash=plan.theory_hash,
+                    policy_hash=plan.policy_hash,
+                    outcome="false",
+                )
+            ),
+        )
+    p = replace(p, evidence={**p.evidence, **facts})
+    raw = reference_judgment(p, swapped=swapped, decision="tie", a=1, b=1)
+    for c in raw["criteria"]:
+        c["symbolic_claims"] = [dict(evidence_id=k) for k in facts]
+        if c["criterion_id"] == "meaning_retention":
+            c.update(a_score=0, b_score=0)
+    valid = validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": CRITERION_PARSER_VERSION}
+    )
+    assert valid.global_target_eligible
+    assert valid.overall_score_a == pytest.approx(2 / 3)
+    assert valid.overall_score_b == pytest.approx(2 / 3)
+    assert not validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": ANCHORED_PARSER_VERSION}
+    ).global_target_eligible
+    for c in raw["criteria"]:
+        c.update(a_score=1, b_score=1)
+    invalid = validate_comparison(
+        json.dumps(raw), p, swapped=swapped, annotator={"parser_version": CRITERION_PARSER_VERSION}
+    )
+    assert not invalid.global_target_eligible
+    assert all(":meaning_retention:" in x for x in invalid.validation_errors)
