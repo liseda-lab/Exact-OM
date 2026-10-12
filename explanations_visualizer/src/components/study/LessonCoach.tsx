@@ -7,9 +7,10 @@
 // action, ticks a requirement or chooses an answer. The lesson's full steps sit behind "Why?".
 // Targets are semantic `data-tour` hooks on real controls, never coordinates or nth elements.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { IconCheck } from "@/components/common/Icons";
+import { useStickyBudget } from "@/lib/useStickyBudget";
 import type { LessonRequirement, RequirementAction, TutorialLesson } from "@/study/types";
 
 /** Frontend-authored short help per action; the requirement label (publication text) is the task itself. */
@@ -134,20 +135,9 @@ export function LessonCoach({
   const [why, setWhy] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
   const bar = useRef<HTMLElement>(null);
-  // Sticky bars stack: publish this bar's height so scrolled-to controls clear it (WCAG 2.4.11).
-  useEffect(() => {
-    const element = bar.current;
-    if (!element) return;
-    const root = document.documentElement;
-    const set = () => root.style.setProperty("--coach-h", `${Math.ceil(element.getBoundingClientRect().height)}px`);
-    set();
-    const observer = new ResizeObserver(set);
-    observer.observe(element);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty("--coach-h");
-    };
-  }, []);
+  // Sticky bars stack: publish this bar's height so scrolled-to controls clear it (WCAG 2.4.11);
+  // at enlarged text on a short viewport the bar scrolls with the page instead of covering it.
+  useStickyBudget(bar, "--coach-h", 0.4);
 
   const open = lesson.requirements.filter((requirement) => states[requirement.requirement_id] !== "saved");
   const doneCount = lesson.requirements.length - open.length;

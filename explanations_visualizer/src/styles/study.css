@@ -24,7 +24,13 @@
 }
 
 :root:has(.answer-bar) {
-  scroll-padding-bottom: 5.5rem;
+  scroll-padding-bottom: calc(var(--answer-h, 5rem) + 0.5rem);
+}
+
+/* A sticky bar taller than its share of the viewport scrolls with the page (useStickyBudget). */
+.coach-wrap[data-unstuck],
+.answer-bar[data-unstuck] {
+  position: static;
 }
 
 .admin-header {

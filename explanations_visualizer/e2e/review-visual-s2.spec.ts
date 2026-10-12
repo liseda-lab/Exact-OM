@@ -84,8 +84,10 @@ for (const scheme of SCHEMES) {
           await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
           await expect(page.locator(".graph-canvas canvas, .graph-empty").first()).toBeVisible({ timeout: 60_000 });
           await page.waitForTimeout(1500);
-          await page.getByRole("tab", { name: "Evidence graph", exact: true }).scrollIntoViewIfNeeded();
-          await page.evaluate(() => window.scrollBy(0, -80));
+          // The whole graph panel (canvas, legend and item list), then the canvas in the viewport.
+          const panel = page.getByRole("tabpanel");
+          await panel.screenshot({ path: join(out!, `main-graph-${name}-${width}-${scheme}-panel.png`) });
+          await page.locator(".graph-canvas, .graph-empty").first().scrollIntoViewIfNeeded();
           await shot(page, `main-graph-${name}-${width}-${scheme}`);
         }
       }
@@ -147,7 +149,8 @@ for (const scheme of SCHEMES) {
         for (const condition of first === "explanation" ? (["explanation", "ontology_baseline"] as const) : (["ontology_baseline", "explanation"] as const)) {
           await seedCondition(page, caseApi, condition);
           await page.reload();
-          await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible({ timeout: 60_000 });
+          // The rail is a landmark only on wide layouts; the case question is there at every width.
+          await expect(page.getByRole("heading", { level: 1, name: /^Does / })).toBeVisible({ timeout: 60_000 });
           if (condition === "ontology_baseline") {
             await shot(page, `study-baseline-case-${label}-${scheme}`);
             continue;

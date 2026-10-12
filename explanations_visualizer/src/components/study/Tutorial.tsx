@@ -600,7 +600,7 @@ function LessonWorkspace({
         answerSummary={answerSummaryOf(value, false)}
         railLabel="Practice candidates and your practice answer"
         toolbar={
-          <div className="coach-wrap">
+          <div className="coach-wrap" data-sticky>
             {coach(showMe, <ResourceAccessButton resources={resources} onOpen={() => record({ kind: "downloads" })} onDownload={() => record({ kind: "downloads" })} />)}
             {missing && (
               <p className="note coach-missing" role="status">

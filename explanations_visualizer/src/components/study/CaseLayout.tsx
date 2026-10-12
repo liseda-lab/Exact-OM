@@ -6,9 +6,10 @@
 // the answer status and jumps to it. The workspace keeps its tree position in both
 // arrangements, so switching layout never resets inspection or the graph.
 
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { useNarrow } from "@/lib/useMedia";
+import { useStickyBudget } from "@/lib/useStickyBudget";
 
 export function CaseLayout({
   toolbar,
@@ -31,6 +32,8 @@ export function CaseLayout({
   railLabel?: string;
 }) {
   const narrow = useNarrow(64);
+  const bar = useRef<HTMLDivElement>(null);
+  useStickyBudget(bar, "--answer-h", 0.25, narrow);
   const jump = useCallback(() => {
     const node = document.getElementById(answerId);
     node?.scrollIntoView({ block: "start" });
@@ -62,7 +65,7 @@ export function CaseLayout({
         </div>
       </div>
       {narrow && (
-        <div className="answer-bar" role="region" aria-label="Answer status">
+        <div ref={bar} className="answer-bar" role="region" aria-label="Answer status">
           <span className="answer-bar-text" aria-live="polite">
             Your answer: {answerSummary}
           </span>
