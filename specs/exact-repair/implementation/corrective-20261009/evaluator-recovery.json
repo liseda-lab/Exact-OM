@@ -1,0 +1,20 @@
+{
+  "amendment": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/amendment.json",
+    "sha256": "c304f160527b501e5f29af89b54efae093ab03b72a1a2c96c96139b7280554f0"
+  },
+  "historical_labels_unchanged": true,
+  "plan": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/plan.json",
+    "sha256": "aee7e719239fff0f84e44bc06a9cf43c1f75cc30cb06d9cbf6b60e5c6f3b98d2"
+  },
+  "qualification_required_before_consumers": true,
+  "request_reallocation": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-001/request-amendment.json",
+    "sha256": "acf506e457726f78d9c9dbcc1a34c808ed47f4bbb80bbc31430c975bfc153548"
+  },
+  "schema": "exact-repair/dev-evaluator-implementation/v1",
+  "selection_rule_unchanged": true,
+  "test_opened": false,
+  "training_unchanged": true
+}

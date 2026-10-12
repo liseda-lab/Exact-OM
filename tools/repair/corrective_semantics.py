@@ -508,6 +508,20 @@ def _calibration_exclusions(manifest):
 
 
 def _request_budget(manifest):
+    if manifest.get("evaluator_request_amendment"):
+        from tools.repair.evaluator_evidence import request_reallocation
+
+        quota, prior, previous = request_reallocation(manifest)
+        if manifest.get("qualified_teacher"):
+            from tools.repair.teacher_selection import qualified_contract
+
+            qualified_contract(manifest)
+        _, amendment = _request_budget(previous)
+        return quota["new_limits"], {
+            **amendment,
+            "evaluator_quota": quota,
+            "evaluator_prior": prior,
+        }
     if manifest.get("qualified_teacher"):
         from tools.repair.teacher_selection import qualified_contract
 
@@ -772,6 +786,15 @@ def _reserve_phase(manifest, slot, packet_hash, cost, *, comparison_id=None):
                 state["reservations"].get(k) != v for k, v in prior["reservations"].items()
             ):
                 raise ValueError("Qualified teacher successor would reset calibration history")
+        if amendment and "evaluator_quota" in amendment:
+            prior = amendment["evaluator_prior"]
+            if any(state["reservations"].get(k) != v for k, v in prior["reservations"].items()):
+                raise ValueError("Evaluator amendment lost historical reservations")
+            if state["request_limits"] == amendment["evaluator_quota"]["old_limits"]:
+                state["request_limits"] = limits
+                state["evaluator_request_amendment"] = manifest["evaluator_request_amendment"]
+            if state.get("evaluator_request_amendment") != manifest["evaluator_request_amendment"]:
+                raise ValueError("Evaluator amendment binding changed")
         if state["request_limits"] != limits:
             raise ValueError("Annotation request limits changed without compatible amendment")
         identity = canonical_hash((manifest["phase"], slot))
@@ -951,6 +974,15 @@ def annotate_packet(
         TEACHER: AnnotationBudget(416, 416 * total_tokens, 35, 416 * 90),
         EVALUATOR: AnnotationBudget(288, 288 * total_tokens, 35, 288 * 90),
     }
+    if manifest.get("evaluator_request_amendment"):
+        limits, _ = _request_budget(manifest)
+        counts = {
+            TEACHER: limits["calibration"] + limits["train"],
+            EVALUATOR: limits["development"] + limits["test"],
+        }
+        budgets = {
+            key: AnnotationBudget(n, n * total_tokens, 35, n * 90) for key, n in counts.items()
+        }
     parent_splits = manifest["parent_splits"]
     if parent_splits.get(packet.parent_group_id) != packet.split:
         raise ValueError("Decoded packet changed frozen parent split")
@@ -971,6 +1003,7 @@ def annotate_packet(
                             swapped,
                             verbatim_quotes=not manifest.get("no_verbatim_quotes", False),
                             complete_criteria=manifest.get("complete_criteria", False),
+                            fact_references=manifest.get("fact_references", False),
                         ),
                     )
                 },
@@ -1438,6 +1471,17 @@ def prepare_decoded_packet(request_path: Path, manifest_path: Path, *, seconds: 
         tuple(p.probe_id for p in case.probes),
         entry["coverage"],
     )
+    if manifest.get("intended_commitment_evidence"):
+        from tools.repair.evaluator_evidence import augment
+
+        packet = augment(
+            packet,
+            request["case"],
+            assignments,
+            request_path.parent / "intended-evidence",
+            seconds=seconds - (time.monotonic() - started),
+            memory_mb=manifest.get("verification_memory_mb", 8192),
+        )
     packet = decoded_transport_packet(packet, manifest, request_path.parent / "transport")
     return packet
 
