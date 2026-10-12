@@ -1576,6 +1576,13 @@
   margin-left: auto;
 }
 
+/* Sections between the browser head and body (scope details, top-level entries) keep the card's gutter. */
+.browser > .scope-details,
+.browser > .browser-section {
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
 .scope-details summary {
   cursor: pointer;
   color: var(--ink-2);
@@ -2138,6 +2145,10 @@
   .browser-head,
   .browser-body {
     padding: 1rem;
+  }
+  .browser > .scope-details,
+  .browser > .browser-section {
+    padding: 0.75rem 1rem;
   }
   .pair-header {
     align-items: flex-start;
