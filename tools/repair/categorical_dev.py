@@ -508,7 +508,7 @@ def aggregate(slots, records, packet, policy):
         provenance = dict(
             request_id=row["request_id"],
             attempt=row["attempt"],
-            response_sha256=row["response"]["sha256"],
+            response_sha256=row["raw_sha256"],
         )
         observations.append(provenance)
         ratings.append(
@@ -530,20 +530,32 @@ def aggregate(slots, records, packet, policy):
         else ("tie" if abs(median_a - median_b) <= 1e-6 else "A" if median_a > median_b else "B")
     )
     eligible = len(votes) == len(slots) and len(set(votes)) == 1 and numeric == votes[0]
-    if policy is None:
-        result = dict(
-            status="eligible" if eligible else "comparison_abstention",
-            score=median_a if eligible else None,
-            numeric_rule="median",
-            overall_score_a=median_a,
-            overall_score_b=median_b,
-        )
-    else:
-        result = aggregate_plan_ratings(ratings, packet.criterion_weights, policy)
-        if not eligible:
-            result = dict(result, status="comparison_abstention", score=None)
-    return dict(
-        result,
+    rating_aggregate = (
+        aggregate_plan_ratings(ratings, packet.criterion_weights, policy)
+        if policy is not None
+        else None
+    )
+    status = (
+        "comparison_abstention"
+        if not eligible
+        else rating_aggregate["status"] if rating_aggregate else "eligible"
+    )
+    score = (
+        None
+        if status != "eligible"
+        else rating_aggregate["score"] if rating_aggregate else median_a
+    )
+    # The core plan-rating record retains its own exact schema/hash. The outer
+    # schedule/audit receipt has a distinct schema and binds the raw HTTP bytes.
+    result = dict(
+        schema="exact-repair/categorical-dev-aggregate/v1",
+        packet_hash=packet.content_hash,
+        status=status,
+        score=score,
+        plan_rating_aggregate=rating_aggregate,
+        numeric_rule="median",
+        overall_score_a=median_a,
+        overall_score_b=median_b,
         scheduled=len(slots),
         quorum=len(slots),
         max_disagreement=0.0,
@@ -553,6 +565,7 @@ def aggregate(slots, records, packet, policy):
         votes=votes,
         observations=observations,
     )
+    return dict(result, receipt_hash=canonical_hash(result))
 
 
 def select_models(plan, output, records):
@@ -747,13 +760,38 @@ def run(plan_path, output):
     return select_models(plan, output, records)
 
 
+def review_receipts(plan_path, source, output):
+    """Reaggregate saved authenticated wire responses, with no sending path."""
+    plan = read(plan_path)
+    validate(plan)
+    records = []
+    for slot in plan["slots"]:
+        receipt = Path(source) / "presentations" / slot["id"] / "receipt.json"
+        records.append(verify_receipt(plan, slot, read(receipt)))
+    immutable(
+        Path(output) / "source-receipts.json",
+        dict(
+            plan=binding(plan_path),
+            hosted_calls=0,
+            receipts=[
+                binding(Path(source) / "presentations" / s["id"] / "receipt.json")
+                for s in plan["slots"]
+            ],
+        ),
+    )
+    return select_models(plan, output, records)
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("plan", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--preflight-only", action="store_true")
+    parser.add_argument("--review-receipts", type=Path)
     args = parser.parse_args()
-    if args.preflight_only:
+    if args.review_receipts:
+        review_receipts(args.plan, args.review_receipts, args.output)
+    elif args.preflight_only:
         costs = validate(read(args.plan))
         immutable(args.output, dict(plan=binding(args.plan), costs=costs))
     else:
