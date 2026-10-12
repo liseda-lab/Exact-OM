@@ -173,7 +173,8 @@ def profile_fixture(tmp_path):
     return settings
 
 
-def test_entrypoint_accounts_6000_outputs_and_binds_schema(tmp_path, monkeypatch):
+@pytest.mark.parametrize("measured", [False, True])
+def test_entrypoint_accounts_6000_outputs_and_binds_schema(tmp_path, monkeypatch, measured):
     import exact.llm.routing
 
     client, calls = wire_client(tmp_path / "ledger", monkeypatch, {"effort": "low"})
@@ -182,13 +183,31 @@ def test_entrypoint_accounts_6000_outputs_and_binds_schema(tmp_path, monkeypatch
     # Panel policy has separate fail-closed tests; this test isolates the real
     # annotation entry point, HTTP serialization and both reservation ledgers.
     settings["teacher_panel"] = {"test_only": True}
+    if measured:
+        settings.update(
+            reserve_input_bound=True, dev_evaluator_profile_amendment={"test_only": True}
+        )
     monkeypatch.setattr(runner, "_request_budget", lambda manifest: (runner.PHASE_LIMITS, None))
     result = runner.annotate_packet(packet(), settings, tmp_path / "out", slot_id="s", seconds=300)
     assert result is not None and len(calls) == 1
     payload = json.loads(calls[0]["content"])
     assert payload["max_tokens"] == 6000 and payload["reasoning"] == {"effort": "low"}
     state = runner.read(tmp_path / "ledger/phase-reservations.json")
-    assert next(iter(state["reservations"].values()))["reserved_cost_usd"] == pytest.approx(0.020)
+    tokens = input_token_bound(
+        payload["messages"],
+        {k: payload[k] for k in ("reasoning", "response_format")},
+        settings["request_profiles"]["teacher"]["tokenizer"],
+        32768,
+    )
+    expected = (tokens + 6000 * 2) / 1e6 if measured else 0.020
+    assert next(iter(state["reservations"].values()))["reserved_cost_usd"] == pytest.approx(
+        expected
+    )
+    from exact.repair.records import read_record
+
+    assert read_record(
+        runner.read(tmp_path / "out/run.json")
+    ).max_cost_per_request_usd == pytest.approx(expected)
     assert (
         runner.annotate_packet(packet(), settings, tmp_path / "out", slot_id="s", seconds=1)
         == result
@@ -712,3 +731,42 @@ def test_controlled_entrypoint_distinguishes_input_tokens_from_full_packet_bytes
             runner.annotate_packet(p, settings, tmp_path / "out", slot_id="s", seconds=1) == result
         )
         assert len(calls) == 1
+
+
+def test_declared_utf8_token_upper_bound_needs_no_fictional_tokenizer(tmp_path):
+    settings = profile_fixture(tmp_path)
+    controls = settings["request_profiles"]["teacher"]
+    endpoint = runner.read(controls["endpoint"]["path"])
+    endpoint["data"]["endpoints"][0]["context_length"] = 1000000
+    controls["endpoint"] = save(tmp_path, "byte-endpoint.json", endpoint)
+    amendment = dict(
+        schema="exact-repair/annotation-input-amendment/v1",
+        authorized=True,
+        costs_reset=False,
+        truncate_evidence=False,
+        model="vendor/teacher",
+        provider="pinned",
+        max_input_tokens=400000,
+        max_input_bytes=393216,
+        max_output_tokens=6000,
+        phases=[settings["phase"]],
+        cost_ceiling_usd=settings["cost_ceiling_usd"],
+        request_limits=settings["request_limits"],
+        token_counting="utf8_byte_bound",
+    )
+    controls.update(
+        tokenizer={"kind": "utf8_byte_bound"},
+        max_input_tokens=400000,
+        max_input_bytes=393216,
+        input_amendment=save(tmp_path, "byte-amendment.json", amendment),
+    )
+    assert request_profile(settings, "teacher") == controls
+    messages = [{"role": "user", "content": "∀x: A ⊑ B"}]
+    bound = input_token_bound(messages, tokenizer=controls["tokenizer"], max_input_bytes=4096)
+    assert bound >= len(json.dumps(messages).encode())
+    with pytest.raises(ValueError, match="byte cap"):
+        input_token_bound(messages, tokenizer=controls["tokenizer"], max_input_bytes=4)
+    amendment.pop("token_counting")
+    controls["input_amendment"] = save(tmp_path, "byte-amendment2.json", amendment)
+    with pytest.raises(ValueError, match="explicit input amendment"):
+        request_profile(settings, "teacher")

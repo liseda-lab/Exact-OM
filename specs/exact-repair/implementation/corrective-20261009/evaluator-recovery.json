@@ -1,21 +1,25 @@
 {
   "amendment": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-003/amendment.json",
-    "sha256": "9a8a555ce39a0fcb917abdb6d610b5c388eb5ed46e785464940bf97400f19db9"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/amendment.json",
+    "sha256": "aeca50ed0efc00cc8a9afdaf58d08f6487433136a4694a4bbbafe63d8efee1bd"
+  },
+  "evaluator_profile": {
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/evaluator-profile-amendment.json",
+    "sha256": "e6aa5d85567d75426bcce00ef242263df30b402caa367dbd52ac74d547df1f3a"
   },
   "historical_labels_unchanged": true,
   "plan": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-003/plan.json",
-    "sha256": "2e84c2e3e53de56d4354689d0f7e4bd177d9db8c77caabd775da4ffd4ea56f3f"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/plan.json",
+    "sha256": "ebc57c352839007cbb313470e3c8a31d7afcf0e2d040a30951bf610eacc1e12c"
   },
   "previous_semantic_review": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-002/semantic-review.json",
-    "sha256": "0f60644c248da8fef5a90f4f70133799849badc3aa4de55464bd297f112fb175"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-003/semantic-review.json",
+    "sha256": "10866d37bad76adc8ba8deb103a9f75ba5bae5d906c9bdaca12fa10bbb614178"
   },
   "qualification_required_before_consumers": true,
   "request_reallocation": {
-    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-003/request-amendment.json",
-    "sha256": "d777dd58da53d930f71e3796f0163bb77b51ba2ff16de82b963cde2ac496fbb3"
+    "path": "/home/pgcotovio/Exact-OM/data/exact-repair-corrective-20261009/learning/dev-evaluator-recovery-20261012-004/request-amendment.json",
+    "sha256": "d50853b2ad68bdeafef12a6a224263af89fa3fe069eee813358051a18f33c2f0"
   },
   "schema": "exact-repair/dev-evaluator-implementation/v1",
   "selection_rule_unchanged": true,

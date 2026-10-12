@@ -514,3 +514,64 @@ def test_distinct_criteria_do_not_turn_omission_into_a_false_assertion(swapped):
     )
     assert not invalid.global_target_eligible
     assert all(":meaning_retention:" in x for x in invalid.validation_errors)
+
+
+def test_dev_reference_profile_preserves_teacher_test_and_every_other_dependency(
+    tmp_path, monkeypatch
+):
+    previous = dict(
+        phase="development",
+        profile="teacher",
+        teacher_profile="teacher",
+        test_profile="test",
+        selection_model_ids=["model/train", "model/reference"],
+        profiles={
+            k: dict(model=m, provider=dict(only=["host"], allow_fallbacks=False))
+            for k, m in (
+                ("teacher", "model/train"),
+                ("reference", "model/reference"),
+                ("test", "model/test"),
+            )
+        },
+        request_profiles={"teacher": {}},
+        request_limits=dict(train=253, development=168),
+        prompt_version="fixed",
+        criterion_weights=dict(meaning_retention=1),
+    )
+    immutable(tmp_path / "previous.json", previous)
+    prior = binding(tmp_path / "previous.json")
+    immutable(tmp_path / "interface.json", dict(previous_annotation_manifest=prior))
+    interface = binding(tmp_path / "interface.json")
+    immutable(tmp_path / "input.json", dict(authorization=interface))
+    controls = dict(input_amendment=binding(tmp_path / "input.json"))
+    amendment = dict(
+        schema="exact-repair/dev-evaluator-profile-amendment/v1",
+        authorized=True,
+        user_instruction="Proceed with evaluator fix",
+        costs_reset=False,
+        previous_manifest=prior,
+        profile="reference",
+        request_profile=controls,
+    )
+    immutable(tmp_path / "profile.json", amendment)
+    m = deepcopy(previous)
+    m.update(
+        profile="reference",
+        request_profiles={"reference": controls},
+        reserve_input_bound=True,
+        dev_evaluator_profile_amendment=binding(tmp_path / "profile.json"),
+        dev_interface_amendment=interface,
+        evaluator_request_amendment={"bound": "quota"},
+        request_limits=dict(train=251, development=170),
+    )
+    m["profiles"]["reference"]["provider"]["require_parameters"] = True
+    monkeypatch.setattr("tools.repair.annotation_profile.request_profile", lambda *a: controls)
+    assert evidence.evaluator_profile(m) == previous
+    for key, value in (
+        ("teacher_profile", "reference"),
+        ("prompt_version", "changed"),
+        ("test_profile", "reference"),
+        ("criterion_weights", dict(meaning_retention=0.5)),
+    ):
+        with pytest.raises(ValueError):
+            evidence.evaluator_profile({**m, key: value})

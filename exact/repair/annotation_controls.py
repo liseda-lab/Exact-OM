@@ -168,6 +168,13 @@ def input_token_bound(messages, controls=None, tokenizer=None, max_input_bytes=3
     # admission estimate, not a claim about the provider's billed count.
     plain = json.loads(canonical_json(messages))
     extra = len(json.dumps(json.loads(canonical_json(controls))).encode()) if controls else 0
+    if tokenizer == {"kind": "utf8_byte_bound"}:
+        size = len(json.dumps(plain).encode()) + extra
+        if type(max_input_bytes) is not int or max_input_bytes <= 0:
+            raise ValueError("A finite positive annotation byte cap is required")
+        if size > max_input_bytes:
+            raise ValueError("Annotation input exceeds independent byte cap")
+        return size + 256
     if tokenizer:
         path, digest = tokenizer["path"], tokenizer["sha256"]
         if hashlib.sha256(Path(path).read_bytes()).hexdigest() != digest:
