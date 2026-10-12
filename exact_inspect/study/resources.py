@@ -367,7 +367,9 @@ class ExplanationResource(StrictModel):
             validate_receipt_claims(
                 support.receipt, support.packet, [claim.model_dump() for claim in reviewed]
             )
-            for raw in support.packet.facts:
+            from ..readable_descriptions import label_facts
+
+            for raw in [*support.packet.facts, *label_facts(support.packet)]:
                 subject = EntityRef.model_validate(raw["subject"])
                 key = (raw["fact_id"], (subject.ontology_version_id, subject.iri, subject.kind))
                 original = contextual_facts.get(key)

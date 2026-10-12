@@ -72,10 +72,17 @@ class AdmissionHashes:
     def __call__(self, path):
         path = Path(path).resolve(strict=True)
         stat = path.stat()
-        key = (path, stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+        # A read may update access time without changing the immutable input.
+        # Still bind content metadata, identity and hardlink/protection state.
+        def identity(value):
+            return (value.st_dev, value.st_ino, value.st_mode, value.st_nlink,
+                    getattr(value, "st_flags", 0), value.st_size,
+                    value.st_mtime_ns, value.st_ctime_ns)
+
+        key = (path, *identity(stat))
         if key not in self.checked:
             value = file_hash(path)
-            if path.stat() != stat:
+            if identity(path.stat()) != identity(stat):
                 raise ReviewError("Immutable input changed during admission")
             self.checked[key] = value
             self.bytes_read += stat.st_size

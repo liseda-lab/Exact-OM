@@ -9,6 +9,7 @@ from pydantic import Field, JsonValue, model_validator
 
 from .contracts import WireModel, canonical_hash
 from .generation import FactPacket, parse_provider_output
+from .readable_descriptions import label_facts
 
 Digest = Annotated[str, Field(pattern=r"^sha256:[a-f0-9]{64}$")]
 REVIEW_VERSION = "exact-description-review/1"
@@ -115,7 +116,7 @@ def build_review_request(source_result, raw_response):
         raise ValueError("Independent descriptions cannot add a pair verdict")
     if any(text not in packet.missingness for text in output.limitations):
         raise ValueError("Review candidates contain unsupported limitation prose")
-    ids = {fact["fact_id"] for fact in packet.facts}
+    ids = {fact["fact_id"] for fact in [*packet.facts, *label_facts(packet)]}
     claims = []
     for ordinal, claim in enumerate(output.claims):
         if not claim.fact_ids or not set(claim.fact_ids) <= ids:
@@ -159,7 +160,7 @@ def validate_receipt_claims(receipt, packet, claims):
         or len(claims) != len(approved)
     ):
         raise ValueError("Served claims must match exactly the independently approved inventory")
-    ids = {fact["fact_id"] for fact in packet.facts}
+    ids = {fact["fact_id"] for fact in [*packet.facts, *label_facts(packet)]}
     for claim in claims:
         decision = approved[claim["claim_id"]]
         if (

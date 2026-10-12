@@ -1,0 +1,153 @@
+{
+  "actual_generation_requests": 0,
+  "approval": {
+    "expanded_scope_question_pending": true,
+    "no_rejection_bypass": true,
+    "recognized_previous_scope": {
+      "entity_profile": 74,
+      "pair_comparison": 12
+    },
+    "status": "automatic_review_rejected_expanded_transfer"
+  },
+  "code_sha256": {
+    "exact_inspect/description_review.py": "sha256:82a2eb5fc4dbec890de4c8e3ec2308d3d391fed59092d816a0dd17442fba78ca",
+    "exact_inspect/study/resources.py": "sha256:d7c62c8cb9d037dd72df82d1660466d8aad11be2903cd0561f4dd7662e4ecc2d",
+    "tests/explanation_luna_overlay_test.py": "sha256:670fa4db108df954ad241e012de31aec9c8d03513eaf40c52fe81bf9d50bcab4",
+    "tests/explanation_luna_pipeline_test.py": "sha256:e11b287c3156d66e96d8cb0979dd8b3279d2d5ce998ace7e7ae08fc0929f21b2",
+    "tests/explanation_luna_review_test.py": "sha256:b0f7f8256f428dff37fe441306b225493f6ba6e03f0c5e1c6a632c7f42f994e2",
+    "tools/publish_luna_review.py": "sha256:a8d27914e2757e74ac8a6b0aa919685825b70e214a6d82050ea2b28c428da95d",
+    "tools/review_environment.py": "sha256:fad2a2d7e23d0a084a7cdd3d1048eb03cbc7cd0f3f78e28e6949ef9478f0da11",
+    "tools/review_luna_bundle.py": "sha256:84c33f4bc3fda0b264b775a02bb0766d532184d420ef95148fb3ff82f7ce13cb"
+  },
+  "configuration_ceiling_usd": 5.0,
+  "estimated_max_usd": 1.052581125,
+  "existing_publication_and_inodes_unchanged": true,
+  "gateway": "OpenRouter",
+  "implementation_commit": "commit containing this receipt",
+  "large_files_copied_or_relinked": 0,
+  "limitations": [
+    "Batch dispatch needs the pending explicit full-scope authorization",
+    "All 260 real drafts require separate semantic reviews before publication",
+    "Final real-data API/frozen/scoped parity and actual batch cost/storage remain unverified",
+    "This task does not verify current frontend S2, rendered browser, accessibility, human study approval, deployment or launch",
+    "Existing partial ELK and review-data coverage limitations remain unchanged"
+  ],
+  "model": "openai/gpt-6-luna",
+  "new_revision_published": false,
+  "newly_reviewed_real_artifacts": 0,
+  "plan_canonical_sha256": "sha256:7f58bd7c31223de889baf0cb5f53ddc27c8c91dc868fd4049024122f1c95c155",
+  "plan_file_sha256": "sha256:7f58bd7c31223de889baf0cb5f53ddc27c8c91dc868fd4049024122f1c95c155",
+  "plan_path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/plan.json",
+  "pre_delivery_findings": [
+    {
+      "disposition": "fixed; validates exact typed original labels at each boundary",
+      "issue": "review omitted admitted reference-label citation IDs"
+    },
+    {
+      "disposition": "fixed; constructs and validates a new immutable manifest",
+      "issue": "frozen manifest assignment"
+    },
+    {
+      "disposition": "fixed; exact identical index resumes; differing index refused",
+      "issue": "interruption after private case index installation"
+    },
+    {
+      "disposition": "fixed; inode/content/protection metadata still checked; content mutation rejected",
+      "issue": "read access-time update misclassified as immutable file mutation"
+    }
+  ],
+  "pre_delivery_head": "885f5510d0358ec64410711d0b1353261346894c",
+  "provider_only": [
+    "OpenAI"
+  ],
+  "reasoning": "medium",
+  "schema": "exact-luna-bundle-preparation/1",
+  "scope": {
+    "entity_profile": 140,
+    "pair_comparison": 120
+  },
+  "source_composition_sha256": "sha256:0790ddcf420bc98278c1f898c884c0fab3b924b094650487277eeae05054e230",
+  "source_package_sha256": "sha256:1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+  "source_publication_sha256": "sha256:5eff10207af3ccecbd541840088b022f074df962fd35d3630854c8aa1e743b2a",
+  "starting_commit": "90f929a8b48b6ba51caa5b74a91a540db19b9f55",
+  "status": "awaiting_explicit_full_batch_authorization",
+  "storage_file": "storage.json",
+  "storage_sha256": "sha256:9435817289e54f79e278fadc491417e18824d43bdeb575e3ef937c3e58642608",
+  "verification": {
+    "checks": [
+      {
+        "file": "initial.xml",
+        "name": "initial",
+        "sha256": "sha256:d99e4954c77e6d11a13d3c38c962b3709de70541c3c5d3adf88f69aa45b0d459",
+        "suites": [
+          {
+            "errors": "0",
+            "failures": "0",
+            "hostname": "Pedros-MacBook-Pro-4.local",
+            "name": "pytest",
+            "skipped": "0",
+            "tests": "34",
+            "time": "5.361",
+            "timestamp": "2026-10-12T21:38:51.386085+01:00"
+          }
+        ]
+      },
+      {
+        "file": "boundaries.xml",
+        "name": "boundaries",
+        "sha256": "sha256:41ce9823eb348d5f8ae4c321b533f6b9903b8d0e36d08d841f0602733a16ca37",
+        "suites": [
+          {
+            "errors": "0",
+            "failures": "0",
+            "hostname": "Pedros-MacBook-Pro-4.local",
+            "name": "pytest",
+            "skipped": "0",
+            "tests": "86",
+            "time": "16.407",
+            "timestamp": "2026-10-12T21:43:06.842541+01:00"
+          }
+        ]
+      },
+      {
+        "file": "publication.xml",
+        "name": "publication",
+        "sha256": "sha256:88c389129017e9685d49a87e0e515845b02fcca36aacc7b7747811ebd81b4cb4",
+        "suites": [
+          {
+            "errors": "0",
+            "failures": "0",
+            "hostname": "Pedros-MacBook-Pro-4.local",
+            "name": "pytest",
+            "skipped": "1",
+            "tests": "41",
+            "time": "31.009",
+            "timestamp": "2026-10-12T22:00:40.028927+01:00"
+          }
+        ]
+      },
+      {
+        "file": "postgresql.xml",
+        "name": "postgresql",
+        "sha256": "sha256:6ae80fdfd231dce06061627f0a5201ce9ef1cd3daecdf03c39bf9ba9dde11978",
+        "suites": [
+          {
+            "errors": "0",
+            "failures": "0",
+            "hostname": "Pedros-MacBook-Pro-4.local",
+            "name": "pytest",
+            "skipped": "0",
+            "tests": "1",
+            "time": "13.781",
+            "timestamp": "2026-10-12T22:02:39.866764+01:00"
+          }
+        ]
+      }
+    ],
+    "distinct_passed": 136,
+    "distinct_skipped": 0,
+    "fixture_scope": "synthetic profile-only review cases with a complete retained tutorial; no new real provider claims approved",
+    "postgresql": "isolated real PostgreSQL on 19583; restart and authenticated study closure/republication; no retained database touched",
+    "real_data": "all original indexed file identities and publication hashes rechecked; exact 260-job plan prepared"
+  }
+}
