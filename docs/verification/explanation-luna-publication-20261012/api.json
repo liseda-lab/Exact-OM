@@ -1,0 +1,796 @@
+{
+  "basis_examples": [
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:f92770a4c7683bb825449ba31a56a73b8b211bf3ca298775414511d86330fa10",
+        "value": "malignant fibrous histiocytoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3352",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:0b53d387c6d75be3bbaf85e64ca7ed739c9fe0f1e3e059e98ce2561bae47aa23",
+        "value": "liposarcoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3381",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:c67e71283e517f8f93a2d1d89ddbcce88c08d9b13a09a8d22bfe7dbf2066a40e",
+        "value": "mediastinal osteogenic sarcoma"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_6208",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347",
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385",
+      "child_label": {
+        "fact_id": "sha256:4490268e8af7871c2f55d434aae3e7e32e647ecf3bdb1fbd424a8e9370f2f5e0",
+        "value": "Renal Cell Carcinoma Associated with Neuroblastoma"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100051",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:9bf2fe9caa23b79ad9719c54aab411ac4da095f2e51458fb8e18dbba9b4b1621",
+        "value": "Renal Cell Carcinoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977",
+      "child_label": {
+        "fact_id": "sha256:0c62cc6fc58556edd4bf6c84941babf1fee95535cf37ae30184967d2aed81e55",
+        "value": "Conjunctival Melanocytic Intraepithelial Lesion"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100054",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:3000035965680bdb2cc40e3f57fa82ec3c7c4c4d6a8663d6f7d2fafd4a4f6561",
+        "value": "Conjunctival Melanocytic Neoplasm"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+      "child_label": {
+        "fact_id": "sha256:c4c9d3aa6b240ed70c3438bd9dbffc15bcd55c5af2cdb9ac06b8a81786eb39d4",
+        "value": "Central Nervous System Nongerminomatous Germ Cell Tumor"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100093",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:22766d990101d03eb64dcbac4a8bb72b6ffff4c8e2a85e82289fc2ce8fb935e8",
+        "value": "Nongerminomatous Germ Cell Tumor"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:f92770a4c7683bb825449ba31a56a73b8b211bf3ca298775414511d86330fa10",
+        "value": "malignant fibrous histiocytoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3352",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_201"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:0b53d387c6d75be3bbaf85e64ca7ed739c9fe0f1e3e059e98ce2561bae47aa23",
+        "value": "liposarcoma of bone"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3381",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_184"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://purl.obolibrary.org/obo/DOID_3347",
+      "child_label": {
+        "fact_id": "sha256:c67e71283e517f8f93a2d1d89ddbcce88c08d9b13a09a8d22bfe7dbf2066a40e",
+        "value": "mediastinal osteogenic sarcoma"
+      },
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_6208",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "parent_label": {
+        "fact_id": "sha256:cd06d84d513c592a60f676317436b28708ab44a35f86c697ead6c9fc0abc1ad9",
+        "value": "osteosarcoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://purl.obolibrary.org/obo/DOID_3347",
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "literal_asserted": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ],
+        "structural_navigation": [
+          "http://purl.obolibrary.org/obo/DOID_4050"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385",
+      "child_label": {
+        "fact_id": "sha256:4490268e8af7871c2f55d434aae3e7e32e647ecf3bdb1fbd424a8e9370f2f5e0",
+        "value": "Renal Cell Carcinoma Associated with Neuroblastoma"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100051",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:9bf2fe9caa23b79ad9719c54aab411ac4da095f2e51458fb8e18dbba9b4b1621",
+        "value": "Renal Cell Carcinoma"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C9385"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977",
+      "child_label": {
+        "fact_id": "sha256:0c62cc6fc58556edd4bf6c84941babf1fee95535cf37ae30184967d2aed81e55",
+        "value": "Conjunctival Melanocytic Intraepithelial Lesion"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100054",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:3000035965680bdb2cc40e3f57fa82ec3c7c4c4d6a8663d6f7d2fafd4a4f6561",
+        "value": "Conjunctival Melanocytic Neoplasm"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C204977"
+        ]
+      }
+    },
+    {
+      "additional_parent": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+      "child_label": {
+        "fact_id": "sha256:c4c9d3aa6b240ed70c3438bd9dbffc15bcd55c5af2cdb9ac06b8a81786eb39d4",
+        "value": "Central Nervous System Nongerminomatous Germ Cell Tumor"
+      },
+      "entity": {
+        "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100093",
+        "kind": "class",
+        "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+      },
+      "parent_label": {
+        "fact_id": "sha256:22766d990101d03eb64dcbac4a8bb72b6ffff4c8e2a85e82289fc2ce8fb935e8",
+        "value": "Nongerminomatous Germ Cell Tumor"
+      },
+      "parents": {
+        "elk_inferred_partial": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ],
+        "literal_asserted": [],
+        "structural_navigation": [
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C121619",
+          "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C5461"
+        ]
+      }
+    }
+  ],
+  "boundary": "Real-data preservation and certificate-verified HTTPS/PostgreSQL API; browser evidence is separate.",
+  "cases": 24,
+  "descriptions": 260,
+  "hierarchy": [
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    }
+  ],
+  "http_status_counts": {
+    "200": 2997,
+    "403": 244,
+    "409": 10,
+    "422": 4
+  },
+  "journeys": [
+    {
+      "check_counts": {
+        "actual_elapsed_timing": 27,
+        "allocated_schedule_probe": 1,
+        "baseline_pair_metadata_denied": 60,
+        "baseline_partial_entry-points_denied": 12,
+        "baseline_partial_equivalents_denied": 12,
+        "baseline_partial_hierarchy_denied": 12,
+        "baseline_workspace_denied": 12,
+        "bounded_partial_ancestor_graph": 2,
+        "case_usable_observation": 24,
+        "cited_expression_original_ast": 16,
+        "cross_basis_cursor_denied": 4,
+        "current_case": 24,
+        "current_explanation_resource": 12,
+        "default_export": 1,
+        "entity_context_full": 12,
+        "entity_facts_page": 12,
+        "entry_points_page1": 24,
+        "entry_points_page2": 24,
+        "exact_claim_citation_resolves": 171,
+        "foreign_candidate_metadata_denied": 12,
+        "foreign_partial_scope_denied": 2,
+        "frozen_combined_resource": 12,
+        "frozen_tutorial_resource": 1,
+        "immutable_csv_export": 2,
+        "immutable_json_export": 2,
+        "legacy_client_refused": 1,
+        "main_bound_description": 132,
+        "main_evidence_continuation": 130,
+        "main_exact_selected_artifact": 132,
+        "main_hierarchy_continuation": 30,
+        "main_pair_metadata": 60,
+        "main_partial_entry": 2,
+        "main_partial_equivalents": 2,
+        "main_useful_basis_difference": 18,
+        "mutation:cases": 72,
+        "mutation:complete": 1,
+        "mutation:consent": 1,
+        "mutation:questionnaires": 2,
+        "mutation:setup": 1,
+        "mutation:tutorial": 17,
+        "negotiated_session": 1,
+        "original_axiom": 12,
+        "original_fact": 12,
+        "partial_empty_unknown": 2,
+        "post_interrupt_full_body": 3,
+        "post_interrupt_state": 3,
+        "prepared_explanation_full": 24,
+        "prepared_explanations_page": 12,
+        "public_exploration_catalogue": 1,
+        "repeat_csv_export": 2,
+        "restricted_export": 1,
+        "scoped_bound_description": 132,
+        "scoped_description_inventory": 72,
+        "scoped_evidence_continuation": 130,
+        "scoped_hierarchy_continuation": 30,
+        "scoped_partial_entry": 2,
+        "scoped_partial_equivalents": 2,
+        "scoped_recorded_bridges": 60,
+        "scoped_useful_basis_difference": 18,
+        "served_participation_page": 1,
+        "state_after_tutorial_rejection": 2,
+        "study_ready": 1,
+        "test_invitation": 1,
+        "tutorial_rejection:omitted_entity_kind": 1,
+        "tutorial_rejection:unadmitted_fact": 1,
+        "workspace_capabilities": 12
+      },
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "service_log_observation": {
+        "asgi_exceptions": 0,
+        "content_length_protocol_errors": 0,
+        "protocol_errors": 0
+      },
+      "status": "passed",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.004,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      }
+    },
+    {
+      "check_counts": {
+        "actual_elapsed_timing": 27,
+        "allocated_schedule_probe": 1,
+        "baseline_pair_metadata_denied": 60,
+        "baseline_partial_entry-points_denied": 12,
+        "baseline_partial_equivalents_denied": 12,
+        "baseline_partial_hierarchy_denied": 12,
+        "baseline_workspace_denied": 12,
+        "bounded_partial_ancestor_graph": 2,
+        "case_usable_observation": 24,
+        "cited_expression_original_ast": 19,
+        "cross_basis_cursor_denied": 4,
+        "current_case": 24,
+        "current_explanation_resource": 12,
+        "default_export": 1,
+        "entity_context_full": 12,
+        "entity_facts_page": 12,
+        "entry_points_page1": 24,
+        "entry_points_page2": 24,
+        "exact_claim_citation_resolves": 163,
+        "foreign_candidate_metadata_denied": 12,
+        "foreign_partial_scope_denied": 2,
+        "frozen_combined_resource": 12,
+        "frozen_tutorial_resource": 1,
+        "immutable_csv_export": 2,
+        "immutable_json_export": 2,
+        "legacy_client_refused": 1,
+        "main_bound_description": 132,
+        "main_evidence_continuation": 130,
+        "main_exact_selected_artifact": 128,
+        "main_hierarchy_continuation": 30,
+        "main_pair_metadata": 60,
+        "main_partial_entry": 2,
+        "main_partial_equivalents": 2,
+        "main_useful_basis_difference": 18,
+        "mutation:cases": 72,
+        "mutation:complete": 1,
+        "mutation:consent": 1,
+        "mutation:questionnaires": 2,
+        "mutation:setup": 1,
+        "mutation:tutorial": 17,
+        "negotiated_session": 1,
+        "original_axiom": 12,
+        "original_fact": 12,
+        "partial_empty_unknown": 2,
+        "post_interrupt_full_body": 3,
+        "post_interrupt_state": 3,
+        "prepared_explanation_full": 24,
+        "prepared_explanations_page": 12,
+        "public_exploration_catalogue": 1,
+        "repeat_csv_export": 2,
+        "restricted_export": 1,
+        "scoped_bound_description": 132,
+        "scoped_description_inventory": 72,
+        "scoped_evidence_continuation": 130,
+        "scoped_hierarchy_continuation": 30,
+        "scoped_partial_entry": 2,
+        "scoped_partial_equivalents": 2,
+        "scoped_recorded_bridges": 60,
+        "scoped_useful_basis_difference": 18,
+        "served_participation_page": 1,
+        "state_after_tutorial_rejection": 2,
+        "study_ready": 1,
+        "test_invitation": 1,
+        "tutorial_rejection:omitted_entity_kind": 1,
+        "tutorial_rejection:unadmitted_fact": 1,
+        "workspace_capabilities": 12
+      },
+      "completed_cases": 24,
+      "conditions": {
+        "explanation": 12,
+        "ontology_baseline": 12
+      },
+      "service_log_observation": {
+        "asgi_exceptions": 0,
+        "content_length_protocol_errors": 0,
+        "protocol_errors": 0
+      },
+      "status": "passed",
+      "tutorial": {
+        "actual_elapsed_seconds": 120.0,
+        "correct_attempts": 5,
+        "observation_kind": "Automated API client elapsed time, not human engagement",
+        "required_actions": 24,
+        "wrong_attempts": 5
+      }
+    }
+  ],
+  "pairs": 120,
+  "raw_receipts": [
+    {
+      "bytes": 416275,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification-2/journey-1.json",
+      "sha256": "sha256:2d970341753984c313cc929409dec569c64d6ac09e63d6558249dc337e4566db"
+    },
+    {
+      "bytes": 413924,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification-2/journey-2.json",
+      "sha256": "sha256:016550c1d75a07bb94fb19cb6220a6a8394c6bfbc0f27b8e4db4c88b48ac6710"
+    },
+    {
+      "bytes": 1543,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification-2/static.json",
+      "sha256": "sha256:22805f4c571cb08d9d92090d2f0d2f3934f16c826a966d43a4a5fda80d170d9c"
+    },
+    {
+      "bytes": 23552,
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification-2/verification.json",
+      "sha256": "sha256:5003ad4731717c1b545e205abe6160c7d62ee63883f6dd30efc1ec7e5bd03a87"
+    }
+  ],
+  "requests": 3255,
+  "reused_taxonomy_audit": {
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/api-verification-3/static.json",
+    "reason": "All old ontology/partial-navigation artifact hashes and file identities are unchanged.",
+    "sha256": "sha256:339b4f28480b649fa6d35bd7ab28710e5c809d079a1fefaa5363ed06e35f099a"
+  },
+  "schema": "exact-luna-delivery-verification/1",
+  "scoped_citations": 334,
+  "static": {
+    "active_reviewed_claims": 280,
+    "active_support": {
+      "independently_reviewed": 252,
+      "typed_template_support": 8
+    },
+    "checks": {
+      "cases": 24,
+      "pairs": 120,
+      "resources_with_evidence_order_only_changes": 24,
+      "selected_records": 3443
+    },
+    "historical_approved_claims_preserved": 68,
+    "new_artifacts": 251,
+    "new_package": "sha256:07781b63d2acd24f2542653112e5a20d75cea30af55685b331af3ea1e9b8907b",
+    "new_publication": "sha256:51500ab8b54615ff938da3e70faa6816af67c6867b1b528f4d2a175cb68bff93",
+    "old_artifacts_retained": 990,
+    "old_package": "sha256:1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+    "protected_predecessor_identity_unchanged": true,
+    "retained_predecessor_ids": [
+      "sha256:220f207b073a34e8aecd6a070859d89a468636db3d9165e4f706abae026e7878",
+      "sha256:2aedef70ea1c8b5a4634bd5d5fb6afa39453c2553717118e79d05279cf5a85df",
+      "sha256:73d7f383b20163c18386a08ba2aeefbbe5a8c7ec3a800b62b8c81d74105e88b2",
+      "sha256:77920aee6ce0c53ffcadcdc7145cb851ede817d2701422e380e6c30f5cb345c0",
+      "sha256:83525fd974ccf7071d6b34e12dbb0e22b5d9ba242a2fc03d387f3321ded715bf",
+      "sha256:aa58e1ff32e6d44f9552763cd25eeb1c096dd885f3836169b0a06c8b50a19861",
+      "sha256:aac629b2b456315093e8bf043c22c22a788764df79d005b35a23be6f176ca8bb",
+      "sha256:d84a62f16e8ed1ca917b79df4975435d0d028fdeb819a1093cdf98a9230963a8",
+      "sha256:d95d43bcaa8a7a1e86cbbbf74223ee65f22dab4fa52eade8f569f464af3fc764"
+    ],
+    "status": "passed",
+    "tasks": {
+      "entity_profile": 140,
+      "pair_comparison": 120
+    }
+  },
+  "status": "passed",
+  "verifier_sha256": "sha256:e98888b016346f2c318e54c5c3275481be35239275ea049ca56798d72e6ea79e"
+}

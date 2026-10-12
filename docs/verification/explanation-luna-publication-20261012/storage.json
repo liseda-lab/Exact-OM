@@ -1,0 +1,2488 @@
+{
+  "bytes": 50003761249,
+  "roots": [
+    {
+      "root": "/Users/pedrocotovio/.cache/codex-runtimes",
+      "bytes": 1665070339,
+      "entries": 32741
+    },
+    {
+      "root": "/Users/pedrocotovio/.cache/huggingface",
+      "bytes": 1306888,
+      "entries": 71
+    },
+    {
+      "root": "/Users/pedrocotovio/.claude/projects/-Users-pedrocotovio-Developer-Repos-OM-Exact-OM",
+      "bytes": 102949856,
+      "entries": 26
+    },
+    {
+      "root": "/Users/pedrocotovio/.claude/projects/-Users-pedrocotovio-Documents-Repos-OM-Exact-OM",
+      "bytes": 160,
+      "entries": 2
+    },
+    {
+      "root": "/Users/pedrocotovio/.codex/visualizations/2026/09/25/01a0d99e-ecf4-7430-ad31-3805420dcd7a",
+      "bytes": 766304,
+      "entries": 8
+    },
+    {
+      "root": "/Users/pedrocotovio/.codex/worktrees",
+      "bytes": 148950272,
+      "entries": 6461
+    },
+    {
+      "root": "/Users/pedrocotovio/.npm",
+      "bytes": 216895328,
+      "entries": 2580
+    },
+    {
+      "root": "/Users/pedrocotovio/Developer/Recovery/Exact-OM-20261010",
+      "bytes": 786400,
+      "entries": 172
+    },
+    {
+      "root": "/Users/pedrocotovio/Developer/Repos/OM/.codex-worktrees",
+      "bytes": 9635168,
+      "entries": 502
+    },
+    {
+      "root": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "bytes": 1256501120,
+      "entries": 8095
+    },
+    {
+      "root": "/Users/pedrocotovio/Library/Caches/exact-om-dev",
+      "bytes": 1748487400,
+      "entries": 35617
+    },
+    {
+      "root": "/Users/pedrocotovio/Library/Caches/exact-om-review",
+      "bytes": 41781752292,
+      "entries": 32996
+    },
+    {
+      "root": "/Users/pedrocotovio/Library/Caches/pip",
+      "bytes": 507904,
+      "entries": 125
+    },
+    {
+      "root": "/Users/pedrocotovio/Library/Caches/pnpm",
+      "bytes": 149508800,
+      "entries": 117
+    },
+    {
+      "root": "/Users/pedrocotovio/Library/Caches/pypoetry",
+      "bytes": 160,
+      "entries": 2
+    },
+    {
+      "root": "/private/tmp/exact-assemble-s1-examples.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-attempt-independent-review",
+      "bytes": 149370,
+      "entries": 32
+    },
+    {
+      "root": "/private/tmp/exact-audit-published-review-initial.py",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-audit-published-review.py",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-audit-review-claims.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-audit-review-publication-before-isort.py",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-audit-review-publication-imports-only.py",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b01-b05-scoped-source.zip",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-doid-900-receipt.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-doid-phase-probe",
+      "bytes": 450023584,
+      "entries": 4
+    },
+    {
+      "root": "/private/tmp/exact-b03-doid-phases.jsonl",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-doid-receipt.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-install-navigation.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-ncit-phases.jsonl",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-profile-ncit.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-profile-phases.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-record-real.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b03-reviewed-index",
+      "bytes": 155648,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-api-fixture-edit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-backup-20261010",
+      "bytes": 271040,
+      "entries": 13
+    },
+    {
+      "root": "/private/tmp/exact-b06-export-edit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-final-input-guard.patch",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-forms-edit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-model-edit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b06-store-edit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-closure-final-junit.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-closure-final-tests",
+      "bytes": 45247458,
+      "entries": 1194
+    },
+    {
+      "root": "/private/tmp/exact-b07-closure-junit.xml",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-closure-tests",
+      "bytes": 45247380,
+      "entries": 1194
+    },
+    {
+      "root": "/private/tmp/exact-b07-final-receipt.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-identity-final-authorized-junit.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-identity-final-authorized-tests",
+      "bytes": 47598015,
+      "entries": 2140
+    },
+    {
+      "root": "/private/tmp/exact-b07-identity-final-junit.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-identity-final-tests",
+      "bytes": 2474681,
+      "entries": 1022
+    },
+    {
+      "root": "/private/tmp/exact-b07-lifecycle-smoke.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-merged-postgres-rerun.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-merged-postgres.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-b07-review-fixes.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-backend-corrections-20261003",
+      "bytes": 8983710,
+      "entries": 228
+    },
+    {
+      "root": "/private/tmp/exact-backend-final-20261004",
+      "bytes": 14568,
+      "entries": 152
+    },
+    {
+      "root": "/private/tmp/exact-backend-s1-review-20261010-2mcci08l",
+      "bytes": 1274240,
+      "entries": 11
+    },
+    {
+      "root": "/private/tmp/exact-cache-lineage-fixed-review",
+      "bytes": 9783150,
+      "entries": 1026
+    },
+    {
+      "root": "/private/tmp/exact-capture-s1-examples.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-compose-review.py",
+      "bytes": 20480,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-delivered-retry.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-delivered-verification.py",
+      "bytes": 20480,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-disconnect-review-20261004",
+      "bytes": 3808,
+      "entries": 40
+    },
+    {
+      "root": "/private/tmp/exact-edit-contract-models.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-corrections-2.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-partial-contract.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration10.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration11.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration12.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration13.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration14.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration15.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration16.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration8.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-edit-postmigration9.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-elk-cluster-20261010-7bca91",
+      "bytes": 35188896,
+      "entries": 4
+    },
+    {
+      "root": "/private/tmp/exact-fetch-retained-elk.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-delivered-published-claim-audit-catalogue.json",
+      "bytes": 278528,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-delivered-published-claim-audit-catalogue.md",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-delivered-published-claim-audit.json",
+      "bytes": 700416,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-published-claim-audit-catalogue.json",
+      "bytes": 278528,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-published-claim-audit-catalogue.md",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-published-claim-audit.json",
+      "bytes": 696320,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-final-review-independent-20261004",
+      "bytes": 160,
+      "entries": 2
+    },
+    {
+      "root": "/private/tmp/exact-fix-claim-identity.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-fix-focused.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-fix-install-compose.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-followup-review-20261003",
+      "bytes": 2368,
+      "entries": 25
+    },
+    {
+      "root": "/private/tmp/exact-followup-review-20261004",
+      "bytes": 102118,
+      "entries": 1067
+    },
+    {
+      "root": "/private/tmp/exact-followup2-review-20261004",
+      "bytes": 9192,
+      "entries": 96
+    },
+    {
+      "root": "/private/tmp/exact-followup3-review-20261004",
+      "bytes": 9000,
+      "entries": 94
+    },
+    {
+      "root": "/private/tmp/exact-frozen-hierarchy-probe-diagnostic.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-git-launch-diagnostic.jsonl",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-git-launch-diagnostic.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-git-worker-private.log",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-hermit-cluster-20261010-b48d26",
+      "bytes": 209824,
+      "entries": 18
+    },
+    {
+      "root": "/private/tmp/exact-install-review-downloads.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-install-test-corrections.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-interactive-review-20261005",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-legacy-bridges.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-local300-cross-side-record.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-api-verification-2.log",
+      "bytes": 94208,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-api-verification.log",
+      "bytes": 94208,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-authorized-generation.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-browser-verification.log",
+      "bytes": 94208,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-generation.log",
+      "bytes": 135168,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-handoff.md",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-prepare.log",
+      "bytes": 86016,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-storage-after.json",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-storage-before.json",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-tests",
+      "bytes": 3322996,
+      "entries": 353
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-tests.log",
+      "bytes": 86016,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-bundle-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-commit-message.txt",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-comparison-budget.json",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-delivery-evidence.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-diagnostic-tests",
+      "bytes": 826168,
+      "entries": 107
+    },
+    {
+      "root": "/private/tmp/exact-luna-diagnostic-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-environment-prepare.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-environment-start.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-2",
+      "bytes": 19749507,
+      "entries": 1449
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-2.log",
+      "bytes": 98304,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-3",
+      "bytes": 19749507,
+      "entries": 1449
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-3.log",
+      "bytes": 98304,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-4",
+      "bytes": 19987075,
+      "entries": 1449
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests-4.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pipeline-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-pytest-cache",
+      "bytes": 20864,
+      "entries": 7
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-regressions.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-save.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-final-tests",
+      "bytes": 32239584,
+      "entries": 903
+    },
+    {
+      "root": "/private/tmp/exact-luna-finalize-receipts.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-freeze-review.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-generation.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-handoff.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-label-review-test.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-overlay-test.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-test.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests",
+      "bytes": 2023128,
+      "entries": 146
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-2.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-3.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-4",
+      "bytes": 16962720,
+      "entries": 412
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-4.log",
+      "bytes": 94208,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-4.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-5",
+      "bytes": 16979168,
+      "entries": 414
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-5.log",
+      "bytes": 94208,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests-5.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests.log",
+      "bytes": 135168,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-pipeline-tests.xml",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-postgresql-test",
+      "bytes": 45337031,
+      "entries": 1127
+    },
+    {
+      "root": "/private/tmp/exact-luna-postgresql-test.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-postgresql-test.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-prepare-edits.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-prepare.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-publication.log",
+      "bytes": 90112,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-publishing-tests",
+      "bytes": 29078738,
+      "entries": 1321
+    },
+    {
+      "root": "/private/tmp/exact-luna-publishing-tests.log",
+      "bytes": 86016,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-publishing-tests.xml",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-receipt.log",
+      "bytes": 86016,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-receipt.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-record-handoff.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-review-and-publish.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-review-freeze.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-semantic-decisions.json",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-luna-test.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-materialize-source.swift",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-missing-source-candidate-pairs.json",
+      "bytes": 28672,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-model-comparison-report.md",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-ncit-hermit-20261010-c19e52",
+      "bytes": 111552,
+      "entries": 17
+    },
+    {
+      "root": "/private/tmp/exact-pair-pg-54c3544b48b8",
+      "bytes": 56482623,
+      "entries": 1546
+    },
+    {
+      "root": "/private/tmp/exact-pair-postgres.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-paper-tools",
+      "bytes": 55173216,
+      "entries": 2
+    },
+    {
+      "root": "/private/tmp/exact-partial-elk.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-after-commit-budget.json",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-ancestor-after.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-ancestor-before.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-ancestor-correction.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-ancestor-tests",
+      "bytes": 156097044,
+      "entries": 1778
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-ancestors-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api-final.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api-launch.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api1.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api2-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api2.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api3-budget.json",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-api3.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-bound-environment.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-bound-environment.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad1",
+      "bytes": 97796041,
+      "entries": 2410
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad1.log",
+      "bytes": 466944,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad1.xml",
+      "bytes": 421888,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad2",
+      "bytes": 82522315,
+      "entries": 2203
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad2.log",
+      "bytes": 61440,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-broad2.xml",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-budget-before.json",
+      "bytes": 32768,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-after.xml",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-before.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-fix.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-fix.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-cache-tests",
+      "bytes": 69234325,
+      "entries": 1089
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check10.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check11.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check12.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check13.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check14.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check15.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check16.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check17.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check8.json",
+      "bytes": 36864,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-check9.json",
+      "bytes": 36864,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-commit-budget.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-commit1.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition-budget.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition2-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition2.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition3-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-composition3.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-contract-edit.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-contracts.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-correct-ancestors.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-delivery-budget.json",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-doc-review.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit11.log",
+      "bytes": 61440,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit15.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit16.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit17-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit17.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit17.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit2.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit3.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit4.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit5.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit6.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit7.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit8.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-edit9.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-prepare.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-r2-prepare.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-r2.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-r3-prepare.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-r3-start.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-r3.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-environment-start.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-fetch.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-checks.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-doc-edit.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-tests",
+      "bytes": 293087383,
+      "entries": 6763
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-tests-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-tests.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-final-tests.xml",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus5",
+      "bytes": 11477118,
+      "entries": 493
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus5.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus5.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus6",
+      "bytes": 9799942,
+      "entries": 307
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus6.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focus6.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused2.log",
+      "bytes": 73728,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused2.xml",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused3.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused3.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused4.log",
+      "bytes": 57344,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-focused4.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-followup-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-followup.log",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-followup.py",
+      "bytes": 28672,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend-tests.log",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend-tests2.log",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend-tests3.log",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend2-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend2-run.log",
+      "bytes": 73728,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend2.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend3-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend3-run.log",
+      "bytes": 73728,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-frontend3.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-commit-final.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-commit-final.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-commit.log",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-commit.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-draft.md",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-handoff-write.log",
+      "bytes": 77824,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-independent-review-20261012",
+      "bytes": 296353132,
+      "entries": 6872
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-independent-tests-20261012.log",
+      "bytes": 258048,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-native-budget.json",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-native-fixtures.json",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-native-fixtures.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-native.log",
+      "bytes": 61440,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-pytest-cache",
+      "bytes": 53664,
+      "entries": 8
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-r2-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-r3-budget.json",
+      "bytes": 49152,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-receipt-writer.py",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-review-20261011",
+      "bytes": 685536,
+      "entries": 28
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-start-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-static-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-static-check.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-static.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-static2-budget.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-static2.log",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-tests",
+      "bytes": 7801986,
+      "entries": 303
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-tests2",
+      "bytes": 7917140,
+      "entries": 311
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-tests3",
+      "bytes": 7917140,
+      "entries": 311
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-tests4",
+      "bytes": 7917140,
+      "entries": 311
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-typescript-hook.mjs",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-typescript-hook2.mjs",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-postmigration-typescript-hook3.mjs",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-preparation-independent-review",
+      "bytes": 15333721,
+      "entries": 747
+    },
+    {
+      "root": "/private/tmp/exact-preparation-resume-independent-review",
+      "bytes": 38517560,
+      "entries": 719
+    },
+    {
+      "root": "/private/tmp/exact-prepublication-audit.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-prose-resume-pycache",
+      "bytes": 21797376,
+      "entries": 953
+    },
+    {
+      "root": "/private/tmp/exact-prose-resume-worker-20261010.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-provider-adapter-diagnostic",
+      "bytes": 45408,
+      "entries": 6
+    },
+    {
+      "root": "/private/tmp/exact-publication-audit-sidecar-tests.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-publish-luna-review.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-published-claim-audit-execution-history-final.json",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-published-claim-audit-execution-history.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-raw-selected-stage-audit.json",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-raw-selected-stage-audit.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-readable-descriptions.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-real-evidence-subject-failures.json",
+      "bytes": 28672,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-relocation-wrapper-test.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-campaign-review.git",
+      "bytes": 6841952,
+      "entries": 100
+    },
+    {
+      "root": "/private/tmp/exact-repair-campaign-source",
+      "bytes": 7550080,
+      "entries": 595
+    },
+    {
+      "root": "/private/tmp/exact-repair-corrective-specs",
+      "bytes": 86432,
+      "entries": 8
+    },
+    {
+      "root": "/private/tmp/exact-repair-final-commit.index",
+      "bytes": 143360,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-final-public.index",
+      "bytes": 143360,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-pre-spec-user-changes.json",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-prepared-spec-commit.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-primary-llm-update",
+      "bytes": 168480,
+      "entries": 12
+    },
+    {
+      "root": "/private/tmp/exact-repair-results-review-20261009",
+      "bytes": 212627712,
+      "entries": 2537
+    },
+    {
+      "root": "/private/tmp/exact-repair-spec-index-u6tv9kja.lock",
+      "bytes": 0,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-spec-original-index.txt",
+      "bytes": 118784,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-repair-spec-push.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-reproducible-published-claim-audit-catalogue.json",
+      "bytes": 278528,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-reproducible-published-claim-audit-catalogue.md",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-reproducible-published-claim-audit.json",
+      "bytes": 700416,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-resident-recovery-20261010.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-resume-delivered-workflow.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-20261007",
+      "bytes": 859069,
+      "entries": 413
+    },
+    {
+      "root": "/private/tmp/exact-review-b01-b05",
+      "bytes": 111040,
+      "entries": 13
+    },
+    {
+      "root": "/private/tmp/exact-review-cache-cleanup-20261011.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cache-cleanup-20261011.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cache-lineage-probe.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-20261011.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-apply-20261011.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-http-before-20261011.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-plan-20261011.log",
+      "bytes": 53248,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-verify-20261011.log",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-cleanup-verify-20261011.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-environment-final.md",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-git-worker-probe.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-luna-bundle.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-model-comparison-test.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-model-comparison.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-pair-http-sqlite",
+      "bytes": 8322098,
+      "entries": 205
+    },
+    {
+      "root": "/private/tmp/exact-review-pair-http-sqlite-2",
+      "bytes": 9145404,
+      "entries": 205
+    },
+    {
+      "root": "/private/tmp/exact-review-storage-cleanup-20261010.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-review-work",
+      "bytes": 4605146,
+      "entries": 490
+    },
+    {
+      "root": "/private/tmp/exact-s0-followup-independent-review-20261010",
+      "bytes": 2178584,
+      "entries": 182
+    },
+    {
+      "root": "/private/tmp/exact-s0-independent-review-20261009",
+      "bytes": 2289112,
+      "entries": 180
+    },
+    {
+      "root": "/private/tmp/exact-s1-about-isolation-after.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-about-isolation-before.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-about-isolation-final.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-about-postgres.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-773637948b3b",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-b27853a41c17",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-fix-final-junit.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-fix-junit.xml",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-regression-rerun.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-broad-regression.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-browser-attempt.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-build",
+      "bytes": 16612480,
+      "entries": 1075
+    },
+    {
+      "root": "/private/tmp/exact-s1-builder.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-cache-lineage.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-commit-index",
+      "bytes": 172032,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-commit-sample.txt",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-commit-status-append.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-completion-index",
+      "bytes": 176128,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-completion-main-index.sha256",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-contracts-final.md",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-delivered-boundary-summary.json",
+      "bytes": 28672,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-delivered-forms-excerpt.json",
+      "bytes": 20480,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-delivered-response-excerpts.json",
+      "bytes": 61440,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-descriptions.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-descriptions_test.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-dispatch-scope.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-evidence-subject-final-with-metadata.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-evidence-subject-final.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-commit-sample.txt",
+      "bytes": 69632,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-pg-2c14794c56b1",
+      "bytes": 67051434,
+      "entries": 1670
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-pg-cc06a93f7df5",
+      "bytes": 72560768,
+      "entries": 1355
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-postgres.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-receipt.json",
+      "bytes": 81920,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-receipt.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-review-draft.md",
+      "bytes": 40960,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-service-status.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-final-tools.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-before-regression.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-boundaries-2.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-boundaries.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-graph.json",
+      "bytes": 73728,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-lifecycle.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-literal.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-minimal-import.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-ontology-admission.json",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-pool-parity.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-preflight.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-preserve.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-provider-plan.json",
+      "bytes": 45056,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-provider.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-publication-audit-catalogue.json",
+      "bytes": 290816,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-publication-audit-catalogue.md",
+      "bytes": 65536,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-publication-audit.json",
+      "bytes": 708608,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-pycache",
+      "bytes": 33692096,
+      "entries": 1689
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-regressions.xml",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-review-20261010-qjxk1knc",
+      "bytes": 57562897,
+      "entries": 3965
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-tools.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-followup-unresolved.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-frontend-base-tree.txt",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-frontend-build.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-frontend-finish.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-generate-attempt-2.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-generate-authorized.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-generation.py",
+      "bytes": 32768,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-handoff-evidence.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-handoff-index",
+      "bytes": 176128,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-hierarchy-probe-tests.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-integrate-files.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-integrate.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-journey-index",
+      "bytes": 176128,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-latest-runtime.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-navigation-backup",
+      "bytes": 213696,
+      "entries": 13
+    },
+    {
+      "root": "/private/tmp/exact-s1-new-evidence.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-original-user-work.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-plan.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-pool-and-verifier.initial.xml",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-pool-and-verifier.xml",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-preparation-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prepare-inputs.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-correction-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-final-tests.xml",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-fix-index",
+      "bytes": 176128,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-handoff-index",
+      "bytes": 196608,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-storage-index",
+      "bytes": 196608,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-prose-support-tests.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-resources.py",
+      "bytes": 20480,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-review_models.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-root-before-merge.patch",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-root-edits.py",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-root-final-runtime.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-root.patch",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-s2-response-examples.json",
+      "bytes": 61440,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-spec-status-append.md",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-spec-validation-deps",
+      "bytes": 3620256,
+      "entries": 270
+    },
+    {
+      "root": "/private/tmp/exact-s1-spec00-base.md",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-spec00-user-before.md",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-specification-verification.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-startup-verification",
+      "bytes": 8320,
+      "entries": 3
+    },
+    {
+      "root": "/private/tmp/exact-s1-status-update.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-study_models.py",
+      "bytes": 24576,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-transport-diagnostic",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-s1-workspace-metadata.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-selected-subject-preflight.json",
+      "bytes": 147456,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-selected-subject-preflight.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-selected-trace-example-audit.json",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-selected-trace-example-audit.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-spec-plumbing-xu161bgw.lock",
+      "bytes": 0,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-study-preparation-20261011-postgres-regression.xml",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-study-preparation-20261011-regressions.xml",
+      "bytes": 32768,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-study-preparation-20261011-transport-regressions.xml",
+      "bytes": 8192,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-study-preparation-pytest-cache",
+      "bytes": 41344,
+      "entries": 7
+    },
+    {
+      "root": "/private/tmp/exact-study-resume-20261011.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-summarize-delivered.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-test-postmigration.py",
+      "bytes": 12288,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-timing-cli-pytest-cache",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-timing-pytest-cache",
+      "bytes": 64,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-ui-review-20261002",
+      "bytes": 12179,
+      "entries": 131
+    },
+    {
+      "root": "/private/tmp/exact-ui-review-20261003",
+      "bytes": 915,
+      "entries": 10
+    },
+    {
+      "root": "/private/tmp/exact-verifier-tests",
+      "bytes": 45728,
+      "entries": 12
+    },
+    {
+      "root": "/private/tmp/exact-verify-composed-review.py",
+      "bytes": 16384,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-verify-review-downloads.py",
+      "bytes": 4096,
+      "entries": 1
+    },
+    {
+      "root": "/private/tmp/exact-xr21-review-venv",
+      "bytes": 2097,
+      "entries": 23
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-assessment-review-20261010-n3b0aeb7",
+      "bytes": 2006520,
+      "entries": 181
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-cache-lineage-5p1oij_p",
+      "bytes": 41600,
+      "entries": 15
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-cache-lineage-854ga6pz",
+      "bytes": 41600,
+      "entries": 15
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-repair-circuits-v3-501",
+      "bytes": 242592,
+      "entries": 28
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-repair-events-b6f94374c8364cefa73b7875a9f5ca4f",
+      "bytes": 61600,
+      "entries": 4
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/exact-repair-events-ea47c170814e44e89c783c16fa94ba70",
+      "bytes": 61600,
+      "entries": 4
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/playwright-transform-cache-501",
+      "bytes": 10346240,
+      "entries": 323
+    },
+    {
+      "root": "/private/var/folders/wl/_t8_ylrs3nsdnl3vsyhp_qr40000gn/T/pytest-of-pedrocotovio",
+      "bytes": 295380449,
+      "entries": 7165
+    }
+  ],
+  "external_directory_links": [],
+  "schema": "exact-review-storage-budget/1",
+  "checked_at": "2026-10-12T21:51:40.032878+00:00",
+  "limit_bytes": 100000000000,
+  "safety_reserve_bytes": 5000000000,
+  "growth_bytes": 0,
+  "filesystem_free_bytes": 136307564544,
+  "minimum_filesystem_free_bytes": 30000000000,
+  "remaining_before_hard_limit_bytes": 49996238751,
+  "status": "allowed",
+  "reasons": [],
+  "accounting": "max apparent/allocated; shared inodes once; shared caches counted in full",
+  "enforcement": "cooperative shared lock and polling; not an operating-system quota"
+}

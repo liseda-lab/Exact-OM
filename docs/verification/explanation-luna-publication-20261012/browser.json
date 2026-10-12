@@ -1,0 +1,28 @@
+{
+  "boundary": "Fresh browser study journey with the compiled S2 frontend and actual HTTPS/PostgreSQL service; deliberate invalid tutorial submission is a separate recovery probe, not seeded success.",
+  "chrome_version": "Google Chrome 154.0.8037.98",
+  "owned_study_log_after_browser": {
+    "asgi_exceptions": 0,
+    "bytes": 0,
+    "content_length_errors": 0,
+    "protocol_errors": 0,
+    "sha256": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "raw_receipt": {
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/environment/browser-results.json",
+    "sha256": "sha256:ab599796ce597c9aa99e3209cc3c1fbced077fd6dceb5c014609b99428820860"
+  },
+  "schema": "exact-luna-rendered-browser/1",
+  "stats": {
+    "duration": 92146.50499999999,
+    "expected": 1,
+    "flaky": 0,
+    "skipped": 0,
+    "startTime": "2026-10-12T21:48:11.710Z",
+    "unexpected": 0
+  },
+  "status": "passed",
+  "test_sha256": "sha256:9bfee2f9bbf9bc2e36c703ba0f86b8c201784e05cad1a50b126d755dce53bf64",
+  "test_source_commit": "885f5510d0358ec64410711d0b1353261346894c",
+  "tls": "Locally generated HTTPS certificate; Playwright ignores local trust errors. API verifier separately verifies this exact certificate. Normal CSP retained."
+}

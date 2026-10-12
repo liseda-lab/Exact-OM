@@ -1,0 +1,239 @@
+{
+  "environment": {
+    "backend": {
+      "file_count": 56,
+      "git_commit": "0ec304b3812f1e6f59f64dd0c8d49c3fa981619d",
+      "schema": "exact-review-backend-source/1",
+      "source_sha256": "752b91446f125a12af47d9c6f7c7499c3edba40ea85d5d84fd5bfa86491c8985"
+    },
+    "certificate_sha256": "48532a5c216029a269664d536ec976b4c9b8900b92fe0dc4e73992b1591524fa",
+    "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/frontend-s2-885f551",
+    "frontend_sha256": "b5511d27dabb4ba8d439580db5b4dda258493d87882ab6fcbe3dbd68fe21fc87",
+    "ports": {
+      "exploration": 19605,
+      "postgres": 19603,
+      "study": 19604
+    },
+    "postgres_version": "postgres (PostgreSQL) 16.2",
+    "publication_sha256": "01ed9025fff23909ee208e38b01d530a701c7328a0f7044b6dc3c026eaccb801",
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/environment",
+    "runtime_versions": {
+      "fastapi": "0.116.2",
+      "psycopg": "3.3.6",
+      "pydantic": "2.13.4",
+      "pyowl-core": "0.2.1",
+      "python": "3.12.3",
+      "uvicorn": "0.35.0"
+    },
+    "source_publication_sha256": "51500ab8b54615ff938da3e70faa6816af67c6867b1b528f4d2a175cb68bff93",
+    "state": "running_on_loopback",
+    "study_revision": "review-20261012T213130-b889818090"
+  },
+  "evidence": {
+    "api.json": {
+      "bytes": 31005,
+      "sha256": "sha256:d041a2432fc9d1a473312f60718bd23d0b209ed0590ae99283e72756d5db9bf0"
+    },
+    "browser.json": {
+      "bytes": 1281,
+      "sha256": "sha256:9b50223395fab8e92bfed76650c195393c3e6676770b19d34aaf9aea19c1683a"
+    },
+    "contracts.json": {
+      "bytes": 2011,
+      "sha256": "sha256:44755e1c7330f580fe1af5e63b95c7c67e62baa318d6691eb5a366525e330a98"
+    },
+    "examples.json": {
+      "bytes": 21686,
+      "sha256": "sha256:4b5bdd59acdde91112df5a6ea2a7f1c2017b34cb86647f305d83ddbac7ae5d7c"
+    },
+    "exploration-readiness.json": {
+      "bytes": 624,
+      "sha256": "sha256:7928eb75b80cad22ba60837aae8c0ce8d49044b8283c4decfd5a44b382c9b034"
+    },
+    "generation.json": {
+      "bytes": 212783,
+      "sha256": "sha256:e64d422db43584ccc0c0b081abb9042c293bbdb0185d3ed4979fe1b687321e93"
+    },
+    "preservation.json": {
+      "bytes": 1543,
+      "sha256": "sha256:22805f4c571cb08d9d92090d2f0d2f3934f16c826a966d43a4a5fda80d170d9c"
+    },
+    "publication.json": {
+      "bytes": 185299,
+      "sha256": "sha256:bdbbc7851788771cfcfffb82049ef5ee54a46260d73609a0615725c76e7680b0"
+    },
+    "regressions.xml": {
+      "bytes": 5675,
+      "sha256": "sha256:026e1d86a9e715efa66dae6bb970404aed4a29a50f0cf177fab9011a91e0da13"
+    },
+    "reviews.json": {
+      "bytes": 182251,
+      "sha256": "sha256:30fdbcdb9392977d235593403dad1e83e0ba0da897e2a24ccf497ed99a0e9c95"
+    },
+    "storage.json": {
+      "bytes": 59221,
+      "sha256": "sha256:dadad0454ff1323d1d9062666ca9d50850e231c882f559668487e6795cd2f8aa"
+    },
+    "study-readiness.json": {
+      "bytes": 710,
+      "sha256": "sha256:97840824ad7b33659783e7222867402dd2c0c51f5572e9f8308cc1793871cb7e"
+    },
+    "verification-attempts.json": {
+      "bytes": 1246,
+      "sha256": "sha256:4e3a833e56e5d27a7f5c9c66eef5ee7ce3bcb421371bd7627453628697cc049c"
+    }
+  },
+  "frozen_plan_commit": "90f929a8b48b6ba51caa5b74a91a540db19b9f55",
+  "handoff_commit": "The commit adding docs/verification/explanation-luna-publication-20261012.md; resolve with git log -- that path.",
+  "historical_sessions_retargeted": false,
+  "implementation_commit": "0ec304b3812f1e6f59f64dd0c8d49c3fa981619d",
+  "implementation_correctness": "Delivered and self-verified on the real data and service; independent AI prose review separate from generation, not external clinical approval.",
+  "joint_acceptance": "New Luna revision passed the specified API and compiled-frontend browser checks. Independent joint acceptance and human-only checks remain open.",
+  "launch_readiness": "Not established. Provisional development review only.",
+  "no_public_push_or_deployment": true,
+  "open_gates": [
+    "Independent joint acceptance",
+    "Missing property/individual and sparse-candidate review-data coverage",
+    "Partial ELK and DOID import-scope limitations",
+    "Manual accessibility",
+    "Usability/pilot",
+    "Study-owner approval",
+    "Deployment/restore and operational gates",
+    "Ontology admission and release gates"
+  ],
+  "provider": {
+    "model": {
+      "architecture": {
+        "input_modalities": [
+          "file",
+          "image",
+          "text"
+        ],
+        "instruct_type": null,
+        "modality": "text+image+file->text",
+        "output_modalities": [
+          "text"
+        ],
+        "tokenizer": "GPT"
+      },
+      "benchmarks": {
+        "artificial_analysis": {
+          "agentic_index": null,
+          "coding_index": null,
+          "intelligence_index": 38.1
+        },
+        "design_arena": []
+      },
+      "canonical_slug": "openai/gpt-6-luna-20260922",
+      "context_length": 1050000,
+      "created": 1790100786,
+      "default_parameters": {
+        "frequency_penalty": null,
+        "presence_penalty": null,
+        "repetition_penalty": null,
+        "temperature": null,
+        "top_k": null,
+        "top_p": null
+      },
+      "description": "GPT-6 Luna is the fast, cost-efficient model in OpenAI's GPT-6 series, positioned below GPT-6 Sol. It is suited for high-volume and latency-sensitive workloads such as chat, classification, and lightweight agentic...",
+      "expiration_date": null,
+      "hugging_face_id": null,
+      "id": "openai/gpt-6-luna",
+      "knowledge_cutoff": null,
+      "links": {
+        "details": "/api/v1/models/openai/gpt-6-luna-20260922/endpoints"
+      },
+      "name": "OpenAI: GPT-6 Luna",
+      "per_request_limits": null,
+      "pricing": {
+        "completion": "0.0000005",
+        "input_cache_read": "0.00000001",
+        "input_cache_write": "0.000000125",
+        "overrides": [
+          {
+            "completion": "0.00000075",
+            "input_cache_read": "0.00000002",
+            "input_cache_write": "0.00000025",
+            "min_prompt_tokens": 272000,
+            "prompt": "0.0000002"
+          }
+        ],
+        "prompt": "0.0000001",
+        "web_search": "0.01"
+      },
+      "reasoning": {
+        "default_effort": "medium",
+        "default_enabled": true,
+        "mandatory": false,
+        "supported_efforts": [
+          "max",
+          "xhigh",
+          "high",
+          "medium",
+          "low",
+          "none"
+        ]
+      },
+      "supported_parameters": [
+        "include_reasoning",
+        "max_completion_tokens",
+        "max_tokens",
+        "reasoning",
+        "reasoning_effort",
+        "response_format",
+        "seed",
+        "structured_outputs",
+        "tool_choice",
+        "tools",
+        "verbosity"
+      ],
+      "supported_voices": null,
+      "top_provider": {
+        "context_length": 1050000,
+        "is_moderated": true,
+        "max_completion_tokens": 128000
+      }
+    },
+    "reported_cost_usd": "0.230666125",
+    "responses": 260
+  },
+  "publication": {
+    "manifest": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package-luna-20261012.json",
+    "manifest_sha256": "sha256:07781b63d2acd24f2542653112e5a20d75cea30af55685b331af3ea1e9b8907b",
+    "package_id": "sha256:7962c960d604cdffffc9ecd326cf4d3d4ab232244cf9b31eda2887c5a6a43a2b",
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication-luna-20261012.json",
+    "sha256": "sha256:51500ab8b54615ff938da3e70faa6816af67c6867b1b528f4d2a175cb68bff93"
+  },
+  "recorded_utc": "2026-10-12T21:51:40.769943+00:00",
+  "review": {
+    "approved_luna_claims": 279,
+    "deterministic_artifacts": 8,
+    "independently_reviewed_artifacts": 252,
+    "luna_reviewed_artifacts": 251,
+    "rejected_luna_claims": 13,
+    "retained_predecessor_artifacts": 9
+  },
+  "schema": "exact-luna-delivery/1",
+  "storage": {
+    "additive_publication_bytes": 41037824,
+    "attribution": "Combined changes include other local activity. Task-specific sizes exclude shared input datasets; generation baseline already included the frozen plan.",
+    "baseline_before_generation_bytes": 49779538849,
+    "combined_bytes": 50003761249,
+    "combined_change_from_generation_baseline_bytes": 224222400,
+    "large_files_copied_or_relinked": 0,
+    "limit_bytes": 100000000000,
+    "peak_additional_estimate_bytes": 1000000000,
+    "task_bundle_and_environment_bytes": 119324672
+  },
+  "verification": {
+    "active_descriptions": 260,
+    "cases": 24,
+    "pairs": 120,
+    "prior_implementation_tests": 136,
+    "prior_test_overlap": "The 36 fresh tests overlap the earlier 136 and are not added to claim 172 distinct tests.",
+    "real_api": "passed",
+    "regressions_passed": 36,
+    "rendered_browser": "passed",
+    "scoped_citations": 334
+  }
+}

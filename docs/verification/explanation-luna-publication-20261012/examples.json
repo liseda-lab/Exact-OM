@@ -1,0 +1,480 @@
+{
+  "contract": "exact-description/2",
+  "examples": [
+    {
+      "claims": [
+        {
+          "category": "meaning",
+          "claim_id": "sha256:b77b69c9ee8a2a53316ab4f7694d1985305fc5527f41ae0ed0502e4be65b8a99",
+          "fact_ids": [
+            "sha256:6557823785ffa80e0c5ed1cd9e8cf56e097615bd98b9ca7525168f35faf92a95",
+            "sha256:2b61ea6891b3701da000dd20b5cc1bf12315523f0bad39f8e6d8849387ef0a11"
+          ],
+          "text": "Fontaine progeroid syndrome is a progeroid syndrome characterized by poor growth, abnormal skeletal features, distinctive craniofacial features, sagging thin skin, and decreased subcutaneous fat suggesting an aged appearance that is most pronounced in infancy and improves over time; it has a material basis in a heterozygous mutation in SLC25A24 on chromosome 1p36."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0051067",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:72da14e00e0f782e828131b72c8d806a1f4481afdd6c41332a6df8dc7a521824",
+      "main_api_path": "/api/v1/explanations/sha256:72da14e00e0f782e828131b72c8d806a1f4481afdd6c41332a6df8dc7a521824",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:b77b69c9ee8a2a53316ab4f7694d1985305fc5527f41ae0ed0502e4be65b8a99": [
+            "source"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source"
+        ],
+        "kind": "reviewed_profile",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": "sha256:7c05090472d5ef403d2c3d87e807f02e22392b11c5352c8462a091c6ce0a6f87",
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "reference_label_citations": [
+        {
+          "axiom_ref": "sha256:266294f5689e21f4d42e3c99366659629f877818fd11a1b43b0fe03f53968abc",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:266294f5689e21f4d42e3c99366659629f877818fd11a1b43b0fe03f53968abc",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:ffc252cc90dcafed1fe40dc39f83923533261d35e28809441f46493e11bb5b2b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050736",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "autosomal dominant disease",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:6557823785ffa80e0c5ed1cd9e8cf56e097615bd98b9ca7525168f35faf92a95",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:6557823785ffa80e0c5ed1cd9e8cf56e097615bd98b9ca7525168f35faf92a95",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:b572784a81d2792daceed73e76b9236923a50e33b0804332f81ddd608bce5aaf",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0051067",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "Fontaine progeroid syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:6e0510f12d6b546d67721207e260d7a3a096fe33354c833a7a61de0e39569f6f",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:6e0510f12d6b546d67721207e260d7a3a096fe33354c833a7a61de0e39569f6f",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:8c9ad62584923b53dd5848d0fdd90e71cdd9aae68b76fd8a32d73de3d63f805f",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0081332",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "progeroid syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f14cff51313ca86f828b23f081c9a52575e1d3b6c3b227b4fd16ebd36cfbe24f",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f14cff51313ca86f828b23f081c9a52575e1d3b6c3b227b4fd16ebd36cfbe24f",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:7f3f0004b152f2a37b4933ba3486b5e167cfbf392aaca8920c1008346c4f90e4",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/IDO_0000664",
+            "kind": "object_property",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "has material basis in",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "reviewer_id": "codex-root-semantic-review-20261012-luna-batch",
+      "support_status": "independently_reviewed",
+      "task": "entity_profile"
+    },
+    {
+      "claims": [
+        {
+          "category": "agreement",
+          "claim_id": "sha256:5b9a69aa8f3f618d9523407fb59949cda1d2b00ad059aa24213ddb152c71e0f9",
+          "fact_ids": [
+            "sha256:1f4cae422bda1de8686013cd77c571cab4a4e690624d359c1727fe29af37a82a",
+            "sha256:d22122856762526c755e9c2bcad3a82840211fbfa7a93df3ccb0718f84e192c4",
+            "sha256:294f13a74881925f44321bb0e4b6c8779cdb119ee5bea24679b1efca361444c7",
+            "sha256:5434ce6e1699830e21d1ba73b6491be9eda33e429518139655e368bf1d8764f7"
+          ],
+          "text": "The source, Blau Syndrome, and target, Blau syndrome, both describe the condition as involving arthritis and uveitis."
+        },
+        {
+          "category": "difference",
+          "claim_id": "sha256:bcd3a967088e8bda4c043827b1f2ec4d79b5c4874b08ae18672950c06bce172a",
+          "fact_ids": [
+            "sha256:d22122856762526c755e9c2bcad3a82840211fbfa7a93df3ccb0718f84e192c4",
+            "sha256:5434ce6e1699830e21d1ba73b6491be9eda33e429518139655e368bf1d8764f7"
+          ],
+          "text": "Their definition details differ: the source says it is caused by a NOD2 mutation, usually presents before age four, and features granulomatous dermatitis and arthritis with synovitis; the target describes familial granulomatous arthritis and skin granulomas and states a material basis in heterozygous NOD2 mutations."
+        }
+      ],
+      "entities": [
+        {
+          "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116794",
+          "kind": "class",
+          "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+        },
+        {
+          "iri": "http://purl.obolibrary.org/obo/DOID_0050678",
+          "kind": "class",
+          "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+        }
+      ],
+      "explanation_id": "sha256:f94c37bb6e2a3d10d12e27f01327761c6f2439534aa7172a37a847302b0ac8e9",
+      "main_api_path": "/api/v1/explanations/sha256:f94c37bb6e2a3d10d12e27f01327761c6f2439534aa7172a37a847302b0ac8e9",
+      "preparation_kind": "grounded_description",
+      "presentation": {
+        "claim_sides": {
+          "sha256:5b9a69aa8f3f618d9523407fb59949cda1d2b00ad059aa24213ddb152c71e0f9": [
+            "source",
+            "target"
+          ],
+          "sha256:bcd3a967088e8bda4c043827b1f2ec4d79b5c4874b08ae18672950c06bce172a": [
+            "source",
+            "target"
+          ]
+        },
+        "contract_version": "exact-description-presentation/1",
+        "covered_sides": [
+          "source",
+          "target"
+        ],
+        "kind": "reviewed_comparison",
+        "relation_asserted": false,
+        "render_revision": "typed-readable/3",
+        "review_receipt_sha256": "sha256:911c90db6a3bef0ef675b48eb1fda71aca1c1d1445d2c5ced5c84b79a433dcc3",
+        "scope_note": "Descriptions and excerpts do not determine mapping equivalence or incompatibility."
+      },
+      "reference_label_citations": [
+        {
+          "axiom_ref": "sha256:294f13a74881925f44321bb0e4b6c8779cdb119ee5bea24679b1efca361444c7",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:294f13a74881925f44321bb0e4b6c8779cdb119ee5bea24679b1efca361444c7",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:d95f0ba007599c8653f27bec87285d4c0fe187fe530b24177fabd566e3c8ce65",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050678",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "Blau syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:266294f5689e21f4d42e3c99366659629f877818fd11a1b43b0fe03f53968abc",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:266294f5689e21f4d42e3c99366659629f877818fd11a1b43b0fe03f53968abc",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:ffc252cc90dcafed1fe40dc39f83923533261d35e28809441f46493e11bb5b2b",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_0050736",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "autosomal dominant disease",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:d3043dca91448f47e6e29c7112c3c34e7c8cd0e899c70527d052f2af23fad413",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:d3043dca91448f47e6e29c7112c3c34e7c8cd0e899c70527d052f2af23fad413",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:797ec7548f5ff599f7685ed37c8dd720448d7f88987c57db94657e26d584eeb7",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/DOID_225",
+            "kind": "class",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+            "language": "en",
+            "lexical_form": "syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:f14cff51313ca86f828b23f081c9a52575e1d3b6c3b227b4fd16ebd36cfbe24f",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:f14cff51313ca86f828b23f081c9a52575e1d3b6c3b227b4fd16ebd36cfbe24f",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:7f3f0004b152f2a37b4933ba3486b5e167cfbf392aaca8920c1008346c4f90e4",
+              "document_sha256": "sha256:f552e866a6233add0c02e5fed1ac1b0236c36c7f92247ed8c3a2a522ecc88fbb",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://purl.obolibrary.org/obo/IDO_0000664",
+            "kind": "object_property",
+            "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "has material basis in",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:1f4cae422bda1de8686013cd77c571cab4a4e690624d359c1727fe29af37a82a",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:1f4cae422bda1de8686013cd77c571cab4a4e690624d359c1727fe29af37a82a",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:dfe147e5d5b9d87a3cd5ca5db2d0aa3de1829e7b609cd64c9be10e40934f6670",
+              "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P108",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C116794",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "Blau Syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:04876fec32d15719ba91ddb88c56d29804c8109bf89b418245b11d20d257632b",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:04876fec32d15719ba91ddb88c56d29804c8109bf89b418245b11d20d257632b",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:a21991f6d0ac7531d1c376e263add973fcf2e15f44a2b48891825ea16d57a5e1",
+              "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P108",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C213418",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "Systemic Autoimmune Disease",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:78816f6956aff8f403b3d9b7a56ed42e278d72f76d1efb60755656c77623ead0",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:78816f6956aff8f403b3d9b7a56ed42e278d72f76d1efb60755656c77623ead0",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:53d78d1953b6a711e0db2f8e03ddb17b24e9a26e97f1a8ed4711d298bf0e72b7",
+              "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C28193",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "Syndrome",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:ce3c3a799a79b6fdcfa45c0ede2102f16c5f09d068f298d6c8a1574bd706f1c1",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:ce3c3a799a79b6fdcfa45c0ede2102f16c5f09d068f298d6c8a1574bd706f1c1",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:2c81d3972755458e13e433aded8c0ce405e9f332f9c979264f47949de6503d87",
+              "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C74447",
+            "kind": "class",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "NOD2 Gene",
+            "term_type": "literal"
+          }
+        },
+        {
+          "axiom_ref": "sha256:7ae235937903271aef168c0af1780776aa2519d19c3c6657b92de801a708dbb2",
+          "category": "labels",
+          "derivation_id": null,
+          "fact_id": "sha256:7ae235937903271aef168c0af1780776aa2519d19c3c6657b92de801a708dbb2",
+          "interpretation": "asserted",
+          "origins": [
+            {
+              "axiom_id": "sha256:8d647e98c96d80fc56b6af2fd74ec7a7c9d417e66a40124b01e0e76d274c8388",
+              "document_sha256": "sha256:1a7182a7327ebc4181f7d6b0f7e81ed04dd258f1a86bd8f560e4a0d61439d58a",
+              "provenance_status": "recorded",
+              "source_span": null
+            }
+          ],
+          "predicate_iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P108",
+          "premise_ids": [],
+          "subject": {
+            "iri": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#R176",
+            "kind": "object_property",
+            "ontology_version_id": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9"
+          },
+          "value": {
+            "datatype": "http://www.w3.org/2001/XMLSchema#string",
+            "language": null,
+            "lexical_form": "Disease_Mapped_To_Gene",
+            "term_type": "literal"
+          }
+        }
+      ],
+      "reviewer_id": "codex-root-semantic-review-20261012-luna-batch",
+      "support_status": "independently_reviewed",
+      "task": "pair_comparison"
+    }
+  ],
+  "publication": "publication-luna-20261012.json"
+}

@@ -1,5 +1,10 @@
 # Luna prose revision — prepared batch and publication handoff
 
+> Historical preparation record. The subsequent full-batch authorization was granted, and
+> generation and review are complete. See the [Luna publication handoff](explanation-luna-publication-20261012.md)
+> for the delivered revision, actual cost and verification outcomes. Statements below about
+> a pending approval describe the earlier preparation checkpoint.
+
 12 October 2026. The complete 260-request plan is frozen and the local preparation/publication
 path is implemented. **The new provider batch has not run, no Luna revision has been published,
 and the current study is unchanged.** Automatic approval review rejected dispatch because it

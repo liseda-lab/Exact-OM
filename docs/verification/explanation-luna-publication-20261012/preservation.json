@@ -1,0 +1,36 @@
+{
+  "active_reviewed_claims": 280,
+  "active_support": {
+    "independently_reviewed": 252,
+    "typed_template_support": 8
+  },
+  "checks": {
+    "cases": 24,
+    "pairs": 120,
+    "resources_with_evidence_order_only_changes": 24,
+    "selected_records": 3443
+  },
+  "historical_approved_claims_preserved": 68,
+  "new_artifacts": 251,
+  "new_package": "sha256:07781b63d2acd24f2542653112e5a20d75cea30af55685b331af3ea1e9b8907b",
+  "new_publication": "sha256:51500ab8b54615ff938da3e70faa6816af67c6867b1b528f4d2a175cb68bff93",
+  "old_artifacts_retained": 990,
+  "old_package": "sha256:1e160105df9ab9fcccbc449716066904e03eb93711c57189e896cc728d9a5e70",
+  "protected_predecessor_identity_unchanged": true,
+  "retained_predecessor_ids": [
+    "sha256:220f207b073a34e8aecd6a070859d89a468636db3d9165e4f706abae026e7878",
+    "sha256:2aedef70ea1c8b5a4634bd5d5fb6afa39453c2553717118e79d05279cf5a85df",
+    "sha256:73d7f383b20163c18386a08ba2aeefbbe5a8c7ec3a800b62b8c81d74105e88b2",
+    "sha256:77920aee6ce0c53ffcadcdc7145cb851ede817d2701422e380e6c30f5cb345c0",
+    "sha256:83525fd974ccf7071d6b34e12dbb0e22b5d9ba242a2fc03d387f3321ded715bf",
+    "sha256:aa58e1ff32e6d44f9552763cd25eeb1c096dd885f3836169b0a06c8b50a19861",
+    "sha256:aac629b2b456315093e8bf043c22c22a788764df79d005b35a23be6f176ca8bb",
+    "sha256:d84a62f16e8ed1ca917b79df4975435d0d028fdeb819a1093cdf98a9230963a8",
+    "sha256:d95d43bcaa8a7a1e86cbbbf74223ee65f22dab4fa52eade8f569f464af3fc764"
+  ],
+  "status": "passed",
+  "tasks": {
+    "entity_profile": 140,
+    "pair_comparison": 120
+  }
+}

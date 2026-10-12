@@ -1,0 +1,26 @@
+{
+  "backend": {
+    "file_count": 56,
+    "git_commit": "0ec304b3812f1e6f59f64dd0c8d49c3fa981619d",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "752b91446f125a12af47d9c6f7c7499c3edba40ea85d5d84fd5bfa86491c8985"
+  },
+  "client": "study-review/1",
+  "description": "exact-description/2",
+  "frontend_tree_sha256": "b5511d27dabb4ba8d439580db5b4dda258493d87882ab6fcbe3dbd68fe21fc87",
+  "independent_review": "exact-description-review/1",
+  "presentation": "exact-description-presentation/1",
+  "protocol_files": {
+    "specs/explanation-framework/protocol/description-presentation.runtime-schema.json": "sha256:c2b1dc19843216f2722057871d600252f8e868202244568ee8b11c355d5ec0eb",
+    "specs/explanation-framework/protocol/description-review.runtime-schema.json": "sha256:77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "specs/explanation-framework/protocol/exploration.runtime-openapi.json": "sha256:678c69bbf948e7fa4cd2c683fd077020bf89bceec457cf09eb103ad48033a6f2",
+    "specs/explanation-framework/protocol/partial-inference.runtime-schema.json": "sha256:fbb8f19f73608e90b97f621b03a2770420e0db95588d1cf1a79367f75246e531",
+    "specs/explanation-framework/protocol/review-about.runtime-schema.json": "sha256:b89e1af6bd34b6ea49053050bf333a6f32241a1dd9921930f0ed9a563d3c9626",
+    "specs/explanation-framework/protocol/study-publication.runtime-schema.json": "sha256:bf0bd2211b772824d255e535b18367bf2310eb786b4f04ba0f3d6c222284c2f1",
+    "specs/explanation-framework/protocol/study-resource.runtime-schema.json": "sha256:99b74818a8153c3d1f5e236bf6a7d9c16cc1bf48011afd08012fb88a010280f3",
+    "specs/explanation-framework/protocol/study-tutorial.runtime-schema.json": "sha256:f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "specs/explanation-framework/protocol/study.runtime-openapi.json": "sha256:daa196ef793a3ff37a8129487ca41b5351f2bb08c0ca9c639ae461a908266a62"
+  },
+  "schema": "exact-luna-contract-bindings/1",
+  "wire_shape_changed": false
+}

@@ -1,0 +1,21 @@
+{
+  "failed_test_session_preserved": true,
+  "first_api_attempt": {
+    "disposition": "Verifier expected packet-inline AST at the Fact route. Corrected to validate the expression reference and then dereference and compare the exact original axiom AST. No backend response or assertion was weakened.",
+    "failure": "cited_original_value",
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification/verification.json",
+    "sha256": "sha256:92219bf7b93e20aba75ec9622d18103313fc5f0528ff2333235ebdd17f0cfa0e",
+    "status": "failed"
+  },
+  "schema": "exact-luna-verifier-corrections/1",
+  "static_verifier_corrections": [
+    "Task belongs to support_packet, not the generation manifest.",
+    "Frozen evidence keys include candidate identity; original axiom views include typed focal subject.",
+    "Evidence rows and named scores are compared by identity with every value checked; collection order is not semantic."
+  ],
+  "subsequent_complete_api_attempt": {
+    "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/api-verification-2/verification.json",
+    "sha256": "sha256:5003ad4731717c1b545e205abe6160c7d62ee63883f6dd30efc1ec7e5bd03a87",
+    "status": "passed"
+  }
+}
