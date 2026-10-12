@@ -307,7 +307,7 @@ def reserve(plan, costs):
                 raise ValueError("Pilot resume dependencies changed")
         records = [*state["reservations"].values(), *fresh.values()]
         if (
-            len(records) > 704
+            len(records) > state.get("total_request_limit", 704)
             or sum(r["phase"] == "development" for r in records)
             > state["request_limits"]["development"]
             or sum(r["reserved_cost_usd"] for r in records) > state["cost_ceiling_usd"]

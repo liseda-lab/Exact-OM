@@ -1,5 +1,49 @@
 # October corrective repair campaign
 
+## 12 October: approved matched probabilistic evaluator qualification
+
+The user approved the reviewed plan with “Ok lets do this.” Its frozen manifest
+is `qualification/probabilistic-judge-20261012-001/plan.json`. This supersedes
+the categorical-only follow-up recommendation below. Use the same existing
+supervisor and allocation14451; preserve access shell14451.0 and all held work.
+
+Compare Luna Chat Completions with Luna Decisions on ten cases: seven existing
+regression diagnostics and three fresh, independently authored/native-verified
+controls. Both orders are scheduled; both orders of the two DEV diagnostic cases
+are repeated once. Twenty-four presentations each have one chat baseline, one
+criterion-specific evidence check and one dependent Decisions score request:
+at most72 new requests. One comparison per request, two concurrent presentations,
+2 CPUs/8GiB, no GPU. The models' different provider revisions are recorded; this
+is a comparison of deployed evaluator configurations, not an endpoint-only effect.
+
+Keep the three existing SF-010 meanings, anchors and equal weights. The evidence
+gate uses an explicit sufficient/missing/contradictory classification, admitting
+only a sufficient probability greater than0.5. This is an operational majority
+rule, not calibrated confidence; the API confidence field is retained metadata.
+Only admitted criteria receive native score questions. Expected criterion values
+use the whole distribution divided by four. Any required unknown leaves the
+global scalar null, without renormalizing. Direct preference probabilities remain
+separate. Material ties use0.05; criterion variation uses the same0.25 allowance
+for both methods/arms. Freeze rules before calls; never retune and resample until
+passing. Preserve good partial answers, raw distributions, refusals and receipts.
+
+The authorized amendment raises total requests704→776 and DEV208→280, keeping
+calibration91, TRAIN251, TEST154 and the monetary ceiling$35. All550 historical
+reservations remain. Preserve the128 TEST comparisons and26 swaps. The existing
+qualification stage retains its original start/costs; only its expired deadline
+extends to the original primary freeze, 14 October17:00 UTC. New work shares the
+existing cumulative resource and durable HTTP ledgers. Never retry unknown delivery.
+
+Pilot outputs are not study labels or selectable-checkpoint evidence. Passing
+requires the frozen correctness/coverage/stability checks and a grounded audit.
+Read the independent `audit-notes.json`, raw chat explanations and native reports;
+Decisions itself supplies no explanatory citations. A successful pilot permits
+preparing versioned broader DEV integration with an explicit grounded audit
+contract. A failed scientific check is retained as a result, not fixed by changing
+gold or overwriting old judgments. TEST remains closed and the six weights remain
+bound. Preserve existing technical-failure identities/counters and action-only
+email policy. No routine preparation or completion email while root is reviewing.
+
 ## 12 October: qualify Luna Decisions before further experiment changes
 
 Outcome: the screen and one isolated diagnostic completed as steps14451.186
