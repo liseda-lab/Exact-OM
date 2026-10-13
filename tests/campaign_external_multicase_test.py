@@ -174,9 +174,10 @@ def test_external_selection_cannot_import_freeze_or_final_as_development(tmp_pat
 
 
 @pytest.mark.parametrize(
-    "change", [None, "selection_rules", "mode", "decisions", "policy", "overlay", "missing"]
+    "change", [None, "selection_rules", "mode", "decisions", "policy", "absent_policy", "overlay", "missing"]
 )
-def test_external_diagnostic_preserves_complete_status_without_policy_promotion(tmp_path, change):
+@pytest.mark.parametrize("policy", [None, {}])
+def test_external_diagnostic_preserves_complete_status_without_policy_promotion(tmp_path, change, policy):
     path, raw, record = _multicase_fixture(tmp_path)
     old_path = Path(record["campaign"]["path"])
     old_raw = yaml.safe_load(old_path.read_text())
@@ -197,7 +198,7 @@ def test_external_diagnostic_preserves_complete_status_without_policy_promotion(
         status="complete",
         decision_mode="diagnostic",
         decisions=[],
-        published_policy_overlay={},
+        published_policy_overlay=policy,
         combined_selected_overlay={},
     )
     if change == "mode":
@@ -206,6 +207,8 @@ def test_external_diagnostic_preserves_complete_status_without_policy_promotion(
         result["decisions"] = [{"selected": "candidate"}]
     elif change == "policy":
         result["published_policy_overlay"] = {"selected": True}
+    elif change == "absent_policy":
+        result.pop("published_policy_overlay")
     elif change == "overlay":
         result["combined_selected_overlay"] = {"selected": True}
     elif change == "missing":
@@ -223,7 +226,8 @@ def test_external_diagnostic_preserves_complete_status_without_policy_promotion(
             lock, lock.steps[0], tmp_path, producer_manifests=producers
         )
         assert result["status"] == "complete"
-        assert result["published_policy_overlay"] == {}
+        assert result["published_policy_overlay"] == policy
+        assert not any(harness.selected_experiment_overlays({"experiments": {"E05": result}}, ["E05"]).values())
         assert result["new_cells"] == 0
         assert len(producers) == 16
         assert {p["external_artifact_root"] for p in producers} == {

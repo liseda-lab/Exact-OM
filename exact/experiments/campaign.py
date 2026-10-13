@@ -725,7 +725,9 @@ def external_selection_result(
         and result.get("decision_mode") == "diagnostic"
         and not step.selection.decisions
         and result.get("decisions") == []
-        and result.get("published_policy_overlay") == {}
+        # No-policy diagnostics are serialized as null by select_experiment.
+        and "published_policy_overlay" in result
+        and result["published_policy_overlay"] in (None, {})
         and result.get("combined_selected_overlay") == {}
     )
     if result.get("status") not in {"selected", "screened_out"} and not completed_diagnostic:
