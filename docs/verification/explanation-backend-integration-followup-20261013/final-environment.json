@@ -1,0 +1,43 @@
+{
+  "schema": "exact-backend-followup-environment/1",
+  "backend": {
+    "file_count": 57,
+    "git_commit": "0a72cb4aabd79436d92ce6436a4739af286587bc",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "831a0f01746b4a34fe2c63d4e60d6e47d6f76e26478a5e062f79ec13f1903588"
+  },
+  "runtime_versions": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "python": "3.12.3",
+    "uvicorn": "0.35.0"
+  },
+  "postgres_version": "postgres (PostgreSQL) 16.2",
+  "hashes": {
+    "certificate": "1765f34af87a4400068860fa096d1b2b9d0966b0ef61ea8fc2dec2135aadd3ea",
+    "frontend": "07bdf63e4954b1185a11e453f14eb597aaa34904e65039faea7fd28b7355ddb2",
+    "package": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+    "publication": "6a71de5b947b0ae0cf2928172070e109eb5a7652bd1c8d2f28020a8667a2be31",
+    "source_publication": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f"
+  },
+  "study_revision": "review-20261013T062053-62b43d70b7",
+  "client_contract": "study-review/1",
+  "ports": {
+    "exploration": 19655,
+    "postgres": 19653,
+    "study": 19654
+  },
+  "paths": {
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final",
+    "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+    "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/frontend-2d4600d",
+    "package": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package-definition-review-20261013.json",
+    "publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final/publications/review-20261013T062053-62b43d70b7.json",
+    "source_publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication-definition-review-20261013.json",
+    "assets": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined",
+    "certificate": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final/tls/localhost.pem"
+  },
+  "purpose": "Final committed-code startup and bounded read verification; 44 browser checks and exhaustive parity are bound separately to environment-v2."
+}

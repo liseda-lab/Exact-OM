@@ -1,0 +1,10 @@
+{
+  "command": "docker info --format {{json .ServerVersion}}",
+  "returncode": 0,
+  "stdout": "\"\"",
+  "stderr": "Cannot connect to the Docker daemon at unix:///Users/pedrocotovio/.docker/run/docker.sock. Is the docker daemon running?",
+  "image_build_attempted": false,
+  "public_deployment_attempted": false,
+  "status": "unavailable",
+  "reason": "Empty server version and explicit daemon connection failure; command exit status zero is not success."
+}

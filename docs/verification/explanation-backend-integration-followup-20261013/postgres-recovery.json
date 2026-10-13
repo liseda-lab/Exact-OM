@@ -1,0 +1,26 @@
+{
+  "artifact_type": "study_recovery_verification",
+  "schema_version": 1,
+  "executed_at": "2026-10-13T05:40:01.057169+00:00",
+  "synthetic_only": true,
+  "database": "postgres (PostgreSQL) 16.2",
+  "verified": [
+    "actual_server_restart",
+    "reusable_invitation",
+    "same_assignment_and_submission",
+    "same_acknowledgements_history_and_events",
+    "pg_dump_and_pg_restore_into_separate_database",
+    "same_immutable_export"
+  ],
+  "verified_row_counts": {
+    "sessions": 1,
+    "mutations": 6,
+    "history": 6,
+    "events": 2,
+    "timing_segments": 1
+  },
+  "backup_sha256": "821b8fc48644d97b7a458e5761fb43ff69f728dd5926a5c7812d2426870a90e8",
+  "backup_size_bytes": 793877,
+  "immutable_export_sha256": "b5b5f7480c731bc09c3af8ea87b059e18d41b5fd7fa0753fd7c0f020f699fccf",
+  "retention": "Private ignored local test artifacts; no production retention claim"
+}

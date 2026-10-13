@@ -1,0 +1,135 @@
+{
+  "schema": "exact-backend-followup-read-diagnostics/1",
+  "original_incident": {
+    "status": "undiagnosed",
+    "source": "/Users/pedrocotovio/Library/Caches/exact-om-dev/s2dev/final-r2f1/run1-acceptance-results.json",
+    "source_sha256": "sha256:7a4c3f4ec403147f58f0a415fdc8a3439e0b066f0b5a907bb3c7a68d69ecd11c",
+    "run_started_utc": "2026-10-13T02:15:12Z",
+    "failed_test_started_utc": "2026-10-13T02:18:04Z",
+    "reported_failure": "network_unreachable",
+    "backend_cause_established": false
+  },
+  "historical_reload_R16": "unreproduced and unresolved",
+  "initial_probe_error": {
+    "schema": "exact-startup-read-diagnostics/1",
+    "original_probe_result": "failed_due_to_asserting_document_CSP_on_JSON",
+    "normal_reads": 200,
+    "normal_reads_valid": true,
+    "requested_read_ids": 210,
+    "matched_finished_ids": 210,
+    "error_types": {
+      "null": 210
+    },
+    "server_record_count": 420,
+    "source_sha256": "sha256:1cf4f4942ebfa6cde1a0fee380bc2d314a5cb0cd9cbc8fd3fc4ef9876bf0499e"
+  },
+  "passing_probes": [
+    {
+      "source_sha256": "sha256:c9c18288639d323f0bf4639b425798fecd008dbd54ca696dd67be063184906a5",
+      "environment": "environment-v2",
+      "status": "passed",
+      "phase": "normal_operation",
+      "started_at": "2026-10-13T06:08:38.363Z",
+      "finished_at": "2026-10-13T06:08:48.700Z",
+      "normal_reads": 200,
+      "valid_bodies_exact_content_lengths": true,
+      "categories": {
+        "profile_discovery": 50,
+        "profile": 50,
+        "comparisons": 50,
+        "context": 50
+      },
+      "abort_outcomes": {
+        "AbortError": 10
+      },
+      "reloads_completed": 10,
+      "maximum_reload_ms": 157,
+      "stream_client_cancel_attempts": 10,
+      "stream_first_chunk_bytes": [
+        2612
+      ],
+      "browser_request_failures": [
+        {
+          "mode": "intentional_abort",
+          "error": "net::ERR_ABORTED",
+          "count": 10
+        },
+        {
+          "mode": "intentional_stream_cancel",
+          "error": "net::ERR_ABORTED",
+          "count": 10
+        }
+      ],
+      "document_csp_asserted": true,
+      "matched_finished_server_records": 210,
+      "server_exceptions": 0,
+      "incomplete_matched_server_transmissions": 0,
+      "server_length_mismatches": 0,
+      "route_counts": {
+        "/api/v1/explanations": 100,
+        "/api/v1/explanations/{explanation_id}": 50,
+        "/api/v1/entity-context": 50,
+        "/api/v1/axioms/{axiom_id}/stream": 10
+      }
+    },
+    {
+      "source_sha256": "sha256:b4fc7e29b15a2ce893fab1d04f6c63145e0391780d156f37e850d318cb58718e",
+      "environment": "environment-final",
+      "status": "passed",
+      "phase": "after_startup",
+      "started_at": "2026-10-13T06:30:18.157Z",
+      "finished_at": "2026-10-13T06:30:30.179Z",
+      "normal_reads": 200,
+      "valid_bodies_exact_content_lengths": true,
+      "categories": {
+        "profile_discovery": 50,
+        "profile": 50,
+        "comparisons": 50,
+        "context": 50
+      },
+      "abort_outcomes": {
+        "AbortError": 10
+      },
+      "reloads_completed": 10,
+      "maximum_reload_ms": 138,
+      "stream_client_cancel_attempts": 10,
+      "stream_first_chunk_bytes": [
+        2612
+      ],
+      "browser_request_failures": [
+        {
+          "mode": "intentional_abort",
+          "error": "net::ERR_ABORTED",
+          "count": 10
+        },
+        {
+          "mode": "intentional_reload",
+          "error": "net::ERR_TOO_MANY_RETRIES",
+          "count": 3
+        },
+        {
+          "mode": "intentional_stream_cancel",
+          "error": "net::ERR_ABORTED",
+          "count": 10
+        }
+      ],
+      "document_csp_asserted": true,
+      "matched_finished_server_records": 210,
+      "server_exceptions": 0,
+      "incomplete_matched_server_transmissions": 0,
+      "server_length_mismatches": 0,
+      "route_counts": {
+        "/api/v1/explanations/{explanation_id}": 50,
+        "/api/v1/entity-context": 50,
+        "/api/v1/explanations": 100,
+        "/api/v1/axioms/{axiom_id}/stream": 10
+      }
+    }
+  ],
+  "total_asserted_normal_reads": 400,
+  "total_passing_reload_probes": 20,
+  "total_explicit_abort_attempts": 20,
+  "total_client_stream_cancel_attempts": 20,
+  "interpretation": "No unexpected fetch failure or protocol exception reproduced. Matched server sends completed; client cancel attempts do not establish interrupted server streaming. Passing probes do not diagnose or close the historical incidents.",
+  "privacy": "Only categories, static route templates, bounded error names and aggregate counts. No credentials, invitation, session identifiers, participant data, raw URLs, queries or payloads."
+}

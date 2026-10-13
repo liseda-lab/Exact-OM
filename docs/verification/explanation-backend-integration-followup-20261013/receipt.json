@@ -1,0 +1,263 @@
+{
+  "schema": "exact-backend-integration-followup/1",
+  "recorded_at": "2026-10-13T06:37:11.299034+00:00",
+  "reviewed_commit": "1b04ac065e69505a07f5f6ed6985ce5ca108be33",
+  "implementation_commits": [
+    {
+      "commit": "cc5ecc1cfb830840db7dea5cc297bd7c7070e546",
+      "subject": "fix(explain): restore legacy preparation and typed citation support"
+    },
+    {
+      "commit": "a3bb446e648ef37f6cce36c83fde5b2cbc4f8681",
+      "subject": "fix(explain): bind prepared support to context bytes and export lineage"
+    },
+    {
+      "commit": "f4f042ca94feca371b34a50718a24345f3196dba",
+      "subject": "fix(study): declare synthetic grading provenance in legacy fixture"
+    },
+    {
+      "commit": "d16c816db78a9c7826fe3882beb85935a8ff47ef",
+      "subject": "feat(review): publish independently reviewed definition supplements"
+    },
+    {
+      "commit": "0a72cb4aabd79436d92ce6436a4739af286587bc",
+      "subject": "fix(prepare): revalidate unchanged extracts after context repair"
+    }
+  ],
+  "final_backend_commit": "0a72cb4aabd79436d92ce6436a4739af286587bc",
+  "evidence_commit": "Resolve with git log -1 -- docs/verification/explanation-backend-integration-followup-20261013/receipt.json; this commit does not change backend runtime bytes.",
+  "inputs": [
+    "AGENTS.md",
+    "specs/explanation-framework/23-postmigration-data-and-elk-corrections.md",
+    "specs/explanation-framework/22-review-backend-and-data.md",
+    "docs/verification/explanation-s2-luna-r2-f1-review.md"
+  ],
+  "findings": [
+    {
+      "id": "legacy_inventory",
+      "severity": "P1",
+      "owner": "backend",
+      "root_cause": "Raw context preparation omitted the complete retained category inventory required by resource admission.",
+      "disposition": "fixed; new context revision with exact counts; no validator weakening",
+      "evidence": [
+        "test-outcomes.json",
+        "browser-outcomes.json"
+      ]
+    },
+    {
+      "id": "legacy_context_binding",
+      "severity": "P1",
+      "owner": "backend",
+      "root_cause": "Legacy support bound an ontology-version identity where actual context bytes were required.",
+      "disposition": "fixed; context/4 and generation/6, explicit raw-context export lineage, typed fact/AST admission preserved",
+      "evidence": [
+        "test-outcomes.json",
+        "browser-outcomes.json"
+      ]
+    },
+    {
+      "id": "legacy_synthetic_grading",
+      "severity": "P1",
+      "owner": "fixture",
+      "root_cause": "Synthetic v1 fixture incorrectly used unresolved review-only grading keys.",
+      "disposition": "fixed in a fresh synthetic revision with explicit construction provenance; not scientific adjudication",
+      "evidence": [
+        "artifact-bindings.json",
+        "browser-outcomes.json"
+      ]
+    },
+    {
+      "id": "unchanged_extract_resume",
+      "severity": "P2",
+      "owner": "backend",
+      "root_cause": "Repaired context hash caused unnecessary provider dispatch for unchanged semantic input.",
+      "disposition": "fixed in 0a72cb4; exact saved-request equality except context hash, response integrity and fresh grounding, new artifact/provenance",
+      "evidence": [
+        "test-outcomes.json"
+      ]
+    },
+    {
+      "id": "doid_initial_navigation",
+      "severity": "P2",
+      "owner": "backend with frontend labelling follow-up",
+      "root_cause": "Unfiltered asserted-root ordering did not provide a useful review starting page. No authoritative deprecation classification was invented.",
+      "disposition": "explicit context-bound curated disease start; all 4189 roots accessible; pagination and main/study parity passed",
+      "evidence": [
+        "api-outcomes.json",
+        "artifact-bindings.json"
+      ]
+    },
+    {
+      "id": "low_information_descriptions",
+      "severity": "P2",
+      "owner": "preparation",
+      "root_cause": "17 profiles omitted available original definitions; 12 weak profiles have insufficient retained definition/label information.",
+      "disposition": "17 additive full-definition quotations independently reviewed then published; all existing approved prose retained; source-limited cases remain explicitly bounded",
+      "evidence": [
+        "description-quality.json",
+        "publication.json",
+        "source-limit-audit.json"
+      ]
+    },
+    {
+      "id": "legacy_typed_citations",
+      "severity": "P1",
+      "owner": "backend; packetless historical frontend compatibility",
+      "root_cause": "Packetless legacy artifacts cannot establish kind from an annotation IRI.",
+      "disposition": "fresh supported preparation retains authoritative subjects, including punning/shared facts; historical packetless artifacts remain immutable and without typed guarantees",
+      "evidence": [
+        "test-outcomes.json",
+        "browser-outcomes.json"
+      ]
+    },
+    {
+      "id": "profile_read_incident",
+      "severity": "undetermined",
+      "owner": "integration",
+      "root_cause": null,
+      "disposition": "undiagnosed; no unexpected failure reproduced in bounded startup/normal-read/cancellation/reload probes; no backend cause established",
+      "evidence": [
+        "read-diagnostics.json"
+      ]
+    },
+    {
+      "id": "R16_h11_reload",
+      "severity": "undetermined",
+      "owner": "integration",
+      "root_cause": null,
+      "disposition": "unreproduced and unresolved; no inferred causation from passing current probes",
+      "evidence": [
+        "read-diagnostics.json"
+      ]
+    },
+    {
+      "id": "container_reader_contents",
+      "severity": "P1",
+      "owner": "deployment packaging",
+      "root_cause": "Selective image COPY omitted transitive prepared-reader modules.",
+      "disposition": "fixed source layout and isolated cold-import check; actual image build/start still unverified because daemon unavailable",
+      "evidence": [
+        "test-outcomes.json",
+        "container-runtime.json"
+      ]
+    }
+  ],
+  "verification": {
+    "legacy_browser": {
+      "passed": 19,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "contract": "exact-study/1.0",
+      "dataset": "fresh synthetic legacy fixture"
+    },
+    "luna_browser": {
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "contract": "study-review/1",
+      "dataset": "definition-review-20261013"
+    },
+    "backend_broad": {
+      "passed": 152,
+      "failed": 1,
+      "skipped": 2,
+      "failure_resolved_by": "0a72cb4"
+    },
+    "final_affected_backend": {
+      "passed": 49,
+      "failed": 0,
+      "skipped": 0
+    },
+    "actual_postgresql_recovery": {
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0
+    },
+    "distinct_backend_checks_latest_observation": {
+      "passed": 172,
+      "failed": 0,
+      "skipped": 0,
+      "not_a_single_final_head_run": true
+    },
+    "actual_api": {
+      "pairs": 120,
+      "descriptions": 260,
+      "citations": 336,
+      "cases": 24,
+      "status": "passed"
+    },
+    "read_probes": {
+      "normal_reads_passed": 400,
+      "reloads_completed": 20,
+      "explicit_aborts": 20,
+      "stream_client_cancellation_attempts": 20,
+      "matched_server_finishes": 420,
+      "unexpected_errors": 0
+    },
+    "runtime_contracts": "passed on final backend",
+    "final_owned_service_startup": "passed; HTTPS and PostgreSQL",
+    "frontend_units_types_build": "reuse accepted independent evidence: 131 units, types and production build; frontend unchanged"
+  },
+  "preservation": {
+    "predecessor_artifact_entries": 1241,
+    "unaffected_explanation_locations": 243,
+    "old_clauses": 291,
+    "new_definition_quotes": 17,
+    "selected_evidence_records": 3443,
+    "full_candidate_pool_and_matcher_artifacts": "unchanged and retained",
+    "scores_bridges_original_facts": "preserved",
+    "partial_elk": "positive incomplete taxonomy only; unsupported and unknown distinct",
+    "historical_publications": "preserved",
+    "provider_dispatches": 0,
+    "unrelated_changes": "preserved",
+    "HermiT_restarted": false
+  },
+  "frontend_followup": [
+    {
+      "requirement": "Render entry selection as curated navigation without changing actual edge basis or treating a short first page as completion.",
+      "contract": "selection.kind=curated_default; assertion=navigation_only; full continuation retained."
+    },
+    {
+      "requirement": "If serving packetless historical citations with an inspector, remove the class guess and use authoritative typed subjects or explicit untyped/ambiguous output.",
+      "current_prepared_citation_behavior": "Accepted and unchanged; current Luna and fresh legacy packets retain subjects."
+    }
+  ],
+  "conclusions": {
+    "implementation_correctness": "The requested backend corrections pass the recorded regression, real API and browser boundaries. New prose has separate independent semantic review.",
+    "joint_acceptance": "The required 44 browser checks and prepared-data parity pass. Final offline-only resume change has 49 affected checks and a fresh startup/read probe, not a full repeated browser run. Reliability incidents and stated frontend historical/curation follow-up remain open.",
+    "launch_readiness": "Not established; no public deployment or push."
+  },
+  "technical_remaining": [
+    "Undiagnosed original profile-fetch incident and historical R16",
+    "Actual Docker image build/start; local daemon unavailable",
+    "Production deployment and production-volume restore/RPO/RTO",
+    "Future final matcher/case and ontology admission before research launch"
+  ],
+  "manual_remaining": [
+    "Keyboard and screen-reader audit",
+    "Very narrow enlarged-text usability evaluation",
+    "Participant/pilot evaluation",
+    "Study-owner release approval"
+  ],
+  "evidence": {
+    "api-outcomes.json": "sha256:6f64df6733ed3064fb8545c7b5e3a9df7b4584b7bc3873d12b1364a67eea93e0",
+    "artifact-bindings.json": "sha256:b41cf3e69d89dbe18797bb9026f883d2da06af01556a50f39b831b63a9100b3d",
+    "browser-outcomes.json": "sha256:6e471eb51d647a4d8e74dc57c7089f254666fa92085d32128051a0172815a99e",
+    "commands.json": "sha256:822979ee1a65dd14567400bb5e88c68eee2a8a2586b09330334aa99bdead0675",
+    "container-runtime.json": "sha256:05a22ef2298a5f39ec7f54c458b0ff98c793e323a0139c9e3a973848d5aae204",
+    "description-quality.json": "sha256:0cbed60b2de7b8b3563ba4b28b8ac6f32978eb8a7d6c47f13099ccbc33e68b74",
+    "final-environment.json": "sha256:052b01eed55d8537dc7715e4692be22d04a45f46e23c49aad2c3f0367333d916",
+    "postgres-recovery.json": "sha256:2dd1f5ea256fbdfd1a1a4c98311b34c68fc36ec09ae239f3e39810e6141d0f52",
+    "publication.json": "sha256:469b8fd8f9d6fc2991cd9982e1c1040f578e48eae075be1df7c07401d394a64f",
+    "read-diagnostics.json": "sha256:7a68ff7e16d55b48786e331eaab467f67cf87e38189b566f4cb22e03ce3f0938",
+    "source-limit-audit.json": "sha256:c12d6bdefaf2b65a96cc3bbabd3e214f8a7a6a30311352af977da552cd80395e",
+    "startup.json": "sha256:3029df81806e50379d0bd0167f3602ada0e0cd490d4ed848b0a8cb35b47ae516",
+    "storage.json": "sha256:51e8f4c2b6184df6450a24aeb45d203bbc7b7d0a02b59ba2d9c8419b990ed0c5",
+    "test-outcomes.json": "sha256:c90a88b617d544e8f35e3dedc69ee7c8dfe32274fe0fb3868f25ccc8c6119f7b"
+  },
+  "private_data_included": false,
+  "public_deployment": false,
+  "pushed": false
+}

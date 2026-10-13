@@ -85,3 +85,19 @@ hierarchy entry points, evidence metadata and review discovery, then complete gu
 presentation. S3 owns the fresh integrated browser and visual Q01–Q12 review. The historical
 R16 reload finding remains unresolved; first-use latency and the intermittent local Git-identity startup failure also remain open. Actual HTTPS/PostgreSQL verification completed all 24 cases and both study conditions; rendered browser acceptance remains pending certificate trust and S2 integration. Manual accessibility/usability, study-owner release,
 final matcher/case admission and deployment are separate later gates, not purported passes.
+
+## Backend integration follow-up — 13 October 2026
+
+The [backend follow-up](../../docs/verification/explanation-backend-integration-followup-20261013.md)
+records the repaired `exact-study/1.0` fixture (19 browser checks passed), the unchanged
+accepted frontend on the corrected Luna publication (25 checks passed), explicit curated
+DOID entry selection, typed legacy support, separately reviewed original-definition
+supplements, actual API preservation checks and isolated PostgreSQL recovery. Runtime
+OpenAPI includes entry-selection metadata. Historical publications and immutable shared
+artifacts remain preserved; HermiT remains cancelled.
+
+The earlier profile-read failure and historical R16 remain undiagnosed/unreproduced.
+Actual container execution and production-volume deployment/restore remain technical work;
+manual accessibility, usability/pilot, owner approval and ontology admission remain separate
+open gates. The handoff and machine receipt define the precise verified scope and remaining
+legacy packetless citation compatibility boundary. No public deployment or push occurred.

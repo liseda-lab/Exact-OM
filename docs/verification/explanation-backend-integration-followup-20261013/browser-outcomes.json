@@ -1,0 +1,556 @@
+{
+  "legacy-browser-final": {
+    "stats": {
+      "startTime": "2026-10-13T05:52:29.685Z",
+      "duration": 58479.765999999996,
+      "expected": 19,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "tests": [
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / a study case reflows from 320 to 2560 px and at 200% text without hidden controls (C24)",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 2857,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, light / study welcome accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 2134,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, light / study case, evidence and per-case report accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 4029,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, light / researcher sign-in accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1105,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, dark / study welcome accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1406,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, dark / study case, evidence and per-case report accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 3162,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / desktop, dark / researcher sign-in accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1120,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, light / study welcome accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1287,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, light / study case, evidence and per-case report accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 3667,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, light / researcher sign-in accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1053,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, dark / study welcome accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1232,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, dark / study case, evidence and per-case report accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 3099,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "accessibility.spec.ts",
+        "title": "accessibility.spec.ts / mobile enlarged text, dark / researcher sign-in accessibility",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1071,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study-recovery.spec.ts",
+        "title": "study-recovery.spec.ts / a stale tab cannot save into another equal-revision session sharing the cookie",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1853,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study-recovery.spec.ts",
+        "title": "study-recovery.spec.ts / failed explanation content blocks ranking and pending submission does not claim success",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1819,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study.spec.ts",
+        "title": "study.spec.ts / complete HTTPS/PostgreSQL participant journey, pause, reload, timing and condition isolation",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 11212,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study.spec.ts",
+        "title": "study.spec.ts / v1 explanation cases open card parents with their recorded type (19 F21)",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 6165,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study.spec.ts",
+        "title": "study.spec.ts / offline answers survive reload and reconnect before submission",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 5475,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study.spec.ts",
+        "title": "study.spec.ts / researcher browser authentication, publication, links, progress, exports and closure",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1459,
+            "retry": 0
+          }
+        ]
+      }
+    ],
+    "raw_report_sha256": "sha256:3d5a685be4860621152bf54713b1db0a2d98cc3e26b353300d2a4814650871a3"
+  },
+  "luna-browser-final": {
+    "stats": {
+      "startTime": "2026-10-13T05:53:28.746Z",
+      "duration": 393418.159,
+      "expected": 25,
+      "skipped": 0,
+      "unexpected": 0,
+      "flaky": 0
+    },
+    "tests": [
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R1 an older same-question answer never overwrites a newer saved one / single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 8351,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R1 an older same-question answer never overwrites a newer saved one / multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 8162,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R1 an older same-question answer never overwrites a newer saved one / independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 5534,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R2 the latest answer stays visible throughout restored outbox replay / saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 6520,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R2 the latest answer stays visible throughout restored outbox replay / multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 6277,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R2 the latest answer stays visible throughout restored outbox replay / terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 6325,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R2 the latest answer stays visible throughout restored outbox replay / terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 9113,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "assessment-recovery.spec.ts",
+        "title": "assessment-recovery.spec.ts / S0-FU-R2 the latest answer stays visible throughout restored outbox replay / a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 4097,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R1 generated comparisons are shown as reviewed prose / main app: all nine affected comparisons, and genuine extracts keep quotation",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 37809,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R1 generated comparisons are shown as reviewed prose / study workspace: the same nine in explanation cases",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 61897,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R2 referenced-label citations name the referenced entity / main app: every referenced-label citation in the 33 profiles",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 51097,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R2 referenced-label citations name the referenced entity / study workspace: the same citations in an explanation case resolve through the scope",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 11628,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) / main app and study, added subject before the original",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 8098,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) / main app and study, added subject after the original",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 13731,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R3 a failed comparison-data read is a failure with Retry, not an absence / main app: failure, then Retry restores recorded comparisons in the same view and selection",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 2657,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R3 a failed comparison-data read is a failure with Retry, not an absence / study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 10478,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R4 equivalence groups page, count, recover and navigate (injected group) / main app: a 25-member group",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1159,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R4 equivalence groups page, count, recover and navigate (injected group) / study workspace: the same group through the scope",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 6781,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) / main app: cycle return links, a continuation at the depth limit, punned identities",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 2040,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) / study workspace: the same through the scope",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 15058,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / Graph context outside a narrow study canvas is announced and reachable / 375 px, 100% text, light",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 8832,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "luna-corrections.spec.ts",
+        "title": "luna-corrections.spec.ts / Graph context outside a narrow study canvas is announced and reachable / 320 px, 200% text, dark",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 14331,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "review-hierarchy.spec.ts",
+        "title": "review-hierarchy.spec.ts / asserted and ELK children page to their recorded totals; a basis change restarts paging",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1863,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "review-hierarchy.spec.ts",
+        "title": "review-hierarchy.spec.ts / discovered entry points page and focus one side",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 1148,
+            "retry": 0
+          }
+        ]
+      },
+      {
+        "file": "study-review-journey.spec.ts",
+        "title": "study-review-journey.spec.ts / review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+        "status": "expected",
+        "outcomes": [
+          {
+            "status": "passed",
+            "duration_ms": 86835,
+            "retry": 0
+          }
+        ]
+      }
+    ],
+    "raw_report_sha256": "sha256:9de23aa073a895263f541e24a65eb6edb7416049d0769d3a46abd591b56b6539"
+  }
+}

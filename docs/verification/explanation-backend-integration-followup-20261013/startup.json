@@ -1,0 +1,41 @@
+{
+  "backend": {
+    "file_count": 57,
+    "git_commit": "0a72cb4aabd79436d92ce6436a4739af286587bc",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "831a0f01746b4a34fe2c63d4e60d6e47d6f76e26478a5e062f79ec13f1903588"
+  },
+  "client_contract": "study-review/1",
+  "closes_at": "2026-11-12T06:20:53.161926+00:00",
+  "exploration_url": "https://127.0.0.1:19655/",
+  "publication": {
+    "available_for_test_sessions": true,
+    "closed": false,
+    "closes_at": "2026-11-12T06:20:53.161926+00:00",
+    "database_status": "checked",
+    "expired": false,
+    "next_action": "fresh-session",
+    "published": true,
+    "study_revision": "review-20261013T062053-62b43d70b7"
+  },
+  "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final",
+  "services": {
+    "exploration": {
+      "port": 19655,
+      "ready": true,
+      "state": "owned"
+    },
+    "postgres": {
+      "port": 19653,
+      "ready": true,
+      "state": "owned"
+    },
+    "study": {
+      "port": 19654,
+      "ready": true,
+      "state": "owned"
+    }
+  },
+  "study_revision": "review-20261013T062053-62b43d70b7",
+  "study_url": "https://127.0.0.1:19654/participate/"
+}

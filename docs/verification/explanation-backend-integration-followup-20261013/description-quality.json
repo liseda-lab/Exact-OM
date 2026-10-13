@@ -1,0 +1,522 @@
+{
+  "profiles_audited": 140,
+  "heuristic_counts": {
+    "preparation_omitted_available_definition": 17,
+    "limited_readable_source": 12,
+    "no_low_information_flag": 111
+  },
+  "findings": [
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0111406",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:0074d9ed4b63c43724624c1e1ca53e6f514a41e47049dcc7b30e76409398e4c2",
+      "new_artifact": "sha256:eaeaf60c7360853155e0a1a5edfa334059efb77f0f40bbf3f7e36def46bacc2e",
+      "definition_fact_ids": [
+        "sha256:69228c927692f8ae40bb94c554dea1057213eb39be1759e3e97460b337db1ae8"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:00fd2474abcfbc54d68b6069d706b9c2c65da9e14050b5e0aab36ee84a4ab534",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0050521",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:03b89a0fb7769882a7f0301dce6fef25cfc9675fe35aa9d7c77ee86f45b59a0e",
+      "new_artifact": "sha256:7f85651b9ea3da53a81d872b9044244ec91b665440eb51893240e17078f17447",
+      "definition_fact_ids": [
+        "sha256:438beb77306427e86559d2922d11296777d2df742bebb110dd0af189d90cfbf1"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_4337",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:0bdc1a507da8335b3299db32b0974e0613782deaa6ac59eab8f5b1c1d77cc8da",
+      "new_artifact": "sha256:f13827507278c577d6e2baf33594b7e20d18cc5ae847fb60c38c4a15e2f9996d",
+      "definition_fact_ids": [
+        "sha256:3c17f1c9b8c1e8b3673d4130b2f71194e0561d13ddcd42755aa9ba1ff47e08d3"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0112377",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:1219252f92ac9244913f88e32b597ff18a1191cce090b9ddf9e1097f1fcbbc90",
+      "new_artifact": "sha256:c8dbc135ad6d340021c03e70a7453f444d8962c4389cfb346732127459106f47",
+      "definition_fact_ids": [
+        "sha256:11087dfe536148af3dd633213a5b4b6a4d5600a0250228e05b35fdf4506465cb"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_2544",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:1b88013dbc7ae7201200e59ba91173de4dec80d2460e03bf60bec377b9b000ea",
+      "new_artifact": "sha256:94e7f541ed5ddcbbbcb277ac7180435a10aa2b92ac01c5eec321e7cc10f988bc",
+      "definition_fact_ids": [
+        "sha256:3af49ee61f1cd6be217a78968b1c5d4c226440d1ce66b82b33e51a5686ecbf9b"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_7894",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:21772bd1d6503b398cc20de732a0ddef2cf0061b96e12fb5133032279d1e2152",
+      "new_artifact": "sha256:1fa69d691585a58c5eb96907ee872e4808c2b56d84a7b89c6812a7cdf4f580a8",
+      "definition_fact_ids": [
+        "sha256:eb69851021c16118871f5c81cb4825b4782afb8932c05ab04bd2d44627a5a845"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_5158",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:30ab6d53144dee2107ab7a677ccbba25c4da80d8627a81d250a385e7faba565d",
+      "new_artifact": "sha256:e2b97511381a587219eabec7ccf095191918bb515ef379ea7cffbdb0a71d9c7f",
+      "definition_fact_ids": [
+        "sha256:c9a0646e0e8a0d69722994875323926c1c120bb347276762283228e49b03e26d"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0080897",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:3125a126669e7f66268ec95459a98d35ef6279effb079a1273347856ce6f53f8",
+      "new_artifact": "sha256:513da0185225ab850cebff4b1afc3aecae640ef8ab7f82f64fef97cb897a1d05",
+      "definition_fact_ids": [
+        "sha256:cd7dfdeccb209399fa760df0cd7d6473091d7de503efc015bf6862b875d1cb28"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_10153",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:5955d64c997ee498f9b33d2ce1dc75a69d60043110c2e6970a39d138dca89722",
+      "new_artifact": "sha256:0956ae895dcab1372746b8aea8b641ff382394de7eed6e3a9a0f5864452991bf",
+      "definition_fact_ids": [
+        "sha256:0bcdb1413603423c403a310f1ddad25645b8b873e7d47f11b1ab84966adf2363"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:5bc3a6d3be7cdb9557cd090ec3cf9f8572bd40eac817497f529197363c90498e",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:699aef86ee767edbe46cd102c66cdffa1f50c2c5b2c0cc73807fedacc3a7a776",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:6b8fc05139dd599e6423161a1e8ad0a241b36f8e439912057b03c5b0a337994c",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_13368",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:6cc0ac8c3da7aaf1e615fa6309233f250cd0c8d49926cdb8ebaa71f0f0276708",
+      "new_artifact": "sha256:00cf9c2933e3afc9e1d0c14f5485975f73b5d5763d09c77ab938e94e2ca47b18",
+      "definition_fact_ids": [
+        "sha256:458b0ea555f7c609ad64fdcdec7675f16ac2a5d5fed53e6a61795d60b6c4712a"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0111233",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:6ed56040ad6afbd6b2b92ef2497999965ec82f1249da9c25ee794858ee3c06ba",
+      "new_artifact": "sha256:ef7696b85fe19621cf001fefecc98ca9fdaf98ce0d0a109ff78cba65584d242a",
+      "definition_fact_ids": [
+        "sha256:e0f53684aa2bce4c7e002d41bc4062598aa04c741ca57acb145197300e0176bb"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0061198",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:754d5e452dec93bc8b3fe180d74c11abcf156dc74f4e01fa1c845b7a723bcab1",
+      "new_artifact": "sha256:475681d5d5d37df29ab3f47e4ceca22b372d10b866fdbcbd38bf621ddcf68dd6",
+      "definition_fact_ids": [
+        "sha256:85cf72e7b8ef9049222c1c4d17740833e22d789d52b041b41c4847a48cae4855"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:75de29dab09e6879a46ffdbd039906cad42c597339ef1bea7daae8387a8ce145",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:77920aee6ce0c53ffcadcdc7145cb851ede817d2701422e380e6c30f5cb345c0",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:91a643106127b0e108bbd4ef56c8b9a16110c9d2e142849b9f11c1c14a46e3c3",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0111236",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:9ee86d72bd93e42da0798df4467bf06a589c82b5b0a99f93dea0619c1b0fd30d",
+      "new_artifact": "sha256:912e36dfd70f9628c56bf9aee58e5a07e49ea86c1b8eaae624ecaedb0a31ba41",
+      "definition_fact_ids": [
+        "sha256:16e3ca1c8b436135fb58260634453e15aaeed35f9d4055a9ef6f686f30919d88"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:a6b6fa5c26f4b830db744b7b705e4095bc9087b33d5d42676f1c04c3c5ac50be",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0112379",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:b5f9f7cffa69d84bf019a3f7d8a282d10495bf51aac48b40b1e4f80e2b400214",
+      "new_artifact": "sha256:1c40ff0a195a6b7a5cb8444f8c716a7ea0b71f1fc831406de764e0971555cc4a",
+      "definition_fact_ids": [
+        "sha256:97d88e81c0e75b2a48de8c7af98825b33e78c1ed248092fc77751b929dfa5551"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:b818f1d57e8b8d11c5d6be0bf23a9515ff380548215f12575f64791887b5975e",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:bec16174511c103a8589a93677695128778cdf2d5b65fc28b053532d131be8db",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:cb4815e067a2d3246a531ebd4444bd5bb6e0fce346c540161ea19cc60c4fbcae",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0111231",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:ce21cc6e353dbc43e7ce60e46e4f37541753eaf89c53e464a193fdf89a464980",
+      "new_artifact": "sha256:3c840d21b5466db5b1616436e65740bafb0fd32ece440ebd9a7b71f160d48fcb",
+      "definition_fact_ids": [
+        "sha256:73ce3d0a4a9c7098d8465ba00b3e268436a8a84da0fb9ea36229aa0a32a85031"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "limited_readable_source",
+      "old_artifact": "sha256:d461ff9810a2fbb9ace8be20fe3dcae85563d530443b56e6428e03890ebcb14b",
+      "new_artifact": null,
+      "definition_fact_ids": []
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_0050518",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:dd952b9ad0a41388f5a9c5867fefa7188a95babcc91c29262e00fb35d033546d",
+      "new_artifact": "sha256:1e354f588e044c598e16bf1174c1a5e524ff5e2e21da160e4ff6a662ce7e127d",
+      "definition_fact_ids": [
+        "sha256:2749de2829bb6d13fead80c0ccd21909f9aee2fa45a25d3f78f8acaf6abb8c0f"
+      ]
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_205",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "finding": "preparation_omitted_available_definition",
+      "old_artifact": "sha256:e31cb2cbd51d329a0faff5010a1004b9b912dcfa46889d830ebc421406078be6",
+      "new_artifact": "sha256:ee425253b1877baa1d29da7345ebdbb897bcda3a9b60df7d519807d65ae1cb10",
+      "definition_fact_ids": [
+        "sha256:99423d2ae76accdbaa60de55f6613e70fad2db5bac90c7fd15f1f6c83b33031e"
+      ]
+    }
+  ],
+  "provider_calls": 0,
+  "source_audit_sha256": "sha256:fa28f1aace70bedc4fdef54cca8c16f1078e78d61fed4b82e8eb83db4a0f45ad",
+  "independent_review": {
+    "schema": "exact-independent-definition-supplement-audit/1",
+    "reviewer_id": "exact-independent-integration-review-20261013",
+    "reviewed_at": "2026-10-13T05:18:22.659350+00:00",
+    "package_sha256": "sha256:07781b63d2acd24f2542653112e5a20d75cea30af55685b331af3ea1e9b8907b",
+    "draft_audit_sha256": "sha256:fa28f1aace70bedc4fdef54cca8c16f1078e78d61fed4b82e8eb83db4a0f45ad",
+    "reviewed_artifacts": 17,
+    "approved_claims": 34,
+    "rejected_claims": 0,
+    "indexed_typed_facts_checked": 156,
+    "method": "Manual claim-level semantic review plus mechanical identity/preservation validation; exact primary-key queries against retained policy-filtered context indexes. No full database rehash repeated.",
+    "limitations": [
+      "This approves the exact quoted source statement, not independent biomedical truth.",
+      "Original wording defects remain quoted for A14, B4, pleural cancer and hyperostosis.",
+      "This is deterministic local supplementation, not a new paid provider batch."
+    ],
+    "provider_calls": 0,
+    "published": false,
+    "receipts": [
+      {
+        "draft_id": "sha256:16345d68a68b439ff152835fea8c42a106f342df6c3428dd2641bb1e4b143759",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/16345d68a68b439ff152835fea8c42a106f342df6c3428dd2641bb1e4b143759/review.json",
+        "receipt_canonical_hash": "sha256:0ba626a4c31b93ca70f291c8453448b231b9d61b504721b4dd753fbdaf71eb7e",
+        "predecessor": "sha256:03b89a0fb7769882a7f0301dce6fef25cfc9675fe35aa9d7c77ee86f45b59a0e",
+        "predecessor_sha256": "sha256:441c7b64007ab54d447755e3562882f60de765ad34e9117062c31fc00d702a2c",
+        "reviewed_at": "2026-10-13T05:18:22.581665+00:00"
+      },
+      {
+        "draft_id": "sha256:33f0bff220642efac41bfab293e0410180c95625bbe058a7533718e81431a2b6",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/33f0bff220642efac41bfab293e0410180c95625bbe058a7533718e81431a2b6/review.json",
+        "receipt_canonical_hash": "sha256:7be786067f9cb25fbc0594d143a200fc75fa36d57d2d1b94a285d1d5dfb082fb",
+        "predecessor": "sha256:0074d9ed4b63c43724624c1e1ca53e6f514a41e47049dcc7b30e76409398e4c2",
+        "predecessor_sha256": "sha256:0beeb0bb26956301c3fb25877a0ffeb4b78b4e3271f52ababa8304ae59ffa914",
+        "reviewed_at": "2026-10-13T05:18:22.585319+00:00"
+      },
+      {
+        "draft_id": "sha256:4091bb57077b8abaab149c5ce6d44166714be7009a748bb6323b600996e9dd47",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/4091bb57077b8abaab149c5ce6d44166714be7009a748bb6323b600996e9dd47/review.json",
+        "receipt_canonical_hash": "sha256:aa61b61ce2f7dd2689e482edfcc291d770d54dfd18efe015f683ba3936f895cd",
+        "predecessor": "sha256:21772bd1d6503b398cc20de732a0ddef2cf0061b96e12fb5133032279d1e2152",
+        "predecessor_sha256": "sha256:d156043afd6c5cc3dbc83ad134471d909fd11cc75399c45670e4911367bb22a7",
+        "reviewed_at": "2026-10-13T05:18:22.589319+00:00"
+      },
+      {
+        "draft_id": "sha256:4645af0ee90eac3c0ff30818ca9f9f9575680548063638fcea9140e9fe9112d8",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/4645af0ee90eac3c0ff30818ca9f9f9575680548063638fcea9140e9fe9112d8/review.json",
+        "receipt_canonical_hash": "sha256:ad85b578facdea868d86ca750149d809bdd8714fdd41a1c7f97f4da9e24e433b",
+        "predecessor": "sha256:3125a126669e7f66268ec95459a98d35ef6279effb079a1273347856ce6f53f8",
+        "predecessor_sha256": "sha256:831a7137e5d06f6e49be7c3c24cece1b4505d43922589b5ce06e79ce1b58f600",
+        "reviewed_at": "2026-10-13T05:18:22.592914+00:00"
+      },
+      {
+        "draft_id": "sha256:7369855dc89368e51f34994c0caa9058fef90644a9208dce19798c8492252b05",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/7369855dc89368e51f34994c0caa9058fef90644a9208dce19798c8492252b05/review.json",
+        "receipt_canonical_hash": "sha256:4e1e5f13b1b43ac9ef3693a0a704b7edfbb0301b2ad3024f0e4b7bd9b7c5c97e",
+        "predecessor": "sha256:0bdc1a507da8335b3299db32b0974e0613782deaa6ac59eab8f5b1c1d77cc8da",
+        "predecessor_sha256": "sha256:4062bd0e7ff16516aa1b40bfce02fa961f625bce2d096248ee557e6d945d7d84",
+        "reviewed_at": "2026-10-13T05:18:22.601033+00:00"
+      },
+      {
+        "draft_id": "sha256:7814113f0e2bfe7ce2eee9b92711a1485b98981701a948620c58057b8a1a9a3d",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/7814113f0e2bfe7ce2eee9b92711a1485b98981701a948620c58057b8a1a9a3d/review.json",
+        "receipt_canonical_hash": "sha256:858d0948121657f0975d746407bb75bec89f1aa973c58bd210a56bc67fc58ddb",
+        "predecessor": "sha256:1b88013dbc7ae7201200e59ba91173de4dec80d2460e03bf60bec377b9b000ea",
+        "predecessor_sha256": "sha256:853b72939583d7c65a36d7ba0bedc41a83b2c5db165ee742ddd5c7cfb8115e37",
+        "reviewed_at": "2026-10-13T05:18:22.604080+00:00"
+      },
+      {
+        "draft_id": "sha256:82b40c38d631646a5405a1434e1a45bc340fcfb55eb57cb98ca9a11a8d2b4fc1",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/82b40c38d631646a5405a1434e1a45bc340fcfb55eb57cb98ca9a11a8d2b4fc1/review.json",
+        "receipt_canonical_hash": "sha256:28c8c78bb0fd6100e8d9f8a1965ec533da0c134d6f76a0b05cb38daed3813c21",
+        "predecessor": "sha256:6cc0ac8c3da7aaf1e615fa6309233f250cd0c8d49926cdb8ebaa71f0f0276708",
+        "predecessor_sha256": "sha256:c065b48b663ee05e7eda757d2da6208140256e0a5c48882ece56ccef0a2f6613",
+        "reviewed_at": "2026-10-13T05:18:22.608970+00:00"
+      },
+      {
+        "draft_id": "sha256:831ad3073ac15c2c44c1e38bb2623a25597cfba75e6ebccf820560095db9a926",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/831ad3073ac15c2c44c1e38bb2623a25597cfba75e6ebccf820560095db9a926/review.json",
+        "receipt_canonical_hash": "sha256:a6dbc2bb378894db8dda99475ee7d0eeb0ed52c4091600b1c4da7f79babf440a",
+        "predecessor": "sha256:dd952b9ad0a41388f5a9c5867fefa7188a95babcc91c29262e00fb35d033546d",
+        "predecessor_sha256": "sha256:9adee5ff31031c009f3554cb0dae7f1023d747debc0cac57374dff55122eed29",
+        "reviewed_at": "2026-10-13T05:18:22.614849+00:00"
+      },
+      {
+        "draft_id": "sha256:863d9e86b88570b6fc7ca9f8e02ec899a7c947717d3136c1fd2292398b7f0c89",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/863d9e86b88570b6fc7ca9f8e02ec899a7c947717d3136c1fd2292398b7f0c89/review.json",
+        "receipt_canonical_hash": "sha256:62128f8f8be21cf33f43b610381c533e903b8a67b609a82e59b4d2e56e3e5fca",
+        "predecessor": "sha256:1219252f92ac9244913f88e32b597ff18a1191cce090b9ddf9e1097f1fcbbc90",
+        "predecessor_sha256": "sha256:4f48a6f9336caa44f85450507097cc855d16afe99f2ba577c53735a6cf2a6e6c",
+        "reviewed_at": "2026-10-13T05:18:22.620937+00:00"
+      },
+      {
+        "draft_id": "sha256:8b5036aa125d0a7f197f9d8ddab1cf9985cc4c80fc068f44f4756406a2824a6e",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/8b5036aa125d0a7f197f9d8ddab1cf9985cc4c80fc068f44f4756406a2824a6e/review.json",
+        "receipt_canonical_hash": "sha256:3f95fc6fadf36118e86b2039519bdca35798a7a2b68a03bdbca01e087d0b3d71",
+        "predecessor": "sha256:9ee86d72bd93e42da0798df4467bf06a589c82b5b0a99f93dea0619c1b0fd30d",
+        "predecessor_sha256": "sha256:b05d81c3d1881ddad1d0a94bb0a0a42639cde0060187eb33d46feae42fa35f08",
+        "reviewed_at": "2026-10-13T05:18:22.625424+00:00"
+      },
+      {
+        "draft_id": "sha256:8f4262ff24fc6b891626934cd42f1563b31a1452f5578e417cb98565e1c57ab7",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/8f4262ff24fc6b891626934cd42f1563b31a1452f5578e417cb98565e1c57ab7/review.json",
+        "receipt_canonical_hash": "sha256:653029be9af8413da2819ffa67c3df200b6fd72a7aa90b95e890b3421834cd66",
+        "predecessor": "sha256:6ed56040ad6afbd6b2b92ef2497999965ec82f1249da9c25ee794858ee3c06ba",
+        "predecessor_sha256": "sha256:8a003da76c4d2b92cb2d8c71226084e1b866b3d02e63b789d85f23c4c720a4aa",
+        "reviewed_at": "2026-10-13T05:18:22.629444+00:00"
+      },
+      {
+        "draft_id": "sha256:a61c9dcd92df81dee6b94b19452a8161237fbb26cbed7eeda14b4bb9d29d9ce3",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/a61c9dcd92df81dee6b94b19452a8161237fbb26cbed7eeda14b4bb9d29d9ce3/review.json",
+        "receipt_canonical_hash": "sha256:d3f58433e3d82cd22674ad465c6a29ba565c63b9af49dfab9c747f9488235a53",
+        "predecessor": "sha256:ce21cc6e353dbc43e7ce60e46e4f37541753eaf89c53e464a193fdf89a464980",
+        "predecessor_sha256": "sha256:59fa53bc31ec4004fc3e44f20e6662618ebf65933199ed0dd8a52a48e0f9892a",
+        "reviewed_at": "2026-10-13T05:18:22.633422+00:00"
+      },
+      {
+        "draft_id": "sha256:c73e5e2198fd2daf2f7af3ff06d04e0ff7a64b43a5edd70eb6e4b3389453fe1d",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/c73e5e2198fd2daf2f7af3ff06d04e0ff7a64b43a5edd70eb6e4b3389453fe1d/review.json",
+        "receipt_canonical_hash": "sha256:bd3c9eea4879a90f791c1905f5595b90afe7bda560f8a756f7dca2b6555529ce",
+        "predecessor": "sha256:754d5e452dec93bc8b3fe180d74c11abcf156dc74f4e01fa1c845b7a723bcab1",
+        "predecessor_sha256": "sha256:2cf769d63aad12f5c19af012f8ea7f9c93ec716e39ed072391f0d8cb463d7f5d",
+        "reviewed_at": "2026-10-13T05:18:22.637428+00:00"
+      },
+      {
+        "draft_id": "sha256:d3122bede98a15d10f942ab2ef4763f09644e3c854478614960d74363d49fbaa",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/d3122bede98a15d10f942ab2ef4763f09644e3c854478614960d74363d49fbaa/review.json",
+        "receipt_canonical_hash": "sha256:8ebb9d29c53b9503b9b0d28e3e90a875c33e6cc945d41f0ffad2712377542669",
+        "predecessor": "sha256:b5f9f7cffa69d84bf019a3f7d8a282d10495bf51aac48b40b1e4f80e2b400214",
+        "predecessor_sha256": "sha256:189074da6ab422b934a1d8237817b3f1bd165beb0be412c2b535f3d725ebe46d",
+        "reviewed_at": "2026-10-13T05:18:22.641972+00:00"
+      },
+      {
+        "draft_id": "sha256:de6d4860435423bbac4cd91d226d906740d0c2102bdfacc99b703e8248e2282f",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/de6d4860435423bbac4cd91d226d906740d0c2102bdfacc99b703e8248e2282f/review.json",
+        "receipt_canonical_hash": "sha256:12bd9380b545c6503aea5edfeba7bf45ecbfba8bd322d1fb6c42de27e1ab8a18",
+        "predecessor": "sha256:5955d64c997ee498f9b33d2ce1dc75a69d60043110c2e6970a39d138dca89722",
+        "predecessor_sha256": "sha256:25b9a72850f056f9583ebaee03b73e112613bdcbd0cc5acfdafed8cd588b27e5",
+        "reviewed_at": "2026-10-13T05:18:22.646550+00:00"
+      },
+      {
+        "draft_id": "sha256:ec9da95db9136e30e9b17ebaf0e73f471a22efcb7aa4f54ee058298027255f8f",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/ec9da95db9136e30e9b17ebaf0e73f471a22efcb7aa4f54ee058298027255f8f/review.json",
+        "receipt_canonical_hash": "sha256:5826e3481ba5f7fbaf9d5e5aeae3d0aa71e949be26b3fde1332565c5e0263cff",
+        "predecessor": "sha256:30ab6d53144dee2107ab7a677ccbba25c4da80d8627a81d250a385e7faba565d",
+        "predecessor_sha256": "sha256:3d8640b36782a0fbd9bddf81142a79411a500574eb85430eac443e02209b103b",
+        "reviewed_at": "2026-10-13T05:18:22.651994+00:00"
+      },
+      {
+        "draft_id": "sha256:f580c02ed56d430e2a906540811bd2dedb6ad4fc159065b7abfe4c71120d569c",
+        "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/quality/drafts/f580c02ed56d430e2a906540811bd2dedb6ad4fc159065b7abfe4c71120d569c/review.json",
+        "receipt_canonical_hash": "sha256:c30268b8b3ded127ff7150494f02378edd3bf0ce2748c56c94186ad10f7679c8",
+        "predecessor": "sha256:e31cb2cbd51d329a0faff5010a1004b9b912dcfa46889d830ebc421406078be6",
+        "predecessor_sha256": "sha256:a47fbf8259be24f1d99e4a9bee9447d0315d66664e721befc52ea3bb380768a8",
+        "reviewed_at": "2026-10-13T05:18:22.658841+00:00"
+      }
+    ]
+  }
+}

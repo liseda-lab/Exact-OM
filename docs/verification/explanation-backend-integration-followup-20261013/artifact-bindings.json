@@ -1,0 +1,65 @@
+{
+  "reviewed_commit": "1b04ac065e69505a07f5f6ed6985ce5ca108be33",
+  "frontend_accepted_implementation": "2547263",
+  "frontend_accepted_tests": "2d4600d",
+  "environment_backend": {
+    "file_count": 57,
+    "git_commit": "a3bb446e648ef37f6cce36c83fde5b2cbc4f8681",
+    "schema": "exact-review-backend-source/1",
+    "source_sha256": "e9e95bda0d356a00080ad9638660ea2c8f78c36263a7eaf6640c1707ccd8aa30"
+  },
+  "runtime_versions": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "python": "3.12.3",
+    "uvicorn": "0.35.0"
+  },
+  "postgres_version": "postgres (PostgreSQL) 16.2",
+  "environment_hashes": {
+    "certificate": "8413ce734ced2ce5a88099cd02b267c5b6b24cba0cf7020222ad4b74ee05ab26",
+    "frontend": "07bdf63e4954b1185a11e453f14eb597aaa34904e65039faea7fd28b7355ddb2",
+    "package": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+    "publication": "14975ee469b9d469f7856c9c7f25f24cb9c31e54b34b4bd1fe675337b0be65e7",
+    "source_publication": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f"
+  },
+  "source_package_id": "sha256:55acbf149864181695c4aa19817131682ef615f307c13993172a87fd5eef322c",
+  "environment_revision": "review-20261013T054716-0fb9d1347a",
+  "paths": {
+    "root": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-v2",
+    "repo": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+    "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012/frontend-2d4600d",
+    "package": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package-definition-review-20261013.json",
+    "publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-v2/publications/review-20261013T054716-0fb9d1347a.json",
+    "source_publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication-definition-review-20261013.json",
+    "assets": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined"
+  },
+  "ports": {
+    "exploration": 19635,
+    "postgres": 19633,
+    "study": 19634
+  },
+  "legacy": {
+    "contract": "exact-study/1.0",
+    "fixture": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/legacy-fixture-final",
+    "package_sha256": "sha256:c209cbe82f69d06ce3d24ffd31bea91c023f70eccce55d7082c89e0745793a85",
+    "publication_sha256": "sha256:630c123717940fb996bb227e6930b6902e235c5e87fffa9473862a99922a381c",
+    "port": 19644,
+    "postgres_port": 19643,
+    "synthetic_mechanical_grading_key_not_research": true
+  },
+  "runtime_contract_hashes": {
+    "study.runtime-openapi.json": "sha256:c8af708f3d54398e4cf52eefd46b365862b658b2bb08a0629b23f92d120f68f9",
+    "study-publication.runtime-schema.json": "sha256:bf0bd2211b772824d255e535b18367bf2310eb786b4f04ba0f3d6c222284c2f1",
+    "description-review.runtime-schema.json": "sha256:77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "study-resource.runtime-schema.json": "sha256:99b74818a8153c3d1f5e236bf6a7d9c16cc1bf48011afd08012fb88a010280f3",
+    "exploration.runtime-openapi.json": "sha256:d55604f36c91b780cb1ad5505a6fe7c98c1126f03a0b45c5142bc57b62e4a218",
+    "description-presentation.runtime-schema.json": "sha256:c2b1dc19843216f2722057871d600252f8e868202244568ee8b11c355d5ec0eb",
+    "partial-inference.runtime-schema.json": "sha256:fbb8f19f73608e90b97f621b03a2770420e0db95588d1cf1a79367f75246e531",
+    "review-about.runtime-schema.json": "sha256:b89e1af6bd34b6ea49053050bf333a6f32241a1dd9921930f0ed9a563d3c9626",
+    "study-tutorial.runtime-schema.json": "sha256:f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619"
+  },
+  "source_cache_files_matched": 153,
+  "credentials_included": false
+}

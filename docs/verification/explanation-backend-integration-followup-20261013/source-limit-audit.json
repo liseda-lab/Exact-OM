@@ -1,0 +1,202 @@
+{
+  "schema": "exact-description-source-limit-audit/1",
+  "weak_profiles_without_definition": [
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14033",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1,
+        "synonyms": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3136",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1,
+        "synonyms": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8886",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 4,
+        "labels": 1,
+        "synonyms": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_8787",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_11864",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_13499",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 3,
+        "labels": 1,
+        "restrictions": 1,
+        "synonyms": 2
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {
+        "http://purl.obolibrary.org/obo/RO_0004026": [],
+        "http://purl.obolibrary.org/obo/UBERON_0002115": []
+      },
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_14032",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1,
+        "synonyms": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3612",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 4,
+        "labels": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_1979",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 2,
+        "labels": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_3218",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1,
+        "synonyms": 3
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_5129",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    },
+    {
+      "entity": {
+        "iri": "http://purl.obolibrary.org/obo/DOID_12382",
+        "kind": "class",
+        "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+      },
+      "original_category_counts": {
+        "axioms": 1,
+        "hierarchy": 1,
+        "labels": 1,
+        "synonyms": 3
+      },
+      "missing_definition": true,
+      "restriction_term_labels": {},
+      "disposition": "Retain approved template; no admitted original definition. Unlabelled restriction roles/fillers, where present, remain accessible as original OWL."
+    }
+  ],
+  "original_fact_evidence": "Read-only queries over the complete admitted context database, not only truncated packets.",
+  "flag_counts": {
+    "preparation_omitted_available_definition": 17,
+    "limited_readable_source": 12,
+    "no_low_information_flag": 111
+  }
+}

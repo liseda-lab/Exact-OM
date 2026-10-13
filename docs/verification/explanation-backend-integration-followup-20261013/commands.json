@@ -1,0 +1,142 @@
+{
+  "schema": "exact-backend-followup-commands/1",
+  "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+  "runtimes": {
+    "python": "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "node": "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+    "frontend_test_cache": "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+    "browser": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "browser_version": "155.0.8059.40",
+    "playwright": "1.63.0"
+  },
+  "storage": {
+    "before": "python -B -m tools.review_storage_budget check --growth-gb ESTIMATED_PEAK",
+    "foreground": "python -B -m tools.review_storage_budget run --growth-gb ESTIMATED_PEAK -- COMMAND ARGUMENTS",
+    "detached_services": "1.5 GB explicit aggregate reservation; RLIMIT_FSIZE=134217728; RLIMIT_CORE=0; owned lifecycle only"
+  },
+  "legacy_browser": {
+    "cwd": "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+    "environment": {
+      "EXACT_E2E_URL": "https://127.0.0.1:19644",
+      "EXACT_E2E_STUDY_CONFIG": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/legacy-accepted-harness.json",
+      "EXACT_CHROMIUM_PATH": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    },
+    "argv": [
+      "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+      "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/accessibility.spec.ts",
+      "e2e/study.spec.ts",
+      "e2e/study-recovery.spec.ts",
+      "--grep",
+      "study welcome accessibility|study case, evidence|researcher sign-in accessibility|a study case reflows|complete HTTPS/PostgreSQL|v1 explanation cases|offline answers|researcher browser authentication|a stale tab|failed explanation content",
+      "--reporter=list,json"
+    ],
+    "reproduction_note": "The researcher test closes the publication. Prepare a fresh synthetic fixture, new output and dedicated database before rerunning; do not mutate the closed historical publication."
+  },
+  "luna_browser": {
+    "cwd": "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+    "environment": {
+      "EXACT_E2E_URL": "https://127.0.0.1:19635",
+      "EXACT_E2E_REVIEW_MAIN_URL": "https://127.0.0.1:19635",
+      "EXACT_E2E_STUDY_V2_CONFIG": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/luna-harness.json",
+      "EXACT_CHROMIUM_PATH": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+    },
+    "argv": [
+      "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+      "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe/node_modules/@playwright/test/cli.js",
+      "test",
+      "e2e/luna-corrections.spec.ts",
+      "e2e/study-review-journey.spec.ts",
+      "e2e/review-hierarchy.spec.ts",
+      "e2e/assessment-recovery.spec.ts",
+      "--reporter=list,json"
+    ],
+    "binding": "Original run at environment-v2 with backend a3bb446; for a future rerun use a new private harness for environment-final ports19654/19655."
+  },
+  "backend_broad": [
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/explanation_study_test.py",
+    "tests/explanation_study_v2_test.py",
+    "tests/explanation_integration_contract_test.py",
+    "tests/explanation_integration_timing_test.py",
+    "tests/explanation_integration_position_test.py",
+    "tests/explanation_study_workspace_test.py",
+    "tests/explanation_filtered_ontology_export_test.py",
+    "tests/explanation_export_policy_test.py",
+    "tests/explanation_preparation_test.py",
+    "tests/explanation_backend_followup_test.py",
+    "tests/explanation_study_image_contents_test.py",
+    "tests/explanation_description_metadata_test.py",
+    "tests/explanation_postmigration_corrections_test.py",
+    "tests/explanation_review_resume_test.py",
+    "tests/explanation_recovery_test.py"
+  ],
+  "context_revalidation": [
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "-B",
+    "-m",
+    "pytest",
+    "-q",
+    "tests/explanation_recovery_test.py",
+    "tests/explanation_preparation_test.py",
+    "tests/explanation_framework_test.py",
+    "tests/explanation_backend_followup_test.py"
+  ],
+  "postgres_recovery": {
+    "argv": [
+      "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+      "-B",
+      "-m",
+      "pytest",
+      "-q",
+      "tests/explanation_study_test.py::test_postgresql_real_restart_and_backup_restore",
+      "tests/explanation_study_v2_test.py::test_v2_postgresql_backup_restore_preserves_training_and_draft"
+    ],
+    "required_environment_names": [
+      "EXACT_STUDY_TEST_DATABASE_URL",
+      "EXACT_STUDY_TEST_PGBIN",
+      "EXACT_STUDY_TEST_PGDATA",
+      "EXACT_STUDY_TEST_RECOVERY_DIR"
+    ],
+    "isolation": "Use a dedicated disposable UTF8 cluster with .exact-synthetic-test-cluster marker and separate database; recovery directory must be below ignored data/explanation-framework/postgres. Tests restart that owned cluster. Never target participant services."
+  },
+  "api": [
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "-B",
+    "-m",
+    "tools.verify_backend_followup",
+    "--root",
+    "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013",
+    "--environment",
+    "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final",
+    "--output",
+    "NEW_API_RECEIPT_DIRECTORY"
+  ],
+  "bounded_reads": [
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+    "tools/verify_service_reads.mjs",
+    "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/environment-final",
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+    "NEW_READ_RECEIPT_FILE",
+    "after_startup"
+  ],
+  "contracts": [
+    "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+    "-B",
+    "-m",
+    "tools.freeze_explanation_contracts",
+    "--check"
+  ],
+  "docker_probe": [
+    "docker",
+    "info",
+    "--format",
+    "{{json .ServerVersion}}"
+  ],
+  "privacy": "Harness contents, invitations, credentials and participant state are excluded."
+}
