@@ -344,13 +344,28 @@ def validate_prepared_support(result, contexts, policy):
     validate_metadata_envelope(result)
     packet = FactPacket.model_validate(result.get("support_packet"))
     manifest = result["manifest"]
+
+    def admitted_context_hash(entity, recorded):
+        context = contexts[entity.ontology_version_id]
+        if recorded == context.manifest["artifacts"]["context.sqlite"]:
+            return True
+        # Legacy extract preparation can be exported through the exact same policy.
+        # The immutable export receipt binds the original database checksum; every
+        # typed fact is still checked against the actually served filtered original.
+        exported = context.manifest.get("policy_filter", {})
+        return (
+            manifest.get("description_contract") is None
+            and packet.selection.get("context_binding") == "raw-context/1"
+            and exported.get("policy_hash") == policy.policy_hash
+            and exported.get("source_context_sha256") == recorded
+        )
+
     if (
         packet.task != result["task"]
-        or packet.context_hashes
-        != [
-            contexts[e.ontology_version_id].manifest["artifacts"]["context.sqlite"]
-            for e in packet.entities
-        ]
+        or len(packet.context_hashes) != len(packet.entities)
+        or not all(
+            admitted_context_hash(e, h) for e, h in zip(packet.entities, packet.context_hashes)
+        )
         or manifest["ontology_context_hashes"] != packet.context_hashes
         or manifest["visibility_policy_hash"] != packet.policy_hash
         or packet.selection.get("description_contract") != manifest.get("description_contract")

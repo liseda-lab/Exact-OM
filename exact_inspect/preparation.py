@@ -83,10 +83,10 @@ class ExecutionLock(WireModel):
     comparison_prompt: str | None = None
     implementations: dict[str, str] = Field(
         default_factory=lambda: {
-            "context-index": "context/3",
+            "context-index": "context/4",
             "run-import": "decision-adapter/3",
-            "profiles": "grounding-excerpts-and-comparisons/5",
-            "comparisons": "grounding-excerpts-and-comparisons/5",
+            "profiles": "grounding-excerpts-and-comparisons/6",
+            "comparisons": "grounding-excerpts-and-comparisons/6",
             "portable-export": "inspection-bundle/3",
             "study-export": "study-publication/1",
         }
@@ -583,7 +583,7 @@ class Preparation:
                 packet = entity_packet(
                     entity,
                     facts,
-                    context_hash=context.ontology_version_id,
+                    context_hash=context.manifest["artifacts"]["context.sqlite"],
                     policy=self.lock.policy,
                     missingness=(
                         []
@@ -591,6 +591,8 @@ class Preparation:
                         else ["No definition is available in the selected context scope."]
                     ),
                 )
+                # Portable export retains this source checksum in its policy-filter receipt.
+                packet.selection["context_binding"] = "raw-context/1"
                 key = entry.get("id") or canonical_hash(entity)
                 packets[key] = packet
                 if stage == "profiles":
@@ -610,6 +612,7 @@ class Preparation:
                         packets[target],
                         [profile_rows[source], profile_rows[target]],
                     )
+                    packet.selection["context_binding"] = "raw-context/1"
                     result = jobs.generate(
                         packet,
                         profile,
