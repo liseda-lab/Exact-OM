@@ -3,6 +3,7 @@
 Opt-in until real-device discrete parity is admitted. Selection, evidence budgets,
 precision and downstream candidate grouping remain owned by the existing scorer.
 """
+
 from collections import defaultdict
 import os
 
@@ -34,9 +35,11 @@ def validate_batching_admission():
         return
     execution_options()
     namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
-    if (os.getenv("EXACT_EXPERIMENT_ROLE") != "throughput_fixture"
-            or not namespace.startswith("qualification-")
-            or namespace == "qualification-"):
+    if (
+        os.getenv("EXACT_EXPERIMENT_ROLE") != "throughput_fixture"
+        or not namespace.startswith("qualification-")
+        or namespace == "qualification-"
+    ):
         raise RuntimeError(
             "Experimental encoder/batching execution has not passed GPU discrete parity; it is only admitted "
             "for throughput_fixture runs in an isolated qualification-* namespace."
@@ -77,7 +80,7 @@ def _encode_unique(scorer, texts, kind, *, normalize=True):
     start = 0
     while start < len(values):
         try:
-            vectors = encode(values[start:start + width])
+            vectors = encode(values[start : start + width])
         except torch.cuda.OutOfMemoryError:
             if width == 1:
                 raise
@@ -95,10 +98,17 @@ def _batch_matrices(scorer, requests, kind):
     """Keep encoding, matrix kernels and reduction placement independently testable."""
     options = execution_options()
     output = [None] * len(requests)
-    live = [(index, request) for index, request in enumerate(requests)
-            if request[1] and request[2] and (kind != "context_matrix" or scorer.use_context)]
+    live = [
+        (index, request)
+        for index, request in enumerate(requests)
+        if request[1] and request[2] and (kind != "context_matrix" or scorer.use_context)
+    ]
     for index, request in enumerate(requests):
-        if not request[1] or not request[2] or (kind == "context_matrix" and not scorer.use_context):
+        if (
+            not request[1]
+            or not request[2]
+            or (kind == "context_matrix" and not scorer.use_context)
+        ):
             output[index] = torch.zeros((len(request[1]), len(request[2])), device=scorer.device)
     if not live:
         return output
@@ -106,17 +116,26 @@ def _batch_matrices(scorer, requests, kind):
     vectors = None
     if options["encoder"] == "batch":
         vectors = _encode_unique(
-            scorer, (text for _, req in live for side in req[1:3] for text in side),
-            kind, normalize=False,
+            scorer,
+            (text for _, req in live for side in req[1:3] for text in side),
+            kind,
+            normalize=False,
         )
     encoded = {}
     for index, request in live:
         # Normalize the original side shape even when encoder calls are regrouped.
         # Legacy mode must also preserve left/right cache-miss call boundaries.
-        encoded[index] = tuple(torch.nn.functional.normalize(
-            encode(list(side)) if vectors is None else torch.stack([vectors[text] for text in side]),
-            dim=-1,
-        ) for side in request[1:3])
+        encoded[index] = tuple(
+            torch.nn.functional.normalize(
+                (
+                    encode(list(side))
+                    if vectors is None
+                    else torch.stack([vectors[text] for text in side])
+                ),
+                dim=-1,
+            )
+            for side in request[1:3]
+        )
     if options["matrix_kernel"] == "mm":
         for index, _ in live:
             left, right = encoded[index]
@@ -131,7 +150,7 @@ def _batch_matrices(scorer, requests, kind):
     for (rows, cols), bucket in buckets.items():
         width = max(1, min(64, max_elements // (rows * cols)))
         for start in range(0, len(bucket), width):
-            block = bucket[start:start + width]
+            block = bucket[start : start + width]
             left = torch.stack([encoded[index][0] for index, _ in block])
             right = torch.stack([encoded[index][1] for index, _ in block])
             matrices = scorer._sim01(torch.bmm(left, right.transpose(1, 2)))
@@ -157,14 +176,20 @@ def _batch_context_similarity(scorer, requests):
     vectors = None
     if execution_options()["encoder"] == "batch":
         vectors = _encode_unique(
-            scorer, (text for _, left, right in pairs for text in (left, right)),
-            "similarity", normalize=False,
+            scorer,
+            (text for _, left, right in pairs for text in (left, right)),
+            "similarity",
+            normalize=False,
         )
     scores = []
     for _, source, target in pairs:
         enc = torch.nn.functional.normalize(
-            scorer.encode_contexts_batch([source, target]) if vectors is None
-            else torch.stack([vectors[source], vectors[target]]), dim=-1,
+            (
+                scorer.encode_contexts_batch([source, target])
+                if vectors is None
+                else torch.stack([vectors[source], vectors[target]])
+            ),
+            dim=-1,
         )
         # Retain the exact legacy reduction shape; pack only the final transfer.
         scores.append(scorer._sim01(torch.sum(enc[0] * enc[1], dim=-1)))
@@ -192,9 +217,11 @@ def run_evidence_jobs(scorer, jobs, *, batched):
             for kind, group in waiting.items():
                 requests = [request for _, _, request in group]
                 if not batched:
-                    methods = {"label_matrix": scorer._encode_label_matrix,
-                               "context_matrix": scorer._encode_context_matrix,
-                               "similarity": scorer._context_similarity_from_sentences}
+                    methods = {
+                        "label_matrix": scorer._encode_label_matrix,
+                        "context_matrix": scorer._encode_context_matrix,
+                        "similarity": scorer._context_similarity_from_sentences,
+                    }
                     values = [methods[kind](*request[1:]) for request in requests]
                 elif kind == "similarity":
                     values = _batch_context_similarity(scorer, requests)
@@ -215,8 +242,9 @@ def prepare_structural_block(scorer, pairs, families):
         if len(pairs) < 2:
             raise
     midpoint = len(pairs) // 2
-    return (prepare_structural_block(scorer, pairs[:midpoint], families)
-            + prepare_structural_block(scorer, pairs[midpoint:], families))
+    return prepare_structural_block(scorer, pairs[:midpoint], families) + prepare_structural_block(
+        scorer, pairs[midpoint:], families
+    )
 
 
 def _prepare_structural_block_once(scorer, pairs, families):
@@ -227,9 +255,14 @@ def _prepare_structural_block_once(scorer, pairs, families):
     rows = [{"hierarchy": {}, "cache_hits": set()} for _ in pairs]
     for index, (source, target, src, tgt) in enumerate(pairs):
         for family in families:
-            args = (family, src.get("hierarchy", {}).get(family, []),
-                    tgt.get("hierarchy", {}).get(family, []))
-            cached = peek_channel(scorer._score_hierarchy_family, *args, src_iri=source, tgt_iri=target)
+            args = (
+                family,
+                src.get("hierarchy", {}).get(family, []),
+                tgt.get("hierarchy", {}).get(family, []),
+            )
+            cached = peek_channel(
+                scorer._score_hierarchy_family, *args, src_iri=source, tgt_iri=target
+            )
             if cached is not None:
                 rows[index]["hierarchy"][family] = cached
                 rows[index]["cache_hits"].add(("hierarchy", family))
@@ -251,9 +284,14 @@ def _prepare_structural_block_once(scorer, pairs, families):
             rows[index]["hierarchy"][family] = payload
     jobs, indices = [], []
     for index, (_, _, src, tgt) in enumerate(pairs):
-        args = (src.get("attributes", []), tgt.get("attributes", []),
-                src.get("labels", []), tgt.get("labels", []),
-                rows[index]["hierarchy"], rows[index]["similarity"])
+        args = (
+            src.get("attributes", []),
+            tgt.get("attributes", []),
+            src.get("labels", []),
+            tgt.get("labels", []),
+            rows[index]["hierarchy"],
+            rows[index]["similarity"],
+        )
         cached = peek_channel(scorer._score_attribute_channel, *args)
         if cached is not None:
             rows[index]["attributes"] = cached
