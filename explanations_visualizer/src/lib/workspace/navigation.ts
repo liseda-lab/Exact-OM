@@ -4,7 +4,7 @@
 // absent complete-only reasoner never disables an advertised partial ELK result.
 // Pure module (type-only imports) for Node's test runner.
 
-import type { EntityKind } from "../types";
+import type { EntityKind, EntityRef, EntryPointPage } from "../types";
 import type { Basis, OntologyNavigation, PartialInference, WorkspaceCapabilities } from "./types";
 
 export const PARTIAL_BASIS: Basis = "elk_inferred_partial";
@@ -93,4 +93,25 @@ export function unsupportedConstructs(partial: PartialInference): string[] {
     for (const feature of reason.features ?? []) names.add(FEATURE_NAMES[feature] ?? feature.toLowerCase().replace(/_/g, " "));
   }
   return Array.from(names);
+}
+
+/** How a browser without an explicit, remembered or pinned focus starts (HR4, 21 F06). */
+export type EntryStart = { kind: "curated"; entity: EntityRef } | { kind: "single"; entity: EntityRef } | { kind: "list" };
+
+/**
+ * A declared curated default applies only when the service says so (`selection.kind` and a
+ * navigation-only assertion) for this exact ontology version and kind on an available page;
+ * `default_entity` alone is the first prepared entry and is never treated as curated. Older
+ * pages without `selection` keep the one-root rule: a single entry and nothing more to load.
+ */
+export function entryStart(page: EntryPointPage | null | undefined, ontology: string, kind: EntityKind): EntryStart {
+  if (!page || page.status !== "available") return { kind: "list" };
+  const selection = page.selection;
+  const fallback = (): EntryStart => (page.items.length === 1 && !page.next_cursor && page.items[0].entity.ontology_version_id === ontology ? { kind: "single", entity: page.items[0].entity } : { kind: "list" });
+  if (!selection || selection.kind !== "curated_default") return fallback();
+  const entity = page.default_entity;
+  const navigationOnly = selection.assertion === undefined || selection.assertion === "navigation_only";
+  const inScope = !page.scope?.ontology_version_id || page.scope.ontology_version_id === ontology;
+  if (!navigationOnly || !inScope || !entity || entity.ontology_version_id !== ontology || entity.kind !== kind) return fallback();
+  return { kind: "curated", entity };
 }

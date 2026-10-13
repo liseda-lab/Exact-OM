@@ -65,6 +65,19 @@ function ScopeNote({ meta }: { meta: OntologyMeta | undefined }) {
   );
 }
 
+/** The comparison exactly as it was left: run, source, pair and its own view (HR2 §5). */
+function backParams(params: URLSearchParams, runId: string | null, source: string, pair: string | null): URLSearchParams {
+  const next = new URLSearchParams();
+  if (runId) next.set("run", runId);
+  next.set("source", source);
+  if (pair) next.set("pair", pair);
+  for (const key of ["sk", "list", "details", "hs", "hsk", "ht", "htk"]) {
+    const value = params.get(`from_${key}`);
+    if (value) next.set(key, value);
+  }
+  return next;
+}
+
 export function BrowseView() {
   const state = useExplore();
   const [params, setParams] = useUrlState();
@@ -77,7 +90,7 @@ export function BrowseView() {
   const fromSource = params.get("from_source");
   const fromPair = params.get("from_pair");
 
-  const backHref = fromSource ? `/?${new URLSearchParams({ ...(runId ? { run: runId } : {}), source: fromSource, ...(fromPair ? { pair: fromPair } : {}) }).toString()}` : "/";
+  const backHref = fromSource ? `/?${backParams(params, runId, fromSource, fromPair).toString()}` : "/";
 
   const contextEntity = contextFor?.entity ?? null;
   const context = useEntityContext(contextEntity);

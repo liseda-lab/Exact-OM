@@ -7,7 +7,7 @@ import { IconSearch, SideMarker } from "@/components/common/Icons";
 import { formatScore, orderDescription, primaryScore, type OrderBasis } from "@/components/explore/candidates";
 import { curie, KIND_NAMES } from "@/lib/iri";
 import { useLabels } from "@/lib/labels";
-import type { Candidate, SourceSummary } from "@/lib/types";
+import type { Candidate, EntityRef, SourceSummary } from "@/lib/types";
 import { useNarrow } from "@/lib/useMedia";
 
 export function SourcePicker({
@@ -20,6 +20,9 @@ export function SourcePicker({
   canLoadMore,
   selectedIri,
   onSelect,
+  header,
+  heading = true,
+  children,
 }: {
   sources: SourceSummary[];
   total: number | null;
@@ -30,6 +33,12 @@ export function SourcePicker({
   canLoadMore: boolean;
   selectedIri: string | null;
   onSelect: (source: SourceSummary) => void;
+  /** Controls shown under the heading (the prepared-examples switch, HR2). */
+  header?: React.ReactNode;
+  /** False when the enclosing card already names the section. */
+  heading?: boolean;
+  /** Replaces the source list (prepared examples, HR2); the card, heading and header stay put. */
+  children?: React.ReactNode;
 }) {
   const [filter, setFilter] = useState("");
   // On narrow screens the list collapses to the current source, so the comparison is reachable.
@@ -37,7 +46,7 @@ export function SourcePicker({
   const [open, setOpen] = useState(false);
   const collapsed = narrow && !open && Boolean(selectedIri);
   const ontology = sources[0]?.entity.ontology_version_id;
-  const label = useLabels(ontology, sources.map((source) => source.entity.iri));
+  const label = useLabels(ontology, [...sources.map((source) => source.entity.iri), ...(selectedIri ? [selectedIri] : [])]);
   const index = sources.findIndex((source) => source.entity.iri === selectedIri);
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
@@ -51,10 +60,15 @@ export function SourcePicker({
 
   return (
     <section className="card rail-section" aria-labelledby="source-picker-h">
-      <h2 id="source-picker-h" className="eyebrow">
-        Source {KIND_NAMES[kind] ?? kind}
-      </h2>
-      {collapsed ? (
+      {heading && (
+        <h2 id="source-picker-h" className="eyebrow">
+          Source {KIND_NAMES[kind] ?? kind}
+        </h2>
+      )}
+      {header}
+      {children ? (
+        children
+      ) : collapsed ? (
         <div className="collapsed-choice">
           <span className="source-item current">
             <SideMarker side="source" size="0.875rem" />
@@ -78,6 +92,17 @@ export function SourcePicker({
       </div>
       {error ? <ErrorNote error={error} onRetry={onRetry} what="Sources" /> : null}
       {loading && !sources.length ? <Skeleton lines={3} title={false} /> : null}
+      {selectedIri && index < 0 && !filter && (
+        // A linked or example source beyond the loaded pages stays selected (HR2).
+        <div className="source-item current outside-loaded" aria-current="true">
+          <SideMarker side="source" size="0.875rem" />
+          <span className="source-item-text">
+            <span className="source-item-label">{label(selectedIri)?.value ?? curie(selectedIri)}</span>
+            <span className="iri">{curie(selectedIri)}</span>
+            <span className="meta">Selected · not in the sources loaded below</span>
+          </span>
+        </div>
+      )}
       <ul className="source-list" aria-label="Sources in this run">
         {visible.map((source) => {
           const current = source.entity.iri === selectedIri;
@@ -138,6 +163,7 @@ export function CandidateList({
   total,
   onLoadMore,
   loadingMore,
+  prepared = [],
 }: {
   candidates: Candidate[];
   basis: OrderBasis;
@@ -151,6 +177,8 @@ export function CandidateList({
   total: number | null;
   onLoadMore: () => void;
   loadingMore: boolean;
+  /** Typed targets of the current prepared example (HR2); tagged, never filtered or re-ranked. */
+  prepared?: EntityRef[];
 }) {
   const ontology = candidates[0]?.target.ontology_version_id;
   const label = useLabels(ontology, candidates.map((candidate) => candidate.target.iri));
@@ -165,6 +193,7 @@ export function CandidateList({
         </h2>
         <span className="meta">{candidates.length ? `${candidates.length}${complete ? "" : ` of ${total ?? "more"}`}` : ""}</span>
       </div>
+      {prepared.length > 0 && candidates.length > 0 && <p className="meta rail-sub">{prepared.length} of these candidates are prepared for this review; the order is the matcher&apos;s.</p>}
       {candidates.length > 0 && <p className="meta rail-sub">{orderDescription(basis)}{rankOf(candidates[0], basis) !== null ? "; numbers are the recorded ranks" : "; numbers are positions in this list"}</p>}
       {!complete && (
         <p className="note note-warn">
@@ -201,6 +230,7 @@ export function CandidateList({
                   <span className="candidate-meta">
                     {score ? <span>Matching score {formatScore(score.value)}</span> : <span>No score recorded</span>}
                     {candidate.saved_alignment_member === true && <span className="member-flag">In saved alignment</span>}
+                    {prepared.some((target) => target.ontology_version_id === candidate.target.ontology_version_id && target.iri === candidate.target.iri && target.kind === candidate.target.kind) && <span className="member-flag prepared-flag">Prepared example</span>}
                   </span>
                 </span>
               </button>

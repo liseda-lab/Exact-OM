@@ -19,7 +19,7 @@ import { curie, KIND_NAMES } from "@/lib/iri";
 import { useLabelLookup } from "@/lib/labelSource";
 import type { EntityKind, EntityRef, EntryPointItem, HierarchyEdge, HierarchyPage } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
-import { BASIS_OPTIONS, basisAvailability, offeredBases, unsupportedConstructs } from "@/lib/workspace/navigation";
+import { BASIS_OPTIONS, basisAvailability, entryStart, offeredBases, unsupportedConstructs, type EntryStart } from "@/lib/workspace/navigation";
 import type { Basis, PartialInference } from "@/lib/workspace/types";
 import { useWorkspace, useWorkspaceAction } from "@/lib/workspace/WorkspaceContext";
 
@@ -28,6 +28,8 @@ export type FocusVia = "parent" | "child" | "search" | "card" | "return";
 
 // The chosen mode per workspace scope and side survives tab switches and deliberate navigation.
 const chosenModes = new Map<string, Basis>();
+// Declared curated starting points per workspace, ontology, kind and basis, as served (HR4).
+const curatedStarts = new Map<string, string>();
 
 const isPartial = (basis: Basis) => basis === "elk_inferred_partial";
 
@@ -230,13 +232,24 @@ function BasisDifference({ focus, partialParents, complete }: { focus: EntityRef
   );
 }
 
-/** Paginated typed entry points for the current mode; choosing one focuses it. */
-function EntryPoints({ ontology, kind, basis, side, onFocus, onSingle }: { ontology: string; kind: EntityKind; basis: Basis; side: "source" | "target"; onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void; onSingle?: (entity: EntityRef) => void }) {
+/**
+ * Paginated typed entry points for the current mode; choosing one focuses it. Without a focus,
+ * the page decides the start (`entryStart`): a declared curated default or the single root is
+ * opened; several ordinary entries stay a list (21 F06, HR4).
+ */
+function EntryPoints({ ontology, kind, basis, side, onFocus, onStart }: { ontology: string; kind: EntityKind; basis: Basis; side: "source" | "target"; onFocus: (iri: string, kind: EntityKind, via: FocusVia) => void; onStart?: (start: EntryStart) => void }) {
   const workspace = useWorkspace();
   const first = useAsync(`${workspace.key}|entry|${ontology}|${kind}|${basis}`, (signal) => workspace.entryPoints!(ontology, kind, basis, null, signal));
-  // One entry: select it and show its children (21 F06). Several: the list stays the choice.
+  const start = entryStart(first.data, ontology, kind);
+  const suggested = start.kind === "curated" ? start.entity : null;
   useEffect(() => {
-    if (onSingle && first.data && first.data.items.length === 1 && !first.data.next_cursor) onSingle(first.data.items[0].entity);
+    if (!first.data) return;
+    const key = `${workspace.key}|${ontology}|${kind}|${basis}`;
+    if (suggested) curatedStarts.set(key, suggested.iri);
+    else curatedStarts.delete(key);
+    // Only the page for this exact ontology, kind and basis reaches here (useAsync never shows
+    // another key's data); a focus chosen meanwhile removes onStart, so it is never overridden.
+    if (onStart) onStart(start);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [first.data]);
   const loadMore = useCallback((cursor: string, signal: AbortSignal) => workspace.entryPoints!(ontology, kind, basis, cursor, signal), [workspace, ontology, kind, basis]);
@@ -255,6 +268,7 @@ function EntryPoints({ ontology, kind, basis, side, onFocus, onSingle }: { ontol
                 {item.preferred_label?.value ?? label(item.entity.iri)?.value ?? <span className="muted">{curie(item.entity.iri)}</span>}
               </button>
               <span className="iri">{curie(item.entity.iri)}</span>
+              {suggested && item.entity.iri === suggested.iri && item.entity.kind === suggested.kind && <span className="pill pill-suggested">Suggested starting point</span>}
               {item.entry_kind === "component_entry" && <span className="meta">· entry to a group without a single root</span>}
             </li>
           ))}
@@ -314,7 +328,7 @@ export function HierarchyBrowser({
   side,
   ontology,
   ontologyLabel,
-  focusIri,
+  focusIri: explicitIri,
   kind = "class",
   pinnedIri,
   pinnedKind = "class",
@@ -347,6 +361,13 @@ export function HierarchyBrowser({
   };
   const [modeNote, setModeNote] = useState<string | null>(null);
   const [entriesOpen, setEntriesOpen] = useState(false);
+  // A declared curated start applies only while no explicit, remembered or pinned focus exists;
+  // it is local navigation (no URL, history or remembered choice), so a reload starts there again
+  // and any deliberate focus always wins (HR4).
+  const startKey = `${workspace.key}|${side}|${ontology}|${kind}`;
+  const [suggested, setSuggested] = useState<{ key: string; entity: EntityRef; basis: Basis } | null>(null);
+  const suggestedIri = !explicitIri && suggested?.key === startKey ? suggested.entity.iri : null;
+  const focusIri = explicitIri ?? suggestedIri;
   const focus = focusIri ? { ontology_version_id: ontology, iri: focusIri, kind } : null;
   const available = (value: Basis) => basisAvailability(workspace.capabilities, ontology, kind, value);
   const offered = offeredBases(workspace.capabilities, ontology);
@@ -376,6 +397,8 @@ export function HierarchyBrowser({
   const entryPoints = Boolean(workspace.entryPoints) && workspace.capabilities.navigationByOntology?.[ontology]?.entryPoints === "available";
   const semantics = (parents.data as HierarchyPage | null)?.entity_semantics ?? null;
   const optionNote = BASIS_OPTIONS.find((option) => option.value === effective)?.note;
+  // Labelled only under a basis whose entry page declares it (partial ELK declares none).
+  const isSuggestedStart = Boolean(focusIri && ((suggestedIri === focusIri && suggested?.basis === effective) || curatedStarts.get(`${workspace.key}|${ontology}|${kind}|${effective}`) === focusIri));
 
   return (
     <section className={`card browser browser-${side}`} aria-label={`${sideName} ontology browser`}>
@@ -482,7 +505,15 @@ export function HierarchyBrowser({
               setEntriesOpen(false);
               onFocus(iri, entityKind, via);
             }}
-            onSingle={!focusIri ? (entity) => onFocus(entity.iri, entity.kind, "search") : undefined}
+            onStart={
+              !focusIri
+                ? (start) => {
+                    if (start.kind === "curated") setSuggested({ key: startKey, entity: start.entity, basis: effective });
+                    // One root (legacy and single-root ontologies): focus it as before (21 F06).
+                    else if (start.kind === "single") onFocus(start.entity.iri, start.entity.kind, "search");
+                  }
+                : undefined
+            }
           />
         </div>
       )}
@@ -523,6 +554,17 @@ export function HierarchyBrowser({
             <span className={`eyebrow text-${side}`}>Focused {KIND_NAMES[kind]}{pinnedIri && !away ? " · compared" : ""}</span>
             <span className="focus-label">{label(focusIri)?.value ?? <span className="muted">{label(focusIri)?.status === "loading" ? "Loading label…" : "No label in scope"}</span>}</span>
             <span className="iri">{focusIri}</span>
+            {isSuggestedStart && (
+              // A navigation choice for this review, not an ontology statement (HR4).
+              <p className="suggested-start">
+                <span className="pill pill-suggested">Suggested starting point</span>
+                {!entriesOpen && entryPoints && (
+                  <button type="button" className="link-btn" onClick={() => setEntriesOpen(true)}>
+                    Show all top-level {kind === "class" ? "classes" : `${KIND_NAMES[kind]}s`}
+                  </button>
+                )}
+              </p>
+            )}
             {onOpenContext && (
               <div className="focus-actions">
                 <button type="button" className="btn btn-sm" onClick={() => onOpenContext(focusIri, kind)}>

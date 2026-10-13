@@ -4,6 +4,11 @@
 // meaning cards and the comparison, then open optional details (hierarchy, evidence,
 // decision trace, graph, scores). The pair workspace is the same composition the study's
 // explanation condition uses. All navigation state is in the URL.
+//
+// First entry (spec 24 HR2): an explicit URL wins, then a deliberate choice saved for this exact
+// package and run, then the development review's first prepared example (when the bound
+// catalogue offers one), then the run's first source. Prepared examples sit beside All sources;
+// neither filters nor re-ranks the run's sources and candidates.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -12,11 +17,13 @@ import { IconChevronLeft, IconChevronRight } from "@/components/common/Icons";
 import { formatScore, orderCandidates, primaryScore } from "@/components/explore/candidates";
 import { DecisionTrace, ScoresPanel } from "@/components/explore/DecisionTrace";
 import { ontologyName, useExplore } from "@/components/explore/ExploreContext";
+import { CatalogueNotice, ExampleList, SourceModeSwitch, useReviewCatalogue, type SourceMode } from "@/components/explore/PreparedExamples";
 import { ReviewPanel } from "@/components/explore/ReviewPanel";
 import { CandidateList, SourcePicker } from "@/components/explore/SourceRail";
 import { PairWorkspace, type Focus, type PairNavigation, type RevealRequest } from "@/components/workspace/PairWorkspace";
 import { getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
+import { caseForSource, examplePair, landingChoice, savedChoiceFor, type ReviewCase, type SavedChoice } from "@/lib/reviewCatalogue";
 import type { Candidate, EntityKind, EntityRef, Page, PairTrace, SourceSummary } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
 import { useNarrow } from "@/lib/useMedia";
@@ -30,6 +37,27 @@ export function useEntityContext(entity: EntityRef | null) {
 
 const FIRST_LOAD_PAGES = 5;
 const PAGE = 100;
+/** A slow catalogue read never blocks ordinary browsing for longer than this. */
+const CATALOGUE_WAIT_MS = 8_000;
+/** A linked pair beyond the first load is looked for in at most this many further pages. */
+const PAIR_SEARCH_PAGES = 20;
+const CHOICE_KEY = "exact.compare.choice";
+
+function readChoice(): string | null {
+  try {
+    return window.localStorage.getItem(CHOICE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeChoice(choice: SavedChoice) {
+  try {
+    window.localStorage.setItem(CHOICE_KEY, JSON.stringify(choice));
+  } catch {
+    /* a convenience only */
+  }
+}
 
 function kindOf(value: string | null): EntityKind {
   return value === "object_property" || value === "data_property" || value === "individual" ? value : "class";
@@ -43,6 +71,15 @@ export function CompareView() {
   const sourceIri = params.get("source");
   const pairId = params.get("pair");
   const tab = params.get("details");
+  const listParam = params.get("list");
+  const listMode: SourceMode | null = listParam === "examples" || listParam === "all" ? listParam : null;
+  const packageId = state.health?.package_id ?? null;
+
+  // The bound development-review catalogue (exploration only); absent on generic bundles.
+  const catalogue = useReviewCatalogue(state.phase === "ready" ? packageId : null);
+  const runIds = useMemo(() => state.runs.map((item) => item.run_id), [state.runs]);
+  const examples = catalogue.state.status === "available" && runIds.includes(catalogue.state.catalogue.source_run_id) ? catalogue.state.catalogue : null;
+  const otherRun = catalogue.state.status === "available" && !examples;
 
   // Sources: first page, then explicit "load more".
   const [extraSources, setExtraSources] = useState<SourceSummary[]>([]);
@@ -68,13 +105,45 @@ export function CompareView() {
   }, [runId, sourceCursor]);
 
   const source = allSources.find((item) => item.entity.iri === sourceIri) ?? null;
+  // A source beyond the loaded pages keeps its typed kind from the URL (example or link).
+  const sourceKind = source?.entity.kind ?? kindOf(params.get("sk"));
+  const sourceRef = useMemo<EntityRef | null>(() => (sourceIri && run ? { ontology_version_id: source?.entity.ontology_version_id ?? run.source_ontology_version_id, iri: sourceIri, kind: sourceKind } : null), [sourceIri, run, source, sourceKind]);
+  const activeCase = examples && runId === examples.source_run_id ? caseForSource(examples, sourceRef) : null;
+  const mode: SourceMode = listMode ?? (examples || catalogue.state.status === "loading" ? (sourceIri && !activeCase && examples ? "all" : "examples") : "all");
+
+  // First entry; a late catalogue never overrides a source already chosen or All sources.
+  const [waited, setWaited] = useState(false);
   useEffect(() => {
-    if (!sourceIri && allSources.length) setParams({ source: allSources[0].entity.iri, pair: null }, "replace");
-  }, [sourceIri, allSources, setParams]);
+    const timer = window.setTimeout(() => setWaited(true), CATALOGUE_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, []);
+  useEffect(() => {
+    if (state.phase !== "ready" || !runId) return;
+    const decision = landingChoice({
+      explicitSource: Boolean(sourceIri),
+      explicitPair: Boolean(pairId),
+      saved: savedChoiceFor(readChoice(), packageId, runId),
+      catalogue: catalogue.state,
+      runIds,
+      listMode,
+      waited,
+      firstSource: allSources[0]?.entity ?? null,
+    });
+    if (decision.kind === "saved") setParams({ source: decision.choice.source, sk: decision.choice.source_kind, pair: decision.choice.pair }, "replace");
+    else if (decision.kind === "example") setParams({ ...(decision.run_id !== runId ? { run: decision.run_id } : {}), source: decision.item.source.iri, sk: decision.item.source.kind, pair: null }, "replace");
+    else if (decision.kind === "first_source") setParams({ source: decision.source.iri, pair: null }, "replace");
+  }, [state.phase, runId, sourceIri, pairId, packageId, catalogue.state, runIds, listMode, waited, allSources, setParams]);
+
+  // A link that names a pair without its source: the run's own record says which source it is.
+  const linked = useAsync<PairTrace>(!sourceIri && pairId && runId ? `linked|${runId}|${pairId}` : null, (signal) =>
+    getJson<PairTrace>(`/api/v1/runs/${encodeURIComponent(runId!)}/pair`, { pair_id: pairId! }, signal),
+  );
+  useEffect(() => {
+    if (!sourceIri && linked.data && linked.data.pair_id === pairId) setParams({ source: linked.data.source.iri, sk: linked.data.source.kind }, "replace");
+  }, [sourceIri, pairId, linked.data, setParams]);
 
   // Candidates: the backend pages by pair identity, so a first bounded load is sorted by the
   // recorded rank and the remainder stays one explicit "load more" away.
-  const sourceKind = source?.entity.kind ?? "class";
   const candidateKey = runId && sourceIri ? `cands|${runId}|${sourceKind}|${sourceIri}` : null;
   const first = useAsync<{ items: Candidate[]; cursor: string | null; total: number | null }>(candidateKey, async (signal) => {
     const items: Candidate[] = [];
@@ -106,9 +175,47 @@ export function CompareView() {
   const loaded = useMemo(() => [...(first.data?.items ?? []), ...(continued?.items ?? [])], [first.data, continued]);
   const { ordered, basis } = useMemo(() => orderCandidates(loaded), [loaded]);
   const candidate = ordered.find((item) => item.pair_id === pairId) ?? null;
+  // No pair chosen: a prepared example opens its first prepared candidate in matcher order;
+  // otherwise the matcher's first candidate, as before.
   useEffect(() => {
-    if (ordered.length && !candidate) setParams({ pair: ordered[0].pair_id }, "replace");
-  }, [ordered, candidate, setParams]);
+    if (!ordered.length || candidate || pairId) return;
+    const preferred = mode === "examples" && activeCase ? examplePair(ordered, activeCase) : null;
+    setParams({ pair: (preferred ?? ordered[0]).pair_id }, "replace");
+  }, [ordered, candidate, pairId, mode, activeCase, setParams]);
+  // An explicit pair is never replaced silently: it is looked for in this source's further
+  // candidate pages (bounded), and if it is not there the page says so and offers a choice.
+  const searchKey = `${candidateKey}|${pairId}`;
+  const [searched, setSearched] = useState<{ key: string; pages: number }>({ key: "", pages: 0 });
+  const searchedPages = searched.key === searchKey ? searched.pages : 0;
+  const pairMissing = Boolean(pairId && !candidate && first.data && !first.loading);
+  useEffect(() => {
+    if (!pairMissing || !cursor || continued?.loading || continued?.error || searchedPages >= PAIR_SEARCH_PAGES) return;
+    setSearched({ key: searchKey, pages: searchedPages + 1 });
+    void loadMoreCandidates();
+  }, [pairMissing, cursor, continued?.loading, continued?.error, searchedPages, searchKey, loadMoreCandidates]);
+  const pairNotFound = pairMissing && !continued?.loading && (!cursor || searchedPages >= PAIR_SEARCH_PAGES || Boolean(continued?.error));
+
+  // Deliberate choices are kept for this exact package and run only (spec 24 HR2 §3).
+  const remember = useCallback(
+    (iri: string, kind: EntityKind, pair: string | null) => {
+      if (packageId && runId) writeChoice({ package_id: packageId, run_id: runId, source: iri, source_kind: kind, pair });
+    },
+    [packageId, runId],
+  );
+  const chooseExample = useCallback(
+    (item: ReviewCase) => {
+      remember(item.source.iri, item.source.kind, null);
+      setParams({ ...(examples && examples.source_run_id !== runId ? { run: examples.source_run_id } : {}), source: item.source.iri, sk: item.source.kind, pair: null, list: "examples", hs: null, hsk: null, ht: null, htk: null });
+    },
+    [remember, setParams, examples, runId],
+  );
+  const choosePair = useCallback(
+    (item: Candidate) => {
+      remember(item.source.iri, item.source.kind, item.pair_id);
+      setParams({ pair: item.pair_id, ht: null, htk: null });
+    },
+    [remember, setParams],
+  );
 
   const sourceEntity = candidate?.source ?? source?.entity ?? null;
   const targetEntity = candidate?.target ?? null;
@@ -157,8 +264,14 @@ export function CompareView() {
     }
     if (sourceIri) next.set("from_source", sourceIri);
     if (pairId) next.set("from_pair", pairId);
+    // The comparison's own view comes back unchanged: source kind, list, tab and each side's
+    // independent hierarchy focus (spec 24 HR2 §5).
+    for (const key of ["sk", "list", "details", "hs", "hsk", "ht", "htk"]) {
+      const value = params.get(key);
+      if (value) next.set(`from_${key}`, value);
+    }
     window.location.assign(`/browse/?${next.toString()}`);
-  }, [runId, sourceEntity, targetEntity, sourceIri, pairId, navigation]);
+  }, [runId, sourceEntity, targetEntity, sourceIri, pairId, navigation, params]);
 
   if (!state.runs.length) {
     return (
@@ -180,6 +293,7 @@ export function CompareView() {
   return (
     <div className="compare-layout">
       <aside className="compare-rail" aria-label="Choose a source and candidate">
+        {/* One card in both modes, so the switch keeps keyboard focus when the list changes. */}
         <SourcePicker
           sources={allSources}
           total={sources.data?.total_count ?? null}
@@ -189,8 +303,19 @@ export function CompareView() {
           onMore={loadMoreSources}
           canLoadMore={Boolean(sourceCursor)}
           selectedIri={sourceIri}
-          onSelect={(item) => setParams({ source: item.entity.iri, pair: null, hs: null, hsk: null, ht: null, htk: null })}
-        />
+          header={
+            <>
+              {(examples || catalogue.state.status === "loading") && <SourceModeSwitch mode={mode} onMode={(next) => setParams({ list: next })} examples={examples?.cases.length ?? null} sources={sources.data?.total_count ?? null} />}
+              <CatalogueNotice state={catalogue.state} otherRun={otherRun} onRetry={catalogue.reload} />
+            </>
+          }
+          onSelect={(item) => {
+            remember(item.entity.iri, item.entity.kind, null);
+            setParams({ source: item.entity.iri, sk: item.entity.kind, pair: null, list: examples ? "all" : null, hs: null, hsk: null, ht: null, htk: null });
+          }}
+        >
+          {mode === "examples" ? <ExampleList state={catalogue.state} otherRun={otherRun} currentCaseId={activeCase?.case_id ?? null} onChoose={chooseExample} /> : null}
+        </SourcePicker>
         <CandidateList
           candidates={ordered}
           basis={basis}
@@ -198,7 +323,8 @@ export function CompareView() {
           error={first.error ?? continued?.error}
           onRetry={continued?.error ? loadMoreCandidates : first.reload}
           selectedPair={candidate?.pair_id ?? null}
-          onSelect={(item) => setParams({ pair: item.pair_id, ht: null, htk: null })}
+          onSelect={choosePair}
+          prepared={activeCase?.targets ?? []}
           complete={complete}
           total={total}
           onLoadMore={loadMoreCandidates}
@@ -208,8 +334,57 @@ export function CompareView() {
       </aside>
 
       <div className="compare-main" id="main" tabIndex={-1}>
-        {!candidate && (first.loading || sources.loading) && <Skeleton lines={6} />}
-        {!candidate && !first.loading && first.data && !ordered.length && <p className="note">No candidate pair is available for this source.</p>}
+        {!candidate && !pairNotFound && (first.loading || sources.loading || (!sourceIri && !linked.error && !(sources.data && !allSources.length)) || pairMissing) && (
+          <div aria-busy="true">
+            {!sourceIri && catalogue.state.status === "loading" && <p className="meta">Opening a prepared example…</p>}
+            {pairMissing && <p className="meta">Finding the linked pair among this source&apos;s candidates…</p>}
+            <Skeleton lines={6} />
+          </div>
+        )}
+        {!sourceIri && linked.error ? (
+          <div className="note note-warn" role="alert">
+            <p>The linked pair was not found in this run.</p>
+            <div className="note-actions">
+              {examples && (
+                <button type="button" className="btn btn-sm" onClick={() => chooseExample(examples.cases[0])}>
+                  Open a prepared example
+                </button>
+              )}
+              <button type="button" className="btn btn-sm" onClick={() => setParams({ pair: null, list: "all" })}>
+                Browse all sources
+              </button>
+            </div>
+          </div>
+        ) : null}
+        {pairNotFound && (
+          <div className="note note-warn" role="alert">
+            <p>The linked pair is not among this source&apos;s {ordered.length} loaded candidates in this run.</p>
+            <div className="note-actions">
+              {ordered.length > 0 && (
+                <button type="button" className="btn btn-sm" onClick={() => choosePair(ordered[0])}>
+                  Open the first candidate
+                </button>
+              )}
+              {examples && (
+                <button type="button" className="btn btn-sm" onClick={() => chooseExample(activeCase ?? examples.cases[0])}>
+                  Open a prepared example
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+        {!candidate && !first.loading && first.data && !ordered.length && (
+          <div className="note">
+            <p>No candidate pair is available for this source.</p>
+            {examples && (
+              <div className="note-actions">
+                <button type="button" className="btn btn-sm" onClick={() => chooseExample(examples.cases[0])}>
+                  Open a prepared example
+                </button>
+              </div>
+            )}
+          </div>
+        )}
         {candidate && pair && sourceEntity && targetEntity && (
           <>
             <PairWorkspace
@@ -247,10 +422,10 @@ export function CompareView() {
                       </h1>
                     </div>
                     <div className="pair-nav">
-                      <button type="button" className="icon-btn" aria-label="Previous candidate" disabled={index <= 0} onClick={() => setParams({ pair: ordered[index - 1].pair_id, ht: null, htk: null })}>
+                      <button type="button" className="icon-btn" aria-label="Previous candidate" disabled={index <= 0} onClick={() => choosePair(ordered[index - 1])}>
                         <IconChevronLeft />
                       </button>
-                      <button type="button" className="icon-btn" aria-label="Next candidate" disabled={index >= ordered.length - 1} onClick={() => setParams({ pair: ordered[index + 1].pair_id, ht: null, htk: null })}>
+                      <button type="button" className="icon-btn" aria-label="Next candidate" disabled={index >= ordered.length - 1} onClick={() => choosePair(ordered[index + 1])}>
                         <IconChevronRight />
                       </button>
                     </div>

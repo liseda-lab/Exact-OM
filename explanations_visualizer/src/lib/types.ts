@@ -191,10 +191,23 @@ export interface EntryPointItem {
   preferred_label?: { status: string; value: string | null; language?: string | null } | null;
 }
 
+/**
+ * How the first entry page was chosen (HR4). `curated_default` is an explicit review-navigation
+ * choice; it asserts nothing about the ontology (`navigation_only`). Older services omit it.
+ */
+export interface EntrySelection {
+  kind: "prepared_order" | "curated_default" | string;
+  revision?: string | null;
+  rationale?: string | null;
+  assertion?: "navigation_only" | string;
+}
+
 export interface EntryPointPage extends Page<EntryPointItem> {
   basis: string;
+  /** The first entry in prepared order unless `selection` declares a curated default. */
   default_entity: EntityRef | null;
   navigation_contract?: string;
+  selection?: EntrySelection | null;
 }
 
 /** A recorded matcher comparison (exact-evidence-metadata/1); never an original ontology fact. */
