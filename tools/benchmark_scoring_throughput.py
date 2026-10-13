@@ -16,22 +16,21 @@ import sys
 import time
 from contextlib import ExitStack
 from collections import Counter
-from functools import wraps
+from functools import partial, wraps
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 if __package__ in {None, ""}:
     sys.path.insert(0, str(ROOT))
 
-from exact.experiments.throughput import (
+from exact.experiments.throughput import (  # noqa: E402
     Measurement,
     PhaseCounters,
     freeze_workload,
     group_chunks,
-    identity,
     stress_coverage,
 )
-from exact.utils.provenance import sha256_file
+from exact.utils.provenance import sha256_file  # noqa: E402
 
 
 def binding(path):
@@ -141,7 +140,60 @@ def retrieval_validation_stats(dataset):
     }
 
 
-def run(args):
+def stamp_pair_identity(row, source, target, query_id):
+    for key, expected in (
+        ("src_iri", source),
+        ("tgt_iri", target),
+        ("original_query_id", query_id),
+    ):
+        if key in row and row[key] != expected:
+            raise ValueError(f"Scorer returned conflicting {key}")
+    row.update(
+        src_iri=source, tgt_iri=target, original_query_id=query_id, qualification_fixture=True
+    )
+
+
+def observe_encoder(encoding, _model, tokens):
+    """Count one logical encode, without counting graph capture's internal forwards."""
+    started = time.perf_counter()
+    rows = len(tokens["input_ids"])
+    encoding["calls"] += 1
+    encoding["rows"] += rows
+    encoding["batch_sizes"][rows] += 1
+    encoding["tokens"] += int(tokens["attention_mask"].sum())
+    encoding["counter_seconds"] += time.perf_counter() - started
+
+
+def preparation_identity(args):
+    """Bind the public native state; execution/cache flags do not change that state."""
+    return {
+        "inputs": {
+            name: binding(getattr(args, name))
+            for name in ("config", "workload", "templates", "fitted_manifest")
+            if getattr(args, name, None)
+        },
+        "device": args.device,
+        "diagnostics": args.diagnostics,
+    }
+
+
+def materialize_features(dataset, groups):
+    """Public features only, shared equally by all variants and timed separately."""
+    started = time.perf_counter()
+    entities = dict.fromkeys(
+        (side, iri)
+        for group in groups
+        for query in group
+        for side, iri in [("src", query["source"]), *[("tgt", t) for t in query["candidates"]]]
+    )
+    for side, iri in entities:
+        dataset.get_entity_features(iri, side)
+    return {"seconds": time.perf_counter() - started, "entities": len(entities)}
+
+
+def run(args, *, shared=None, validate_records=None):
+    if shared is not None and not getattr(args, "pre_materialize_features", False):
+        raise ValueError("Shared native state requires explicit warm-public-feature measurement")
     # Hugging Face reads these flags at import time, before model construction.
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", OPENROUTER_API_KEY="")
     _forbid_hosted_generation()
@@ -238,40 +290,55 @@ def run(args):
     groups = all_groups
     if args.max_chunks:
         groups = groups[: args.max_chunks]
+    prepared_identity = preparation_identity(args)
     setup_start = time.perf_counter()
-    dataset = PairAdaptiveContextDataset(
-        output_path=args.output / "native",
-        device=args.device,
-        source_options=config.io.source_options,
-        target_options=config.io.target_options,
-        **config.dataset_params.model_dump(),
-    )
-    dataset.load_ontologies(config.data.source, config.data.target)
-    # Reuse the exact existing templates, never regenerate them through a model.
-    templates = json.loads(args.templates.read_text())
-    dataset._verbalization_templates = templates.get("templates", templates)
-    # Native graph creation belongs to preparation; per-entity feature extraction stays cold.
-    _ = dataset.source_graph, dataset.target_graph
-    dataset._candidates = pd.DataFrame(
-        [(q["source"], t) for group in all_groups for q in group for t in q["candidates"]],
-        columns=["Src", "Tgt"],
-    )
-    if fitted_manifest:
-        dataset._candidates = pd.DataFrame(metadata)
-        dataset._candidate_generation_params = config.candidates.model_dump(mode="python")
-        dataset.validate_retrieval_artifacts()
-        if (
-            dataset._retrieval_artifacts["cross_encoder"].sha256
-            != fitted_manifest["expected_retrieval_sha256"]
-        ):
-            raise ValueError("Fitted retrieval weights differ from the stopped G4 candidate pool")
-        if dataset.dataset_signature != fitted_manifest["dataset_signature"]:
-            raise ValueError("Fitted qualification ontology signature differs")
-    dataset.get_exact_matches()
-    if not fitted_manifest:
-        dataset.restrict_benchmark_exact_matches()
+    if shared is None:
+        dataset = PairAdaptiveContextDataset(
+            output_path=args.output / "native",
+            device=args.device,
+            source_options=config.io.source_options,
+            target_options=config.io.target_options,
+            **config.dataset_params.model_dump(),
+        )
+        dataset.load_ontologies(config.data.source, config.data.target)
+        # Reuse exact existing templates, never regenerate them through a model.
+        templates = json.loads(args.templates.read_text())
+        dataset._verbalization_templates = templates.get("templates", templates)
+        _ = dataset.source_graph, dataset.target_graph
+        dataset._candidates = pd.DataFrame(
+            [(q["source"], t) for group in all_groups for q in group for t in q["candidates"]],
+            columns=["Src", "Tgt"],
+        )
+        if fitted_manifest:
+            dataset._candidates = pd.DataFrame(metadata)
+            dataset._candidate_generation_params = config.candidates.model_dump(mode="python")
+            dataset.validate_retrieval_artifacts()
+            if (
+                dataset._retrieval_artifacts["cross_encoder"].sha256
+                != fitted_manifest["expected_retrieval_sha256"]
+            ):
+                raise ValueError(
+                    "Fitted retrieval weights differ from the stopped G4 candidate pool"
+                )
+            if dataset.dataset_signature != fitted_manifest["dataset_signature"]:
+                raise ValueError("Fitted qualification ontology signature differs")
+        dataset.get_exact_matches()
+        if not fitted_manifest:
+            dataset.restrict_benchmark_exact_matches()
+        shared = {"identity": prepared_identity, "dataset": dataset}
+        native_seconds = time.perf_counter() - setup_start
+        shared["native_seconds"] = native_seconds
+    else:
+        if shared["identity"] != prepared_identity:
+            raise ValueError("Shared native preparation differs from the admitted inputs")
+        dataset = shared["dataset"]
+        native_seconds = 0.0
     exact_pairs = dataset._exact_mapping_pairs()
-    native_seconds = time.perf_counter() - setup_start
+    pre_materialized = bool(getattr(args, "pre_materialize_features", False))
+    if pre_materialized and "features" not in shared:
+        shared["features"] = materialize_features(dataset, all_groups)
+    if str(args.device).startswith("cuda"):
+        torch.cuda.reset_peak_memory_stats()
     model_start = time.perf_counter()
     primary = config.get_model_sequence()[0]
     params = {
@@ -344,21 +411,8 @@ def run(args):
 
     scorer._llm_gate_mask = counted_gate
 
-    def encoded_batch(_model, _args, kwargs):
-        started = time.perf_counter()
-        ids = kwargs["input_ids"]
-        rows = len(ids)
-        encoding["calls"] += 1
-        encoding["rows"] += rows
-        encoding["batch_sizes"][rows] += 1
-        encoding["tokens"] += int(kwargs["attention_mask"].detach().cpu().sum())
-        encoding["counter_seconds"] += time.perf_counter() - started
-
-    hooks = [
-        model.register_forward_pre_hook(encoded_batch, with_kwargs=True)
-        for model in (getattr(scorer, "lex_model", None), getattr(scorer, "ctx_model", None))
-        if model is not None
-    ]
+    # Logical encoder requests exclude graph warmup/capture/verification forwards.
+    scorer._encoder_observer = partial(observe_encoder, encoding)
     methods = {
         "_experiment_entity_features": "feature_gathering",
         "_encode_label_matrix": "raw_matrices",
@@ -373,6 +427,9 @@ def run(args):
     }
     receipts = {}
     for mode in args.modes:
+        mode_groups = groups
+        if mode != "cold" and getattr(args, "replay_max_chunks", None):
+            mode_groups = groups[: args.replay_max_chunks]
         phases = PhaseCounters()
         encoded_texts.clear()
         encoding.update(calls=0, rows=0, tokens=0, batch_sizes=Counter(), counter_seconds=0.0)
@@ -391,7 +448,7 @@ def run(args):
         if mode == "partial":
             # Prime alternating COMPLETE groups outside measurement, preserving pools.
             started_prime = time.perf_counter()
-            for group in groups[::2]:
+            for group in mode_groups[::2]:
                 pairs = [
                     (q["source"], t)
                     for q in group
@@ -424,9 +481,11 @@ def run(args):
         )
         store = ExplanationStore(args.output / mode / "ordinary-evidence")
         measure = Measurement(
-            mode="warm" if mode == "partial" else mode, workload=workload, device=args.device
+            mode="warm" if mode == "partial" or (mode == "cold" and pre_materialized) else mode,
+            workload=workload,
+            device=args.device,
         )
-        for number, group in enumerate(groups):
+        for number, group in enumerate(mode_groups):
             pairs = [
                 (q["source"], t)
                 for q in group
@@ -478,12 +537,10 @@ def run(args):
                     raise ValueError("Nonfinite numerical result cannot count as completed pairs")
                 query_ids = {q["source"]: q["qid"] for q in group}
                 for row, s, t in zip(records, sources, targets):
-                    row.update(
-                        src_iri=s,
-                        tgt_iri=t,
-                        original_query_id=query_ids[s],
-                        qualification_fixture=True,
-                    )
+                    stamp_pair_identity(row, s, t, query_ids[s])
+                if validate_records is not None:
+                    with phases.phase("structural_validation"):
+                        validate_records(dataset, scorer, records)
                 store.append(records)
                 if fitted_manifest:
                     rows.extend(fitted.selector_rows(metadata, sources, targets, result))
@@ -577,7 +634,11 @@ def run(args):
                 scorer._numerical_cache.stats() if hasattr(scorer, "_numerical_cache") else None
             ),
             "encoder": {**encoding, "distinct_texts": len(encoded_texts)},
+            "routing": dict(routing),
         }
+        from exact.impl.models.encoder_graph import encoder_graph_stats
+
+        receipts[mode]["encoder_graph_cumulative"] = encoder_graph_stats(scorer)
     write(
         args.output / "measurement.json",
         {
@@ -591,6 +652,14 @@ def run(args):
             "fitted_selector_and_extraction_scope": "bounded complete source cohorts, timed separately",
             "diagnostics": args.diagnostics,
             "native_preparation_seconds": native_seconds,
+            "shared_native_preparation_seconds": shared["native_seconds"],
+            "shared_public_feature_preparation": shared.get("features"),
+            "scoring_scope": (
+                "warm_public_features_cold_encoder_and_numerical_caches"
+                if pre_materialized
+                else "cold_public_features_and_encoders"
+            ),
+            "cold_throughput_gate_admissible": not pre_materialized,
             "model_loading_seconds": model_seconds,
             "fitted_binding_verification_seconds": fitted_binding_seconds,
             "phases": phases.receipt(),
@@ -633,6 +702,10 @@ def run(args):
                 for key in (
                     "EXACT_PAIR_CONTEXT_BATCHING",
                     "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY",
+                    "EXACT_ENCODER_CUDA_GRAPHS",
+                    "EXACT_ENCODER_GRAPH_MAX_SHAPES",
+                    "EXACT_ENCODER_GRAPH_MAX_BYTES",
+                    "EXACT_ENCODER_GRAPH_MIN_CALLS",
                     "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
                     "EXACT_PAIR_CONTEXT_TEXT_BATCH",
                     "EXACT_PAIR_CONTEXT_SCHEDULE",
@@ -644,8 +717,17 @@ def run(args):
             "instrumentation": "opt-in inclusive host timers and encoder counters; measured counter_seconds included in wall time",
         },
     )
-    for hook in hooks:
-        hook.remove()
+    from exact.experiments.encoder_store import close_encoder_stores
+    from exact.impl.models.encoder_graph import clear_encoder_graphs
+
+    clear_encoder_graphs(scorer)
+    if hasattr(scorer, "_numerical_cache"):
+        scorer._numerical_cache.close()
+    close_encoder_stores()
+    # Break fixture and instrumentation cycles before a fresh variant loads models.
+    fixtures.scorer = None
+    del scorer._encode_texts, scorer._llm_gate_mask, scorer._encoder_observer
+    return shared
 
 
 def main():
