@@ -29,7 +29,8 @@ def freeze_workload(queries: Iterable[Mapping], *, pair: str, minimum_pairs: int
             raise ValueError("Repeated candidate within an original query")
         groups[source].append({"qid": qid, "source": source, "candidates": candidates})
     order = sorted(groups, key=lambda s: (identity(["throughput-20261009", pair, s]), s))
-    selected, unique = [], set()
+    selected: list[dict[str, Any]] = []
+    unique: set[tuple[str, str]] = set()
     for source in order:
         selected.extend(groups[source])
         unique.update((source, target) for q in groups[source] for target in q["candidates"])
@@ -53,7 +54,9 @@ def group_chunks(queries: Iterable[Mapping], maximum_pairs: int):
     """Pack complete queries; an oversized query stays whole for group-dependent decisions."""
     if maximum_pairs < 1:
         raise ValueError("Chunk size must be positive")
-    chunk, count, sources = [], 0, set()
+    chunk: list[Mapping[str, Any]] = []
+    count = 0
+    sources: set[str] = set()
     for query in queries:
         width = len(query["candidates"])
         # The scorer's group operations key by source. Repeated-source queries
@@ -70,7 +73,7 @@ def group_chunks(queries: Iterable[Mapping], maximum_pairs: int):
 
 def stress_coverage(records: Iterable[Mapping], group_sizes: Iterable[int]) -> dict:
     """Report predeclared label-free stress predicates without changing sampling."""
-    counts = Counter()
+    counts: Counter[str] = Counter()
     for row in records:
         lengths = []
         for value in row.get("context_sentences", {}).values():
@@ -137,8 +140,8 @@ class Measurement:
         if mode not in {"cold", "warm", "replay", "hosted", "end_to_end"}:
             raise ValueError("Unknown measurement mode")
         self.mode, self.workload, self.device = mode, workload, device
-        self.seen = set()
-        self.chunks = []
+        self.seen: set[tuple] = set()
+        self.chunks: list[dict[str, Any]] = []
 
     def commit_chunk(self, *, elapsed: float, computed: Iterable[tuple], available: int = 0,
                      duplicate_rows: int = 0, durable: bool, **metrics):
@@ -172,7 +175,8 @@ class Measurement:
 
 def forecast(work: Mapping[str, Mapping[str, Any]]) -> dict:
     """Sum counted work/rate intervals; unknown phases remain unknown, never zero."""
-    phases, total_low, total_high = {}, 0.0, 0.0
+    phases: dict[str, list[float] | None] = {}
+    total_low, total_high = 0.0, 0.0
     unknown = []
     for name, item in work.items():
         count, rate = item.get("count"), item.get("rate_per_second")

@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if __package__ in {None, ""}:
     sys.path.insert(0, str(ROOT))
 
-from exact.runs.store import ExplanationStore, _atomic_json
-from exact.utils.provenance import sha256_file
+from exact.runs.store import ExplanationStore, _atomic_json  # noqa: E402
+from exact.utils.provenance import sha256_file  # noqa: E402
 
 
 SYNTHETIC_DIAGNOSTIC_PATHS = (

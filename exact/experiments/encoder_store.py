@@ -94,7 +94,7 @@ class EncoderStore:
         self.db.close()
 
 
-_STORES = OrderedDict()
+_STORES: OrderedDict[tuple[int, str], EncoderStore] = OrderedDict()
 
 
 def close_encoder_stores():

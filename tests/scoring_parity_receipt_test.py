@@ -102,8 +102,10 @@ def test_cli_exit_status_matches_durable_parity_receipt(tmp_path, monkeypatch, p
         ExplanationStore(path / "cold/ordinary-evidence").append(records)
         _atomic_json(path / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
     output = tmp_path / "parity.json"
-    monkeypatch.setattr(sys, "argv", ["compare_scoring_parity", "--baseline", str(baseline),
-                                    "--candidate", str(candidate), "--output", str(output)])
+    monkeypatch.setattr(sys, "argv", [
+        "compare_scoring_parity", "--baseline", str(baseline),
+        "--candidate", str(candidate), "--output", str(output),
+    ])
     if passes:
         main()
     else:
