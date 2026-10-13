@@ -179,6 +179,69 @@ async function openTab(page: Page, name: string) {
   await expect(tab).toHaveAttribute("aria-selected", "true");
 }
 
+/**
+ * R2-F1: one original record stored under two typed entities (here: an added punned individual
+ * copy of a real cited record, injected into the served support packet in a chosen order).
+ */
+async function injectSecondSubject(page: Page, focalIri: string, first: boolean) {
+  // One handler: route handlers on one pattern do not chain.
+  await page.route(/\/explanations\/sha256[^/?]*$/, async (route) => {
+    const response = await route.fetch();
+    const body = await response.json();
+    if (body.task !== "entity_profile" || body.entities?.[0]?.iri !== focalIri) return route.fulfill({ response, json: body });
+    const cited = new Set(body.claims.flatMap((claim: { fact_ids: string[] }) => claim.fact_ids));
+    // The focal entity's own cited label record, and the cited label of a referenced (other) entity.
+    type Packed = { fact_id: string; category?: string; subject: { iri: string } };
+    const picks: [Packed[], (fact: Packed) => boolean][] = [
+      [body.support_packet.facts, (fact) => fact.subject.iri === focalIri],
+      [body.support_packet.selection.referenced_labels, (fact) => fact.subject.iri !== focalIri],
+    ];
+    for (const [list, wanted] of picks) {
+      const original = list.find((fact) => cited.has(fact.fact_id) && fact.category === "labels" && wanted(fact))!;
+      const copy = { ...original, subject: { ...original.subject, kind: "individual" } };
+      list.splice(list.indexOf(original) + (first ? 0 : 1), 0, copy);
+    }
+    return route.fulfill({ response, json: body });
+  });
+}
+
+async function expectSubjects(page: Page, scope: Locator, citation: string, expectation: { state: "about" | "ambiguous"; about?: string; kinds: string[] }, shot: string) {
+  await scope.getByRole("button", { name: `Open the cited original record: ${citation}` }).first().click();
+  const dialog = page.getByRole("dialog");
+  const subjects = dialog.locator(".inspector-subjects");
+  await expect(subjects).toHaveAttribute("data-subject-state", expectation.state);
+  const kinds = await subjects.locator("[data-subject-kind]").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("data-subject-kind")!));
+  expect(kinds.sort()).toEqual([...expectation.kinds].sort());
+  if (expectation.about) await expect(subjects.locator('[data-subject-role="about"] [data-subject-kind]')).toHaveAttribute("data-subject-kind", expectation.about);
+  if (expectation.state === "ambiguous") await expect(subjects).toContainText("this citation does not say which one it is about");
+  await evidence(dialog, `r2f1-injected-${expectation.state}-${workspaceName(page)}-${shot}`);
+  await page.keyboard.press("Escape");
+}
+
+test.describe("R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject)", () => {
+  const ILEUM = "http://purl.obolibrary.org/obo/DOID_10153";
+  for (const first of [true, false]) {
+    test(`main app and study, added subject ${first ? "before" : "after"} the original`, async ({ page }) => {
+      test.setTimeout(300_000);
+      const review01 = reviewCases().find((item) => item.case_id === "review-01")!;
+      // Own label: the caller's context (the class) is admitted, so it stays; the other kind is listed.
+      // Referenced label: the focal entity is not admitted, so both typed subjects are shown, unresolved.
+      const check = async () => {
+        const card = page.locator(".entity-card-target");
+        const order = first ? "added-first" : "added-last";
+        await expectSubjects(page, card, "Target label", { state: "about", about: "class", kinds: ["class", "individual"] }, order);
+        await expectSubjects(page, card, "Label of DOID:10154", { state: "ambiguous", kinds: ["class", "individual"] }, order);
+      };
+      await injectSecondSubject(page, ILEUM, first);
+      await openMainPair(page, review01, 4);
+      await check();
+      await studyCaseInExplanation(page, "review-01");
+      await inspectCandidate(page, 4);
+      await check();
+    });
+  }
+});
+
 /** The cytoscape view of the open graph. */
 async function graphView(page: Page) {
   return page.locator(".graph-canvas").evaluate((element) => {
