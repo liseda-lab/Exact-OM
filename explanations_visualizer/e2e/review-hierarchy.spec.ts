@@ -79,7 +79,11 @@ test("discovered entry points page and focus one side", async ({ page }) => {
   await page.goto(`${main}/browse/?${new URLSearchParams({ so: ids.NCIT, s: NCIT_MALIGNANT, sk: "class", to: ids.DOID, tk: "class" })}`);
   const source = page.getByRole("region", { name: "Source ontology browser" });
   const target = page.getByRole("region", { name: "Target ontology browser" });
-  // No target focus: its top-level classes are the starting point, with continuation.
+  // No target focus: the service's curated starting point opens, labelled (spec 24 HR4); the
+  // top-level classes stay one action away, with continuation.
+  await expect(target.locator(".focus-card")).toContainText("Suggested starting point");
+  expect(new URL(page.url()).searchParams.get("t")).toBeNull();
+  await target.getByRole("button", { name: /Show all top-level classes/ }).click();
   const entries = target.locator(".entry-points");
   await expect(entries.locator(".child-list li").first()).toBeVisible();
   const first = await entries.locator(".child-list li").count();
@@ -87,8 +91,10 @@ test("discovered entry points page and focus one side", async ({ page }) => {
   await expect.poll(() => entries.locator(".child-list li").count()).toBeGreaterThan(first);
   const shown = await entries.locator(".child-list li .iri").allTextContents();
   expect(new Set(shown).size).toBe(shown.length);
-  await entries.locator(".tree-label").first().click();
+  // Another top-level class: a deliberate focus on this side only.
+  await entries.locator(".tree-label").nth(1).click();
   await expect(target.locator(".focus-label")).toBeVisible();
+  await expect.poll(() => new URL(page.url()).searchParams.get("t")).toBe(`http://purl.obolibrary.org/obo/${shown[1].replace(":", "_")}`);
   await expect(source.locator(".focus-label")).toHaveText("Malignant Neoplasm");
   // The source's own top-level classes open on request without changing its focus.
   await source.getByRole("button", { name: "Top-level classes" }).click();

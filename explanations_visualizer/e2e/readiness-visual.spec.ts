@@ -92,7 +92,8 @@ test.describe("study: controls after a reload", () => {
       // Seeded only to reach a case for this capture; the acceptance journey seeds nothing.
       await seedToCase(page);
       await page.reload();
-      await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible({ timeout: 60_000 });
+      // Wide: a "Candidates and your answer" sidebar; narrow: "Candidates" and "Your answer" regions.
+      await expect(page.getByRole("heading", { level: 1, name: /^Does / })).toBeVisible({ timeout: 60_000 });
       await expect(page.getByRole("button", { name: /^Add .* as rank 1$/ }).first()).toBeEnabled();
       // Styled (HR1): the stylesheet token applies and icons are sized by it.
       const styled = await page.evaluate(() => ({ token: getComputedStyle(document.documentElement).getPropertyValue("--paper").trim(), widest: Math.max(0, ...Array.from(document.querySelectorAll("svg.icon")).map((icon) => icon.getBoundingClientRect().width)) }));
