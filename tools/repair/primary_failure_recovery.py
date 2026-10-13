@@ -7,12 +7,20 @@ from exact.repair.records import canonical_hash
 from tools.repair.shared_release import authenticate, bound, validate_completion
 
 CAUSE = "RuntimeError: ValueError: Unregistered v3 inference feature channel: matcher_member"
+METADATA_CAUSE = "ValueError: public study inputs require explicit case/parent/split/scope metadata"
 
 
 def prior_costs(manifest):
-    if "feature_boundary_recovery" not in manifest:
+    fields = [
+        k for k in ("feature_boundary_recovery", "metadata_boundary_recovery") if k in manifest
+    ]
+    if not fields:
         return {}
-    recovery = bound(manifest["feature_boundary_recovery"])
+    if len(fields) != 1:
+        raise ValueError("Ambiguous primary failure recovery")
+    field = fields[0]
+    metadata_recovery = field == "metadata_boundary_recovery"
+    recovery = bound(manifest[field])
     original = bound(recovery["manifest"])
     original_identity = canonical_hash(original)
     # Pin a retained producer's own source separately from a corrected consumer.
@@ -31,11 +39,28 @@ def prior_costs(manifest):
                 k: v for k, v in original["public_input_producer"].items() if k != "source_commit"
             },
         )
-    mutable = {"dispatch_nonce", "source_commit", "capacity_admission", "feature_boundary_recovery"}
-    if recovery.get("schema") != "exact-repair/primary-feature-boundary-recovery/v1" or {
+    if metadata_recovery:
+        # Retain completed pools under their original explicit producer source.
+        for value in (manifest, original):
+            contracts = {}
+            for row_id, contract in value.get("pool_producers", {}).items():
+                contract = dict(contract)
+                expected_source = bound(contract["manifest"])["source_commit"]
+                if contract.get("source_commit", expected_source) != expected_source:
+                    raise ValueError("Retained pool producer source changed")
+                contract.pop("source_commit", None)
+                contracts[row_id] = contract
+            value["pool_producers"] = contracts
+    mutable = {"dispatch_nonce", "source_commit", "capacity_admission", field}
+    schema = (
+        "exact-repair/primary-"
+        + ("metadata" if metadata_recovery else "feature")
+        + "-boundary-recovery/v1"
+    )
+    if recovery.get("schema") != schema or {
         k: v for k, v in original.items() if k not in mutable
     } != {k: v for k, v in manifest.items() if k not in mutable}:
-        raise ValueError("Feature-boundary recovery changed scientific inputs or budgets")
+        raise ValueError("Primary failure recovery changed scientific inputs or budgets")
     completion, outputs, _, job = validate_completion(recovery["receipt"])
     retirement = bound(recovery["retirement"])
     if (
@@ -49,9 +74,9 @@ def prior_costs(manifest):
         raise ValueError("Recovery lacks a terminal, retired original worker")
     work = Path(completion["work"])
     report = bound(dict(path=str(work / "report.json"), sha256=outputs["report.json"]))
-    if report["manifest_identity"] != original_identity or [
-        r["id"] for r in report["rows"]
-    ] != [r["id"] for r in original["rows"]]:
+    if report["manifest_identity"] != original_identity or [r["id"] for r in report["rows"]] != [
+        r["id"] for r in original["rows"]
+    ]:
         raise ValueError("Recovery report identities or denominator changed")
     attempted = [r for r in report["rows"] if r["status"] != "not_attempted"]
     if len(attempted) != 1:
@@ -65,13 +90,13 @@ def prior_costs(manifest):
         saved != {k: v for k, v in row.items() if k != "id"}
         or saved["identity"] != canonical_hash((original_identity, declaration))
         or saved["status"] != "error"
-        or saved.get("detail") != CAUSE
+        or saved.get("detail") != (METADATA_CAUSE if metadata_recovery else CAUSE)
         or saved.get("cleanup_complete") is not True
         or saved.get("result") is not None
         or not math.isfinite(spent)
         or not 0 <= spent < declaration["case_seconds"] - 5
     ):
-        raise ValueError("Recovery is not the bounded, cleaned-up feature-boundary failure")
+        raise ValueError("Recovery is not the bounded, cleaned-up primary failure")
     for artifact in saved["artifacts"]:
         authenticate(artifact)
     return {row["id"]: spent}
