@@ -729,7 +729,7 @@ def encoder_identity(scorer, tokenizer, model, max_len):
         tokenization["sha256"] = _hash(tokenization)
         if batch is not None:
             batch[tokenizer_key] = tokenization
-    local_key = (id(model), id(tokenizer), max_len, revision, scorer.fp16,
+    local_key = (os.getpid(), id(model), id(tokenizer), max_len, revision, scorer.fp16,
                  str(scorer._cache_tensor_dtype), scorer.pooling_method.value,
                  scorer.device_type, namespace)
     execution = {
@@ -757,14 +757,21 @@ def encoder_identity(scorer, tokenizer, model, max_len):
                  _hash([model_config, tokenizer_settings, tokenization["sha256"]]))
     identities = cached.get(local_key)
     if identities is None:
-        weights = hashlib.sha256()
-        for name, value in state_tensors:
-            weights.update(json.dumps([name, str(value.dtype), list(value.shape)]).encode())
-            weights.update(value.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes())
+        # Tokenizer/namespace changes require a new identity, not another copy
+        # of GPU weights. Keep exactly the existing versioned byte digest.
+        weight_key = (os.getpid(), weight_versions)
+        weight_cache = getattr(model, "_exact_encoder_weight_digest", None)
+        if weight_cache is None or weight_cache[0] != weight_key:
+            weights = hashlib.sha256()
+            for name, value in state_tensors:
+                weights.update(json.dumps([name, str(value.dtype), list(value.shape)]).encode())
+                weights.update(value.detach().cpu().contiguous().view(torch.uint8).numpy().tobytes())
+            weight_cache = (weight_key, weights.hexdigest() if state_tensors else None)
+            model._exact_encoder_weight_digest = weight_cache
         payload = {
             "schema": 1,
             "revision": revision,
-            "weights_sha256": weights.hexdigest() if state_tensors else None,
+            "weights_sha256": weight_cache[1],
             "tf32": torch.backends.cuda.matmul.allow_tf32,
             "autocast": torch.is_autocast_enabled("cuda"),
             "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
