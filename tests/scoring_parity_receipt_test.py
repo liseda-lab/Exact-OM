@@ -136,14 +136,25 @@ def fitted_outputs(tmp_path):
     from exact.utils.provenance import sha256_file
 
     manifest = tmp_path / "fitted-manifest.json"
-    _atomic_json(manifest, {"namespace": "qualification_only"})
+    workload = tmp_path / "workload.json"
+    _atomic_json(workload, {"queries": [{"qid": "q1", "source": "s", "candidates": ["a", "b"]}]})
+    _atomic_json(
+        manifest,
+        {
+            "namespace": "qualification_only",
+            "workload": {"path": str(workload), "sha256": sha256_file(workload)},
+        },
+    )
     paths = (tmp_path / "baseline", tmp_path / "candidate")
     for root in paths:
         records = rows()
         for row in records:
             row["original_query_id"] = "q1"
         ExplanationStore(root / "cold/ordinary-evidence").append(records)
-        _atomic_json(root / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
+        _atomic_json(
+            root / "cold.json",
+            {"chunks": [{"rows": 2, "query_ids": ["q1"], "exact_prefiltered_rows": 0}]},
+        )
         _atomic_json(
             root / "measurement.json",
             {
@@ -221,7 +232,7 @@ def test_fitted_comparison_does_not_hide_discrete_drift(tmp_path, change):
     elif change == "policy":
         value["policy"]["threshold"] += 1e-7
     elif change == "anchors":
-        value["protected_pairs"] = [["s", "a"]]
+        value["protected_pairs"] = [["s", "anchor"]]
     elif change == "prompt":
         value[0]["prompt"] = "support=0.868"
     else:
@@ -300,3 +311,43 @@ def test_mixed_legacy_query_stamps_cannot_silently_repair_wrong_ids(tmp_path):
         _atomic_json(root / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
     with pytest.raises(ValueError, match="Incomplete query identities"):
         compare(baseline, candidate, tmp_path / "parity.json")
+
+
+def test_identically_truncated_receipts_cannot_hide_an_admitted_candidate(tmp_path):
+    import json
+    from exact.runs.store import _atomic_json
+    from exact.utils.provenance import sha256_file
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    workload_path = tmp_path / "workload.json"
+    workload = json.loads(workload_path.read_text())
+    workload["queries"][0]["candidates"].append("c")
+    _atomic_json(workload_path, workload)
+    manifest_path = tmp_path / "fitted-manifest.json"
+    manifest = json.loads(manifest_path.read_text())
+    manifest["workload"]["sha256"] = sha256_file(workload_path)
+    _atomic_json(manifest_path, manifest)
+    for root in (baseline, candidate):
+        path = root / "measurement.json"
+        measurement = json.loads(path.read_text())
+        measurement["fitted_manifest"]["sha256"] = sha256_file(manifest_path)
+        _atomic_json(path, measurement)
+    # Both implementations and their receipts agree, but both omit candidate c.
+    with pytest.raises(ValueError, match="every admitted candidate"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+
+
+def test_identical_mappings_outside_the_cohort_cannot_establish_parity(tmp_path):
+    import json
+    from exact.runs.store import _atomic_json
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    for root in (baseline, candidate):
+        path = root / "cold/fitted-decisions.json"
+        result = json.loads(path.read_text())
+        result["mappings"].append(["s", "unscored"])
+        _atomic_json(path, result)
+    with pytest.raises(ValueError, match="outside the admitted cohort"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)

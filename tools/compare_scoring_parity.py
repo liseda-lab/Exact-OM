@@ -131,6 +131,14 @@ def compare_fitted(left_path, right_path, *, ordinary, ordinary_only=False, mode
             raise ValueError("Changed fitted qualification manifest")
     if measurements[0]["fitted_manifest"] != measurements[1]["fitted_manifest"]:
         raise ValueError("Fitted parity requires the same admitted fitted recipe")
+    manifest = json.loads(Path(measurements[0]["fitted_manifest"]["path"]).read_text())
+    workload_binding = manifest["workload"]
+    if sha256_file(Path(workload_binding["path"])) != workload_binding["sha256"]:
+        raise ValueError("Changed fitted qualification workload")
+    workload = json.loads(Path(workload_binding["path"]).read_text())
+    queries = {query["qid"]: query for query in workload["queries"]}
+    if len(queries) != len(workload["queries"]):
+        raise ValueError("Repeated fitted workload query identity")
 
     decisions, evidence, prompts = [], [], []
     for root in (left_path, right_path):
@@ -138,7 +146,9 @@ def compare_fitted(left_path, right_path, *, ordinary, ordinary_only=False, mode
         evidence.append(json.loads((root / mode / "selector-evidence.json").read_text()))
         prompts.append(json.loads((root / mode / "hosted-fixtures.json").read_text()))
     rows = []
-    for result, records, selected in zip(decisions, ordinary, evidence):
+    for root, result, records, selected in zip(
+        (left_path, right_path), decisions, ordinary, evidence
+    ):
         if (
             result.get("namespace") != "qualification_only"
             or result.get("selector_scope") != "bounded_cohort"
@@ -167,6 +177,32 @@ def compare_fitted(left_path, right_path, *, ordinary, ordinary_only=False, mode
             ):
                 raise ValueError("Incomplete fitted mapping or protected-pair identities")
         cohort = [(row["src_iri"], row["tgt_iri"]) for row in records]
+        protected = set(map(tuple, result["protected_pairs"]))
+        chunks = json.loads((root / (mode + ".json")).read_text())["chunks"]
+        query_ids = [qid for chunk in chunks for qid in chunk["query_ids"]]
+        if query_ids != list(queries)[: len(query_ids)]:
+            raise ValueError("Fitted chunks must preserve the admitted workload query prefix")
+        expected = []
+        for chunk in chunks:
+            group = [
+                (qid, queries[qid]["source"], target)
+                for qid in chunk["query_ids"]
+                for target in queries[qid]["candidates"]
+            ]
+            filtered = [row for row in group if row[1:] not in protected]
+            if chunk["rows"] != len(filtered) or chunk.get("exact_prefiltered_rows") != len(
+                group
+            ) - len(filtered):
+                raise ValueError("Fitted chunk does not cover every admitted candidate")
+            expected.extend(filtered)
+        if [
+            (row["original_query_id"], row["src_iri"], row["tgt_iri"]) for row in records
+        ] != expected:
+            raise ValueError("Fitted ordinary records differ from their complete admitted queries")
+        if not set(map(tuple, result["mappings"])) <= set(cohort) | protected:
+            raise ValueError(
+                "Fitted mappings contain pairs outside the admitted cohort and exact anchors"
+            )
         if (
             not cohort
             or len(set(cohort)) != len(cohort)
