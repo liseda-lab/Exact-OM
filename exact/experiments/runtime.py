@@ -681,6 +681,10 @@ def encoder_identity(scorer, tokenizer, model, max_len):
 
     stable_tokenizer = _stable_tokenizer_identity_enabled()
     graph_enabled()
+    if os.getenv("EXACT_PAIR_CONTEXT_RECIPE") is not None:
+        from exact.impl.models.pair_adaptive_batch import validate_batching_admission
+
+        validate_batching_admission()
     config = getattr(model, "config", None)
     revision = getattr(config, "_commit_hash", None)
     if (
@@ -754,6 +758,8 @@ def encoder_identity(scorer, tokenizer, model, max_len):
             )
         },
     }
+    if recipe := os.getenv("EXACT_PAIR_CONTEXT_RECIPE"):
+        execution["EXACT_PAIR_CONTEXT_RECIPE"] = recipe
     model_config = {key: value for key, value in config.to_dict().items()
                     if key not in {"_name_or_path", "name_or_path"}}
     local_key = (*local_key, weight_versions, tuple(execution.items()),

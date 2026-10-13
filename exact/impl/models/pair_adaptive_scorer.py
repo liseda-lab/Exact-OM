@@ -1026,9 +1026,14 @@ class PairAdaptiveSemanticScorer(
         self,
         generate_llm_rationales_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        from exact.impl.models.pair_adaptive_batch import scientific_execution_payload
+
         payload = super()._runtime_fingerprint_payload(
             generate_llm_rationales_override=generate_llm_rationales_override
         )
+        execution = scientific_execution_payload()
+        if execution is not None:
+            payload["pair_context_execution"] = execution
         payload["pair_adaptive_channels"] = {
             "hierarchy_embedding_weight": self.hierarchy_embedding_weight,
             "hierarchy_support_weight": self.hierarchy_support_weight,

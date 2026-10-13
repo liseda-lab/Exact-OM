@@ -1,13 +1,27 @@
 """Bounded staged execution of the existing evidence channel computations.
 
-Opt-in until real-device discrete parity is admitted. Selection, evidence budgets,
-precision and downstream candidate grouping remain owned by the existing scorer.
+Scientific use is opt-in for the reviewed staged recipe. Selection, evidence
+budgets, precision and downstream grouping remain owned by the existing scorer.
 """
 
 from collections import defaultdict
 import os
 
 import torch
+
+
+BATCHING_RECIPE = "staged-32x64-mm-v1"
+SCIENTIFIC_BATCHING_ENV = {
+    "EXACT_PAIR_CONTEXT_BATCHING": "1",
+    "EXACT_PAIR_CONTEXT_SCHEDULE": "staged",
+    "EXACT_PAIR_CONTEXT_ENCODER": "batch",
+    "EXACT_PAIR_CONTEXT_MATRIX_KERNEL": "mm",
+    "EXACT_PAIR_CONTEXT_ARITHMETIC": "device",
+    "EXACT_PAIR_CONTEXT_BLOCK_PAIRS": "32",
+    "EXACT_PAIR_CONTEXT_TEXT_BATCH": "64",
+    "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY": "0",
+    "EXACT_ENCODER_CUDA_GRAPHS": "0",
+}
 
 
 def execution_options():
@@ -27,26 +41,58 @@ def execution_options():
 
 
 def validate_batching_admission():
-    """Keep the unqualified GPU path out of scientific runs, including replay."""
+    """Admit the fixed reviewed recipe; keep other variants in qualification."""
     from exact.impl.models.encoder_graph import graph_enabled
 
     graph_enabled()
     stable_identity = os.getenv("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY", "0")
     if stable_identity not in {"0", "1"}:
         raise ValueError("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY must be 0 or 1")
+    recipe = os.getenv("EXACT_PAIR_CONTEXT_RECIPE")
+    namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
+    if recipe is not None:
+        if recipe != BATCHING_RECIPE:
+            raise ValueError(f"Unknown EXACT_PAIR_CONTEXT_RECIPE: {recipe!r}")
+        mismatches = [
+            name for name, value in SCIENTIFIC_BATCHING_ENV.items() if os.getenv(name) != value
+        ]
+        if mismatches:
+            raise ValueError(f"Batching recipe {recipe} requires its fixed settings: {mismatches}")
+        prefix = f"scientific-{recipe}-"
+        if (
+            os.getenv("EXACT_EXPERIMENT_ROLE") != "development"
+            or not namespace.startswith(prefix)
+            or namespace == prefix
+        ):
+            raise RuntimeError(
+                f"Batching recipe {recipe} is only admitted for development runs "
+                f"in an isolated {prefix}* namespace."
+            )
+        return
     if os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") != "1" and stable_identity == "0":
         return
     execution_options()
-    namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
     if (
         os.getenv("EXACT_EXPERIMENT_ROLE") != "throughput_fixture"
         or not namespace.startswith("qualification-")
         or namespace == "qualification-"
     ):
         raise RuntimeError(
-            "Experimental encoder/batching execution has not passed GPU discrete parity; it is only admitted "
-            "for throughput_fixture runs in an isolated qualification-* namespace."
+            "Experimental encoder/batching execution is only admitted for throughput_fixture runs "
+            "in an isolated qualification-* namespace or the explicitly reviewed development recipe."
         )
+
+
+def scientific_execution_payload():
+    """Bind checkpoints to the admitted execution without changing legacy identities."""
+    if os.getenv("EXACT_PAIR_CONTEXT_RECIPE") is None:
+        return None
+    validate_batching_admission()
+    return {
+        "recipe": BATCHING_RECIPE,
+        "namespace": os.environ["EXACT_PRIMITIVE_NAMESPACE"],
+        "settings": dict(SCIENTIFIC_BATCHING_ENV),
+    }
 
 
 def score_evidence_job(scorer, name, job):

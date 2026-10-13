@@ -127,6 +127,8 @@ def _scope(model, *, channels=False, operation=None):
     if channels:
         settings.pop("fusion_config", None)
     execution = {name: os.getenv(name) for name in _CONTEXT_EXECUTION}
+    if recipe := os.getenv("EXACT_PAIR_CONTEXT_RECIPE"):
+        execution["EXACT_PAIR_CONTEXT_RECIPE"] = recipe
     batch_key = fingerprint([operation, settings, execution])
     if channels and batch_scopes is not None and batch_key in batch_scopes:
         return batch_scopes[batch_key]

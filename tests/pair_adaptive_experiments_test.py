@@ -731,7 +731,7 @@ def test_unqualified_batching_rejected_before_cache_or_evidence(
             monkeypatch.setenv(name, value)
     monkeypatch.setattr(numerical, "_scope", lambda *_a, **_k: pytest.fail("cache accessed before admission"))
     monkeypatch.setattr(scorer, "_experiment_entity_features", lambda *_a: pytest.fail("evidence accessed before admission"))
-    with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+    with pytest.raises(RuntimeError, match="only admitted"):
         _evidence_forward(scorer)
     assert calls == {"labels": [], "contexts": []}
 

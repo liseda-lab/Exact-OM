@@ -233,9 +233,9 @@ def test_direct_evidence_helpers_enforce_qualification_admission(monkeypatch, fl
 
     pending = job()
     try:
-        with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+        with pytest.raises(RuntimeError, match="only admitted"):
             score_evidence_job(scorer, "hierarchy", pending)
-        with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+        with pytest.raises(RuntimeError, match="only admitted"):
             prepare_structural_block(scorer, [], [])
     finally:
         pending.close()
