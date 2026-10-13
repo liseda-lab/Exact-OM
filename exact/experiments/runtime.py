@@ -834,11 +834,32 @@ def cached_encoder_rows(
     directory = os.getenv("EXACT_EMBEDDING_CACHE_DIR")
     if not directory or not texts:
         return compute(texts)
-    import torch
-
     identities = encoder_identity(scorer, tokenizer, model, max_len)
+    return _cached_encoder_rows_from_identity(
+        scorer, model, texts, compute, identities, return_cpu=return_cpu
+    )
+
+
+def _cached_encoder_rows_from_identity(
+    scorer: Any,
+    model: Any,
+    texts: list[str],
+    compute: Callable[[list[str]], Any],
+    identities: tuple[str, str | None] | None,
+    *, return_cpu: bool = False,
+) -> Any:
+    """Use an identity just checked by the same resident/persistent lookup call.
+
+    This private path must not retain an identity across encoder invocations.
+    Public callers use cached_encoder_rows, which validates its own inputs.
+    """
+    directory = os.getenv("EXACT_EMBEDDING_CACHE_DIR")
+    if not directory or not texts:
+        return compute(texts)
     if identities is None:
         return compute(texts)
+    import torch
+
     config = model.config
     identity, legacy = identities
     from exact.experiments.encoder_store import encoder_store

@@ -338,15 +338,14 @@ class ScorerCommonMixin:
 
         if missing_keys:
             if os.getenv("EXACT_EMBEDDING_CACHE_DIR"):
-                from exact.experiments.runtime import cached_encoder_rows
+                from exact.experiments.runtime import _cached_encoder_rows_from_identity
 
-                encodings = cached_encoder_rows(
+                encodings = _cached_encoder_rows_from_identity(
                     self,
-                    tokenizer,
                     model,
                     missing_keys,
-                    max_len,
                     lambda rows: self._encode_texts(tokenizer, model, rows, max_len),
+                    identity,
                     return_cpu=True,
                 )
             else:
