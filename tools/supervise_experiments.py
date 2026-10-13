@@ -941,6 +941,13 @@ def check(directory, policy, state, *, act=False, stop_requested=lambda: False):
             current["notification"] = notify_blocker(
                 directory, policy, storage_incident, "requires_user"
             )
+        if act and registry.get("paused_monitor_allowlist"):
+            from exact.experiments.paused_reviews import notify_paused_reviews
+
+            current["paused_review_notifications"] = notify_paused_reviews(
+                directory, policy, registry, observation, state, now=now
+            )
+            write(directory / "state.json", state)
     elif (directory / "MANUAL_CONTROL").exists():
         current.update(
             status="manual_control",
