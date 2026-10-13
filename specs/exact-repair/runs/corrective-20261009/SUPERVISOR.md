@@ -1,5 +1,61 @@
 # October corrective repair campaign
 
+## 13 October: authorized noise-aware DEV supersedes the perfection gate
+
+This section is authoritative over the historical holds below. The user approved
+the prospective policy in [NOISE-AWARE-DEV-20261013.md](NOISE-AWARE-DEV-20261013.md).
+Read `learning/noise-aware-dev-20261013-001/plan.json`, authorization, preflight and
+handoff, and registry `active_noise_aware_dev`. Root implements and launches this
+batch, then releases MANUAL_CONTROL. Continue with the existing supervisor code,
+five-minute checks and gpt-6-astra/xhigh through the existing ChatGPT login.
+
+Evaluate all six fixed epoch6/update756 models with Luna Chat. No training,
+model shopping or perfect-judge qualification loop is needed. Preserve all192
+logical rows,32semantic slots,16paired parents and6order audits. The111request
+schedule has73unary assessments and38pair presentations. Unknowns, conflicts,
+repeat noise and ties stay visible and mask affected labels; they never remove
+a model. Consistent ordinal judgments can remain useful without stable cardinal
+scores. A scientifically inconclusive result is an acceptable result.
+
+The old `corrective-primary-validation` readiness gate is prospectively disabled
+under the bound user amendment, with all prior evidence and repair counters
+preserved. Do not label the old failed qualification a pass, reset attempts, create
+a replacement failure identity, or revive its complete-semantic-score requirement.
+The explicit new checkpoint rule is the common completed training endpoint from
+spec16, not outcome-dependent selection. All six weights remain unchanged.
+
+Once `annotate-noise-aware-dev-20261013-001` completes, handle the registered
+`prepare-noise-aware-dev-next-001` preparation task autonomously:
+
+1. Authenticate plan/report/raw receipts, inspect technical failures separately
+   from semantic disagreement, consolidate Slurm usage and retain every cost.
+2. Save a concise report of logical coverage, direct/admitted comparisons,
+   criterion uncertainty, parent-level paired effects and missing-label sensitivity.
+   Do not tune thresholds or repeat opinions until they look better. A parser or
+   proven evidence-attribution bug may be fixed with a recorded compatible recovery;
+   conflicting semantic judgments alone are data, not an implementation incident.
+3. Bind the six fixed models from the new `model-freeze.json` into successor
+   TEST preparation, preserving all original case/parent/seed schedules. Check
+   independent assessor rubric/projection compatibility offline. Keep the Gemini
+   TEST assessor independent; no silent switch to Luna or reusing DEV observations.
+4. Keep stale TEST launch descriptors disabled; prepare new bindings, then submit
+   only at/after14October17UTC. Preserve154TEST slots and the16October23UTC
+   measurement deadline, then the17October evidence export target. Finish DEV and
+   prepare the manifests now rather than waiting until the TEST boundary.
+
+The cumulative $35 ceiling remains. The exact request amendment is total1076:
+91calibration/251TRAIN/580DEV/154TEST; all811 historical reservations survive.
+Read preflight for the conservative additional reservation; do not reset unknown
+billing or create arbitrary new worker-hour limits. Training labels/checkpoints,
+split boundaries and production-matcher deferral stay intact.
+
+Two actual unsuccessful technical repairs at the same incident still stop that
+repair chain, including replacements. Normal disagreement, a masked comparison,
+or routine batch preparation never consumes an incident repair attempt. Notify
+the user only for a real intervention/decision or the deduplicated finished/idle
+queue notice. Continue independent eligible work. Do not ask for permission to
+perform this already authorized reporting, accounting, freezing or preparation.
+
 ## 13 October: projected Luna Chat completed; criterion attribution remains unresolved
 
 This is the latest status. Read the authoritative

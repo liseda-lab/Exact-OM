@@ -394,7 +394,7 @@ def one(plan, slot, directory, gate=None, *, parser=parse_response, score_filter
         model = plan["models"][slot["model"]]
         profile = LLMProfile.from_raw(slot["model"], model["profile"])
         endpoint = "chat/completions" if slot["stage"] == "chat" else "decisions"
-        role = ROLE + ":" + identity
+        role = plan.get("transport_role", ROLE) + ":" + identity
         ledger = RequestLedger(Path(plan["ledger_directory"]))
         key = (
             ledger.plan(
