@@ -1,7 +1,7 @@
 # Exact-OM scoring throughput contract: 200 cold unique pairs/second
 
 Recorded: 2026-10-09. Updated: 2026-10-13. Status:
-**corrective_fixes_verified_full_throughput_admission_open_scientific_execution_paused**.
+**combined_batch_graph_validation_running_scientific_execution_paused**.
 
 Implementation evidence (updated 2026-10-10): [handoff](THROUGHPUT-IMPLEMENTATION-20261009.md).
 748 CPU regression tests passed on the final frozen source. Experimental H0
@@ -17,12 +17,51 @@ The [October 13 implementation handoff](THROUGHPUT-IMPLEMENTATION-20261013.md)
 records the hashing fix, independently controlled batching and fitted-recipe
 qualification. On the 600-pair RTX 4090 panel, conservative execution preserves
 ordinary and fitted outputs exactly across cold, warm and partial caches; tokenizer identity
-normalization and encoder regrouping fail discrete parity. These failed options
-remain default-off and scientifically blocked. The 200-pair target is not met.
+normalization and encoder regrouping fail the then-required discrete parity.
+These are historical compatibility failures; they do not establish that batching
+implements an invalid method. The options remain default-off pending review.
+The 200-pair target is not established.
 G4 stopped at its committed 9,728-example checkpoint. The user
 requires a new approval before G4 or any other scientific experiment restarts;
 passing optimization tests does not release this hold. Earlier failed batching
 receipts remain valid historical failures, not evidence for the corrected path.
+
+### October 13 amendment: scientific validity and numerical compatibility
+
+The user authorized completion of encoder regrouping with CUDA graphs and **one
+bounded offline comparison**, followed by a result review. Sequential GPU output
+is a compatibility reference, not a mathematical ground truth. The revised
+acceptance rule distinguishes algorithmic invariants from numerical drift:
+
+- Keep the data, candidate groups, model weights, precision, tokenizer, pooling,
+  truncation, selection/reduction formulas, configured tie rules, fitted heads and
+  extraction policy fixed. Preserve complete, valid provenance for the facts
+  actually selected. Broken coverage, stale cache reuse, invalid citations,
+  nonfinite outputs or altered method/configuration still fail correctness.
+- Report numerical error and changed selected evidence, ordering, ranks, hosted
+  routing, requests and final mappings. Such differences from sequential execution
+  do **not** alone reject method-preserving GPU regrouping. Do not invent an
+  epsilon that proves scientific equivalence or promote results automatically.
+- Unchanged serialization and cache replay contracts remain exact. A graph must
+  reproduce its own same-shape eager operation; capture uses a local verification
+  guard and falls back when it cannot establish that contract. This does not
+  require regrouped output to equal the old sequential output.
+- Keep old results and costs immutable. Numerical namespaces distinguish variants;
+  partial historical G4 predictions cannot be silently mixed with new execution.
+  Any later restart/recomputation and scientific admission require user approval.
+
+The bounded comparison uses the existing public, reference-free fitted panel:
+5,000 pairs (250 complete groups) for each of sequential, staged encoder batching,
+and that same batching with graphs. A smaller complete-group prefix checks warm,
+replayed and partial caches. Native and public feature preparation is performed
+once and timed separately; per-variant encoder/channel caches start empty. Report
+preparation-inclusive estimates as well as scoring rates. This warm-feature panel
+does not by itself meet the full cold-work, multi-dataset 200-pair admission gate.
+No fitting, new hosted calls, scientific outputs or subsequent queue entries are
+authorized. The supervisor may monitor this job while the campaign stays paused.
+The [combined implementation handoff](THROUGHPUT-COMBINED-20261013.md) records the
+511 passing regressions, real-encoder smoke, frozen recipe, submitted validation
+step `14372.283` and supervisor `14372.284`. Full-panel results remain pending.
 
 Original October 9 inspection: checkout `328b9c5a`, then-running G4 source:
 `035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f`, frozen under
@@ -93,14 +132,16 @@ edges without implementing a Python ontology projector.
   for global candidate generation. Preserve original local query identities,
   candidate memberships and denominators, including empty or unmatched cases.
 - Preserve encoder weights and revisions, tokenizer, precision, pooling,
-  truncation, evidence limits, evidence ordering, tie rules, thresholds,
+  truncation, evidence limits, evidence ordering rules, tie rules, thresholds,
   cardinality, calibration, fitted artifacts and request construction. Changes
   to these are scientific changes, not batching optimizations.
 - Private test references remain unavailable to optimization, cache construction,
   selection and fitting. Unknown reference pairs do not become negatives. Label-free
   arms may reuse label-independent primitives, never target-supervised fitted data.
-- Preserve exact numerical explanation inputs, selected fact identities,
-  provenance links and competition information needed to reconstruct decisions.
+- Preserve the actual numerical explanation inputs, selected fact identities,
+  provenance links and competition information needed to reconstruct each decision.
+  Selected identities may differ between numerical variants under the amendment;
+  every emitted identity must still resolve to its genuine supporting fact.
   Generated rationales remain off. Diagnostic separation in T07 does not authorize
   deleting ordinary decision evidence.
 - Existing completed predictions, evaluation artifacts and historical costs are
@@ -184,8 +225,9 @@ Capture source revision, configuration and dependency identities, GPU/CPU model,
 assigned cores, device precision flags and input-manifest hashes.
 
 The performance acceptance is **at least 200 cold local pairs/second on each
-admitted class-pair workload for each distinct deployed scoring path**, without
-changing its natural predictions. A workload below target remains a reported
+admitted class-pair workload for each distinct deployed scoring path**, while
+preserving the algorithmic invariants and reporting numerical/discrete drift.
+A workload below target remains a reported
 failure, even if another task lifts the aggregate above 200. Cheap warm or
 duplicate paths do not create additional cold qualification obligations; their
 actual work and dependency equivalence must be proved.
@@ -193,7 +235,8 @@ actual work and dependency equivalence must be proved.
 Keep `throughput_target_status` separate from `execution_readiness`. A measured
 180 pairs/second is a missed 200-pair target, not a scientific failure or an
 automatic reason to leave a feasible approved experiment idle. Admission still
-requires parity, coverage, resource/spending safety and a measured whole-program
+requires correctness and documented compatibility/drift under section 5, coverage,
+resource/spending safety and a measured whole-program
 forecast within the subsequently authorized execution plan. If those already pass,
 a numeric target miss alone does not require a new allowance or scope approval;
 report the miss and residual bottleneck explicitly. If the forecast instead implies
@@ -354,17 +397,18 @@ migration. Batched FP16 encoder kernels can differ from small-batch kernels due
 to padding/reduction shape. Test real encoder outputs on the assigned GPU, not
 only fake encoders. Record absolute/relative score error and every change to
 selected evidence, tie ordering, routing, acceptance and final mappings. Numerical
-tolerances cannot justify changed discrete decisions. If discrepancies exist,
-preserve legacy computation for affected cases under a validated detection rule
-or reject the optimization; a guessed epsilon is not a universal parity proof.
+tolerances alone cannot establish scientific equivalence. Under the October 13
+amendment, changed discrete outputs are measured diagnostics, not automatic
+rejection of a method-preserving implementation. A guessed epsilon is not a
+universal parity proof; approval of scientific execution follows result review.
 
-After the observed GPU failure, isolate encoder rebatching, matrix-kernel changes
-and CPU/GPU arithmetic separately. The first transfer/cache optimization must
-retain legacy encoder padding/call boundaries and arithmetic. Check exact hosted
-packet bytes as well as selected facts: score formatting can change prompts even
-when fact membership stays constant. Larger batching remains conditional on this
-proof; no tolerance or new numerical convention is approved by the performance
-target.
+Isolate encoder rebatching, matrix-kernel changes and CPU/GPU arithmetic in the
+comparison recipe. Preserve the conservative path for compatibility checks.
+Measure hosted packet differences as well as selected facts: score formatting can
+change prompts even when fact membership stays constant. Hosted responses remain
+reusable only under the existing exact request identity. The authorized combined
+test changes staged scheduling/encoder grouping and then graphs; matrix arithmetic,
+precision and tokenizer identity policy stay fixed.
 
 The corrected path independently controls scheduling (`legacy`/`staged`), encoder
 calls (`legacy`/`batch`), matrix operations (`mm`/`bmm`) and arithmetic placement
@@ -571,8 +615,8 @@ actual measured throughput and remaining-work forecast are recorded, and the
 immutable deployment/rollback package is prepared. A running deployment is not a
 prerequisite for T09: the separate C05 rollout step consumes T09's acceptance and
 later records its own admission/launch receipt. If performance misses, report the
-measured bottleneck and revised forecast; do not weaken parity, change scientific
-scope or claim a target was achieved.
+measured bottleneck and revised forecast; do not weaken unchanged cache/serialization
+contracts or algorithmic invariants, change scientific scope or claim a target was achieved.
 
 ## 5. Required regression and scientific parity coverage
 
@@ -615,12 +659,13 @@ The acceptance record must cover:
    adversarial boundary cases. Publish numeric differences and all discrete
    mismatches. Explain any legacy fallbacks and count their actual runtime.
 
-Use exact equality for discrete structures, ordering, candidate identities,
-selected evidence and final decisions. Unchanged cache/serialization/index paths
-must preserve stored numerical values exactly. Any tolerance needed for changed
-GPU batching must be justified from the existing precision and accompanied by
-unchanged discrete decisions in the verification workload; passing toleranced
-vectors alone is not an acceptance result or a proof for every possible input.
+Use exact equality for candidate identity, coverage and unchanged
+cache/serialization/index paths. Validate provenance against the actual inputs.
+For changed GPU grouping, record score and discrete-output differences under the
+October 13 amendment rather than requiring identical selections or decisions.
+Neither a small vector error nor unchanged mappings on this finite panel prove
+scientific equivalence for every possible input. Performance, algorithmic
+correctness, compatibility and later scientific admission are separate results.
 
 ## 6. Evidence, forecast and completion record
 

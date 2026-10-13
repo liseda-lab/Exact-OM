@@ -3,7 +3,56 @@ kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
 updated_at: '2026-10-13'
-status: corrective_fixes_verified_full_throughput_admission_open_scientific_execution_paused
+status: combined_batch_graph_validation_running_scientific_execution_paused
+combined_implementation_20261013:
+  handoff: specs/experiments/THROUGHPUT-COMBINED-20261013.md
+  evidence_root: data/experiments-v2/g4-combined-optimization-20261013-01
+  authorization: one_bounded_offline_validation_then_user_result_review
+  run_id: G4-combined-optimization-validation-20261013
+  pairs_per_primary_variant: 5000
+  complete_source_groups: 250
+  variants: [sequential, staged_encoder, staged_encoder_CUDA_graph]
+  fixed_controls:
+    matrix_kernel: mm
+    arithmetic: device
+    stable_tokenizer_identity: false
+    precision_model_pooling_truncation_and_fitted_heads: unchanged
+  shared_preparation: native_ontology_and_public_features_once_timed_separately
+  variant_caches: isolated_initially_empty
+  cache_check_prefix_pairs: 600
+  paid_calls_allowed: false
+  private_references_allowed: false
+  outputs_promotable: false
+  numerical_drift: reported_not_an_automatic_correctness_failure
+  altered_method_invalid_provenance_or_coverage: correctness_failure
+  graph_same_shape_eager_check: required_with_safe_fallback
+  old_strict_parity_receipts: preserved_as_historical_compatibility_results
+  performance_target_admission: open_requires_full_cold_multi_dataset_evidence
+  supervisor: watch_only_single_allowlisted_validation_while_campaign_paused
+  subsequent_queue_entries_allowed: false
+  scientific_restart_requires_new_user_approval: true
+  verification_status: implementation_and_short_checks_complete_long_validation_running
+  source_revision: 2c0fd931cb036408b2e9d9e2716418ae2a2bc2d5
+  implementation_commits: [e4c93a38, 0220f274, 2c0fd931]
+  recipe_sha256: 7d351410644791ebcf7fd5c48423effe9f78c1797611ae32f2432fa314e38d8e
+  validation_step: '14372.283'
+  supervisor_step: '14372.284'
+  supervisor_first_running_observation_UTC: '2026-10-13T02:17:27Z'
+  pending_batch_records_unchanged: 7
+  CPU_tests_passed: 511
+  CPU_warnings: 11
+  architecture_contracts_kept: 5
+  scoped_mypy: passed
+  integrated_encoder_smoke:
+    step: '14372.282'
+    logical_calls: 32
+    captures: 4
+    replays: 12
+    same_shape_eager_outputs: bitwise_equal
+    retained_bytes_after_release: 0
+    graph_retention_cap_bytes: 2147483648
+    initial_512MiB_smoke: outputs_equal_replay_coverage_limited_by_retention_cap
+  long_validation_results: pending_user_review
 implementation_20261013:
   handoff: specs/experiments/THROUGHPUT-IMPLEMENTATION-20261013.md
   evidence_root: data/experiments-v2/g4-optimization-implementation-20261012-01
@@ -390,7 +439,7 @@ work_packages:
     depends_on: [T01]
   T04:
     title: Two-phase context batching and vectorized numerical reductions
-    status: conservative_600_pair_ordinary_parity_pass_fast_encoder_batching_failed_not_admitted
+    status: combined_batch_graph_validation_authorized_old_strict_failures_retained_no_scientific_admission
     depends_on: [T01, T02, T03]
   T05:
     title: Dependency-scoped primitive reuse and durable training-aggregate references
@@ -443,17 +492,25 @@ acceptance:
     - D_H2_valid publicly sourced and prepared independently of H2 reporting inputs.
     - No private reference reads or final-result-guided changes.
   numerical:
-    deterministic_cpu_absolute_tolerance: 0.000001
-    pinned_gpu_absolute_tolerance: 0.00001
+    acceptance_amended: '2026-10-13'
+    sequential_output_is_mathematical_ground_truth: false
     unchanged_model_precision: true
     score_tolerance_alone_sufficient: false
     exact_checks:
       - source_target_and_query_identity_and_order
-      - selected_fact_and_label_ids
       - empty_missing_and_unknown_semantics
-      - ties_route_membership_and_acceptance_decisions
-      - final_rankings_mappings_and_global_competitors
-      - reconstructible_pair_selector_calibration_and_extraction_traces
+      - unchanged_cache_serialization_and_replay_contracts
+      - algorithm_configuration_weights_dtype_pooling_truncation_and_tie_rules
+    validity_checks:
+      - emitted_fact_and_label_ids_resolve_to_actual_input_provenance
+      - complete_finite_reconstructible_pair_selector_calibration_and_extraction_traces
+    drift_report_not_automatic_failure:
+      - score_absolute_and_relative_error
+      - selected_evidence_and_order
+      - ranks_route_membership_and_acceptance_decisions
+      - final_mappings_and_global_competitors
+      - hosted_request_bytes_and_reuse_eligibility
+    no_automatic_scientific_admission: true
   cache:
     require_dependency_change_misses: true
     require_batch_boundary_independence_for_pure_primitives: true
