@@ -1,0 +1,337 @@
+{
+  "generator": "Native pyowl_core parser + exact_inspect.context.build_context_package (docs/verification/explanation-s2-luna-r2-f1/native_fixtures.py); same punned record as the R2-F1 review fixture",
+  "punned_label": {
+    "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+    "subjects": [
+      {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "class"
+      },
+      {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "individual"
+      }
+    ],
+    "fact_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+    "category": "labels",
+    "facts": [
+      {
+        "id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "fact_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "subject": {
+          "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+          "iri": "urn:punned",
+          "kind": "class"
+        },
+        "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "Punned entity",
+          "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+          "language": null
+        },
+        "axiom_ref": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "axiom_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:9f93987ac0429451a3d41fb85b4acaeddf2280a9d0b94917f53509de6a0c87be",
+            "axiom_id": "sha256:74ab66f6884bbb342de88acf6dd0c952775632e14221a5412ca8086e758681a1",
+            "source_span": {
+              "start": 92,
+              "end": 186,
+              "unit": "byte"
+            },
+            "provenance_status": "recorded"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null,
+        "category": "labels",
+        "qualifiers": [],
+        "qualifier_categories": [],
+        "synonym_scope": "preferred",
+        "assertion_directions": [],
+        "reference_role": "entity_reference",
+        "availability": "available"
+      },
+      {
+        "id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "fact_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "subject": {
+          "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+          "iri": "urn:punned",
+          "kind": "individual"
+        },
+        "predicate_iri": "http://www.w3.org/2000/01/rdf-schema#label",
+        "value": {
+          "term_type": "literal",
+          "lexical_form": "Punned entity",
+          "datatype": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral",
+          "language": null
+        },
+        "axiom_ref": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "axiom_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:9f93987ac0429451a3d41fb85b4acaeddf2280a9d0b94917f53509de6a0c87be",
+            "axiom_id": "sha256:74ab66f6884bbb342de88acf6dd0c952775632e14221a5412ca8086e758681a1",
+            "source_span": {
+              "start": 92,
+              "end": 186,
+              "unit": "byte"
+            },
+            "provenance_status": "recorded"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null,
+        "category": "labels",
+        "qualifiers": [],
+        "qualifier_categories": [],
+        "synonym_scope": "preferred",
+        "assertion_directions": [],
+        "reference_role": "entity_reference",
+        "availability": "available"
+      }
+    ],
+    "axiom": {
+      "ast": {
+        "annotations": [],
+        "property": {
+          "iri": {
+            "type": "IRI",
+            "value": "http://www.w3.org/2000/01/rdf-schema#label"
+          },
+          "kind": "annotation_property",
+          "type": "AnnotationProperty"
+        },
+        "subject": {
+          "type": "IRI",
+          "value": "urn:punned"
+        },
+        "type": "AnnotationAssertion",
+        "value": {
+          "datatype": {
+            "iri": {
+              "type": "IRI",
+              "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral"
+            },
+            "kind": "datatype",
+            "type": "Datatype"
+          },
+          "language": null,
+          "lexical_form": "Punned entity",
+          "type": "Literal"
+        }
+      },
+      "availability": "available",
+      "axiom_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+      "category": "labels",
+      "fact_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+      "id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+      "interpretation": {
+        "kind": "asserted",
+        "scope": "root"
+      },
+      "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+      "original_axiom_digest": "sha256:74ab66f6884bbb342de88acf6dd0c952775632e14221a5412ca8086e758681a1",
+      "original_format": "pyowl-core/canonical-bytes;model=2",
+      "original_syntax": "eAFFAgUTYW5ub3RhdGlvbl9wcm9wZXJ0eQEtAQIqaHR0cDovL3d3dy53My5vcmcvMjAwMC8wMS9yZGYtc2NoZW1hI2xhYmVsAQ0BAgp1cm46cHVubmVkAVoEAg1QdW5uZWQgZW50aXR5AUcCBQhkYXRhdHlwZQE6AQI3aHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zI1BsYWluTGl0ZXJhbAAGAA==",
+      "origins": [
+        {
+          "document_key": "d2:c98ee7190d7fce6e730f54da673bcbee770ff9e2fc7b8ee87ca10714a6956304",
+          "occurrence": 2,
+          "source_sha256": "sha256:9f93987ac0429451a3d41fb85b4acaeddf2280a9d0b94917f53509de6a0c87be",
+          "span": {
+            "byte_end": 186,
+            "byte_start": 92,
+            "column_end": null,
+            "column_start": 3,
+            "line_end": null,
+            "line_start": 4,
+            "type": "SourceSpan"
+          },
+          "type": "OriginOccurrence"
+        }
+      ],
+      "predicate": "http://www.w3.org/2000/01/rdf-schema#label",
+      "qualifiers": [],
+      "rendering": {
+        "status": "unsupported",
+        "text": "{\"annotations\":[],\"property\":{\"iri\":{\"type\":\"IRI\",\"value\":\"http://www.w3.org/2000/01/rdf-schema#label\"},\"kind\":\"annotation_property\",\"type\":\"AnnotationProperty\"},\"subject\":{\"type\":\"IRI\",\"value\":\"urn:punned\"},\"type\":\"AnnotationAssertion\",\"value\":{\"datatype\":{\"iri\":{\"type\":\"IRI\",\"value\":\"http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral\"},\"kind\":\"datatype\",\"type\":\"Datatype\"},\"language\":null,\"lexical_form\":\"Punned entity\",\"type\":\"Literal\"}}"
+      },
+      "subject_iri": "urn:punned",
+      "synonym_scope": "preferred",
+      "value": {
+        "datatype": {
+          "iri": {
+            "type": "IRI",
+            "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#PlainLiteral"
+          },
+          "kind": "datatype",
+          "type": "Datatype"
+        },
+        "language": null,
+        "lexical_form": "Punned entity",
+        "type": "Literal"
+      }
+    }
+  },
+  "shared_axiom": {
+    "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+    "subjects": [
+      {
+        "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+        "iri": "urn:a",
+        "kind": "class"
+      },
+      {
+        "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+        "iri": "urn:b",
+        "kind": "class"
+      }
+    ],
+    "fact_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+    "category": "hierarchy",
+    "facts": [
+      {
+        "id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "fact_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "subject": {
+          "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+          "iri": "urn:a",
+          "kind": "class"
+        },
+        "predicate_iri": null,
+        "value": {
+          "term_type": "expression_ref",
+          "expression_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331"
+        },
+        "axiom_ref": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "axiom_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:c93afc866ee6c7ef31cc1d892cd0ae84e62d1acdef24e0ac04cc12c5b7f0aaed",
+            "axiom_id": "sha256:eef3b65dd0c318d51a37890029317a063269ea79f97108c0455ef5cd8140a702",
+            "source_span": {
+              "start": 244,
+              "end": 278,
+              "unit": "byte"
+            },
+            "provenance_status": "recorded"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null,
+        "category": "hierarchy",
+        "qualifiers": [],
+        "qualifier_categories": [],
+        "synonym_scope": null,
+        "assertion_directions": [],
+        "reference_role": "entity_reference",
+        "availability": "available"
+      },
+      {
+        "id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "fact_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "subject": {
+          "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+          "iri": "urn:b",
+          "kind": "class"
+        },
+        "predicate_iri": null,
+        "value": {
+          "term_type": "expression_ref",
+          "expression_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331"
+        },
+        "axiom_ref": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "axiom_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+        "interpretation": "asserted",
+        "origins": [
+          {
+            "document_sha256": "sha256:c93afc866ee6c7ef31cc1d892cd0ae84e62d1acdef24e0ac04cc12c5b7f0aaed",
+            "axiom_id": "sha256:eef3b65dd0c318d51a37890029317a063269ea79f97108c0455ef5cd8140a702",
+            "source_span": {
+              "start": 244,
+              "end": 278,
+              "unit": "byte"
+            },
+            "provenance_status": "recorded"
+          }
+        ],
+        "premise_ids": [],
+        "derivation_id": null,
+        "category": "hierarchy",
+        "qualifiers": [],
+        "qualifier_categories": [],
+        "synonym_scope": null,
+        "assertion_directions": [],
+        "reference_role": "entity_reference",
+        "availability": "available"
+      }
+    ],
+    "axiom": {
+      "ast": {
+        "annotations": [],
+        "expressions": [
+          {
+            "iri": {
+              "type": "IRI",
+              "value": "urn:a"
+            },
+            "kind": "class",
+            "type": "Class"
+          },
+          {
+            "iri": {
+              "type": "IRI",
+              "value": "urn:b"
+            },
+            "kind": "class",
+            "type": "Class"
+          }
+        ],
+        "type": "EquivalentClasses"
+      },
+      "availability": "available",
+      "axiom_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+      "category": "hierarchy",
+      "fact_id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+      "id": "sha256:023ee0f34aac0ba75c730c33b57a986b7e4f41f25e8c842a9200b9bcd43ab331",
+      "interpretation": {
+        "kind": "asserted",
+        "scope": "root"
+      },
+      "ontology_version_id": "sha256:142b1566445238efcea7ada9f8871cace99e7fe76fa11d3ebb48aa992253eb25",
+      "original_axiom_digest": "sha256:eef3b65dd0c318d51a37890029317a063269ea79f97108c0455ef5cd8140a702",
+      "original_format": "pyowl-core/canonical-bytes;model=2",
+      "original_syntax": "PgYCEgIFBWNsYXNzAQgBAgV1cm46YRICBQVjbGFzcwEIAQIFdXJuOmIGAA==",
+      "origins": [
+        {
+          "document_key": "d2:8aaded93f0f71f1edba4f1896294301dc616eb8b745dec31d2763bb3e42e839e",
+          "occurrence": 4,
+          "source_sha256": "sha256:c93afc866ee6c7ef31cc1d892cd0ae84e62d1acdef24e0ac04cc12c5b7f0aaed",
+          "span": {
+            "byte_end": 278,
+            "byte_start": 244,
+            "column_end": null,
+            "column_start": 3,
+            "line_end": null,
+            "line_start": 6,
+            "type": "SourceSpan"
+          },
+          "type": "OriginOccurrence"
+        }
+      ],
+      "rendering": {
+        "status": "unsupported",
+        "text": "{\"annotations\":[],\"expressions\":[{\"iri\":{\"type\":\"IRI\",\"value\":\"urn:a\"},\"kind\":\"class\",\"type\":\"Class\"},{\"iri\":{\"type\":\"IRI\",\"value\":\"urn:b\"},\"kind\":\"class\",\"type\":\"Class\"}],\"type\":\"EquivalentClasses\"}"
+      }
+    }
+  }
+}

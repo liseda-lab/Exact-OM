@@ -27,6 +27,18 @@ test("a shared original axiom keeps a copy under every typed subject (C18)", () 
   assert.equal(fact.status, "available");
   assert.deepEqual(fact.subjects.map((subject: { entity: { iri: string } }) => subject.entity.iri).sort(), [c2.iri, crate.iri].sort());
   assert.equal(fact.reconstructed, false, "a stored typed AST is shown as stored");
+  // R2-F1: the caller's admitted subject is the one it is about, in either position; without one
+  // the choice stays open and is listed in a fixed order.
+  for (const caller of [crate, c2]) {
+    const about = resolveFact(complete, { factId: id, ontologies: [], subject: caller });
+    assert.equal(about.ambiguous, false);
+    assert.equal(about.subjects[0].entity.iri, caller.iri);
+  }
+  const open = resolveFact(complete, { factId: id, ontologies: [], subject: null });
+  assert.equal(open.ambiguous, true);
+  assert.deepEqual(open.subjects.map((subject: { entity: { iri: string } }) => subject.entity.iri), [c2.iri, crate.iri].sort((a, b) => a.localeCompare(b)));
+  const foreign = resolveFact(complete, { factId: id, ontologies: [], subject: { ...crate, ontology_version_id: "sha256:foreign" } });
+  assert.equal(foreign.ambiguous, true, "a caller outside the record's subjects is not adopted");
 });
 
 test("citations to labels and hidden duplicate synonyms resolve to their exact record (C03)", () => {

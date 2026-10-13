@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { citedSubjects, claimSides, comparisonView, coveredSides, profileView, roleSides, textOrigin } from "./descriptionPresentation.ts";
+import { citationSubject, citedSubjects, claimSides, comparisonView, coveredSides, profileView, roleSides, textOrigin } from "./descriptionPresentation.ts";
 
 const NCIT = { ontology_version_id: "sha256:ncit", iri: "http://ncit#C121750", kind: "class" as const };
 const DOID = { ontology_version_id: "sha256:doid", iri: "http://doid#DOID_0112183", kind: "class" as const };
@@ -69,17 +69,43 @@ test("generated reviewed prose is never presented as a quotation; only declared 
   assert.equal(profileView(with_("available_facts", "fallback", "factual_fallback", { c: ["source"] })).quote, true);
 });
 
-test("each cited record keeps its own typed subject from the artifact's support packet (R2)", () => {
+test("each cited record keeps every admitted typed subject from the artifact's support packet (R2, R2-F1)", () => {
   // ileum cancer (DOID_10153) cites the label of small intestine cancer (DOID_10154).
   const ileum = { ontology_version_id: "sha256:doid", iri: "http://purl.obolibrary.org/obo/DOID_10153", kind: "class" as const };
   const smallIntestine = { ...ileum, iri: "http://purl.obolibrary.org/obo/DOID_10154" };
-  const punned = { ontology_version_id: "sha256:doid", iri: "http://purl.obolibrary.org/obo/X", kind: "individual" as const };
+  const punnedClass = { ontology_version_id: "sha256:doid", iri: "http://purl.obolibrary.org/obo/X", kind: "class" as const };
+  const punnedIndividual = { ...punnedClass, kind: "individual" as const };
   const profile = Object.assign(artifact("reviewed_profile", "independently_reviewed", [ileum], { c: ["source"] }, ["source"]), {
-    support_packet: { facts: [{ fact_id: "own", subject: ileum }, { fact_id: "pun", subject: punned }], selection: { referenced_labels: [{ fact_id: "label", subject: smallIntestine }] } },
+    support_packet: { facts: [{ fact_id: "own", subject: ileum }, { fact_id: "pun", subject: punnedClass }, { fact_id: "pun", subject: punnedIndividual }, { fact_id: "pun", subject: punnedClass }], selection: { referenced_labels: [{ fact_id: "label", subject: smallIntestine }] } },
   });
   const subjects = citedSubjects(profile);
-  assert.deepEqual(subjects.get("label"), smallIntestine, "a referenced label is about the referenced entity");
-  assert.deepEqual(subjects.get("own"), ileum);
-  assert.equal(subjects.get("pun")?.kind, "individual", "a punned subject keeps its kind");
+  assert.deepEqual(subjects.get("label"), [smallIntestine], "a referenced label is about the referenced entity");
+  assert.deepEqual(subjects.get("own"), [ileum]);
+  assert.deepEqual(subjects.get("pun"), [punnedClass, punnedIndividual], "both typed subjects kept, duplicates removed");
   assert.equal(subjects.get("missing"), undefined);
+});
+
+test("a citation's subject never depends on packet order; a caller counts only when admitted (R2-F1)", () => {
+  const ontology = "sha256:native";
+  const asClass = { ontology_version_id: ontology, iri: "urn:punned", kind: "class" as const };
+  const asIndividual = { ...asClass, kind: "individual" as const };
+  for (const admitted of [[asClass, asIndividual], [asIndividual, asClass]]) {
+    // A caller whose full identity is admitted keeps its context, in either order.
+    assert.deepEqual(citationSubject(admitted, [asIndividual]), { subject: asIndividual, candidates: admitted });
+    assert.deepEqual(citationSubject(admitted, [null, asClass]).subject, asClass);
+    // No caller, or one that is not admitted (another kind, IRI or ontology): explicit ambiguity.
+    assert.equal(citationSubject(admitted, []).subject, null);
+    assert.equal(citationSubject(admitted, [{ ...asClass, kind: "object_property" as const }]).subject, null);
+    assert.equal(citationSubject(admitted, [{ ...asClass, iri: "urn:focal" }]).subject, null);
+    assert.equal(citationSubject(admitted, [{ ...asIndividual, ontology_version_id: "sha256:foreign" }]).subject, null);
+  }
+  // A shared axiom stored under two classes: the matching caller, else open.
+  const a = { ontology_version_id: ontology, iri: "urn:a", kind: "class" as const };
+  const b = { ...a, iri: "urn:b" };
+  assert.deepEqual(citationSubject([a, b], [b]).subject, b);
+  assert.equal(citationSubject([b, a], [{ ...a, iri: "urn:c" }]).subject, null);
+  // One admitted subject wins over a wrong caller (the original wrong-focal-entity case).
+  assert.deepEqual(citationSubject([b], [a]).subject, b);
+  // Without admitted subjects the caller is passed on for the original axiom to validate.
+  assert.deepEqual(citationSubject([], [a, b]), { subject: a, candidates: [] });
 });

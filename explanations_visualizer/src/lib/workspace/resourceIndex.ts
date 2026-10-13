@@ -251,7 +251,10 @@ export function entityContextFrom(index: ResourceIndex, entity: EntityRef, scope
 /** Resolve one cited/displayed record by identity and, when given, typed subject. */
 export function resolveFact(index: ResourceIndex, ref: FactRef): ResolvedFact {
   const copies = index.facts.get(ref.factId) ?? [];
-  const chosen = (ref.subject ? copies.find((copy) => entityKey(copy.subject) === entityKey(ref.subject!)) : null) ?? copies[0];
+  // The frozen resource stores one copy per typed subject: the reference's own subject when it is
+  // one of them; otherwise several copies leave the subject explicitly open (R2-F1).
+  const matched = ref.subject ? copies.find((copy) => entityKey(copy.subject) === entityKey(ref.subject!)) ?? null : null;
+  const chosen = matched ?? copies[0];
   if (!chosen) {
     return {
       ref, status: "not_exported", reason: "This record is not part of the information prepared for this view.", ontology: null, category: null,
@@ -268,7 +271,8 @@ export function resolveFact(index: ResourceIndex, ref: FactRef): ResolvedFact {
     category: chosen.category,
     interpretation: chosen.interpretation,
     predicateIri: chosen.predicate_iri,
-    subjects: copies.map((copy) => ({ entity: copy.subject, side: null })),
+    subjects: (matched ? [matched, ...copies.filter((copy) => copy !== matched)] : [...copies].sort((a, b) => entityKey(a.subject).localeCompare(entityKey(b.subject)))).map((copy) => ({ entity: copy.subject, side: null })),
+    ambiguous: !matched && copies.length > 1,
     literal: chosen.value.term_type === "literal" ? { text: chosen.value.lexical_form ?? "", language: chosen.value.language ?? null, datatype: chosen.value.datatype ?? null } : null,
     axiom: toAxiom(chosen),
     reconstructed,

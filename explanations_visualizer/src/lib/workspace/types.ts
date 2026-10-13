@@ -60,7 +60,10 @@ export interface FactRef {
   factId: string;
   /** Ontologies to try, most likely first; a citation's explanation names its entities. */
   ontologies: string[];
+  /** The typed entity this reference is about, when established; null leaves it to `candidates`. */
   subject?: EntityRef | null;
+  /** Every typed subject the citing artifact admits for the record (R2-F1); checked against the axiom. */
+  candidates?: EntityRef[];
 }
 
 export interface FactSubject {
@@ -76,8 +79,10 @@ export interface ResolvedFact {
   category: string | null;
   interpretation: string | null;
   predicateIri: string | null;
-  /** Every typed subject this original record is stored under in the active scope. */
+  /** Every typed subject this original record is stored under in the active scope; the one it is about first. */
   subjects: FactSubject[];
+  /** Several typed subjects remain and nothing establishes which one this reference is about. */
+  ambiguous?: boolean;
   /** Exact literal text when the record is a literal annotation. */
   literal: { text: string; language: string | null; datatype: string | null } | null;
   /** Typed AST for display; `reconstructed` when built from a stored (subject, predicate, value). */

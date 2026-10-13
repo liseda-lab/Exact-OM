@@ -60,26 +60,41 @@ function SubjectLine({ fact }: { fact: ResolvedFact }) {
   const first = fact.subjects[0]?.entity.ontology_version_id ?? null;
   const label = useLabelLookup(first, fact.subjects.filter((subject) => subject.entity.ontology_version_id === first).map((subject) => subject.entity.iri));
   if (!fact.subjects.length) return <p className="meta">Subject not recorded with this reference.</p>;
+  // The exact typed subject: entity, kind and ontology (R2). One established subject is "About";
+  // other typed entities storing the same original record are listed separately; with none
+  // established, all are shown and the open choice is stated (R2-F1).
+  const item = (subject: ResolvedFact["subjects"][number]) => {
+    const side = sideOf(subject.entity.ontology_version_id) ?? subject.side;
+    const name = subject.entity.ontology_version_id === first ? label(subject.entity.iri)?.value : null;
+    return (
+      <li key={`${subject.entity.ontology_version_id}|${subject.entity.kind}|${subject.entity.iri}`} data-subject-iri={subject.entity.iri} data-subject-kind={subject.entity.kind} data-subject-ontology={subject.entity.ontology_version_id}>
+        {side && <SideMarker side={side} size="0.875rem" />}
+        <span>{name ?? curie(subject.entity.iri)}</span>
+        <span className="meta">
+          {KIND_NAMES[subject.entity.kind]} · {workspace.ontologyName(subject.entity.ontology_version_id) ?? shortHash(subject.entity.ontology_version_id, 12)}
+        </span>
+        <span className="iri">{subject.entity.iri}</span>
+      </li>
+    );
+  };
+  if (fact.ambiguous)
+    return (
+      <div className="inspector-subjects" data-subject-state="ambiguous">
+        <span className="meta">Stored under {fact.subjects.length} typed entities; this citation does not say which one it is about</span>
+        <ul>{fact.subjects.map(item)}</ul>
+      </div>
+    );
+  const [about, ...others] = fact.subjects;
   return (
-    <div className="inspector-subjects">
-      <span className="meta">{fact.subjects.length > 1 ? `Stored under ${fact.subjects.length} entities (one shared original axiom)` : "About"}</span>
-      <ul>
-        {fact.subjects.map((subject) => {
-          const side = sideOf(subject.entity.ontology_version_id) ?? subject.side;
-          const name = subject.entity.ontology_version_id === first ? label(subject.entity.iri)?.value : null;
-          return (
-            // The exact typed subject: entity, kind and ontology (R2).
-            <li key={`${subject.entity.ontology_version_id}|${subject.entity.kind}|${subject.entity.iri}`} data-subject-iri={subject.entity.iri} data-subject-kind={subject.entity.kind} data-subject-ontology={subject.entity.ontology_version_id}>
-              {side && <SideMarker side={side} size="0.875rem" />}
-              <span>{name ?? curie(subject.entity.iri)}</span>
-              <span className="meta">
-                {KIND_NAMES[subject.entity.kind]} · {workspace.ontologyName(subject.entity.ontology_version_id) ?? shortHash(subject.entity.ontology_version_id, 12)}
-              </span>
-              <span className="iri">{subject.entity.iri}</span>
-            </li>
-          );
-        })}
-      </ul>
+    <div className="inspector-subjects" data-subject-state="about">
+      <span className="meta">About</span>
+      <ul data-subject-role="about">{item(about)}</ul>
+      {others.length > 0 && (
+        <>
+          <span className="meta">Also stored under (one shared original record)</span>
+          <ul data-subject-role="also">{others.map(item)}</ul>
+        </>
+      )}
     </div>
   );
 }
@@ -94,7 +109,8 @@ function FactDialog({ reference, label, cited, onClose }: { reference: FactRef; 
   const report = useWorkspaceAction();
   const fact = state.data;
   const subjectIri = fact?.subjects[0]?.entity.iri ?? reference.subject?.iri ?? "";
-  const relation = fact?.axiom ? axiomRelation(fact.axiom.ast, subjectIri) : null;
+  // A plain reading is from one subject's point of view: none when the subject is left open.
+  const relation = fact?.axiom && !fact.ambiguous ? axiomRelation(fact.axiom.ast, subjectIri) : null;
   const readable = relation && hasReading(relation.other);
   const target = typeof document !== "undefined" ? locate(reference.factId) : null;
   return (

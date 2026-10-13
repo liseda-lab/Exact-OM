@@ -7,7 +7,7 @@
 import { useState } from "react";
 
 import { ErrorNote } from "@/components/common/ErrorNote";
-import { citedSubjects, profileView, referencedLabelSubjects } from "@/lib/descriptionPresentation";
+import { citationSubject, citedSubjects, profileView, referencedLabelSubjects } from "@/lib/descriptionPresentation";
 import { useFactInspector } from "@/components/workspace/FactInspector";
 import { useSideOf } from "@/lib/workspace/WorkspaceContext";
 import { curie, shortHash } from "@/lib/iri";
@@ -19,8 +19,10 @@ export interface CitedFact {
   /** Short name of the record; the claim's own "cited fact" wording is used when absent. */
   label?: string;
   side?: "source" | "target";
-  /** The cited record's exact typed subject (ontology, kind, IRI); the inspector opens it about this entity. */
+  /** The caller's typed context for the record (its own entity in a shown context), if any. */
   subject?: EntityRef | null;
+  /** Every typed subject the artifact admits for this record; decides whether `subject` applies (R2-F1). */
+  admitted?: EntityRef[];
 }
 
 const CATEGORY_NAMES: Record<string, string> = {
@@ -57,11 +59,13 @@ export function Citations({
       {claim.fact_ids.map((factId, index) => {
         const fact = cite(factId);
         const label = fact?.label ?? (claim.fact_ids.length > 1 ? `cited fact ${index + 1}` : "cited fact");
-        // The record's own typed subject wins; the block's subject is only a fallback (R2).
-        const about = fact?.subject ?? subject ?? null;
+        // A caller context (the record's own, then this block's entity) counts only when it is an
+        // admitted typed subject; otherwise one admitted subject, or explicit ambiguity (R2, R2-F1).
+        const { subject: about, candidates } = citationSubject(fact?.admitted ?? [], [fact?.subject, subject]);
         // Look the record up in its subject's ontology first, then the side it was cited from.
-        const ordered = about
-          ? [about.ontology_version_id, ...ontologies.filter((ontology) => ontology !== about.ontology_version_id)]
+        const home = about?.ontology_version_id ?? candidates[0]?.ontology_version_id ?? null;
+        const ordered = home
+          ? [home, ...ontologies.filter((ontology) => ontology !== home)]
           : fact?.side
             ? [...ontologies].sort((a, b) => Number(sideOf(b) === fact.side) - Number(sideOf(a) === fact.side))
             : ontologies;
@@ -73,7 +77,7 @@ export function Citations({
             data-tour="citation"
             aria-label={`Open the cited original record: ${label}`}
             title={`Reference ${shortHash(factId, 12)}`}
-            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: about }, label, "citation")}
+            onClick={() => inspector?.open({ factId, ontologies: ordered, subject: about, candidates }, label, "citation")}
             disabled={!inspector}
           >
             {label}
@@ -85,19 +89,20 @@ export function Citations({
 }
 
 /**
- * Citations of one artifact with their exact typed subjects from its support packet, and labels
- * of referenced entities named as such ("Label of DOID:7505", R2).
+ * Citations of one artifact with every typed subject its support packet admits for each record,
+ * and labels of referenced entities named as such ("Label of DOID:7505", R2). The caller's own
+ * context is kept as is; it is never replaced by a subject chosen by packet order (R2-F1).
  */
 export function withReferencedLabels(cite: (factId: string) => CitedFact | undefined, explanation: GeneratedExplanation): (factId: string) => CitedFact | undefined {
   const referenced = referencedLabelSubjects(explanation);
   const subjects = citedSubjects(explanation);
   return (factId) => {
     const known = cite(factId);
-    const subject = subjects.get(factId) ?? known?.subject ?? null;
-    if (known) return { ...known, subject };
+    const admitted = subjects.get(factId) ?? [];
+    if (known) return { ...known, admitted };
     const other = referenced.get(factId);
-    if (other) return { label: `Label of ${curie(other.iri)}`, subject: other };
-    return subject ? { subject } : undefined;
+    if (other) return { label: `Label of ${curie(other.iri)}`, admitted: admitted.length ? admitted : [other] };
+    return admitted.length ? { admitted } : undefined;
   };
 }
 

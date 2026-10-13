@@ -73,6 +73,7 @@ export function useExplanation(task: "entity_profile" | "pair_comparison", entit
 
 export function useResolvedFact(ref: FactRef | null) {
   const source = useWorkspace();
-  const signature = ref ? `${ref.factId}|${ref.ontologies.join(",")}|${entitySignature(ref.subject) ?? ""}` : null;
+  const candidates = ref?.candidates?.map((entity) => entitySignature(entity)).sort().join(",") ?? "";
+  const signature = ref ? `${ref.factId}|${ref.ontologies.join(",")}|${entitySignature(ref.subject) ?? ""}|${candidates}` : null;
   return useAsync(signature ? `${source.key}|fact|${signature}` : null, (signal) => source.fact(ref!, signal));
 }

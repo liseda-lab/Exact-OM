@@ -149,13 +149,42 @@ export function referencedLabelSubjects(explanation: GeneratedExplanation): Map<
 }
 
 /**
- * The exact typed subject of every record the artifact cites, from its own support packet: the
- * admitted facts and the labels of referenced entities (R2). A citation is opened about this
- * entity, never about the profile's or comparison's focal entity by default.
+ * Every admitted typed subject of each record the artifact cites, from its own support packet
+ * (the admitted facts and the labels of referenced entities), de-duplicated by full identity.
+ * One original record can belong to several typed entities (a punned IRI, a shared axiom); all
+ * are kept, in no meaningful order (R2-F1).
  */
-export function citedSubjects(explanation: GeneratedExplanation): Map<string, EntityRef> {
-  const result = new Map<string, EntityRef>();
-  for (const fact of explanation.support_packet?.facts ?? []) if (fact.subject && !result.has(fact.fact_id)) result.set(fact.fact_id, fact.subject);
-  for (const fact of explanation.support_packet?.selection?.referenced_labels ?? []) if (fact.subject && !result.has(fact.fact_id)) result.set(fact.fact_id, fact.subject);
+export function citedSubjects(explanation: GeneratedExplanation): Map<string, EntityRef[]> {
+  const result = new Map<string, EntityRef[]>();
+  const add = (factId: string, subject: EntityRef | undefined) => {
+    if (!subject) return;
+    const list = result.get(factId) ?? [];
+    if (!list.some((entity) => same(entity, subject))) list.push(subject);
+    result.set(factId, list);
+  };
+  for (const fact of explanation.support_packet?.facts ?? []) add(fact.fact_id, fact.subject);
+  for (const fact of explanation.support_packet?.selection?.referenced_labels ?? []) add(fact.fact_id, fact.subject);
   return result;
+}
+
+export interface CitationSubject {
+  /** The one typed entity this citation is about, or null when the admitted subjects leave it open. */
+  subject: EntityRef | null;
+  /** Every admitted typed subject of the record (empty when the artifact does not state them). */
+  candidates: EntityRef[];
+}
+
+/**
+ * Which typed entity a citation is about (R2, R2-F1). Callers (the record's own context, then the
+ * block's entity) are kept only when their full ontology/IRI/kind identity is an admitted subject;
+ * otherwise a single admitted subject is used; several admitted subjects with no matching caller
+ * stay explicitly ambiguous. Packet order never decides. Without admitted subjects (older
+ * artifacts) the first caller is passed on and the original axiom still validates it.
+ */
+export function citationSubject(admitted: EntityRef[], callers: (EntityRef | null | undefined)[]): CitationSubject {
+  const present = callers.filter((caller): caller is EntityRef => Boolean(caller));
+  if (!admitted.length) return { subject: present[0] ?? null, candidates: [] };
+  const matching = present.find((caller) => admitted.some((entity) => same(entity, caller)));
+  if (matching) return { subject: matching, candidates: admitted };
+  return { subject: admitted.length === 1 ? admitted[0] : null, candidates: admitted };
 }

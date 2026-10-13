@@ -52,15 +52,24 @@ function axiomSubject(ast: Record<string, unknown>, ontology: string): FactRef["
   }
 }
 
+const byIdentity = (a: EntityRef, b: EntityRef) => `${a.ontology_version_id}|${a.iri}|${a.kind}`.localeCompare(`${b.ontology_version_id}|${b.iri}|${b.kind}`);
+const sameEntity = (a: EntityRef, b: EntityRef) => a.ontology_version_id === b.ontology_version_id && a.iri === b.iri && a.kind === b.kind;
+
 /** Describe a stored axiom as a resolved original record without reinterpreting it. */
 export function resolvedFromAxiom(ref: FactRef, axiom: Axiom): ResolvedFact {
   const ast = axiom.ast as Record<string, unknown>;
-  // The original record decides what it is about. A supplied typed subject is kept when it is
-  // the same IRI in the same ontology (its kind disambiguates punning); a different entity is
-  // never shown as the subject of this record (R2).
+  // The original record decides what it can be about: a typed entity is consistent only in the
+  // record's ontology and, when the axiom names one subject, with that IRI (kinds then tell punned
+  // entities apart). A consistent supplied subject is the one it is about; other admitted
+  // subjects are listed with it; several admitted subjects without one stay ambiguous; a
+  // different entity is never shown (R2, R2-F1).
   const own = axiomSubject(ast, axiom.ontology_version_id);
-  const supplied = ref.subject && ref.subject.ontology_version_id === axiom.ontology_version_id ? ref.subject : null;
-  const subject = own ? (supplied && supplied.iri === own.iri ? supplied : own) : supplied;
+  const consistent = (entity: EntityRef) => entity.ontology_version_id === axiom.ontology_version_id && (!own || entity.iri === own.iri);
+  const supplied = ref.subject && consistent(ref.subject) ? ref.subject : null;
+  const admitted = (ref.candidates ?? []).filter(consistent).filter((entity) => !supplied || !sameEntity(entity, supplied));
+  const ambiguous = !supplied && admitted.length > 1;
+  // An open choice is listed in a fixed order, so nothing about it depends on packet order.
+  const subjects: EntityRef[] = supplied ? [supplied, ...admitted] : ambiguous ? [...admitted].sort(byIdentity) : admitted.length ? admitted : own ? [own] : [];
   const value = ast.type === "AnnotationAssertion" ? (ast.value as Record<string, unknown> | undefined) : undefined;
   const property = ast.type === "AnnotationAssertion" ? (ast.property as { iri?: { value?: string } } | undefined)?.iri?.value ?? null : null;
   return {
@@ -71,7 +80,8 @@ export function resolvedFromAxiom(ref: FactRef, axiom: Axiom): ResolvedFact {
     category: axiom.category,
     interpretation: axiom.interpretation?.kind ?? null,
     predicateIri: property,
-    subjects: subject ? [{ entity: subject, side: null }] : [],
+    subjects: subjects.map((entity) => ({ entity, side: null })),
+    ambiguous,
     literal: value?.type === "Literal"
       ? { text: String(value.lexical_form ?? ""), language: (value.language as string | null) ?? null, datatype: null }
       : null,
