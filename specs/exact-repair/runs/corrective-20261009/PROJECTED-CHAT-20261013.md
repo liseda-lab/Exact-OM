@@ -62,3 +62,58 @@ Run as a detached two-CPU, 8 GiB, zero-GPU Slurm step within allocation 14451.
 Code, inputs, request schedule and rules are frozen before launch. Existing HTTP
 receipts prevent duplicate transmissions on resume. The existing deterministic
 supervisor remains unchanged; root holds semantic review through MANUAL_CONTROL.
+
+## Completed result
+
+Step `14451.203` completed all 50 requests successfully; there were no delivery,
+provider or parser failures. Luna Chat passed 54/54 allowed control criterion
+checks and 18/18 direct control preferences. Required missing collateral meaning
+correctly caused abstention in all four partial-evidence presentations. These
+counts include repetitions and canonical reuse, not independent samples. Every
+raw rationale was reviewed. No cross-plan citation or assertion borrowing was
+observed in the unary outputs; the conjunction diagnostic also passed.
+
+**Full qualification still fails on the DEV domain diagnostic.** One unary
+repetition correctly identifies the current narrower domain and acknowledges the
+native intended-domain entailment, but penalizes the restriction under both
+assertion fidelity and focal meaning retention. The second repetition puts the
+restriction only under assertion fidelity. Retention changes from 0.25 to 1.0,
+exceeding the frozen 0.25 repeat tolerance and reversing the numeric winner.
+There are two direct/numeric conflicts, both in this domain case's first repeat.
+
+One swapped pair response also describes itself as unary and says there is no
+comparator. Both complete plans were present. Audit found an implementation
+defect: the projection's exclusion-reason string described unary behavior even
+in pair packets with an empty exclusion list. This could contribute to the
+misreading; causation is not established. Projection version 2 now explicitly
+declares `single_plan` or `pairwise_comparison`, and pair exclusion reasons are
+null. Both orientations and all 36 real-case views are checked; the 63 focused
+tests and three-module mypy check pass again in step `14451.204`. This correction
+has **offline validation only**. The paid run used projection version 1 in commit
+`47a3800f`; its frozen packets and answers remain untouched. The observed pair
+counts therefore do not establish qualification of the corrected pair interface.
+No additional paid sampling was performed: the independent unary instability
+already rejects expansion.
+
+Some structured `mixed` findings use the natural reading of supported plus
+damaged content, while the original finding description named both omissions and
+unsupported commitments. Any successor should reconcile that taxonomy and make
+criterion responsibility explicit, preserving SF-008/010 and original labels.
+No code-derived winner may silently replace a conflicting primary pair judgment.
+The five fresh controls remain fictional template instantiations; vocabulary
+carryovers in their prose further limit claims of independently sampled meaning.
+
+Reported test cost is **$0.069259645**, with cost fields on all 50 responses.
+The full $0.4055079 conservative reservation remains, giving **$23.21443865/$35**
+cumulative reserved exposure and 811 reservation rows. All 761 earlier rows are
+unchanged, including historical billing uncertainty. Slurm steps 202, 203 and
+204 total **277 worker seconds, 16.498 measured CPU seconds and zero GPU use**.
+The initial free preparation script's route-field lookup was corrected before
+paid admission; it made no generation request and changed no historical row.
+
+The authoritative machine-readable audit is
+`qualification/scoped-judge-20261013-001/review.json`, with complete receipts,
+raw responses, `postrun-checks.json` and `accounting-final.json`. Broad DEV and
+independent TEST remain held. All six existing checkpoints and TRAIN labels are
+preserved. The supervisor receives the exact remaining criterion-attribution
+issue and must not interpret an exit-zero qualification job as study readiness.

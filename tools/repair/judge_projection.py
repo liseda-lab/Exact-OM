@@ -9,7 +9,7 @@ import json
 
 from exact.repair.records import canonical_hash
 
-VERSION = "exact-repair/judge-evidence-projection/v1"
+VERSION = "exact-repair/judge-evidence-projection/v2"
 THEORY_PREFIX = "Complete reconstructed theory:\n"
 INDEX_PREFIX = "Checked fact index. Plan IDs identify complete theories; ENTAILS and SATISFIABLE answer different questions.\n"
 
@@ -121,6 +121,7 @@ def project(payload, side=None):
                     "plan_" + s for s, p in plans.items() if p["plan_id"] == row["plan_id"]
                 ]
     view = {
+        "assessment_kind": "single_plan" if side is not None else "pairwise_comparison",
         **{
             k: v
             for k, v in payload.items()
@@ -134,7 +135,11 @@ def project(payload, side=None):
             "source_evidence_hash": canonical_hash(payload["evidence"]),
             "source_local_context_hash": canonical_hash(local),
             "excluded_evidence_ids": sorted(set(payload["evidence"]) - set(evidence)),
-            "excluded_reason": "other-plan and pair-only facts are outside a unary assessment",
+            "excluded_reason": (
+                "other-plan and pair-only facts are outside a unary assessment"
+                if side is not None
+                else None
+            ),
             "duplicate_fact_indexes_removed": len(local) - len(retained_local),
             "complete_current_theories_preserved": True,
         },

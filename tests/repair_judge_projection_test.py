@@ -65,6 +65,8 @@ def test_unary_projection_preserves_complete_current_and_original_content_withou
     c = attributed_case()
     before = copy.deepcopy(c)
     p = s.state(c, side="b")
+    assert p["assessment_kind"] == "single_plan"
+    assert "unary" in p["projection"]["excluded_reason"]
     assert set(p["evidence"]) == {"D1", "Fb"}
     assert p["evidence"]["D1"] == c["payload"]["evidence"]["D1"]
     assert p["evidence"]["Fb"]["outcome"] == "false"
@@ -84,6 +86,8 @@ def test_unary_projection_preserves_complete_current_and_original_content_withou
 def test_pair_projection_binds_facts_to_oriented_plan_and_retains_both_theories(swapped):
     c = attributed_case()
     p = s.state(c, swapped=swapped)
+    assert p["assessment_kind"] == "pairwise_comparison"
+    assert p["projection"]["excluded_reason"] is None
     assert set(p["evidence"]) == set(c["payload"]["evidence"])
     for side in ("a", "b"):
         plan = p["plan_" + side]

@@ -1,5 +1,44 @@
 # October corrective repair campaign
 
+## 13 October: projected Luna Chat completed; criterion attribution remains unresolved
+
+This is the latest status. Read the authoritative
+`qualification/scoped-judge-20261013-001/review.json` and
+[completed report](PROJECTED-CHAT-20261013.md). Step14451.203 completed all50
+responses,54/54 control criterion checks and18/18 control direct preferences.
+All four required-unknown partial-evidence comparisons abstained. Unary fact
+ownership is correct in the audited outputs, with no foreign citations observed.
+
+Do not release broader DEV from those control counts. A repeated DEV domain
+assessment penalizes one focal restriction under both retention and assertion,
+then only under assertion: retention0.25→1.0, with two direct/numeric conflicts.
+The fixed repeat tolerance fails independently of any pair-interface issue.
+The next issue is criterion responsibility, not an authentication, resource,
+training or allowance failure. Keep all six trained models and192 verified DEV
+rows available; no retraining is implied by this evaluator result.
+
+Root also fixed misleading unary-exclusion metadata in pair prompts. Projection
+v2 declares the assessment kind explicitly and gives pairs no exclusion reason;
+63 focused tests,36 real-case views and the three-module mypy check pass. This
+post-run change has offline validation only. Do not claim it passed a paid panel,
+mix answers across versions, or reroll the completed panel until it passes.
+All old packets, scores and raw errors remain immutable. Any successor must
+declare its criterion/evidence allocation and preserve SF-010 primary pair
+judgments, unknown masks, disagreement exclusion and full coverage requirements.
+
+The new test reported$0.069259645; keep all conservative reservations:
+811 rows,$23.21443865/$35,total965 with91calibration/251TRAIN/469DEV/154TEST.
+All761 old rows are unchanged. Three Slurm steps consumed277worker-seconds,
+16.498measured CPU-seconds and no GPU. Historical billing uncertainty, original
+clocks and readiness-incident unsuccessful attempts stay intact.
+
+The campaign remains scientifically unqualified. Keep full DEV/TEST consumers
+held and preserve the stable readiness incident; an exit-zero engineering run is
+not full study completion. Root reports the result in chat. Continue the existing
+deterministic monitoring without repeated Codex calls to rediscover this result.
+Email only for a new concrete action or the existing deduplicated idle notice.
+No supervisor implementation change is part of this correction.
+
 ## 13 October: user-authorized Luna Chat evidence projection qualification
 
 The user selected Luna Chat and instructed “Ok please fix and check.” This
