@@ -1,5 +1,16 @@
 # October corrective repair campaign
 
+## 13 October: user approved starting TEST as soon as ready
+
+The user explicitly approved an earlier opening after the six endpoints were
+frozen. [EARLY-TEST-20261013.md](EARLY-TEST-20261013.md) and registry
+`active_early_test_opening` supersede the historical14October17UTC opening below.
+Use the newly bound schedule, freeze and replacement descriptors; retain all
+original rows, seeds, weights, per-case budgets, counters and costs. The absolute
+16October23UTC measurement deadline, final8h reserve and17October export target
+remain. There is no remaining user approval needed to start these jobs or prepare
+the independent Gemini annotation batch with the already authorized retries.
+
 ## 13 October: bounded future LLM failure recovery
 
 The user authorized one or two retries for future failed calls. Read
