@@ -2,7 +2,9 @@
 
 import os
 import sqlite3
+from contextlib import nullcontext
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 import torch
@@ -11,6 +13,7 @@ from exact.experiments import numerical_cache
 from exact.experiments import runtime as encoder_runtime
 from exact.experiments.numerical_cache import cached_numerical, peek_channel
 from exact.impl.datasets.base import BaseAlignmentDataset
+from exact.impl.models.pair_adaptive_channels import PairAdaptiveChannelsMixin
 from exact.impl.retrieval import artifacts
 from tests.encoder_cache_migration_test import Config, Tokenizer, scorer
 from tests.numerical_cache_test import Probe, runtime
@@ -283,6 +286,40 @@ def test_channel_probe_is_read_only_and_respects_scope(tmp_path, monkeypatch):
         assert model.channel_calls == 1
         monkeypatch.setenv("EXACT_NUMERICAL_CACHE", "0")
         assert peek_channel(model.channel, values) is None
+
+
+@pytest.mark.parametrize("operation", ["channel", "probe"])
+@pytest.mark.parametrize(
+    "feature", ["EXACT_PAIR_CONTEXT_BATCHING", "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY"]
+)
+def test_direct_channel_cache_hit_requires_qualification_admission(
+    tmp_path, monkeypatch, operation, feature
+):
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "0")
+    monkeypatch.setenv("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY", "0")
+    monkeypatch.setenv(feature, "1")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_ENCODER", "batch")
+    monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "throughput_fixture")
+    monkeypatch.setenv("EXACT_PRIMITIVE_NAMESPACE", "qualification-direct-channel")
+    payload, reads = {"score": 0.75}, []
+    cache = SimpleNamespace(
+        pid=os.getpid(),
+        path=tmp_path / "numerical/entries.sqlite",
+        get=lambda *_args: (reads.append(True), payload)[1],
+        batch=nullcontext,
+    )
+    model = SimpleNamespace(_numerical_cache=cache, device="cpu")
+    method = PairAdaptiveChannelsMixin._score_label_channel.__get__(model)
+    monkeypatch.setattr(numerical_cache, "_scope", lambda *_a, **_k: (tmp_path, "fixed"))
+    invoke = method if operation == "channel" else lambda *args: peek_channel(method, *args)
+    with torch.inference_mode():
+        assert invoke(["source"], ["target"]) is payload
+        monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "scientific")
+        with pytest.raises(RuntimeError, match="only admitted"):
+            invoke(["source"], ["target"])
+    # Deliberately offer the same cached identity after the namespace becomes
+    # invalid: the cached result must not bypass admission or touch storage.
+    assert len(reads) == 1
 
 
 @pytest.mark.parametrize("setting", ["SCHEDULE", "ENCODER", "MATRIX_KERNEL", "ARITHMETIC"])

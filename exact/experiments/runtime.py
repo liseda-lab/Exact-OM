@@ -632,10 +632,53 @@ def _compatible_encoder_source(scorer: Any) -> str | None:
     return expected
 
 
+def _stable_tokenizer_identity_enabled():
+    enabled = os.getenv("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY", "0")
+    if enabled not in {"0", "1"}:
+        raise ValueError("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY must be 0 or 1")
+    if enabled == "0":
+        return False
+    namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
+    if (
+        os.getenv("EXACT_EXPERIMENT_ROLE") != "throughput_fixture"
+        or not namespace.startswith("qualification-")
+        or namespace == "qualification-"
+    ):
+        raise RuntimeError(
+            "Stable tokenizer identity requires GPU discrete parity and is only admitted "
+            "for throughput_fixture runs in an isolated qualification-* namespace."
+        )
+    return True
+
+
+def _explicit_tokenization(scorer):
+    from exact.impl.models.scorer_common import ScorerCommonMixin
+
+    # inference_mode and instrumentation using functools.wraps retain the actual
+    # implementation contract. Arbitrary custom encoders may use backend defaults.
+    return inspect.unwrap(scorer._encode_texts) is inspect.unwrap(ScorerCommonMixin._encode_texts)
+
+
+def _tokenizer_backend(tokenizer, *, explicit):
+    if not hasattr(tokenizer, "backend_tokenizer"):
+        return None
+    backend = tokenizer.backend_tokenizer.to_str()
+    if explicit:
+        state = json.loads(backend)
+        # _encode_texts explicitly sets padding=True, truncation=True and max_len.
+        # Their backend state changes after a call; sides and special tokens are
+        # independently bound. Every semantic backend component remains intact.
+        state.pop("padding", None)
+        state.pop("truncation", None)
+        backend = json.dumps(state, sort_keys=True, separators=(",", ":"))
+    return backend
+
+
 def encoder_identity(scorer, tokenizer, model, max_len):
     """Actual encoder weights and execution contract, independent of reporting labels."""
     import torch
 
+    stable_tokenizer = _stable_tokenizer_identity_enabled()
     config = getattr(model, "config", None)
     revision = getattr(config, "_commit_hash", None)
     if (
@@ -671,12 +714,15 @@ def encoder_identity(scorer, tokenizer, model, max_len):
         "backend_id": id(getattr(tokenizer, "backend_tokenizer", None)),
     }
     batch = getattr(scorer, "_numerical_channel_scopes", None)
-    tokenizer_key = ("encoder_tokenizer", id(tokenizer), _hash(tokenizer_settings))
+    explicit_tokenization = stable_tokenizer and _explicit_tokenization(scorer)
+    tokenizer_key = (
+        "encoder_tokenizer", id(tokenizer), _hash(tokenizer_settings), explicit_tokenization,
+    )
     tokenization = batch.get(tokenizer_key) if batch is not None else None
     if tokenization is None:
         tokenization = {
             "vocab": tokenizer.get_vocab(),
-            "backend": tokenizer.backend_tokenizer.to_str() if hasattr(tokenizer, "backend_tokenizer") else None,
+            "backend": _tokenizer_backend(tokenizer, explicit=explicit_tokenization),
         }
         # Store copies: a mutable Python vocabulary must not alter its past identity.
         tokenization = json.loads(json.dumps(tokenization))
@@ -701,6 +747,7 @@ def encoder_identity(scorer, tokenizer, model, max_len):
                 "EXACT_PAIR_CONTEXT_ENCODER",
                 "EXACT_PAIR_CONTEXT_MATRIX_KERNEL",
                 "EXACT_PAIR_CONTEXT_ARITHMETIC",
+                "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY",
             )
         },
     }

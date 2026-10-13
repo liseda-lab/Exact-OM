@@ -28,6 +28,7 @@ _CONTEXT_EXECUTION = (
     "EXACT_PAIR_CONTEXT_ENCODER",
     "EXACT_PAIR_CONTEXT_MATRIX_KERNEL",
     "EXACT_PAIR_CONTEXT_ARITHMETIC",
+    "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY",
 )
 
 
@@ -445,6 +446,16 @@ def _validate_retrieval_inputs(model):
         validate()
 
 
+def _validate_batching_admission(function):
+    if function.__module__ == "exact.impl.models.pair_adaptive_channels" or (
+        function.__name__ == "forward"
+        and function.__module__ == "exact.impl.models.pair_adaptive_scorer"
+    ):
+        from exact.impl.models.pair_adaptive_batch import validate_batching_admission
+
+        validate_batching_admission()
+
+
 def peek_channel(method, *args, **kwargs):
     """Read an exact channel cache hit without computing or opening a writer.
 
@@ -454,6 +465,7 @@ def peek_channel(method, *args, **kwargs):
     model = getattr(method, "__self__", None)
     if model is None or not getattr(method, "_numerical_cache_channel", False):
         return None
+    _validate_batching_admission(method)
     boundary = not getattr(model, "_numerical_validation_depth", 0)
     if boundary:
         _validate_retrieval_inputs(model)
@@ -490,14 +502,6 @@ def cached_numerical(*, channels=False):
                     _validate_retrieval_inputs(model)
                 return value
 
-            if (not channels and function.__name__ == "forward"
-                    and function.__module__ == "exact.impl.models.pair_adaptive_scorer"):
-                from exact.impl.models.pair_adaptive_batch import (
-                    validate_batching_admission,
-                )
-
-                # Admission also precedes cache hits and the cache-disabled path.
-                validate_batching_admission()
             # Hosted responses retain their own request ledger and are never hidden
             # behind full-forward replay. Raw channels have no decision calls.
             gate = getattr(model, "llm_experiment_config", {}).get("gate", {}).get("mode")
@@ -566,6 +570,9 @@ def cached_numerical(*, channels=False):
 
         @wraps(function)
         def call(model, *args, **kwargs):
+            # Direct channels/probes must obey the same isolation as forward,
+            # including a hit whose function body would never execute.
+            _validate_batching_admission(function)
             if not channels or not getattr(model, "_numerical_validation_depth", 0):
                 _validate_retrieval_inputs(model)
             if channels:
