@@ -9,11 +9,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
 from pathlib import Path
+from stat import S_ISREG
 from typing import Any, Literal, Mapping
 
 ArtifactKind = Literal["contrastive_encoder", "cross_encoder"]
+_ArtifactInventory = tuple[tuple[str, int, int, int, int, int], ...]
 
 _MANIFEST_NAMES = ("retrieval_artifact.json", "artifact.json")
 _NEGATIVE_POLICIES = {
@@ -45,6 +48,19 @@ class LocalRetrievalArtifact:
     model_path: Path
     sha256: str
     metadata: Mapping[str, Any]
+    _verified: tuple[int, _ArtifactInventory] | None = field(
+        default=None, init=False, repr=False, compare=False
+    )
+    _full_hashes: int = field(default=0, init=False, repr=False, compare=False)
+    _inventory_checks: int = field(default=0, init=False, repr=False, compare=False)
+    _bytes_hashed: int = field(default=0, init=False, repr=False, compare=False)
+
+    def validation_stats(self) -> dict[str, int]:
+        return {
+            "full_hashes": self._full_hashes,
+            "inventory_checks": self._inventory_checks,
+            "bytes_hashed": self._bytes_hashed,
+        }
 
     def provenance(self) -> dict[str, Any]:
         """Return a JSON-safe artifact record for cache and pool manifests."""
@@ -57,15 +73,30 @@ class LocalRetrievalArtifact:
             "metadata": dict(self.metadata),
         }
 
-    def assert_unchanged(self) -> None:
-        """Fail if artifact bytes changed after validation."""
+    def assert_unchanged(self, *, force: bool = False) -> None:
+        """Reuse a verified digest only while the complete file inventory is unchanged.
 
-        current = _artifact_sha256(self.manifest_path, self.model_path)
+        Admission/resume resolves a new artifact and hashes its bytes. Subsequent
+        checks inspect metadata, including ctime and inode, so same-size edits or
+        replacements cannot reuse that verification. A new process verifies again.
+        """
+        inventory = _artifact_inventory(self.manifest_path, self.model_path)
+        object.__setattr__(self, "_inventory_checks", self._inventory_checks + 1)
+        verified = (os.getpid(), inventory)
+        if not force and self._verified == verified:
+            return
+        current = _verified_artifact_sha256(self.manifest_path, self.model_path, inventory)
+        object.__setattr__(self, "_full_hashes", self._full_hashes + 1)
+        object.__setattr__(self, "_inventory_checks", self._inventory_checks + 1)
+        object.__setattr__(
+            self, "_bytes_hashed", self._bytes_hashed + sum(row[3] for row in inventory)
+        )
         if current != self.sha256:
             raise ValueError(
                 "Retrieval artifact changed after validation: "
                 f"{self.manifest_path} ({self.sha256} != {current})"
             )
+        object.__setattr__(self, "_verified", verified)
 
 
 def resolve_local_retrieval_artifact(
@@ -92,6 +123,7 @@ def resolve_local_retrieval_artifact(
         raise ValueError(f"Retrieval artifact roots may not be symbolic links: {supplied}")
     supplied = supplied.resolve()
     manifest_path = _resolve_manifest_path(supplied)
+    manifest_stamp = _file_stamp(manifest_path)
     payload = _read_manifest(manifest_path)
 
     if payload.get("schema_version") != 1:
@@ -139,14 +171,22 @@ def resolve_local_retrieval_artifact(
     if not model_path.exists():
         raise FileNotFoundError(f"Fitted model path does not exist: {model_path}")
 
-    digest = _artifact_sha256(manifest_path, model_path)
-    return LocalRetrievalArtifact(
+    inventory = _artifact_inventory(manifest_path, model_path)
+    if _file_stamp(manifest_path) != manifest_stamp:
+        raise ValueError(f"Retrieval artifact changed during validation: {manifest_path}")
+    digest = _verified_artifact_sha256(manifest_path, model_path, inventory)
+    artifact = LocalRetrievalArtifact(
         kind=expected_kind,
         manifest_path=manifest_path,
         model_path=model_path,
         sha256=digest,
         metadata=dict(payload),
     )
+    object.__setattr__(artifact, "_verified", (os.getpid(), inventory))
+    object.__setattr__(artifact, "_full_hashes", 1)
+    object.__setattr__(artifact, "_inventory_checks", 2)
+    object.__setattr__(artifact, "_bytes_hashed", sum(row[3] for row in inventory))
+    return artifact
 
 
 def retrieval_artifact_requirement(
@@ -286,7 +326,10 @@ def _read_manifest(path: Path) -> dict[str, Any]:
     return value
 
 
-def _artifact_sha256(manifest_path: Path, model_path: Path) -> str:
+def _artifact_files(manifest_path: Path, model_path: Path) -> list[Path]:
+    for path in (manifest_path, model_path):
+        if Path(os.path.abspath(path)) != path.resolve():
+            raise ValueError(f"Retrieval artifacts may not contain symlinks: {path}")
     files = {manifest_path.resolve()}
     if model_path.is_file():
         files.add(model_path.resolve())
@@ -298,10 +341,35 @@ def _artifact_sha256(manifest_path: Path, model_path: Path) -> str:
                 files.add(item.resolve())
     else:
         raise ValueError(f"Fitted model path is not a regular file or directory: {model_path}")
+    return sorted(files, key=lambda item: item.as_posix())
+
+
+def _file_stamp(path: Path) -> tuple[str, int, int, int, int, int]:
+    stat = path.stat(follow_symlinks=False)
+    if not S_ISREG(stat.st_mode):
+        raise ValueError(f"Retrieval artifact is not a regular file: {path}")
+    return (str(path), stat.st_dev, stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
+
+
+def _artifact_inventory(manifest_path: Path, model_path: Path) -> _ArtifactInventory:
+    return tuple(_file_stamp(path) for path in _artifact_files(manifest_path, model_path))
+
+
+def _verified_artifact_sha256(
+    manifest_path: Path, model_path: Path, inventory: _ArtifactInventory
+) -> str:
+    digest = _artifact_sha256(manifest_path, model_path)
+    if inventory != _artifact_inventory(manifest_path, model_path):
+        raise ValueError(f"Retrieval artifact changed during validation: {manifest_path}")
+    return digest
+
+
+def _artifact_sha256(manifest_path: Path, model_path: Path) -> str:
+    files = _artifact_files(manifest_path, model_path)
 
     root = manifest_path.parent.resolve()
     digest = hashlib.sha256()
-    for path in sorted(files, key=lambda item: item.as_posix()):
+    for path in files:
         try:
             relative = path.relative_to(root).as_posix()
         except ValueError as exc:

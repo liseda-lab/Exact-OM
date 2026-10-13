@@ -891,6 +891,10 @@ class BaseAlignmentDataset(IDataset):
             artifact.assert_unchanged()
         return dict(self._retrieval_artifacts)
 
+    def validate_retrieval_artifacts(self) -> None:
+        """Fail closed on fitted input drift at scorer batch boundaries."""
+        self._configured_retrieval_artifacts()
+
     @property
     def cache_fingerprint(self) -> Optional[str]:
         payload = self._cache_fingerprint_payload()

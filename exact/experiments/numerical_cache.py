@@ -19,6 +19,17 @@ import torch
 
 from exact.utils.fitted_artifacts import fingerprint
 
+_CONTEXT_EXECUTION = (
+    "EXACT_PAIR_CONTEXT_BATCHING",
+    "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
+    "EXACT_PAIR_CONTEXT_TEXT_BATCH",
+    "EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS",
+    "EXACT_PAIR_CONTEXT_SCHEDULE",
+    "EXACT_PAIR_CONTEXT_ENCODER",
+    "EXACT_PAIR_CONTEXT_MATRIX_KERNEL",
+    "EXACT_PAIR_CONTEXT_ARITHMETIC",
+)
+
 
 def _tree(value, tensor):
     if isinstance(value, torch.Tensor):
@@ -97,7 +108,8 @@ def _scope(model, *, channels=False, operation=None):
                      "hierarchical_relation_families", "ctx_sentence_delimiter"}}
     if channels:
         settings.pop("fusion_config", None)
-    batch_key = fingerprint([operation, settings])
+    execution = {name: os.getenv(name) for name in _CONTEXT_EXECUTION}
+    batch_key = fingerprint([operation, settings, execution])
     if channels and batch_scopes is not None and batch_key in batch_scopes:
         return batch_scopes[batch_key]
     cached = getattr(model, "_numerical_runtime_binding", None)
@@ -111,14 +123,28 @@ def _scope(model, *, channels=False, operation=None):
         encoders = {} if operation == '_score_string_channel' else _encoder_bindings(model, label_only=True)
         if encoders is not None:
             pure = {
-                'schema': 'exact-pure-channel-v1', 'operation': operation,
-                'tau': model.tau, 'encoders': encoders,
-                'options': (model.strsim_config if operation == '_score_string_channel' else {
-                    'use_lexical': model.use_lexical, 'lex_enabled': model.lex_enabled,
-                    'lex_config': model.lex_config, 'label_pair_pooling': model.label_pair_pooling.value}),
-                'implementation': identity['implementation'], 'dependencies': identity['dependencies'],
-                'device': str(model.device), 'torch': torch.__version__,
-                'namespace': os.getenv('EXACT_PRIMITIVE_NAMESPACE', record.get('primitive_namespace', 'scientific')),
+                "schema": "exact-pure-channel-v1",
+                "operation": operation,
+                "tau": model.tau,
+                "encoders": encoders,
+                "options": (
+                    model.strsim_config
+                    if operation == "_score_string_channel"
+                    else {
+                        "use_lexical": model.use_lexical,
+                        "lex_enabled": model.lex_enabled,
+                        "lex_config": model.lex_config,
+                        "label_pair_pooling": model.label_pair_pooling.value,
+                    }
+                ),
+                "implementation": identity["implementation"],
+                "dependencies": identity["dependencies"],
+                "device": str(model.device),
+                "torch": torch.__version__,
+                "namespace": os.getenv(
+                    "EXACT_PRIMITIVE_NAMESPACE", record.get("primitive_namespace", "scientific")
+                ),
+                "execution": execution,
             }
             result = Path(os.environ.get('EXACT_NUMERICAL_CACHE_ROOT', record['root'])), fingerprint(pure)
             model._numerical_scope_rebuilds = getattr(model, '_numerical_scope_rebuilds', 0) + 1
@@ -180,6 +206,7 @@ def _scope(model, *, channels=False, operation=None):
         "pair_context_block_pairs": os.getenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", "32"),
         "pair_context_text_batch": os.getenv("EXACT_PAIR_CONTEXT_TEXT_BATCH", "64"),
         "pair_context_matrix_elements": os.getenv("EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS", "1048576"),
+        "context_execution": execution,
     }
     artifacts = {}
     for name in (
@@ -397,14 +424,64 @@ class NumericalCache:
         }
 
 
+def _validate_retrieval_inputs(model):
+    validate = getattr(
+        getattr(model, "_attached_dataset", None), "validate_retrieval_artifacts", None
+    )
+    if callable(validate):
+        validate()
+
+
+def peek_channel(method, *args, **kwargs):
+    """Read an exact channel cache hit without computing or opening a writer.
+
+    Structural preparation uses this to avoid doing encoder work for a channel
+    the ordinary scorer will replay. Required inputs are never optional caches.
+    """
+    model = getattr(method, "__self__", None)
+    if model is None or not getattr(method, "_numerical_cache_channel", False):
+        return None
+    boundary = not getattr(model, "_numerical_validation_depth", 0)
+    if boundary:
+        _validate_retrieval_inputs(model)
+    if torch.is_grad_enabled():
+        return None
+    scope = _scope(model, channels=True, operation=method.__name__)
+    cache = getattr(model, "_numerical_cache", None)
+    if (
+        scope is None
+        or cache is None
+        or cache.pid != os.getpid()
+        or cache.path.parent.parent != scope[0]
+    ):
+        return None
+    try:
+        key = fingerprint(_arguments([args, kwargs]))
+        value = cache.get(scope[1], method.__name__, key, getattr(model, "device", "cpu"))
+    except (OSError, sqlite3.Error, TypeError, ValueError):
+        value = None
+    if boundary:
+        _validate_retrieval_inputs(model)
+    return value
+
+
 def cached_numerical(*, channels=False):
     """Memoize pure channel payloads, or a decision-off scorer's complete output."""
 
     def decorate(function):
         def invoke(model, *args, **kwargs):
+            boundary = not channels or not getattr(model, "_numerical_validation_depth", 0)
+
+            def validated(value):
+                if boundary:
+                    _validate_retrieval_inputs(model)
+                return value
+
             if (not channels and function.__name__ == "forward"
                     and function.__module__ == "exact.impl.models.pair_adaptive_scorer"):
-                from exact.impl.models.pair_adaptive_batch import validate_batching_admission
+                from exact.impl.models.pair_adaptive_batch import (
+                    validate_batching_admission,
+                )
 
                 # Admission also precedes cache hits and the cache-disabled path.
                 validate_batching_admission()
@@ -413,9 +490,15 @@ def cached_numerical(*, channels=False):
             gate = getattr(model, "llm_experiment_config", {}).get("gate", {}).get("mode")
             allowed = channels or not getattr(model, "use_llm", False) or gate == "off"
             if torch.is_grad_enabled():
-                return function(model, *args, **kwargs)
+                return validated(function(model, *args, **kwargs))
+            # Scientific input/identity errors must propagate. Only optional
+            # cache storage and serialization failures may trigger computation.
+            scope = _scope(
+                model,
+                channels=channels or not allowed,
+                operation=function.__name__ if channels else None,
+            )
             try:
-                scope = _scope(model, channels=channels or not allowed, operation=function.__name__ if channels else None)
                 if scope is not None:
                     root, identity = scope
                     cache = getattr(model, "_numerical_cache", None)
@@ -425,7 +508,7 @@ def cached_numerical(*, channels=False):
             except (OSError, sqlite3.Error, TypeError, ValueError, KeyError):
                 scope = None
             if scope is None:
-                return function(model, *args, **kwargs)
+                return validated(function(model, *args, **kwargs))
             with cache.batch():
                 try:
                     value = cache.get(
@@ -436,12 +519,14 @@ def cached_numerical(*, channels=False):
                 replayed = value is not None
                 if value is None:
                     # Errors from the actual scorer are not swallowed or retried.
-                    value = function(model, *args, **kwargs)
+                    value = validated(function(model, *args, **kwargs))
                     try:
                         if allowed:
                             cache.put(identity, function.__name__, key, value)
                     except (OSError, sqlite3.Error, TypeError, RuntimeError):
                         cache.skipped += 1
+                else:
+                    value = validated(value)
             if not channels and isinstance(value, dict):
                 value["numerical_cache"] = {
                     **cache.stats(),
@@ -468,11 +553,15 @@ def cached_numerical(*, channels=False):
 
         @wraps(function)
         def call(model, *args, **kwargs):
-            if channels or torch.is_grad_enabled():
+            if not channels or not getattr(model, "_numerical_validation_depth", 0):
+                _validate_retrieval_inputs(model)
+            if channels:
                 return invoke(model, *args, **kwargs)
             marker = object()
             previous = getattr(model, "_numerical_channel_scopes", marker)
+            depth = getattr(model, "_numerical_validation_depth", 0)
             model._numerical_channel_scopes = {}
+            model._numerical_validation_depth = depth + 1
             try:
                 return invoke(model, *args, **kwargs)
             finally:
@@ -480,7 +569,12 @@ def cached_numerical(*, channels=False):
                     del model._numerical_channel_scopes
                 else:
                     model._numerical_channel_scopes = previous
+                if depth:
+                    model._numerical_validation_depth = depth
+                else:
+                    del model._numerical_validation_depth
 
+        setattr(call, "_numerical_cache_channel", channels)
         return call
 
     return decorate
@@ -492,6 +586,7 @@ def training_content_contract(model):
     This narrow contract is intentionally unavailable for unfamiliar scorers or
     datasets. Actual train rows, labels and batching are bound by the caller.
     """
+    _validate_retrieval_inputs(model)
     dataset = getattr(model, "_attached_dataset", None)
     runtime_path = os.getenv("EXACT_EXPERIMENT_RUNTIME")
     if (not runtime_path or os.getenv("EXACT_NUMERICAL_CACHE", "1") == "0"
@@ -595,6 +690,7 @@ def training_score_reference(model, identity, application, batch_size, *, aggreg
     from exact.experiments.runtime import _write
     from exact.utils.provenance import sha256_file
 
+    _validate_retrieval_inputs(model)
     marker = object()
     old_role = getattr(model, "_numerical_scoring_role", marker)
     old_llm = getattr(model, "use_llm", marker)
@@ -671,6 +767,7 @@ def training_score_reference(model, identity, application, batch_size, *, aggreg
 
 def shared_training_scores(model, identity, application, batch_size, *, rows=None):
     """Reuse feature rows, never fitted heads; retain label/source/pool bindings."""
+    _validate_retrieval_inputs(model)
     old_role = getattr(model, "_numerical_scoring_role", None)
     model._numerical_scoring_role = "train"
     try:

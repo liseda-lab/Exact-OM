@@ -690,9 +690,19 @@ def encoder_identity(scorer, tokenizer, model, max_len):
         "tf32": torch.backends.cuda.matmul.allow_tf32,
         "autocast": torch.is_autocast_enabled("cuda"),
         "autocast_dtype": str(torch.get_autocast_dtype("cuda")),
-        **{name: os.getenv(name) for name in (
-            "EXACT_PAIR_CONTEXT_BATCHING", "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
-            "EXACT_PAIR_CONTEXT_TEXT_BATCH", "EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS")},
+        **{
+            name: os.getenv(name)
+            for name in (
+                "EXACT_PAIR_CONTEXT_BATCHING",
+                "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
+                "EXACT_PAIR_CONTEXT_TEXT_BATCH",
+                "EXACT_PAIR_CONTEXT_MATRIX_ELEMENTS",
+                "EXACT_PAIR_CONTEXT_SCHEDULE",
+                "EXACT_PAIR_CONTEXT_ENCODER",
+                "EXACT_PAIR_CONTEXT_MATRIX_KERNEL",
+                "EXACT_PAIR_CONTEXT_ARITHMETIC",
+            )
+        },
     }
     model_config = {key: value for key, value in config.to_dict().items()
                     if key not in {"_name_or_path", "name_or_path"}}
