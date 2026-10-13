@@ -246,12 +246,18 @@ def publication(fixture: Path, out: Path) -> dict:
         keys.append(
             {
                 "case_id": case_id,
-                "case_kind": "unresolved",
-                "acceptable_candidate_ids": [],
-                "adjudication_version": "not-adjudicated",
-                "criterion": "Synthetic development fixture; no adjudication exists.",
-                "evidence": ["None: development fixture"],
-                "origin": "natural",
+                "case_kind": "answer_present",
+                "acceptable_candidate_ids": ["c1"],
+                "adjudication_version": "synthetic-mechanical-key/1",
+                "criterion": "Arbitrary synthetic key for exercising server-owned grading only; not an ontology-equivalence adjudication.",
+                "evidence": ["Constructed test key: c1; no scientific correctness claim"],
+                "origin": "constructed",
+                "construction_provenance": {
+                    "original_candidate_ids": [c["candidate_id"] for c in candidates],
+                    "original_scores": {c["candidate_id"]: c["score"] for c in candidates},
+                    "original_ranks": {c["candidate_id"]: c["display_position"] for c in candidates},
+                    "replacement_rule": "No replacements. Synthetic matcher pool and c1 mechanical key; not ontology-equivalence evidence.",
+                },
                 "original_production_ranks": {
                     c["candidate_id"]: c["display_position"] for c in candidates
                 },
