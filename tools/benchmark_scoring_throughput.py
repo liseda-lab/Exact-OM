@@ -632,6 +632,7 @@ def run(args):
                 key: os.getenv(key)
                 for key in (
                     "EXACT_PAIR_CONTEXT_BATCHING",
+                    "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY",
                     "EXACT_PAIR_CONTEXT_BLOCK_PAIRS",
                     "EXACT_PAIR_CONTEXT_TEXT_BATCH",
                     "EXACT_PAIR_CONTEXT_SCHEDULE",
