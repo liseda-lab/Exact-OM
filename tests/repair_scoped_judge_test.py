@@ -200,6 +200,32 @@ def test_chat_grounding_and_unknown_consistency_are_validated():
             s.parse(response, wire, "chat", models()["chat"])
 
 
+@pytest.mark.parametrize("embedded", [False, True])
+def test_unary_citation_cannot_borrow_another_plans_entailment(embedded):
+    c = case()
+    fact = dict(plan_id="other", outcome="false")
+    c["payload"]["evidence"]["F1"] = (
+        dict(kind="native_entailment", text=json.dumps(fact))
+        if embedded
+        else dict(kind="native_query", **fact)
+    )
+    slot = s.schedule([c])[0]
+    wire = s.packet(c, slot, models())
+    answer = {
+        k: dict(
+            anchor="full", finding="supported", reason="A supplied fact", evidence_ids=["D1", "F1"]
+        )
+        for k in s.chat.CRITERIA
+    }
+    response = dict(
+        model="openai/gpt-6-luna",
+        provider="OpenAI",
+        choices=[dict(finish_reason="stop", message=dict(content=json.dumps(answer)))],
+    )
+    with pytest.raises(ValueError, match="another plan"):
+        s.parse(response, wire, "chat", models()["chat"])
+
+
 def test_native_live_wire_replay_does_not_repay_and_binds_gate(tmp_path, monkeypatch):
     c, mm = case(), models()
     slots = s.schedule([c])[1:3]

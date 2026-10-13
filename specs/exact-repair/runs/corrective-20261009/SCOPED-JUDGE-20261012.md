@@ -65,3 +65,68 @@ progress and result reports are under the campaign's
 `work/qualify-scoped-judge-20261012-001/` directories. Work executes as a detached
 Slurm step in allocation 14451 with two CPUs, 8 GiB RAM and no GPU. Existing access
 and the deterministic five-minute supervisor remain in place.
+
+## Completed results — 13 October
+
+Neither configuration qualifies for broader evaluation. The automatic numeric
+control checks improved substantially for Chat, but the saved-rationale audit
+identifies remaining factual attribution errors on the larger DEV examples.
+
+| Frozen check | Luna Chat | Luna Decisions |
+|---|---:|---:|
+| Allowed control criterion profiles | 54/54 | 25/54 |
+| Direct control preferences correct | 17/18 | 14/18 |
+| Score-derived control preferences correct | 18/18 | 18/18 |
+| Direct/derived conflicts, including DEV | 3 | 10 |
+| Full qualification | No | No |
+
+These checks include repeated presentations and duplicate-plan reuse; they are
+not independent domain samples. Allowed anchor ranges are not a claim that every
+cardinal value within the range is equally well calibrated. The native criterion
+check uses majority probability on allowed levels, not exact expected-score
+equality. Both methods produce structurally complete DEV totals, but that does
+not make those totals semantically valid.
+
+Chat's first DEV-domain repetition describes a deleted plan as if it selected the
+other plan's narrower domain, and attributes the deleted plan's false intended
+entailment to the retaining plan. Its second repetition distinguishes them. This
+is a fact/plan attribution problem, beyond subjective damage severity. Two unary
+Chat responses cite the other plan's native evidence (one conjunction, one domain).
+A post-run guard now rejects such citations; 48 focused tests pass. No further
+paid calls were made to validate that safeguard. One direct partial-evidence
+response also chooses a winner despite acknowledging unknown required collateral
+meaning. Decisions makes that abstention error on all four presentations and
+gives poor criterion profiles even on some simple controls.
+
+The canonical unary inputs retained the entire two-plan evidence bundle and the
+original-versus-selected axiom records. Explicit focus instructions did not
+reliably prevent borrowing another plan's evidence. The next intervention should
+project owner-specific native facts and clearly distinguish current theory from
+fallible original observations, preserving the complete current theory and source
+archive. This remains a hypothesis requiring a frozen follow-up test; these
+results do not establish an intrinsic limitation of the Decisions endpoint or a
+reason to retrain the HGT models.
+
+The initial step `14451.196` encountered 15 HTTP 400 rejections: the native source
+question supplied a single alternative, while the provider requires at least
+two. A tested transport correction adds `no_supported_source`. Step `14451.199`
+successfully replaced only those 15 rejected requests; 109 other logical records
+were retained, including the one deliberately skipped score request. Exact raw
+requests, source/gate provenance, original errors and both code snapshots remain.
+This was one technical repair attempt, not fifteen unsuccessful repairs.
+
+Across both steps, 123 responses carry reported cost totaling **$0.18163342**;
+the correction accounts for **$0.0103744**. The 15 historical validation errors
+contain no billing field, so their conservative reservations remain. The merged
+raw report's `cost_complete` describes final logical responses; the authoritative
+`review.json` explicitly records historical billing uncertainty. Conservative
+cumulative exposure is **$22.80893075 / $35**, with 761 reservations, 915 total
+request slots and the unchanged 154 TEST slots. Seven Slurm steps, including
+offline failures and checks, consumed 303 worker seconds and 30.671 measured CPU
+seconds, with no GPU use. Source, tests and recovery are committed on `dev`.
+
+The authoritative completion/audit record is
+`qualification/scoped-judge-20261012-001/review.json`, with Slurm consolidation in
+`accounting-final.json`. Neither pilot produces study labels or checkpoint
+selection evidence. The supervisor receives this outcome; old judgments, six
+trained checkpoints, TEST boundaries, costs and repair history remain intact.

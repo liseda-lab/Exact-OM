@@ -1,5 +1,46 @@
 # October corrective repair campaign
 
+## 13 October: corrected scoped test complete; semantic qualification still fails
+
+This section supersedes the older matched-pilot status and quotas below. The user
+authorized the scoped test with “Ok please run that test”. Read
+`qualification/scoped-judge-20261012-001/review.json`, its bound original/recovery
+reports, and [the completed report](SCOPED-JUDGE-20261012.md).
+
+Steps14451.196 and14451.199 are complete. The latter corrected one provider
+validation defect: source-choice questions require two alternatives. All15
+rejected requests were replaced successfully without resampling valid responses.
+Preserve both attempts and reservations. This incident is resolved after one
+root repair; do not turn fifteen rejected requests into fifteen repair attempts.
+
+Chat passes54/54 automatic control criterion checks and17/18 direct preferences;
+Decisions passes25/54 and14/18. Both derive18/18 control preferences from scores,
+but neither qualifies. Chat misattributes current-plan facts on a DEV repetition;
+two unary responses cite another plan's native evidence. The new citation guard
+rejects these, with48 tests passing. Native criterion judgments and required
+abstention remain unreliable. Numeric control success alone cannot release DEV.
+
+The source-specific evidence projection is the next design issue: unary prompts
+still contained both plans' logical evidence and original/selected axiom records.
+Do not relabel or repeatedly sample the completed test to make it pass. A new
+qualification requires its own frozen projection, scope, cost reservation and
+grounding audit; routine offline diagnosis remains allowed. No new study labels,
+training, checkpoint selection or TEST launch is eligible from this result.
+
+Reported successful-response cost is$0.18163342. Preserve uncertainty for15 HTTP
+validation failures with no billing field and all conservative reservations:
+761 rows, $22.80893075 of$35, total915 slots = calibration91 + TRAIN251 + DEV419
++ TEST154. Preserve every old cost and the independent TEST boundary. Slurm
+accounting includes all seven checks/run steps (303worker-seconds,30.671CPU-seconds).
+
+Root's handoff updates the existing registry and pins these instructions. Reuse
+the existing supervisor implementation, five-minute deterministic checks and
+gpt-6-astra/xhigh ChatGPT configuration. Preserve the stable readiness incident
+and previous unsuccessful repair counters. The campaign remains scientifically
+blocked, not operationally broken. Email only for a concrete user action or the
+existing deduplicated empty-queue notification; no routine completion/preparation
+email while root reports the results in chat.
+
 ## 12 October: matched pilot completed; neither interface qualifies for expansion
 
 The approved matched pilot completed in Slurm step `14451.191`: 72/72 responses

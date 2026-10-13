@@ -164,6 +164,9 @@ def run(path, output):
         historical_rejection_costs_preserved=True,
         semantic_contract_changed=False,
     )
+    # Merging logical replacements must not erase the billing uncertainty of
+    # historical HTTP rejections that returned no cost field.
+    report["cost_complete"] = report["cost_complete"] and original_report["cost_complete"]
     write_artifact(Path(output) / "report.json", report)
     return report
 

@@ -300,6 +300,20 @@ def parse(response, wire, stage, model):
             or (row["anchor"] == "unknown") != (row["finding"] == "unknown")
         ):
             raise ValueError("Invalid or inconsistent anchor/finding")
+        if not pair:
+            for key in row["evidence_ids"]:
+                evidence = p["evidence"][key]
+                owner = evidence.get("plan_id")
+                text = evidence.get("text", "")
+                if owner is None and isinstance(text, str) and text.startswith("{"):
+                    try:
+                        structured = json.loads(text)
+                    except ValueError:
+                        structured = {}
+                    if isinstance(structured, dict):
+                        owner = structured.get("plan_id")
+                if owner is not None and owner != p["plan"]["plan_id"]:
+                    raise ValueError("Criterion cites another plan's logical evidence")
     return answer
 
 
