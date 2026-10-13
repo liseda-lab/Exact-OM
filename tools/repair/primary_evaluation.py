@@ -392,6 +392,8 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
             problem, objective, diagnose=True, ledger_path=directory / "search-ledger.json"
         )
     elif operation == "observable_score_greedy":
+        from exact.repair.candidates import normalise_axioms
+
         scores = public.get("observable_mapping_scores")
         if not scores or any(o.kind != "mapping" for o in problem.objects):
             return dict(status="unavailable_observable_scores", logical_status="UNKNOWN")
@@ -403,7 +405,11 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
         # Predeclared greedy prefix: successively remove lowest-score mappings;
         # every candidate plan is checked by the same native kernel.
         assignment = [
-            next(i for i, c in enumerate(o.candidates) if c.axioms == o.original_axioms)
+            next(
+                i
+                for i, c in enumerate(o.candidates)
+                if c.axioms == normalise_axioms(o.original_axioms)
+            )
             for o in problem.objects
         ]
         order = sorted(
@@ -539,7 +545,12 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
             owned_device(manifest["gpu_uuid"])
     from tools.repair.primary_failure_recovery import prior_costs
 
-    recovery_costs = prior_costs(manifest)
+    if "greedy_boundary_recovery" in manifest:
+        from tools.repair.greedy_failure_recovery import recovery_state
+
+        recovery_costs, retained_rows = recovery_state(manifest)
+    else:
+        recovery_costs = prior_costs(manifest)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     with (output / "owner.lock").open("a+") as lock:

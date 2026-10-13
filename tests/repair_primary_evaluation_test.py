@@ -221,6 +221,41 @@ def test_conference_learned_receives_same_explicit_scope(tmp_path, monkeypatch):
     assert observed[0][1]["theory_scope"] == case["theory_scope"]
 
 
+def test_greedy_keep_matches_canonical_equivalence_candidates(tmp_path, monkeypatch):
+    import dataclasses
+    from exact.repair.records import read_record
+    from exact.repair.candidates import mapping_candidates
+
+    case, _, protocol = public_fixture(tmp_path)
+    public = json.loads((tmp_path / "public.json").read_text())
+    problem = read_record(public["input"])
+    obj = problem.objects[0]
+    original = (owl.EquivalentClasses(owl.CanonicalSet((obj.source_entity, obj.target_entity))),)
+    candidates = mapping_candidates(obj.object_id, obj.source_entity, obj.target_entity, "=")
+    obj = dataclasses.replace(obj, original_axioms=original, candidates=candidates)
+    assert not any(c.axioms == original for c in candidates)
+    problem = dataclasses.replace(problem, objects=(obj,))
+    case["input_hash"] = problem.content_hash
+    public.update(
+        input=problem.to_dict(), metadata=case, observable_mapping_scores={obj.object_id: 0.8}
+    )
+    write_artifact(tmp_path / "public.json", public)
+    row = dict(adapter=dict(operation="observable_score_greedy"), settings={})
+    monkeypatch.setenv("EXACT_REPAIR_DEADLINE_EPOCH", str(time.time() + 100))
+    result = evaluate_input(
+        row,
+        case,
+        binding(tmp_path / "public.json"),
+        protocol,
+        None,
+        None,
+        tmp_path / "greedy",
+        time.time() + 50,
+        "cpu",
+    )
+    assert result["logical_status"] == "VERIFIED_FEASIBLE"
+
+
 def test_interrupted_case_cannot_renew_its_budget(tmp_path):
     manifest = fixture_manifest(tmp_path)
     directory = tmp_path / "run/rows/native"
