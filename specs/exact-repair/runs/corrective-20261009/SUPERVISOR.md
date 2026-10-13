@@ -2,6 +2,13 @@
 
 ## 13 October: first TEST pool provenance boundary repaired
 
+Registry `active_retained_conference_inputs` is the latest deployment. The first
+replacement222 exposed the separate producer/consumer source-commit equality
+guard before any row started. Pin the retained input producer's original commit
+explicitly; do not rebuild or discard its completed inputs. Follow the new linked
+replacement and retain both failed job costs, original row costs and incident
+history. Root validates complete actual producer receipts before release.
+
 Read [CONFERENCE-FEATURE-RECOVERY-20261013.md](CONFERENCE-FEATURE-RECOVERY-20261013.md)
 and registry `active_conference_feature_recovery`. Input job14451.218 completed;
 reuse it. Pool14451.219 failed on the provenance key `matcher_member` before a

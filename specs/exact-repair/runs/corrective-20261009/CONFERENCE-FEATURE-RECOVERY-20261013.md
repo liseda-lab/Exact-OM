@@ -25,3 +25,13 @@ This is repair attempt1 for the stable provenance-boundary incident. Preserve
 the supervisor's two-unsuccessful-repair limit across replacement jobs; do not
 rename the incident or reset counters. Keep early TEST authorization, absolute
 16October23UTC deadline/final8h reserve, all splits and the $35 ceiling unchanged.
+
+The first replacement (14451.222) stopped during input handoff, before starting
+any scientific row: the consumer required its source commit to equal the already
+completed input producer's commit. The retained producer now has an explicit
+frozen `public_input_producer.source_commit`. This admits exactly the recorded
+producer version while all schedule, model-freeze, case, nonce, completion,
+artifact and checksum guards remain active. Legacy manifests retain the original
+same-source requirement. The next linked replacement preserves both failed job
+charges and the original row's remaining budget. Validate the actual completed
+producer receipts through this handoff before release.

@@ -14,6 +14,23 @@ def prior_costs(manifest):
         return {}
     recovery = bound(manifest["feature_boundary_recovery"])
     original = bound(recovery["manifest"])
+    original_identity = canonical_hash(original)
+    # Pin a retained producer's own source separately from a corrected consumer.
+    # Every other input-producer identity remains identical to the failed row.
+    manifest = dict(manifest)
+    if "public_input_producer" in manifest:
+        contract = dict(manifest["public_input_producer"])
+        expected_source = bound(contract["manifest"])["source_commit"]
+        if contract.get("source_commit", expected_source) != expected_source:
+            raise ValueError("Retained input producer source changed")
+        contract.pop("source_commit", None)
+        manifest["public_input_producer"] = contract
+        original = dict(
+            original,
+            public_input_producer={
+                k: v for k, v in original["public_input_producer"].items() if k != "source_commit"
+            },
+        )
     mutable = {"dispatch_nonce", "source_commit", "capacity_admission", "feature_boundary_recovery"}
     if recovery.get("schema") != "exact-repair/primary-feature-boundary-recovery/v1" or {
         k: v for k, v in original.items() if k not in mutable
@@ -32,7 +49,7 @@ def prior_costs(manifest):
         raise ValueError("Recovery lacks a terminal, retired original worker")
     work = Path(completion["work"])
     report = bound(dict(path=str(work / "report.json"), sha256=outputs["report.json"]))
-    if report["manifest_identity"] != canonical_hash(original) or [
+    if report["manifest_identity"] != original_identity or [
         r["id"] for r in report["rows"]
     ] != [r["id"] for r in original["rows"]]:
         raise ValueError("Recovery report identities or denominator changed")
@@ -46,7 +63,7 @@ def prior_costs(manifest):
     spent = saved["charged_seconds"]
     if (
         saved != {k: v for k, v in row.items() if k != "id"}
-        or saved["identity"] != canonical_hash((canonical_hash(original), declaration))
+        or saved["identity"] != canonical_hash((original_identity, declaration))
         or saved["status"] != "error"
         or saved.get("detail") != CAUSE
         or saved.get("cleanup_complete") is not True

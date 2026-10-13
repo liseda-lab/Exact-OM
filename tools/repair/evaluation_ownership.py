@@ -340,8 +340,8 @@ def external_public_inputs(manifest):
 
     producer = bound(contract["manifest"])
     declared, cases = validate(producer, time.time())
-    if any(producer.get(k) != manifest.get(k) for k in
-           ("schedule", "source_commit", "model_freeze_receipt")):
+    if (producer.get("source_commit") != contract.get("source_commit", manifest.get("source_commit"))
+            or any(producer.get(k) != manifest.get(k) for k in ("schedule", "model_freeze_receipt"))):
         raise ValueError("Public input source/schedule/freeze differs")
     if not set(manifest["cases"]) <= set(declared) or inputs:
         raise ValueError("Public input producer can only supply its exact Conference cases")

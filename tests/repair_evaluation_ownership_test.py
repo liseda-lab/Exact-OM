@@ -340,3 +340,35 @@ def test_unattempted_pool_tail_remains_unavailable_without_crash(tmp_path, monke
     result = execute_rows(consumer, tmp_path / "consumer", evaluator=operator.add)
     assert result["rows"][0]["status"] == "unavailable_shared_pool"
     assert result["charged_seconds"] == 0
+
+
+def test_retained_input_requires_its_explicit_original_source(monkeypatch):
+    from tools.repair import conference_test_inputs as producer_api
+    from tools.repair import evaluation_ownership as ownership
+
+    producer = dict(source_commit="old", schedule="same", model_freeze_receipt="fixed")
+    manifest = dict(
+        source_commit="corrected",
+        schedule="same",
+        model_freeze_receipt="fixed",
+        cases={"case": {"case_id": "case"}},
+        public_inputs={},
+        public_input_producer=dict(manifest="producer", attempt="unused"),
+    )
+    monkeypatch.setattr(ownership, "bound", lambda ref: producer)
+    monkeypatch.setattr(
+        producer_api, "validate", lambda p, now: ({"case": {}}, [{"case_id": "case"}])
+    )
+    with pytest.raises(ValueError, match="source/schedule/freeze"):
+        ownership.external_public_inputs(manifest)
+    manifest["public_input_producer"]["source_commit"] = "old"
+
+    def reached_receipts(path):
+        raise RuntimeError("terminal receipt validation reached")
+
+    monkeypatch.setattr(ownership, "read", reached_receipts)
+    with pytest.raises(RuntimeError, match="terminal receipt validation reached"):
+        ownership.external_public_inputs(manifest)
+    manifest["model_freeze_receipt"] = "foreign"
+    with pytest.raises(ValueError, match="source/schedule/freeze"):
+        ownership.external_public_inputs(manifest)
