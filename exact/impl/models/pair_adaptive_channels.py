@@ -20,6 +20,17 @@ from exact.utils.candidate_generation import normalize_candidate_text
 from exact.utils.formatting import clip01, safe_mean  # noqa: F401
 
 
+def _host_lists(*values):
+    """Pack same-dtype reductions into one transfer without changing arithmetic."""
+    sizes = [value.numel() for value in values]
+    flat = torch.cat([value.reshape(-1) for value in values]).detach().cpu().tolist()
+    result, start = [], 0
+    for size in sizes:
+        result.append(flat[start:start + size])
+        start += size
+    return result
+
+
 class PairAdaptiveChannelsMixin:
     @cached_numerical(channels=True)
     def _score_label_channel(
@@ -442,9 +453,10 @@ class PairAdaptiveChannelsMixin:
             else torch.zeros(len(tgt_items), device=self.device)
         )
 
+        row_scores, col_scores = _host_lists(row_best, col_best)
         src_idx = self._select_diverse_indices(
             src_items,
-            row_best.detach().cpu().tolist(),
+            row_scores,
             self.max_hierarchy_triples_per_family,
             per_relation_cap=None,
             relation_getter=lambda _: family,
@@ -452,7 +464,7 @@ class PairAdaptiveChannelsMixin:
         )
         tgt_idx = self._select_diverse_indices(
             tgt_items,
-            col_best.detach().cpu().tolist(),
+            col_scores,
             self.max_hierarchy_triples_per_family,
             per_relation_cap=None,
             relation_getter=lambda _: family,
@@ -467,8 +479,9 @@ class PairAdaptiveChannelsMixin:
         src_sentences = self._verbalize_hierarchy_items(family, src_selected)
         tgt_sentences = self._verbalize_hierarchy_items(family, tgt_selected)
         reduced = support_mat[src_idx][:, tgt_idx]
-        src_support = reduced.max(dim=1).values.detach().cpu().tolist()
-        tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
+        src_support, tgt_support = _host_lists(
+            reduced.max(dim=1).values, reduced.max(dim=0).values,
+        )
         str_f = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
         emb_f = yield ("similarity", src_sentences, tgt_sentences, self.max_input_tokens_hier)
         spec_vals = [self._hier_item_specificity(item) for item in src_selected] + [
@@ -773,9 +786,10 @@ class PairAdaptiveChannelsMixin:
             if support_mat.numel()
             else torch.zeros(len(tgt_items), device=self.device)
         )
+        row_scores, col_scores = _host_lists(row_best, col_best)
         src_idx = self._select_diverse_indices(
             src_items,
-            row_best.detach().cpu().tolist(),
+            row_scores,
             min(self.max_object_triples, len(src_items)),
             per_relation_cap=self.similarity_per_relation_cap,
             relation_getter=lambda item: item["triple"][1],
@@ -783,7 +797,7 @@ class PairAdaptiveChannelsMixin:
         )
         tgt_idx = self._select_diverse_indices(
             tgt_items,
-            col_best.detach().cpu().tolist(),
+            col_scores,
             min(self.max_object_triples, len(tgt_items)),
             per_relation_cap=self.similarity_per_relation_cap,
             relation_getter=lambda item: item["triple"][1],
@@ -795,8 +809,9 @@ class PairAdaptiveChannelsMixin:
         src_selected = [src_items[i] for i in src_idx]
         tgt_selected = [tgt_items[i] for i in tgt_idx]
         reduced = support_mat[src_idx][:, tgt_idx]
-        src_support = reduced.max(dim=1).values.detach().cpu().tolist()
-        tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
+        src_support, tgt_support = _host_lists(
+            reduced.max(dim=1).values, reduced.max(dim=0).values,
+        )
         str_sim = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
         src_sentences = self._verbalize_object_items(src_selected)
         tgt_sentences = self._verbalize_object_items(tgt_selected)
@@ -1073,14 +1088,15 @@ class PairAdaptiveChannelsMixin:
             else torch.zeros(len(tgt_items), device=self.device)
         )
 
+        row_scores, col_scores = _host_lists(row_best, col_best)
         src_unsupported = [
             float(item.get("score", 0.0))
-            * (1.0 - float(row_best[idx].item() if idx < row_best.numel() else 0.0))
+            * (1.0 - float(row_scores[idx] if idx < len(row_scores) else 0.0))
             for idx, item in enumerate(src_items)
         ]
         tgt_unsupported = [
             float(item.get("score", 0.0))
-            * (1.0 - float(col_best[idx].item() if idx < col_best.numel() else 0.0))
+            * (1.0 - float(col_scores[idx] if idx < len(col_scores) else 0.0))
             for idx, item in enumerate(tgt_items)
         ]
 
@@ -1493,14 +1509,14 @@ class PairAdaptiveChannelsMixin:
             weights = [self._attribute_weight(item) for item in side_items]
             bank_texts = [self._normalize_text(item.get("text")) for item in bank]
             mat = yield ("context_matrix", texts, bank_texts)
-            best = (
-                mat.max(dim=1).values.detach().cpu().tolist()
-                if mat.numel()
-                else [0.0 for _ in texts]
-            )
-            best_idx = (
-                mat.argmax(dim=1).detach().cpu().tolist() if mat.numel() else [0 for _ in texts]
-            )
+            if mat.numel():
+                maxima = mat.max(dim=1)
+                best, indices = _host_lists(
+                    maxima.values.to(torch.float64), maxima.indices.to(torch.float64),
+                )
+                best_idx = [int(index) for index in indices]
+            else:
+                best, best_idx = [0.0 for _ in texts], [0 for _ in texts]
             denom = sum(weights) or 1.0
             score = sum(w * s for w, s in zip(weights, best)) / denom
             weighted_support = [w * s for w, s in zip(weights, best)]

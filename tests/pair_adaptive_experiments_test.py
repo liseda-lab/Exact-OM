@@ -692,6 +692,9 @@ def test_staged_channels_preserve_scores_evidence_routes_and_ties(monkeypatch, b
     legacy = _evidence_forward(scorer)
     calls["contexts"].clear()
     monkeypatch.setenv("EXACT_PAIR_CONTEXT_BATCHING", "1")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_SCHEDULE", "staged")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_ENCODER", "batch")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_MATRIX_KERNEL", "bmm")
     monkeypatch.setenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", str(block))
     batched = _evidence_forward(scorer)
     for key, value in legacy.items():

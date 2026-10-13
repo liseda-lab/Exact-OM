@@ -1731,9 +1731,14 @@ class PairAdaptiveSemanticScorer(
             struct_channel_qualities[key] = []
             struct_channel_active[key] = []
 
-        from exact.impl.models.pair_adaptive_batch import call_prepared, prepare_structural_block
+        from exact.impl.models.pair_adaptive_batch import (
+            call_prepared, execution_options, prepare_structural_block,
+        )
 
-        context_batching = os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") == "1"
+        context_batching = (
+            os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") == "1"
+            and execution_options()["schedule"] == "staged"
+        )
         context_block = max(1, int(os.getenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", "32")))
         prepared_rows = []
         for idx, (src_iri, tgt_iri) in enumerate(zip(src_iris, tgt_iris)):
@@ -1762,6 +1767,7 @@ class PairAdaptiveSemanticScorer(
                     tgt_feats.get("hierarchy", {}).get(family, []),
                     src_iri=src_iri,
                     tgt_iri=tgt_iri,
+                    cache_hit=prepared is not None and ("hierarchy", family) in prepared["cache_hits"],
                 )
                 hierarchy_payloads[family] = family_payload
                 struct_channel_scores[f"hier__{family}"].append(float(family_payload["score"]))
@@ -1778,6 +1784,7 @@ class PairAdaptiveSemanticScorer(
                 prepared["similarity"] if prepared is not None else None,
                 src_feats.get("object_triples", []),
                 tgt_feats.get("object_triples", []),
+                cache_hit=prepared is not None and ("similarity", None) in prepared["cache_hits"],
             )
             diff_payload = self._score_difference_channel(
                 src_feats.get("object_triples", []),
@@ -1814,6 +1821,7 @@ class PairAdaptiveSemanticScorer(
                 tgt_feats.get("labels", []),
                 hierarchy_payloads,
                 sim_payload,
+                cache_hit=prepared is not None and ("attributes", None) in prepared["cache_hits"],
             )
             struct_channel_scores["sim_obj"].append(float(sim_payload["score"]))
             struct_channel_qualities["sim_obj"].append(float(sim_payload["quality"]))

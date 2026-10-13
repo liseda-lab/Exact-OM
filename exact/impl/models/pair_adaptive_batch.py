@@ -9,10 +9,27 @@ import os
 import torch
 
 
+def execution_options():
+    """Independent qualification switches; defaults retain the legacy numerics."""
+    options = {}
+    for name, default, allowed in (
+        ("SCHEDULE", "legacy", {"legacy", "staged"}),
+        ("ENCODER", "legacy", {"legacy", "batch"}),
+        ("MATRIX_KERNEL", "mm", {"mm", "bmm"}),
+        ("ARITHMETIC", "device", {"device", "cpu"}),
+    ):
+        value = os.getenv("EXACT_PAIR_CONTEXT_" + name, default)
+        if value not in allowed:
+            raise ValueError(f"Invalid EXACT_PAIR_CONTEXT_{name}: {value!r}")
+        options[name.lower()] = value
+    return options
+
+
 def validate_batching_admission():
     """Keep the unqualified GPU path out of scientific runs, including replay."""
     if os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") != "1":
         return
+    execution_options()
     namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
     if (os.getenv("EXACT_EXPERIMENT_ROLE") != "throughput_fixture"
             or not namespace.startswith("qualification-")
@@ -28,11 +45,16 @@ def score_evidence_job(scorer, name, job):
     if prepared is not None and prepared[0] == name:
         job.close()
         return prepared[1]
-    return run_evidence_jobs(scorer, [job], batched=False)[0]
+    return run_evidence_jobs(
+        scorer, [job], batched=os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") == "1"
+    )[0]
 
 
-def call_prepared(scorer, name, method, payload, *args, **kwargs):
+def call_prepared(scorer, name, method, payload, *args, cache_hit=False, **kwargs):
     """Keep existing numerical-cache decorators around complete ordinary records."""
+    if cache_hit:
+        # peek_channel has already validated and restored this exact payload.
+        return payload
     if payload is None:
         return method(*args, **kwargs)
     previous = getattr(scorer, "_prepared_evidence_result", None)
@@ -43,7 +65,7 @@ def call_prepared(scorer, name, method, payload, *args, **kwargs):
         scorer._prepared_evidence_result = previous
 
 
-def _encode_unique(scorer, texts, kind):
+def _encode_unique(scorer, texts, kind, *, normalize=True):
     values = list(dict.fromkeys(texts))
     encode = scorer.encode_labels_batch if kind == "label_matrix" else scorer.encode_contexts_batch
     width = max(1, int(os.getenv("EXACT_PAIR_CONTEXT_TEXT_BATCH", "64")))
@@ -59,21 +81,45 @@ def _encode_unique(scorer, texts, kind):
         else:
             pieces.append(vectors)
             start += width
-    encoded = torch.nn.functional.normalize(torch.cat(pieces, dim=0), dim=-1)
+    encoded = torch.cat(pieces, dim=0)
+    if normalize:
+        encoded = torch.nn.functional.normalize(encoded, dim=-1)
     return {text: encoded[index] for index, text in enumerate(values)}
 
 
 def _batch_matrices(scorer, requests, kind):
-    """Bucket by exact shape, without padding or unrelated pair cross-products."""
+    """Keep encoding, matrix kernels and reduction placement independently testable."""
+    options = execution_options()
     output = [None] * len(requests)
     live = [(index, request) for index, request in enumerate(requests)
             if request[1] and request[2] and (kind != "context_matrix" or scorer.use_context)]
     for index, request in enumerate(requests):
         if not request[1] or not request[2] or (kind == "context_matrix" and not scorer.use_context):
-            output[index] = torch.zeros((len(request[1]), len(request[2])))
+            output[index] = torch.zeros((len(request[1]), len(request[2])), device=scorer.device)
     if not live:
         return output
-    vectors = _encode_unique(scorer, (text for _, req in live for side in req[1:3] for text in side), kind)
+    encode = scorer.encode_labels_batch if kind == "label_matrix" else scorer.encode_contexts_batch
+    vectors = None
+    if options["encoder"] == "batch":
+        vectors = _encode_unique(
+            scorer, (text for _, req in live for side in req[1:3] for text in side),
+            kind, normalize=False,
+        )
+    encoded = {}
+    for index, request in live:
+        # Normalize the original side shape even when encoder calls are regrouped.
+        # Legacy mode must also preserve left/right cache-miss call boundaries.
+        encoded[index] = tuple(torch.nn.functional.normalize(
+            encode(list(side)) if vectors is None else torch.stack([vectors[text] for text in side]),
+            dim=-1,
+        ) for side in request[1:3])
+    if options["matrix_kernel"] == "mm":
+        for index, _ in live:
+            left, right = encoded[index]
+            output[index] = scorer._sim01(left @ right.T)
+        if options["arithmetic"] == "cpu":
+            output = [matrix.detach().cpu() for matrix in output]
+        return output
     buckets = defaultdict(list)
     for index, req in live:
         buckets[(len(req[1]), len(req[2]))].append((index, req))
@@ -82,9 +128,11 @@ def _batch_matrices(scorer, requests, kind):
         width = max(1, min(64, max_elements // (rows * cols)))
         for start in range(0, len(bucket), width):
             block = bucket[start:start + width]
-            left = torch.stack([torch.stack([vectors[t] for t in req[1]]) for _, req in block])
-            right = torch.stack([torch.stack([vectors[t] for t in req[2]]) for _, req in block])
-            matrices = scorer._sim01(torch.bmm(left, right.transpose(1, 2))).detach().cpu()
+            left = torch.stack([encoded[index][0] for index, _ in block])
+            right = torch.stack([encoded[index][1] for index, _ in block])
+            matrices = scorer._sim01(torch.bmm(left, right.transpose(1, 2)))
+            if options["arithmetic"] == "cpu":
+                matrices = matrices.detach().cpu()
             for (index, _), matrix in zip(block, matrices):
                 output[index] = matrix
     return output
@@ -102,10 +150,21 @@ def _batch_context_similarity(scorer, requests):
             pairs.append((index, left, right))
     if not pairs:
         return output
-    vectors = _encode_unique(scorer, (text for _, left, right in pairs for text in (left, right)), "similarity")
-    left = torch.stack([vectors[source] for _, source, _ in pairs])
-    right = torch.stack([vectors[target] for _, _, target in pairs])
-    scores = scorer._sim01(torch.sum(left * right, dim=-1)).detach().cpu().tolist()
+    vectors = None
+    if execution_options()["encoder"] == "batch":
+        vectors = _encode_unique(
+            scorer, (text for _, left, right in pairs for text in (left, right)),
+            "similarity", normalize=False,
+        )
+    scores = []
+    for _, source, target in pairs:
+        enc = torch.nn.functional.normalize(
+            scorer.encode_contexts_batch([source, target]) if vectors is None
+            else torch.stack([vectors[source], vectors[target]]), dim=-1,
+        )
+        # Retain the exact legacy reduction shape; pack only the final transfer.
+        scores.append(scorer._sim01(torch.sum(enc[0] * enc[1], dim=-1)))
+    scores = torch.stack(scores).detach().cpu().tolist()
     for (index, _, _), score in zip(pairs, scores):
         output[index] = float(score)
     return output
@@ -157,26 +216,46 @@ def prepare_structural_block(scorer, pairs, families):
 
 def _prepare_structural_block_once(scorer, pairs, families):
     """Prepare one bounded internal tile; group-dependent fusion stays outside it."""
+    from exact.experiments.numerical_cache import peek_channel
+
     jobs, keys = [], []
-    rows = [{"hierarchy": {}} for _ in pairs]
+    rows = [{"hierarchy": {}, "cache_hits": set()} for _ in pairs]
     for index, (source, target, src, tgt) in enumerate(pairs):
         for family in families:
-            jobs.append(scorer._hierarchy_family_job(
-                family, src.get("hierarchy", {}).get(family, []),
-                tgt.get("hierarchy", {}).get(family, []), source, target))
-            keys.append((index, family))
-        jobs.append(scorer._similarity_channel_job(src.get("object_triples", []), tgt.get("object_triples", []), staged=True))
-        keys.append((index, None))
+            args = (family, src.get("hierarchy", {}).get(family, []),
+                    tgt.get("hierarchy", {}).get(family, []))
+            cached = peek_channel(scorer._score_hierarchy_family, *args, src_iri=source, tgt_iri=target)
+            if cached is not None:
+                rows[index]["hierarchy"][family] = cached
+                rows[index]["cache_hits"].add(("hierarchy", family))
+            else:
+                jobs.append(scorer._hierarchy_family_job(*args, source, target))
+                keys.append((index, family))
+        args = (src.get("object_triples", []), tgt.get("object_triples", []))
+        cached = peek_channel(scorer._score_similarity_channel, *args)
+        if cached is not None:
+            rows[index]["similarity"] = cached
+            rows[index]["cache_hits"].add(("similarity", None))
+        else:
+            jobs.append(scorer._similarity_channel_job(*args, staged=True))
+            keys.append((index, None))
     for (index, family), payload in zip(keys, run_evidence_jobs(scorer, jobs, batched=True)):
         if family is None:
             rows[index]["similarity"] = payload
         else:
             rows[index]["hierarchy"][family] = payload
-    jobs = [scorer._attribute_channel_job(
-                src.get("attributes", []), tgt.get("attributes", []),
+    jobs, indices = [], []
+    for index, (_, _, src, tgt) in enumerate(pairs):
+        args = (src.get("attributes", []), tgt.get("attributes", []),
                 src.get("labels", []), tgt.get("labels", []),
                 rows[index]["hierarchy"], rows[index]["similarity"])
-            for index, (_, _, src, tgt) in enumerate(pairs)]
-    for row, payload in zip(rows, run_evidence_jobs(scorer, jobs, batched=True)):
-        row["attributes"] = payload
+        cached = peek_channel(scorer._score_attribute_channel, *args)
+        if cached is not None:
+            rows[index]["attributes"] = cached
+            rows[index]["cache_hits"].add(("attributes", None))
+        else:
+            jobs.append(scorer._attribute_channel_job(*args))
+            indices.append(index)
+    for index, payload in zip(indices, run_evidence_jobs(scorer, jobs, batched=True)):
+        rows[index]["attributes"] = payload
     return rows
