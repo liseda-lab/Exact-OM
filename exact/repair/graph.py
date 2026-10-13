@@ -45,6 +45,8 @@ _IDENTIFIERS = frozenset(
         "document_id",
         "srcentity",
         "tgtentity",
+        "matcher_member",
+        "matcher_row_index",
     }
 )
 _FEATURE_KEYS = frozenset(

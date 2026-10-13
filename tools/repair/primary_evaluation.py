@@ -520,6 +520,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                 raise ValueError("Evaluation capacity qualification remains unresolved")
         else:
             owned_device(manifest["gpu_uuid"])
+    from tools.repair.primary_failure_recovery import prior_costs
+
+    recovery_costs = prior_costs(manifest)
     output = Path(output)
     output.mkdir(parents=True, exist_ok=True)
     with (output / "owner.lock").open("a+") as lock:
@@ -630,9 +633,10 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                 )
             else:
                 started = now()
+                prior_spent = recovery_costs.get(row["id"], 0.0)
                 case_deadline = min(
                     limit - CLEANUP_SECONDS,
-                    started + row["case_seconds"] - CLEANUP_SECONDS,
+                    started + row["case_seconds"] - prior_spent - CLEANUP_SECONDS,
                 )
                 immutable(
                     guard,
@@ -669,7 +673,8 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
                     result=outcome.value,
                     detail=outcome.detail,
                     cleanup_complete=outcome.cleanup_complete,
-                    charged_seconds=now() - started,
+                    charged_seconds=prior_spent + now() - started,
+                    prior_charged_seconds=prior_spent,
                     started_epoch=started,
                     finished_epoch=now(),
                     reserved_seconds=row["case_seconds"],

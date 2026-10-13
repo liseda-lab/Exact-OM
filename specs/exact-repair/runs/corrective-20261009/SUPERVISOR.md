@@ -1,5 +1,17 @@
 # October corrective repair campaign
 
+## 13 October: first TEST pool provenance boundary repaired
+
+Read [CONFERENCE-FEATURE-RECOVERY-20261013.md](CONFERENCE-FEATURE-RECOVERY-20261013.md)
+and registry `active_conference_feature_recovery`. Input job14451.218 completed;
+reuse it. Pool14451.219 failed on the provenance key `matcher_member` before a
+result. The corrected graph excludes archive-member/row identifiers while
+retaining raw provenance and confidence. Root validated actual Conference inputs,
+52 focused tests and mypy, then prepared the linked first repair attempt with
+the original case/job budgets reduced by already consumed work. Keep the same
+incident, all costs and the two-unsuccessful-repair limit. Continue the newly
+bound remaining54jobs and independent Gemini annotation with bounded retries.
+
 ## 13 October: user approved starting TEST as soon as ready
 
 The user explicitly approved an earlier opening after the six endpoints were

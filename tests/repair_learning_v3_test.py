@@ -98,9 +98,21 @@ def test_v3_feature_states_identifier_mask_and_future_evidence_rejection():
     ]
     assert len(set(states)) == 4
     assert features({"score": 0.0, "path": "/test/parent17"}) == features({"score": 0.0})
+    for member, index in (("LogMap-cmt-ekaw.rdf", 0), ("different-file.rdf", 827)):
+        assert features(
+            {
+                "score": 0.0,
+                "matcher_archive_hash": "source-hash",
+                "matcher_member": member,
+                "matcher_row_index": index,
+            }
+        ) == features({"score": 0.0})
+    with pytest.raises(ValueError, match="Unregistered"):
+        features({"unknown_measurement": 0.5})
     for evidence in (
         {"nested": {"intended_assignment": [1]}},
         {"available_before_decision": False},
+        {"matcher_member": {"reference_alignment": [1]}},
     ):
         with pytest.raises(ValueError):
             features(evidence)
