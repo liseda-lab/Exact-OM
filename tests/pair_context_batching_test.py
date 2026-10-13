@@ -6,6 +6,7 @@ import torch
 
 from exact.impl.models.pair_adaptive_batch import (
     _batch_matrices, call_prepared, execution_options, prepare_structural_block,
+    score_evidence_job,
 )
 from exact.impl.models.pair_adaptive_channels import _host_lists
 from tests.pair_adaptive_experiments_test import _evidence_forward, _evidence_scorer
@@ -178,3 +179,25 @@ def test_ablation_switches_reject_misspellings(monkeypatch):
     monkeypatch.setenv("EXACT_PAIR_CONTEXT_ENCODER", "batched")
     with pytest.raises(ValueError, match="EXACT_PAIR_CONTEXT_ENCODER"):
         execution_options()
+
+
+@pytest.mark.parametrize("flag", ["EXACT_PAIR_CONTEXT_BATCHING", "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY"])
+def test_direct_evidence_helpers_enforce_qualification_admission(monkeypatch, flag):
+    monkeypatch.setenv(flag, "1")
+    monkeypatch.setenv("EXACT_PAIR_CONTEXT_ENCODER", "batch")
+    monkeypatch.setenv("EXACT_EXPERIMENT_ROLE", "reporting")
+    monkeypatch.setenv("EXACT_PRIMITIVE_NAMESPACE", "scientific")
+    scorer = SimpleNamespace(_prepared_evidence_result=("hierarchy", {"score": 1.0}))
+
+    def job():
+        pytest.fail("unadmitted generator executed")
+        yield  # pragma: no cover
+
+    pending = job()
+    try:
+        with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+            score_evidence_job(scorer, "hierarchy", pending)
+        with pytest.raises(RuntimeError, match="has not passed GPU discrete parity"):
+            prepare_structural_block(scorer, [], [])
+    finally:
+        pending.close()

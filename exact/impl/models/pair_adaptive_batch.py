@@ -27,7 +27,10 @@ def execution_options():
 
 def validate_batching_admission():
     """Keep the unqualified GPU path out of scientific runs, including replay."""
-    if os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") != "1":
+    stable_identity = os.getenv("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY", "0")
+    if stable_identity not in {"0", "1"}:
+        raise ValueError("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY must be 0 or 1")
+    if os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") != "1" and stable_identity == "0":
         return
     execution_options()
     namespace = os.getenv("EXACT_PRIMITIVE_NAMESPACE", "")
@@ -35,12 +38,13 @@ def validate_batching_admission():
             or not namespace.startswith("qualification-")
             or namespace == "qualification-"):
         raise RuntimeError(
-            "Pair-context batching has not passed GPU discrete parity; it is only admitted "
+            "Experimental encoder/batching execution has not passed GPU discrete parity; it is only admitted "
             "for throughput_fixture runs in an isolated qualification-* namespace."
         )
 
 
 def score_evidence_job(scorer, name, job):
+    validate_batching_admission()
     prepared = getattr(scorer, "_prepared_evidence_result", None)
     if prepared is not None and prepared[0] == name:
         job.close()
@@ -204,6 +208,7 @@ def run_evidence_jobs(scorer, jobs, *, batched):
 
 
 def prepare_structural_block(scorer, pairs, families):
+    validate_batching_admission()
     try:
         return _prepare_structural_block_once(scorer, pairs, families)
     except torch.cuda.OutOfMemoryError:
