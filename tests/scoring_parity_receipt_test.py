@@ -6,9 +6,16 @@ from tools.compare_scoring_parity import compare_records
 
 
 def rows():
-    return [{"src_iri": "s", "tgt_iri": t, "confidences": {"S_final": .5},
-             "prediction": {"global_match": True}, "context_triples": ["fact1", "fact2"]}
-            for t in ("a", "b")]
+    return [
+        {
+            "src_iri": "s",
+            "tgt_iri": t,
+            "confidences": {"S_final": 0.5},
+            "prediction": {"global_match": True},
+            "context_triples": ["fact1", "fact2"],
+        }
+        for t in ("a", "b")
+    ]
 
 
 @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
@@ -102,10 +109,19 @@ def test_cli_exit_status_matches_durable_parity_receipt(tmp_path, monkeypatch, p
         ExplanationStore(path / "cold/ordinary-evidence").append(records)
         _atomic_json(path / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
     output = tmp_path / "parity.json"
-    monkeypatch.setattr(sys, "argv", [
-        "compare_scoring_parity", "--baseline", str(baseline),
-        "--candidate", str(candidate), "--output", str(output),
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "compare_scoring_parity",
+            "--baseline",
+            str(baseline),
+            "--candidate",
+            str(candidate),
+            "--output",
+            str(output),
+        ],
+    )
     if passes:
         main()
     else:
@@ -128,20 +144,39 @@ def fitted_outputs(tmp_path):
             row["original_query_id"] = "q1"
         ExplanationStore(root / "cold/ordinary-evidence").append(records)
         _atomic_json(root / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
-        _atomic_json(root / "measurement.json", {
-            "namespace": "qualification_only", "paid_calls": 0,
-            "fixture_outputs_promotable": False,
-            "fitted_manifest": {"path": str(manifest), "sha256": sha256_file(manifest)},
-        })
-        _atomic_json(root / "cold/fitted-decisions.json", {
-            "namespace": "qualification_only", "policy": {"threshold": 0.7},
-            "protected_pairs": [], "mappings": [["s", "a"]],
-            "rows": [{"Src": "s", "Tgt": target, "S_final": 0.5} for target in ("a", "b")],
-        })
+        _atomic_json(
+            root / "measurement.json",
+            {
+                "namespace": "qualification_only",
+                "paid_calls": 0,
+                "fixture_outputs_promotable": False,
+                "fitted_manifest": {"path": str(manifest), "sha256": sha256_file(manifest)},
+            },
+        )
+        _atomic_json(
+            root / "cold/fitted-decisions.json",
+            {
+                "namespace": "qualification_only",
+                "selector_scope": "bounded_cohort",
+                "hosted_quality_established": False,
+                "policy": {
+                    "threshold": 0.7,
+                    "source_cardinality": 1,
+                    "target_cardinality": 1,
+                    "extraction": {"mode": "mutual_best"},
+                },
+                "protected_pairs": [],
+                "mappings": [["s", "a"]],
+                "rows": [{"Src": "s", "Tgt": target, "S_final": 0.5} for target in ("a", "b")],
+            },
+        )
         _atomic_json(root / "cold/selector-evidence.json", records)
-        _atomic_json(root / "cold/hosted-fixtures.json", [
-            {"role": "decision", "prompt": "support=0.867", "probability": 0.5},
-        ])
+        _atomic_json(
+            root / "cold/hosted-fixtures.json",
+            [
+                {"role": "decision", "prompt": "support=0.867", "probability": 0.5},
+            ],
+        )
     return paths
 
 
@@ -204,10 +239,64 @@ def test_fitted_parity_rejects_different_cohorts_and_changed_bindings(tmp_path):
     baseline, candidate = fitted_outputs(tmp_path)
     path = candidate / "cold.json"
     original = json.loads(path.read_text())
-    _atomic_json(path, {"chunks": original["chunks"] * 2})
+    _atomic_json(path, {"chunks": [{"rows": 2, "query_ids": ["different"]}]})
     with pytest.raises(ValueError, match="equal complete cohorts"):
         compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
     _atomic_json(path, original)
-    (tmp_path / "fitted-manifest.json").write_text('{}')
+    (tmp_path / "fitted-manifest.json").write_text("{}")
     with pytest.raises(ValueError, match="Changed fitted qualification manifest"):
         compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+
+
+def test_fitted_parity_rejects_unreported_candidate_tail(tmp_path):
+    from exact.runs.store import ExplanationStore
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    extra = {**rows()[0], "src_iri": "extra", "original_query_id": "extra"}
+    ExplanationStore(candidate / "cold/ordinary-evidence").append([extra])
+    with pytest.raises(ValueError, match="complete durable ordinary store"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+
+
+@pytest.mark.parametrize("damage", ["subset", "reordered", "score", "policy", "query"])
+def test_fitted_parity_rejects_identical_incomplete_outputs(tmp_path, damage):
+    import json
+    from exact.runs.store import _atomic_json
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    for root in (baseline, candidate):
+        path = root / "cold/fitted-decisions.json"
+        result = json.loads(path.read_text())
+        evidence_path = root / "cold/selector-evidence.json"
+        evidence = json.loads(evidence_path.read_text())
+        if damage == "subset":
+            result["rows"] = result["rows"][:1]
+            evidence = evidence[:1]
+        elif damage == "reordered":
+            result["rows"].reverse()
+        elif damage == "score":
+            del result["rows"][0]["S_final"]
+        elif damage == "query":
+            evidence[0]["original_query_id"] = "wrong"
+        else:
+            del result["policy"]["extraction"]
+        _atomic_json(path, result)
+        _atomic_json(evidence_path, evidence)
+    with pytest.raises(ValueError, match="cohort|finite final scores|Incomplete fitted"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+
+
+def test_mixed_legacy_query_stamps_cannot_silently_repair_wrong_ids(tmp_path):
+    from exact.runs.store import ExplanationStore, _atomic_json
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = tmp_path / "baseline", tmp_path / "candidate"
+    for root in (baseline, candidate):
+        records = rows()
+        records[0]["original_query_id"] = "wrong"
+        ExplanationStore(root / "cold/ordinary-evidence").append(records)
+        _atomic_json(root / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
+    with pytest.raises(ValueError, match="Incomplete query identities"):
+        compare(baseline, candidate, tmp_path / "parity.json")
