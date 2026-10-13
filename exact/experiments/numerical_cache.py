@@ -100,12 +100,25 @@ def _scope(model, *, channels=False, operation=None):
     batch_scopes = getattr(model, "_numerical_channel_scopes", None)
     operation = operation if operation in {'_score_string_channel', '_score_label_channel'} else None
     # Cheap mutable settings invalidate the otherwise batch-scoped identity.
-    settings = {name: value for name, value in vars(model).items()
-         if name.endswith(("_config", "_enabled"))
-         or name.startswith(("max_", "top_"))
-         or name in {"tau", "use_lexical", "use_context", "fp16", "request_seed",
-                     "label_pair_pooling", "pooling_method", "_numerical_scoring_role",
-                     "hierarchical_relation_families", "ctx_sentence_delimiter"}}
+    settings = {
+        name: value
+        for name, value in vars(model).items()
+        if name.endswith(("_config", "_enabled"))
+        or name.startswith(("max_", "top_"))
+        or name
+        in {
+            "tau",
+            "use_lexical",
+            "use_context",
+            "fp16",
+            "request_seed",
+            "label_pair_pooling",
+            "pooling_method",
+            "_numerical_scoring_role",
+            "hierarchical_relation_families",
+            "ctx_sentence_delimiter",
+        }
+    }
     if channels:
         settings.pop("fusion_config", None)
     execution = {name: os.getenv(name) for name in _CONTEXT_EXECUTION}
@@ -687,7 +700,6 @@ def publish_training_reference(path, reference):
 
 def training_score_reference(model, identity, application, batch_size, *, aggregate_path=None):
     """Discover a verified durable aggregate without duplicating its row payload."""
-    from exact.experiments.runtime import _write
     from exact.utils.provenance import sha256_file
 
     _validate_retrieval_inputs(model)
