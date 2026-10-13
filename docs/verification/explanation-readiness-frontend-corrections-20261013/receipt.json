@@ -1,0 +1,322 @@
+{
+ "schema": "exact-readiness-frontend-corrections/1",
+ "date": "2026-10-13/14",
+ "spec": "specs/explanation-framework/24-human-review-readiness-corrections.md",
+ "review": "docs/verification/explanation-human-review-readiness-20261013.md",
+ "base_commit": "1bd10c9e912f02afa44acacb508fc909314e125e",
+ "commits": {
+  "bbedb3c": "HR1 boundary style checks and diagnostics",
+  "fc5558c": "HR2/HR4 implementation and unit tests",
+  "fffa6d8": "HR2/HR4 browser regressions and captures",
+  "1b878dd": "test corrections after final run 1",
+  "6dc6cbe": "HR1 injected check-validity test"
+ },
+ "frontend_source_tree": {
+  "reviewed": "e67b62358fbbbd7160ff6871491bfe32d53a0a6f",
+  "final_src_tree": "5ba9e338ab3667215a6c2ce9b2899c06c8ead031 (identical at fffa6d8, 1b878dd and 6dc6cbe)",
+  "explanations_visualizer_tree_at_fffa6d8": "de8a513ddf4f44e2e50d342323730310cd8fe091"
+ },
+ "final_binding": {
+  "environment": "~/Library/Caches/exact-om-review/backend-integration-20261013/environment-frontend-fffa6d8",
+  "ports": {
+   "postgres": 19663,
+   "study": 19664,
+   "exploration": 19665
+  },
+  "service_worktree": "~/Library/Caches/exact-om-dev/s2dev/source-fffa6d8 (clean, detached at fffa6d8)",
+  "frontend_export": "~/Library/Caches/exact-om-review/backend-integration-20261013/frontend-fffa6d8",
+  "frontend_sha256": "a3e5b711d1c037d0ca3d0be601c70a331784d9526213aa0c7a6ba460fedcb0d4",
+  "backend_source_sha256": "831a0f01746b4a34fe2c63d4e60d6e47d6f76e26478a5e062f79ec13f1903588 (unchanged from the reviewed backend)",
+  "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a (unchanged)",
+  "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f (unchanged)",
+  "environment_publication": {
+   "study_revision": "review-20261013T231535-27ac5d757d",
+   "sha256": "831bac60ce48c5bdad257ae568c07feccc39e606aa7e9d0ae8e36d776a7fc6bd",
+   "closes_after_days": 30
+  },
+  "certificate_sha256": "92fd43a003536016810515ae01d982ae406713241b80211528a61fdb81d54c49"
+ },
+ "investigation_binding": {
+  "environment": "backend-integration-20261013/environment-final (19653-19655), owned by the backend/review pass, used read-only plus development test sessions",
+  "frontend_sha256": "07bdf63e4954b1185a11e453f14eb597aaa34904e65039faea7fd28b7355ddb2 (the failing export)",
+  "study_revision": "review-20261013T062053-62b43d70b7"
+ },
+ "checks": {
+  "typecheck": "passed (tsc --noEmit)",
+  "unit": {
+   "tests": 141,
+   "passed": 141,
+   "failed": 0,
+   "skipped": 0
+  },
+  "build": "passed (Next.js 15.5.26 static export); export copied and bound by the lifecycle tool"
+ },
+ "hr1": {
+  "disposition": "unresolved / not reproduced in the recorded follow-up runs",
+  "investigation_runs": {
+   "batch_original_export": {
+    "checks": 9,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "first-case",
+     "first-baseline-case-1",
+     "consultation-reload",
+     "first-explanation-case-13",
+     "completion"
+    ],
+    "first_condition": "ontology_baseline",
+    "css_transfers": 4,
+    "css_outcomes": [
+     "200/finished/70441B/export_match=True/network"
+    ],
+    "documents": 4,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   },
+   "journey2_original_export": {
+    "checks": 14,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "assessment-q5-extra-reload-1",
+     "assessment-q5-extra-reload-2",
+     "assessment-q5-extra-reload-3",
+     "assessment-q5-extra-reload-4",
+     "assessment-q5-extra-reload-5",
+     "first-case",
+     "first-explanation-case-1",
+     "consultation-reload",
+     "first-baseline-case-13",
+     "completion"
+    ],
+    "first_condition": "explanation",
+    "css_transfers": 9,
+    "css_outcomes": [
+     "200/finished/70441B/export_match=True/network"
+    ],
+    "documents": 9,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   }
+  },
+  "final_runs": {
+   "run1": {
+    "checks": 9,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "first-case",
+     "first-baseline-case-1",
+     "consultation-reload",
+     "first-explanation-case-13",
+     "completion"
+    ],
+    "first_condition": "ontology_baseline",
+    "css_transfers": 4,
+    "css_outcomes": [
+     "200/finished/71010B/export_match=True/network"
+    ],
+    "documents": 4,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   },
+   "run2": {
+    "checks": 9,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "first-case",
+     "first-baseline-case-1",
+     "consultation-reload",
+     "first-explanation-case-13",
+     "completion"
+    ],
+    "first_condition": "ontology_baseline",
+    "css_transfers": 4,
+    "css_outcomes": [
+     "200/finished/71010B/export_match=True/network"
+    ],
+    "documents": 4,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   },
+   "extra_baseline": {
+    "checks": 9,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "first-case",
+     "first-baseline-case-1",
+     "consultation-reload",
+     "first-explanation-case-13",
+     "completion"
+    ],
+    "first_condition": "ontology_baseline",
+    "css_transfers": 4,
+    "css_outcomes": [
+     "200/finished/71010B/export_match=True/network"
+    ],
+    "documents": 4,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   },
+   "extra_explanation_first": {
+    "checks": 9,
+    "failed_checks": 0,
+    "stages": [
+     "study-entry",
+     "lesson-2-reload",
+     "lesson-6",
+     "assessment-q5-reload",
+     "first-case",
+     "first-explanation-case-1",
+     "consultation-reload",
+     "first-baseline-case-13",
+     "completion"
+    ],
+    "first_condition": "explanation",
+    "css_transfers": 4,
+    "css_outcomes": [
+     "200/finished/71010B/export_match=True/network"
+    ],
+    "documents": 4,
+    "in_page_event_types": [
+     "document",
+     "link-added",
+     "link-load"
+    ]
+   }
+  },
+  "boundary_reloads_used": 5,
+  "keepalive_probe": {
+   "attempts": 32,
+   "failures": 0,
+   "bad": [],
+   "sample": [
+    {
+     "i": 0,
+     "gap": 4800,
+     "status": 200,
+     "bytes": 70441,
+     "net": []
+    },
+    {
+     "i": 1,
+     "gap": 4900,
+     "status": 200,
+     "bytes": 70441,
+     "net": []
+    },
+    {
+     "i": 2,
+     "gap": 4950,
+     "status": 200,
+     "bytes": 70441,
+     "net": []
+    }
+   ],
+   "label": "diagnostic, not a reproduction: 32 CSS fetches from the study origin after 4.8-5.2 s idle gaps"
+  },
+  "cache_probe": {
+   "label": "diagnostic",
+   "ignoreHTTPSErrors": "network,network,network",
+   "trusted_spki": "network,network,network",
+   "reason": "both services send Cache-Control no-store (exploration) / private, no-store (study) on /_next/static assets"
+  },
+  "delivery_observation_final": {
+   "study_19664": "200 text/css; charset=utf-8, 71010 bytes, private, no-store, body equals export",
+   "exploration_19665": "200 text/css; charset=utf-8, 71010 bytes, no-store, body equals export",
+   "missing_css_path": "404 application/json"
+  },
+  "injected_validity": {
+   "checks": 3,
+   "failed_checks": 1,
+   "stages": [
+    "styled-baseline",
+    "injected",
+    "after-recovery"
+   ],
+   "first_condition": null,
+   "css_transfers": 3,
+   "css_outcomes": [
+    "200/finished/71010B/export_match=True/network",
+    "None/failed/0B/export_match=None/unknown"
+   ],
+   "documents": 3,
+   "in_page_event_types": [
+    "document",
+    "link-added",
+    "link-error",
+    "link-load"
+   ]
+  }
+ },
+ "storage": {
+  "start_bytes": 51831623194,
+  "start_checked_at": "2026-10-13T22:25:40Z",
+  "final_bytes": 51796822266,
+  "final_checked_at": "2026-10-13T23:45:59.522552+00:00",
+  "filesystem_free_bytes": 116665692160,
+  "limit_bytes": 100000000000
+ },
+ "credentials_included": false,
+ "evidence_sha256": {
+  "browser-outcomes.json": "fea7bcb8caef7785e16ab9035b414d17d279235af837adb199665278119c4b91",
+  "probes/cache_probe.cjs": "0fa80ab71674e02ac2ad29c46100c9660ba3d4e1a4ee43cb60751de24cfd285a",
+  "probes/keepalive-study-result.json": "f4b45cb34e9800cab5ba1f14e2c8a60b63b87ee7764ae6d54c36a3cf03b840c6",
+  "probes/keepalive_probe.cjs": "588e83382f8d44cd78ff4927fe265cbea3bc4fa87c04207746a141d0257febbd",
+  "screenshots/hr2-all-sources-desktop-dark.png": "4ded8d698a6e271c5b25506324739b8a9cb5af90318c9028112688b160db1b12",
+  "screenshots/hr2-catalogue-failed-desktop-light.png": "ae78bd7ab5c2f7e7871a839c1db46335fb447d9c4c18f1aca744664bdfda3ec1",
+  "screenshots/hr2-examples-open-320-200pct-dark.png": "b44e8f330912a70ea7a0caee39caeb549f69470448c78b639fcf2bc54799fe1f",
+  "screenshots/hr2-landing-320-200pct-dark.png": "7a6b282a7c281ebe53aae045e986b994bf24578058d3c5615ccca805e3ef2fce",
+  "screenshots/hr2-landing-375-light.png": "2636f571603b5c217d4d07e15756d73ff37126ed6ff3f802e2218e24cbf5c297",
+  "screenshots/hr2-landing-desktop-light.png": "31f12fdb9c04ce56b8bb9961e75474836799e1e4286861ae2ace523b5fb40743",
+  "screenshots/hr4-entry-list-375-light.png": "d15c65cc53a713eb1c9b6761ad3d300bec65535c03ba26483c79aa0a9f5243ce",
+  "screenshots/hr4-entry-list-desktop-dark.png": "77330431b738448c02ce730e5690909db4d5d5c05cd7911792f20e0457237a3a",
+  "screenshots/hr4-suggested-start-320-200pct-dark.png": "6d44c2e261c7aebc485384038b87f950671d5d5f903a17f8996019b51cda87c1",
+  "screenshots/hr4-suggested-start-desktop-dark.png": "3d9b6f3e0b5d1536c641d34ece79e30a209d5d36341e89b36b91988b08fd4396",
+  "screenshots/hr4-suggested-start-desktop-light.png": "98e902416d4fe995745d984c4231d7296be11ca5d9d03c6c2047066bc76dc7ac",
+  "screenshots/injected-stylesheet-failure-synthetic.png": "b62cef627b95f71921a89881d14f39464377f98c6be0bc01e0e2c7fe57166dda",
+  "screenshots/study-case-after-reload-320-200pct-dark.png": "a654b870d3f76e29662f0c0cffd534567c32103f2aa52ac02cd37dec775935e2",
+  "screenshots/study-case-after-reload-375-light.png": "a80e82d65b17dc38f9fbe26cfe2ed57757dad3985aedb3ed462e18e67cd710b5",
+  "screenshots/study-case-after-reload-desktop-dark.png": "279258109f6b56f5245669c6fac551c2fcaec87688747c714c4944388af84289",
+  "style-diagnostics/final-extra-journey-baseline-first.json": "9ec0a908dd534294d9acc862be76e8b1008df5bab4a33f2d4b20540c1bcab70b",
+  "style-diagnostics/final-extra-journey-explanation-first.json": "4cd5e8b6df292d746120aed252607a7316d2c665839f0392537e38bac98bb9d2",
+  "style-diagnostics/final-run1-journey.json": "964a46074829e4ef5aed0515e534ddf9453a07ee7f19b4ab33c60acb2cd1816e",
+  "style-diagnostics/final-run2-journey.json": "fe2b08770634dc5b697d64ed36feb00e39e0fd339b72cba2eab2484f25f64a75",
+  "style-diagnostics/injected-stylesheet-failure.json": "3f14aa3110a55a40a2ba17325bfcea4776a815a38f4af2ad1be0a27c35edea49",
+  "style-diagnostics/investigation-batch-original-export-journey.json": "5fd58175409cee0ea076d343f9cef7e9694ccb62865804992c733da11740a265",
+  "style-diagnostics/investigation-journey2-original-export.json": "2fa62de99263e35e40f511937765c1be0048e96d35ab638ea59011afdeaa78fa"
+ }
+}

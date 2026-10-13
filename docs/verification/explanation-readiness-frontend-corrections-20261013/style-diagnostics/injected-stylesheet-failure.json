@@ -1,0 +1,357 @@
+{
+  "schema": "exact-style-diagnostics/1",
+  "test": "style-boundary-injected",
+  "identity": {},
+  "checks": 3,
+  "failed_checks": 1,
+  "css_requests": 3,
+  "css_failed": 1,
+  "css_failed_not_canceled": 1,
+  "css_pending": 0,
+  "css_from": {
+    "network": 2,
+    "unknown": 1
+  },
+  "css_export_mismatch": 0,
+  "status": "passed",
+  "probes": [
+    {
+      "stage": "styled-baseline",
+      "document": 1791934894124,
+      "navigation_type": "navigate",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 18,
+      "icons": 4,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loading",
+      "styled": true
+    },
+    {
+      "stage": "injected",
+      "document": 1791934894449,
+      "navigation_type": "reload",
+      "token": "",
+      "body_font": "Times",
+      "max_icon_px": 1424,
+      "icons": 4,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": -1
+        }
+      ],
+      "fonts": "loaded",
+      "styled": false
+    },
+    {
+      "stage": "after-recovery",
+      "document": 1791934896554,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 0,
+      "icons": 0,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    }
+  ],
+  "network": [
+    {
+      "id": "15CDAEDC6B906391CEB26D9CE8626FA1",
+      "path": "/browse/",
+      "type": "Document",
+      "document": "/browse/",
+      "started_ms": 35,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "11052",
+      "content_encoding": null,
+      "encoded_bytes": 12061,
+      "decoded_bytes": 11052,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "50031.8",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/browse/",
+      "started_ms": 82,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71313,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    },
+    {
+      "id": "B04FA65446A3AB99846E8AFCC249368E",
+      "path": "/browse/",
+      "type": "Document",
+      "document": "/browse/",
+      "started_ms": 354,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "11052",
+      "content_encoding": null,
+      "encoded_bytes": 12061,
+      "decoded_bytes": 11052,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "50031.91",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/browse/",
+      "started_ms": 388,
+      "from_cache": "unknown",
+      "status": null,
+      "mime": null,
+      "declared_length": null,
+      "content_encoding": null,
+      "encoded_bytes": null,
+      "decoded_bytes": 0,
+      "outcome": "failed",
+      "error": "net::ERR_CONNECTION_RESET",
+      "canceled": false,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "037DFE7B44D8C13AF4A777FEE8FE571A",
+      "path": "/browse/",
+      "type": "Document",
+      "document": "/browse/",
+      "started_ms": 2473,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "11052",
+      "content_encoding": null,
+      "encoded_bytes": 12061,
+      "decoded_bytes": 11052,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "50031.138",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/browse/",
+      "started_ms": 2492,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71313,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    }
+  ],
+  "lifecycle": [
+    {
+      "at_ms": 61,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 243,
+      "type": "load"
+    },
+    {
+      "at_ms": 257,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 346,
+      "type": "before-navigation",
+      "reason": "injected stylesheet failure"
+    },
+    {
+      "at_ms": 379,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 398,
+      "type": "requestfailed",
+      "resource": "stylesheet",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "error": "net::ERR_CONNECTION_RESET"
+    },
+    {
+      "at_ms": 453,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 453,
+      "type": "load"
+    },
+    {
+      "at_ms": 2467,
+      "type": "before-navigation",
+      "reason": "ordinary reload"
+    },
+    {
+      "at_ms": 2484,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 2558,
+      "type": "navigated",
+      "page": "/browse/"
+    },
+    {
+      "at_ms": 2558,
+      "type": "load"
+    }
+  ],
+  "documents": [
+    {
+      "document": 1791934894124,
+      "events": [
+        {
+          "at": 25,
+          "type": "document",
+          "page": "/browse/",
+          "navigation": "navigate"
+        },
+        {
+          "at": 29,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 83,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    },
+    {
+      "document": 1791934894449,
+      "events": [
+        {
+          "at": 29,
+          "type": "document",
+          "page": "/browse/",
+          "navigation": "reload"
+        },
+        {
+          "at": 31,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 44,
+          "type": "link-error",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": -1
+        }
+      ]
+    },
+    {
+      "document": 1791934896554,
+      "events": [
+        {
+          "at": 15,
+          "type": "document",
+          "page": "/browse/",
+          "navigation": "reload"
+        },
+        {
+          "at": 17,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 35,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    }
+  ]
+}

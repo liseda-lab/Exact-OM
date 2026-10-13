@@ -1,0 +1,603 @@
+{
+  "schema": "exact-style-diagnostics/1",
+  "test": "study-review-journey",
+  "identity": {
+    "frontend_sha256": "a3e5b711d1c037d0ca3d0be601c70a331784d9526213aa0c7a6ba460fedcb0d4",
+    "frontend_commit": "fffa6d8427137cd22ac039d1cdf949a628f86770",
+    "backend_source_sha256": "831a0f01746b4a34fe2c63d4e60d6e47d6f76e26478a5e062f79ec13f1903588",
+    "backend_commit": "fffa6d8427137cd22ac039d1cdf949a628f86770",
+    "publication_sha256": "831bac60ce48c5bdad257ae568c07feccc39e606aa7e9d0ae8e36d776a7fc6bd",
+    "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+    "study_revision": "review-20261013T231535-27ac5d757d",
+    "environment": "backend-integration-20261013/environment-frontend-fffa6d8"
+  },
+  "checks": 9,
+  "failed_checks": 0,
+  "css_requests": 4,
+  "css_failed": 0,
+  "css_failed_not_canceled": 0,
+  "css_pending": 0,
+  "css_from": {
+    "network": 4
+  },
+  "css_export_mismatch": 0,
+  "status": "passed",
+  "probes": [
+    {
+      "stage": "study-entry",
+      "document": 1791934577655,
+      "navigation_type": "navigate",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 28,
+      "icons": 1,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loading",
+      "styled": true
+    },
+    {
+      "stage": "lesson-2-reload",
+      "document": 1791934584920,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 19,
+      "icons": 9,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "lesson-6",
+      "document": 1791934584920,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 20,
+      "icons": 20,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "assessment-q5-reload",
+      "document": 1791934599559,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 17,
+      "icons": 10,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "first-case",
+      "document": 1791934599559,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 18,
+      "icons": 9,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "first-baseline-case-1",
+      "document": 1791934599559,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 18,
+      "icons": 9,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "consultation-reload",
+      "document": 1791934603560,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 0,
+      "icons": 0,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "first-explanation-case-13",
+      "document": 1791934603560,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 19,
+      "icons": 9,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    },
+    {
+      "stage": "completion",
+      "document": 1791934603560,
+      "navigation_type": "reload",
+      "token": "#f6f4f0",
+      "body_font": "\"IBM Plex Sans\", \"IBM Plex Sans Fallback\", \"Segoe UI\", system-ui, sans-serif",
+      "max_icon_px": 17,
+      "icons": 1,
+      "style_sheets": 1,
+      "links": [
+        {
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ],
+      "fonts": "loaded",
+      "styled": true
+    }
+  ],
+  "network": [
+    {
+      "id": "BBFD86BA3DADF547465A5B7B8BF9306F",
+      "path": "/participate",
+      "type": "Document",
+      "document": "/participate",
+      "started_ms": 64,
+      "from_cache": "unknown",
+      "status": null,
+      "mime": null,
+      "declared_length": null,
+      "content_encoding": null,
+      "encoded_bytes": null,
+      "decoded_bytes": 0,
+      "outcome": "pending",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "BBFD86BA3DADF547465A5B7B8BF9306F",
+      "path": "/participate/",
+      "type": "Document",
+      "document": "/participate/",
+      "started_ms": 73,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "9105",
+      "content_encoding": null,
+      "encoded_bytes": 10106,
+      "decoded_bytes": 9105,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "47125.8",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/participate/",
+      "started_ms": 95,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71457,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    },
+    {
+      "id": "5D50C53A613F5D0E0B7894FC964A7FD6",
+      "path": "/participate/",
+      "type": "Document",
+      "document": "/participate/",
+      "started_ms": 7338,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "9105",
+      "content_encoding": null,
+      "encoded_bytes": 10106,
+      "decoded_bytes": 9105,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "47125.92",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/participate/",
+      "started_ms": 7358,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71457,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    },
+    {
+      "id": "85DA4DEF36C4BBB7DD1EFA0A384B3074",
+      "path": "/participate/",
+      "type": "Document",
+      "document": "/participate/",
+      "started_ms": 21979,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "9105",
+      "content_encoding": null,
+      "encoded_bytes": 10106,
+      "decoded_bytes": 9105,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "47125.232",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/participate/",
+      "started_ms": 21995,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71457,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    },
+    {
+      "id": "72FA1BD6752751F9FFC11B88DD3D1312",
+      "path": "/participate/",
+      "type": "Document",
+      "document": "/participate/",
+      "started_ms": 25981,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/html",
+      "declared_length": "9105",
+      "content_encoding": null,
+      "encoded_bytes": 10106,
+      "decoded_bytes": 9105,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": null,
+      "matches_export": null
+    },
+    {
+      "id": "47125.321",
+      "path": "/_next/static/css/16a388574bac8a7c.css",
+      "type": "Stylesheet",
+      "document": "/participate/",
+      "started_ms": 25996,
+      "from_cache": "network",
+      "status": 200,
+      "mime": "text/css",
+      "declared_length": "71010",
+      "content_encoding": null,
+      "encoded_bytes": 71457,
+      "decoded_bytes": 71010,
+      "outcome": "finished",
+      "error": null,
+      "canceled": null,
+      "blocked": null,
+      "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+      "matches_export": true
+    }
+  ],
+  "lifecycle": [
+    {
+      "at_ms": 82,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 211,
+      "type": "load"
+    },
+    {
+      "at_ms": 217,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 220,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 7331,
+      "type": "before-navigation",
+      "reason": "lesson-2 reload"
+    },
+    {
+      "at_ms": 7350,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 7435,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 7436,
+      "type": "load"
+    },
+    {
+      "at_ms": 21973,
+      "type": "before-navigation",
+      "reason": "assessment reload"
+    },
+    {
+      "at_ms": 21988,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 22063,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 22063,
+      "type": "load"
+    },
+    {
+      "at_ms": 23361,
+      "type": "allocation",
+      "first_condition": "ontology_baseline"
+    },
+    {
+      "at_ms": 25976,
+      "type": "before-navigation",
+      "reason": "consultation reload"
+    },
+    {
+      "at_ms": 25990,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 26052,
+      "type": "navigated",
+      "page": "/participate/"
+    },
+    {
+      "at_ms": 26052,
+      "type": "load"
+    }
+  ],
+  "documents": [
+    {
+      "document": 1791934577655,
+      "events": [
+        {
+          "at": 26,
+          "type": "document",
+          "page": "/participate/",
+          "navigation": "navigate"
+        },
+        {
+          "at": 29,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 61,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    },
+    {
+      "document": 1791934584920,
+      "events": [
+        {
+          "at": 15,
+          "type": "document",
+          "page": "/participate/",
+          "navigation": "reload"
+        },
+        {
+          "at": 17,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 57,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    },
+    {
+      "document": 1791934599559,
+      "events": [
+        {
+          "at": 13,
+          "type": "document",
+          "page": "/participate/",
+          "navigation": "reload"
+        },
+        {
+          "at": 15,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 46,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    },
+    {
+      "document": 1791934603560,
+      "events": [
+        {
+          "at": 13,
+          "type": "document",
+          "page": "/participate/",
+          "navigation": "reload"
+        },
+        {
+          "at": 14,
+          "type": "link-added",
+          "parent": "HEAD",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": null
+        },
+        {
+          "at": 36,
+          "type": "link-load",
+          "path": "/_next/static/css/16a388574bac8a7c.css",
+          "rel": "stylesheet",
+          "media": "",
+          "disabled": false,
+          "rules": 707
+        }
+      ]
+    }
+  ]
+}

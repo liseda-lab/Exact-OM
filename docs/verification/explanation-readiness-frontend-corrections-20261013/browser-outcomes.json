@@ -1,0 +1,879 @@
+{
+ "schema": "exact-browser-outcomes/1",
+ "browser": "system Chrome via Playwright, one worker, zero retries, HTTPS with application CSP and the local test-certificate allowance",
+ "runs": [
+  {
+   "label": "HR1 investigation: instrumented four-file batch (original export)",
+   "binding": "environment-final (19653-19655), frontend 07bdf63e (2d4600d export), backend 831a0f01, publication 6a71de5b",
+   "started": "2026-10-13T22:33:23.585Z",
+   "duration_s": 424.4,
+   "passed": 25,
+   "failed": 0,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+     "status": "passed",
+     "duration_ms": 8860
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+     "status": "passed",
+     "duration_ms": 8344
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+     "status": "passed",
+     "duration_ms": 5562
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+     "status": "passed",
+     "duration_ms": 6840
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+     "status": "passed",
+     "duration_ms": 6657
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+     "status": "passed",
+     "duration_ms": 6404
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+     "status": "passed",
+     "duration_ms": 9497
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+     "status": "passed",
+     "duration_ms": 4339
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > main app: all nine affected comparisons, and genuine extracts keep quotation",
+     "status": "passed",
+     "duration_ms": 40048
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > study workspace: the same nine in explanation cases",
+     "status": "passed",
+     "duration_ms": 59891
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > main app: every referenced-label citation in the 33 profiles",
+     "status": "passed",
+     "duration_ms": 51320
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > study workspace: the same citations in an explanation case resolve through the scope",
+     "status": "passed",
+     "duration_ms": 13102
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject before the original",
+     "status": "passed",
+     "duration_ms": 11158
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject after the original",
+     "status": "passed",
+     "duration_ms": 14718
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > main app: failure, then Retry restores recorded comparisons in the same view and selection",
+     "status": "passed",
+     "duration_ms": 3738
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+     "status": "passed",
+     "duration_ms": 11535
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > main app: a 25-member group",
+     "status": "passed",
+     "duration_ms": 1470
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > study workspace: the same group through the scope",
+     "status": "passed",
+     "duration_ms": 9794
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > main app: cycle return links, a continuation at the depth limit, punned identities",
+     "status": "passed",
+     "duration_ms": 2385
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > study workspace: the same through the scope",
+     "status": "passed",
+     "duration_ms": 17673
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 375 px, 100% text, light",
+     "status": "passed",
+     "duration_ms": 11093
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 320 px, 200% text, dark",
+     "status": "passed",
+     "duration_ms": 14487
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > asserted and ELK children page to their recorded totals; a basis change restarts paging",
+     "status": "passed",
+     "duration_ms": 1915
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > discovered entry points page and focus one side",
+     "status": "passed",
+     "duration_ms": 1368
+    },
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 90268
+    }
+   ]
+  },
+  {
+   "label": "HR1 investigation: targeted journey 2 with 5 extra assessment reloads (original export)",
+   "binding": "environment-final (19653-19655), frontend 07bdf63e (2d4600d export), backend 831a0f01, publication 6a71de5b",
+   "started": "2026-10-13T22:42:38.567Z",
+   "duration_s": 97.2,
+   "passed": 1,
+   "failed": 0,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 95615
+    }
+   ]
+  },
+  {
+   "label": "Final matrix run 1: four required files + readiness-entry + readiness-visual",
+   "binding": "environment-frontend-fffa6d8 (19663-19665), frontend a3e5b711 (fffa6d8 export), backend 831a0f01, publication 831bac60",
+   "started": "2026-10-13T23:19:18.773Z",
+   "duration_s": 622.1,
+   "passed": 49,
+   "failed": 3,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+     "status": "passed",
+     "duration_ms": 9843
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+     "status": "passed",
+     "duration_ms": 10526
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+     "status": "passed",
+     "duration_ms": 5833
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+     "status": "passed",
+     "duration_ms": 7531
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+     "status": "passed",
+     "duration_ms": 6143
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+     "status": "passed",
+     "duration_ms": 6217
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+     "status": "passed",
+     "duration_ms": 10339
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+     "status": "passed",
+     "duration_ms": 4373
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > main app: all nine affected comparisons, and genuine extracts keep quotation",
+     "status": "passed",
+     "duration_ms": 40971
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > study workspace: the same nine in explanation cases",
+     "status": "passed",
+     "duration_ms": 58295
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > main app: every referenced-label citation in the 33 profiles",
+     "status": "passed",
+     "duration_ms": 48248
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > study workspace: the same citations in an explanation case resolve through the scope",
+     "status": "passed",
+     "duration_ms": 10081
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject before the original",
+     "status": "passed",
+     "duration_ms": 7617
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject after the original",
+     "status": "passed",
+     "duration_ms": 14869
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > main app: failure, then Retry restores recorded comparisons in the same view and selection",
+     "status": "passed",
+     "duration_ms": 2846
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+     "status": "passed",
+     "duration_ms": 9894
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > main app: a 25-member group",
+     "status": "passed",
+     "duration_ms": 1325
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > study workspace: the same group through the scope",
+     "status": "passed",
+     "duration_ms": 6789
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > main app: cycle return links, a continuation at the depth limit, punned identities",
+     "status": "passed",
+     "duration_ms": 2118
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > study workspace: the same through the scope",
+     "status": "passed",
+     "duration_ms": 14715
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 375 px, 100% text, light",
+     "status": "passed",
+     "duration_ms": 6841
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 320 px, 200% text, dark",
+     "status": "passed",
+     "duration_ms": 13747
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a fresh visit opens the first prepared example; All sources keeps every source and candidate",
+     "status": "passed",
+     "duration_ms": 2210
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > an example beyond the first source page stays selected; Back, Forward and reload keep each choice",
+     "status": "passed",
+     "duration_ms": 3305
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a deliberate unprepared link is kept and labelled honestly; a deliberate choice is remembered for this package and run",
+     "status": "passed",
+     "duration_ms": 1975
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > an explicit pair that is not a candidate is never replaced silently; a pair-only link finds its source",
+     "status": "passed",
+     "duration_ms": 2914
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > Browse and back returns to the same pair, tab and each side's hierarchy focus",
+     "status": "passed",
+     "duration_ms": 3259
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a late catalogue never overrides a choice made while it loads (injected delay)",
+     "status": "passed",
+     "duration_ms": 1109
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a catalogue slower than the bounded wait leaves ordinary browsing in place (injected delay)",
+     "status": "passed",
+     "duration_ms": 12887
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a linked pair beyond the first candidate pages is found and stays selected (injected paging)",
+     "status": "passed",
+     "duration_ms": 1216
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > declared absence (404) is ordinary browsing: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 947
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > invalid catalogue (409): the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1142
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > incompatible schema: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1107
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > denied (403): the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1239
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > network failure: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1135
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > a catalogue for another run offers no examples and says so (injected)",
+     "status": "passed",
+     "duration_ms": 886
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > a fresh Browse opens the curated default, labelled; every other root stays listed and pageable",
+     "status": "passed",
+     "duration_ms": 1182
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > an explicit focus is never replaced, and a choice made while the default loads wins (injected delay)",
+     "status": "passed",
+     "duration_ms": 3339
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > older entry pages without selection, and a missing default, keep the list (injected contract variants)",
+     "status": "passed",
+     "duration_ms": 1095
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > partial ELK keeps the current focus but declares no suggestion",
+     "status": "passed",
+     "duration_ms": 824
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > the compared entity stays the focus in the pair workspace; the suggestion is only labelled in the list",
+     "status": "passed",
+     "duration_ms": 1909
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > desktop-light",
+     "status": "passed",
+     "duration_ms": 10111
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > desktop-dark",
+     "status": "passed",
+     "duration_ms": 9841
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > 375-light",
+     "status": "passed",
+     "duration_ms": 6154
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > 320-200pct-dark",
+     "status": "passed",
+     "duration_ms": 5962
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > catalogue failure notice (injected 503)",
+     "status": "passed",
+     "duration_ms": 4117
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, desktop-dark",
+     "status": "passed",
+     "duration_ms": 5425
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, 375-light",
+     "status": "failed",
+     "duration_ms": 62616,
+     "error": "Error: expect(locator).toBeVisible() failed"
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, 320-200pct-dark",
+     "status": "failed",
+     "duration_ms": 62863,
+     "error": "Error: expect(locator).toBeVisible() failed"
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > asserted and ELK children page to their recorded totals; a basis change restarts paging",
+     "status": "passed",
+     "duration_ms": 1750
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > discovered entry points page and focus one side",
+     "status": "failed",
+     "duration_ms": 15585,
+     "error": "Error: expect(locator).toBeVisible() failed"
+    },
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 86672
+    }
+   ]
+  },
+  {
+   "label": "Final matrix run 2 after test corrections (1b878dd): same binding",
+   "binding": "environment-frontend-fffa6d8 (19663-19665), frontend a3e5b711 (fffa6d8 export), backend 831a0f01, publication 831bac60",
+   "started": "2026-10-13T23:31:28.243Z",
+   "duration_s": 474.3,
+   "passed": 52,
+   "failed": 0,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+     "status": "passed",
+     "duration_ms": 8734
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+     "status": "passed",
+     "duration_ms": 9708
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+     "status": "passed",
+     "duration_ms": 5433
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+     "status": "passed",
+     "duration_ms": 7181
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+     "status": "passed",
+     "duration_ms": 6323
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+     "status": "passed",
+     "duration_ms": 6158
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+     "status": "passed",
+     "duration_ms": 9974
+    },
+    {
+     "file": "assessment-recovery.spec.ts",
+     "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+     "status": "passed",
+     "duration_ms": 3972
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > main app: all nine affected comparisons, and genuine extracts keep quotation",
+     "status": "passed",
+     "duration_ms": 32976
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > study workspace: the same nine in explanation cases",
+     "status": "passed",
+     "duration_ms": 52009
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > main app: every referenced-label citation in the 33 profiles",
+     "status": "passed",
+     "duration_ms": 47641
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > study workspace: the same citations in an explanation case resolve through the scope",
+     "status": "passed",
+     "duration_ms": 10460
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject before the original",
+     "status": "passed",
+     "duration_ms": 8335
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject after the original",
+     "status": "passed",
+     "duration_ms": 15559
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > main app: failure, then Retry restores recorded comparisons in the same view and selection",
+     "status": "passed",
+     "duration_ms": 3005
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+     "status": "passed",
+     "duration_ms": 10952
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > main app: a 25-member group",
+     "status": "passed",
+     "duration_ms": 1292
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > study workspace: the same group through the scope",
+     "status": "passed",
+     "duration_ms": 8676
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > main app: cycle return links, a continuation at the depth limit, punned identities",
+     "status": "passed",
+     "duration_ms": 2171
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > study workspace: the same through the scope",
+     "status": "passed",
+     "duration_ms": 14059
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 375 px, 100% text, light",
+     "status": "passed",
+     "duration_ms": 8533
+    },
+    {
+     "file": "luna-corrections.spec.ts",
+     "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 320 px, 200% text, dark",
+     "status": "passed",
+     "duration_ms": 13946
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a fresh visit opens the first prepared example; All sources keeps every source and candidate",
+     "status": "passed",
+     "duration_ms": 2177
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > an example beyond the first source page stays selected; Back, Forward and reload keep each choice",
+     "status": "passed",
+     "duration_ms": 3328
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a deliberate unprepared link is kept and labelled honestly; a deliberate choice is remembered for this package and run",
+     "status": "passed",
+     "duration_ms": 2002
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > an explicit pair that is not a candidate is never replaced silently; a pair-only link finds its source",
+     "status": "passed",
+     "duration_ms": 2969
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > Browse and back returns to the same pair, tab and each side's hierarchy focus",
+     "status": "passed",
+     "duration_ms": 3290
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a late catalogue never overrides a choice made while it loads (injected delay)",
+     "status": "passed",
+     "duration_ms": 1128
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a catalogue slower than the bounded wait leaves ordinary browsing in place (injected delay)",
+     "status": "passed",
+     "duration_ms": 12866
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > a linked pair beyond the first candidate pages is found and stays selected (injected paging)",
+     "status": "passed",
+     "duration_ms": 1245
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > declared absence (404) is ordinary browsing: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 971
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > invalid catalogue (409): the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1130
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > incompatible schema: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1127
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > denied (403): the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1088
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > network failure: the first source opens and the reason is shown",
+     "status": "passed",
+     "duration_ms": 1231
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR2 prepared examples on first entry > catalogue failures stay visible (injected responses) > a catalogue for another run offers no examples and says so (injected)",
+     "status": "passed",
+     "duration_ms": 851
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > a fresh Browse opens the curated default, labelled; every other root stays listed and pageable",
+     "status": "passed",
+     "duration_ms": 1083
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > an explicit focus is never replaced, and a choice made while the default loads wins (injected delay)",
+     "status": "passed",
+     "duration_ms": 3326
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > older entry pages without selection, and a missing default, keep the list (injected contract variants)",
+     "status": "passed",
+     "duration_ms": 1130
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > partial ELK keeps the current focus but declares no suggestion",
+     "status": "passed",
+     "duration_ms": 844
+    },
+    {
+     "file": "readiness-entry.spec.ts",
+     "title": "readiness-entry.spec.ts > HR4 curated hierarchy start > the compared entity stays the focus in the pair workspace; the suggestion is only labelled in the list",
+     "status": "passed",
+     "duration_ms": 1920
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > desktop-light",
+     "status": "passed",
+     "duration_ms": 10250
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > desktop-dark",
+     "status": "passed",
+     "duration_ms": 9732
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > 375-light",
+     "status": "passed",
+     "duration_ms": 6190
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > 320-200pct-dark",
+     "status": "passed",
+     "duration_ms": 6014
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > main app: prepared examples and the curated hierarchy start > catalogue failure notice (injected 503)",
+     "status": "passed",
+     "duration_ms": 4019
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, desktop-dark",
+     "status": "passed",
+     "duration_ms": 5124
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, 375-light",
+     "status": "passed",
+     "duration_ms": 3331
+    },
+    {
+     "file": "readiness-visual.spec.ts",
+     "title": "readiness-visual.spec.ts > study: controls after a reload > case view after reload, 320-200pct-dark",
+     "status": "passed",
+     "duration_ms": 4357
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > asserted and ELK children page to their recorded totals; a basis change restarts paging",
+     "status": "passed",
+     "duration_ms": 1329
+    },
+    {
+     "file": "review-hierarchy.spec.ts",
+     "title": "review-hierarchy.spec.ts > discovered entry points page and focus one side",
+     "status": "passed",
+     "duration_ms": 960
+    },
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 88045
+    }
+   ]
+  },
+  {
+   "label": "Additional full journey (allocated baseline-first again) + injected style-check validity",
+   "binding": "environment-frontend-fffa6d8 (19663-19665), frontend a3e5b711 (fffa6d8 export), backend 831a0f01, publication 831bac60",
+   "started": "2026-10-13T23:39:59.951Z",
+   "duration_s": 97.1,
+   "passed": 2,
+   "failed": 0,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 90877
+    },
+    {
+     "file": "style-boundary.spec.ts",
+     "title": "style-boundary.spec.ts > the style check rejects a document whose stylesheet transfer failed, and records the failure (injected)",
+     "status": "passed",
+     "duration_ms": 3117
+    }
+   ]
+  },
+  {
+   "label": "Additional full journey, explanation-first allocation",
+   "binding": "environment-frontend-fffa6d8 (19663-19665), frontend a3e5b711 (fffa6d8 export), backend 831a0f01, publication 831bac60",
+   "started": "2026-10-13T23:42:47.930Z",
+   "duration_s": 90.5,
+   "passed": 1,
+   "failed": 0,
+   "skipped": 0,
+   "flaky": 0,
+   "tests": [
+    {
+     "file": "study-review-journey.spec.ts",
+     "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+     "status": "passed",
+     "duration_ms": 89031
+    }
+   ]
+  }
+ ]
+}
