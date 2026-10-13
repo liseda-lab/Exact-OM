@@ -1,0 +1,53 @@
+{
+  "fixture": "Native pyowl_core ontology with a class and an individual using the same IRI; valid FactPacket",
+  "fact_id": "sha256:666ce1612a16e03e823d9ec54fe1ac1f4b867f0bc98d036202a4f5aea0f2ac77",
+  "caller_subject": {
+    "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+    "iri": "urn:punned",
+    "kind": "individual"
+  },
+  "runs": [
+    {
+      "packet_order": [
+        "class",
+        "individual"
+      ],
+      "wrapped_subject": {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "class"
+      },
+      "inspector_subject": {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "class"
+      },
+      "inspector_subjects": [
+        "class"
+      ],
+      "ambiguous": false
+    },
+    {
+      "packet_order": [
+        "individual",
+        "class"
+      ],
+      "wrapped_subject": {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "individual"
+      },
+      "inspector_subject": {
+        "ontology_version_id": "sha256:3e8ecb7b2f6302e68e882dc2a3c390c8908be687913eca8b3aec5246cf52e43f",
+        "iri": "urn:punned",
+        "kind": "individual"
+      },
+      "inspector_subjects": [
+        "individual"
+      ],
+      "ambiguous": false
+    }
+  ],
+  "order_dependent": true,
+  "caller_kept": false
+}

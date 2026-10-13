@@ -1,0 +1,461 @@
+{
+  "schema": "exact-frontend-correction-receipt/1",
+  "finding": "R2-F1 (explanation-s2-luna-frontend-corrections-review.md)",
+  "date": "2026-10-13",
+  "commits": {
+    "fix": "2547263",
+    "browser_regression": "2d4600d",
+    "reviewed_before": "0e6bebb"
+  },
+  "bindings": {
+    "frontend_source_tree": "e67b62358fbbbd7160ff6871491bfe32d53a0a6f",
+    "frontend_tree_sha256_bound_by_environment": "07bdf63e4954b1185a11e453f14eb597aaa34904e65039faea7fd28b7355ddb2",
+    "frontend_output": "~/Library/Caches/exact-om-review/luna-bundle-20261012/frontend-2d4600d",
+    "rebuild_equal_except_nextjs_build_id": true,
+    "source_publication_sha256": "51500ab8b54615ff938da3e70faa6816af67c6867b1b528f4d2a175cb68bff93",
+    "package_sha256": "07781b63d2acd24f2542653112e5a20d75cea30af55685b331af3ea1e9b8907b",
+    "backend_source_sha256": "752b91446f125a12af47d9c6f7c7499c3edba40ea85d5d84fd5bfa86491c8985",
+    "backend_worktree": "~/Library/Caches/exact-om-dev/s2dev/source-2d4600d (clean, detached at 2d4600d)",
+    "environment": "~/Library/Caches/exact-om-review/luna-bundle-20261012/environment-frontend-2d4600d",
+    "ports": {
+      "postgres": 19623,
+      "study": 19624,
+      "exploration": 19625
+    },
+    "test_publication": {
+      "study_revision": "review-20261013T020941-03e25f85da",
+      "sha256": "c8d523a3305a58f149dadb775640137c39c9c6cff15566d27660ee64bc536953"
+    }
+  },
+  "probe": {
+    "script": "identity_probe.cjs",
+    "fixture": "../explanation-s2-luna-frontend-corrections-review/identity-fixture.json",
+    "before_0e6bebb": {
+      "inspector_kinds_by_order": [
+        "class",
+        "individual"
+      ],
+      "order_dependent": true,
+      "caller_kept": false
+    },
+    "after_2d4600d": {
+      "inspector_kinds_by_order": [
+        "individual",
+        "individual"
+      ],
+      "listed_subjects_by_order": [
+        [
+          "individual",
+          "class"
+        ],
+        [
+          "individual",
+          "class"
+        ]
+      ],
+      "order_dependent": false,
+      "caller_kept": true
+    }
+  },
+  "complete_path_regression": {
+    "test": "explanations_visualizer/src/lib/workspace/citationIdentity.test.ts",
+    "fixtures": "explanations_visualizer/src/lib/workspace/fixtures/citation-identity.json (generator: native_fixtures.py)",
+    "on_prefix_source_0e6bebb": {
+      "passed": 2,
+      "failed": 3,
+      "failing": [
+        "a punned record keeps the caller's admitted kind in either packet order (R2-F1)",
+        "without an admitted caller several typed subjects stay explicitly ambiguous (R2-F1)",
+        "a shared axiom stored under two classes: the matching caller, otherwise both (R2-F1)"
+      ]
+    },
+    "on_fix_2d4600d": {
+      "passed": 5,
+      "failed": 0
+    }
+  },
+  "checks": {
+    "unit": {
+      "command": "npm run test:unit",
+      "tests": 131,
+      "passed": 131,
+      "failed": 0,
+      "skipped": 0
+    },
+    "typecheck": "passed",
+    "build": "passed (Next.js 15.5.26 static export)"
+  },
+  "browser_acceptance": {
+    "browser": "system Chrome through Playwright, HTTPS services with application CSP",
+    "specs": [
+      "study-review-journey.spec.ts",
+      "review-hierarchy.spec.ts",
+      "luna-corrections.spec.ts",
+      "assessment-recovery.spec.ts"
+    ],
+    "run1_fresh_environment": {
+      "started": "2026-10-13T02:15:12.291Z",
+      "duration_s": 1278.6,
+      "passed": 24,
+      "failed": 1,
+      "skipped": 0,
+      "flaky": 0,
+      "tests": [
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+          "status": "passed",
+          "duration_ms": 8483
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+          "status": "passed",
+          "duration_ms": 8698
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+          "status": "passed",
+          "duration_ms": 6339
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+          "status": "passed",
+          "duration_ms": 7317
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+          "status": "passed",
+          "duration_ms": 7153
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+          "status": "passed",
+          "duration_ms": 6708
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+          "status": "passed",
+          "duration_ms": 9739
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+          "status": "passed",
+          "duration_ms": 4307
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > main app: all nine affected comparisons, and genuine extracts keep quotation",
+          "status": "passed",
+          "duration_ms": 44876
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > study workspace: the same nine in explanation cases",
+          "status": "passed",
+          "duration_ms": 65387
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > main app: every referenced-label citation in the 33 profiles",
+          "status": "timedOut",
+          "duration_ms": 900154
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > study workspace: the same citations in an explanation case resolve through the scope",
+          "status": "passed",
+          "duration_ms": 12840
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject before the original",
+          "status": "passed",
+          "duration_ms": 10992
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject after the original",
+          "status": "passed",
+          "duration_ms": 16998
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > main app: failure, then Retry restores recorded comparisons in the same view and selection",
+          "status": "passed",
+          "duration_ms": 3766
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+          "status": "passed",
+          "duration_ms": 11180
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > main app: a 25-member group",
+          "status": "passed",
+          "duration_ms": 1490
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > study workspace: the same group through the scope",
+          "status": "passed",
+          "duration_ms": 8946
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > main app: cycle return links, a continuation at the depth limit, punned identities",
+          "status": "passed",
+          "duration_ms": 2291
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > study workspace: the same through the scope",
+          "status": "passed",
+          "duration_ms": 15494
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 375 px, 100% text, light",
+          "status": "passed",
+          "duration_ms": 8995
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 320 px, 200% text, dark",
+          "status": "passed",
+          "duration_ms": 16801
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "review-hierarchy.spec.ts > asserted and ELK children page to their recorded totals; a basis change restarts paging",
+          "status": "passed",
+          "duration_ms": 1947
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "review-hierarchy.spec.ts > discovered entry points page and focus one side",
+          "status": "passed",
+          "duration_ms": 1354
+        },
+        {
+          "file": "study-review-journey.spec.ts",
+          "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+          "status": "passed",
+          "duration_ms": 89749
+        }
+      ],
+      "failure_note": "R2 main-app test timed out at 'Label of DOID:4110' (mite infestation profile): the page showed 'Generated description' and 'Comparison' read failures (network_unreachable, fetch rejected) from the newly started exploration service, so the citation was never rendered. All other 24 tests passed, including R2 study and both R2-F1 tests."
+    },
+    "run2_same_environment": {
+      "started": "2026-10-13T02:37:18.065Z",
+      "duration_s": 426.5,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "flaky": 0,
+      "tests": [
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+          "status": "passed",
+          "duration_ms": 8513
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+          "status": "passed",
+          "duration_ms": 8492
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R1 an older same-question answer never overwrites a newer saved one > independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+          "status": "passed",
+          "duration_ms": 6070
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+          "status": "passed",
+          "duration_ms": 6321
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+          "status": "passed",
+          "duration_ms": 6837
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+          "status": "passed",
+          "duration_ms": 6812
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+          "status": "passed",
+          "duration_ms": 9867
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "assessment-recovery.spec.ts > S0-FU-R2 the latest answer stays visible throughout restored outbox replay > a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+          "status": "passed",
+          "duration_ms": 4578
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > main app: all nine affected comparisons, and genuine extracts keep quotation",
+          "status": "passed",
+          "duration_ms": 39974
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R1 generated comparisons are shown as reviewed prose > study workspace: the same nine in explanation cases",
+          "status": "passed",
+          "duration_ms": 69737
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > main app: every referenced-label citation in the 33 profiles",
+          "status": "passed",
+          "duration_ms": 52144
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2 referenced-label citations name the referenced entity > study workspace: the same citations in an explanation case resolve through the scope",
+          "status": "passed",
+          "duration_ms": 12994
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject before the original",
+          "status": "passed",
+          "duration_ms": 11169
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R2-F1 a record under several typed subjects never takes its subject from packet order (injected second subject) > main app and study, added subject after the original",
+          "status": "passed",
+          "duration_ms": 17749
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > main app: failure, then Retry restores recorded comparisons in the same view and selection",
+          "status": "passed",
+          "duration_ms": 3659
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R3 a failed comparison-data read is a failure with Retry, not an absence > study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+          "status": "passed",
+          "duration_ms": 11794
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > main app: a 25-member group",
+          "status": "passed",
+          "duration_ms": 1478
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R4 equivalence groups page, count, recover and navigate (injected group) > study workspace: the same group through the scope",
+          "status": "passed",
+          "duration_ms": 9329
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > main app: cycle return links, a continuation at the depth limit, punned identities",
+          "status": "passed",
+          "duration_ms": 2369
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > R6 hierarchy cycles and depth limits are explained and navigable (injected ancestry) > study workspace: the same through the scope",
+          "status": "passed",
+          "duration_ms": 16049
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 375 px, 100% text, light",
+          "status": "passed",
+          "duration_ms": 9268
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "luna-corrections.spec.ts > Graph context outside a narrow study canvas is announced and reachable > 320 px, 200% text, dark",
+          "status": "passed",
+          "duration_ms": 13375
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "review-hierarchy.spec.ts > asserted and ELK children page to their recorded totals; a basis change restarts paging",
+          "status": "passed",
+          "duration_ms": 1897
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "review-hierarchy.spec.ts > discovered entry points page and focus one side",
+          "status": "passed",
+          "duration_ms": 1097
+        },
+        {
+          "file": "study-review-journey.spec.ts",
+          "title": "study-review-journey.spec.ts > review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+          "status": "passed",
+          "duration_ms": 91202
+        }
+      ]
+    }
+  },
+  "r2f1_captures_run2": {
+    "r2f1-injected-about-main-added-first.png": {
+      "sha256": "5aef9a60ed555124e8f5a3b2922d211a3aadd238ca7f3c20342fd379bf854b36",
+      "retained": true
+    },
+    "r2f1-injected-about-main-added-last.png": {
+      "sha256": "5aef9a60ed555124e8f5a3b2922d211a3aadd238ca7f3c20342fd379bf854b36",
+      "retained": false
+    },
+    "r2f1-injected-about-study-added-first.png": {
+      "sha256": "03125fb23de1bdcd1f3818a3df7f3436bc3e307ba5795e14dbdf210ea3571560",
+      "retained": true
+    },
+    "r2f1-injected-about-study-added-last.png": {
+      "sha256": "03125fb23de1bdcd1f3818a3df7f3436bc3e307ba5795e14dbdf210ea3571560",
+      "retained": false
+    },
+    "r2f1-injected-ambiguous-main-added-first.png": {
+      "sha256": "978d9559ab660f84295c09cd525fd9ac7f4869bea44e839e6a4a0238fe3fc16a",
+      "retained": true
+    },
+    "r2f1-injected-ambiguous-main-added-last.png": {
+      "sha256": "978d9559ab660f84295c09cd525fd9ac7f4869bea44e839e6a4a0238fe3fc16a",
+      "retained": false
+    },
+    "r2f1-injected-ambiguous-study-added-first.png": {
+      "sha256": "b2ffeb504e3d5ab62d6bb2c46e30afa1360e3e6a85b148ec8d33fcd6ee6ef210",
+      "retained": true
+    },
+    "r2f1-injected-ambiguous-study-added-last.png": {
+      "sha256": "b2ffeb504e3d5ab62d6bb2c46e30afa1360e3e6a85b148ec8d33fcd6ee6ef210",
+      "retained": false
+    }
+  },
+  "storage": {
+    "start_bytes": 50406054862,
+    "final_bytes": 50590022926,
+    "final_checked_at": "2026-10-13T02:46:31.102742+00:00",
+    "filesystem_free_bytes": 118426841088,
+    "limit_bytes": 100000000000
+  },
+  "credentials_included": false,
+  "backend_validation_relaxed": false
+}

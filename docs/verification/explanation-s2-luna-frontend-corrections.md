@@ -7,6 +7,12 @@ the type check, unit tests and production build pass on the final build, which i
 Luna publication in a new review environment. Graph discoverability at narrow study widths and
 enlarged text was improved and is tested; data limitations are listed separately.
 
+**Follow-up, 13 October:** R2-F1, the remaining finding of the
+[corrections review](explanation-s2-luna-frontend-corrections-review.md), is also corrected. A
+record stored under several typed entities no longer takes its subject from packet order; see
+[R2-F1](#r2-f1-follow-up--one-record-under-several-typed-subjects). With it, R2 is closed for
+the tested scope.
+
 This is development-review evidence. It does not close the human-only audits (manual keyboard
 and screen-reader review, owner design review, participant use), deployment, launch, or the
 backend/fixture items the review assigned to a later pass. Test sessions are development-review
@@ -16,7 +22,7 @@ artifact was changed; no generation, bundle or reasoner run was started.
 | Finding | Correction | Demonstrated by |
 |---|---|---|
 | **R1** generated prose hidden or presented as quotation | Quotation styling, titles and "original"/"definition" wording now come from each artifact's declared preparation and support (`textOrigin`), never from claim category or the paired layout. Reviewed `meaning` prose is shown by default; reviewed per-concept prose reads **"Descriptions side by side"** with generated attribution; only `fact_extract`, exact-support and fallback text is quoted. | All **9** affected comparisons in the main app **and** in study explanation cases: visible exact claim text, "Generated · reviewed", no quotation styling, no "Quoted from each ontology", no misleading "Nothing recorded" line or collapsed quote disclosure. All genuine extracts (paired and one-sided) still quoted with "Original excerpts". Unit tests for every real preparation combination, necessary conditions and fallback facts. |
-| **R2** referenced-label citations named the wrong subject | Each citation carries its exact typed subject from the artifact's support packet (or the context record) into the inspector; the API adapter resolves against the original axiom's own subject, keeping a supplied typed subject only for the same IRI and ontology (punning) and for axioms without a single subject (shared axioms). The inspector states the subject's kind and ontology. | All **35** referenced-label citations in the **33** profiles in the main app, plus the three in case review-01 (including ileum cancer → small intestine cancer, `DOID_10154`) through the study scope: About entity, kind, ontology, the literal against the live original axiom, and the original AST (full IRIs). Unit tests: wrong supplied subject, punned kind, shared `EquivalentClasses`, foreign-ontology subject. |
+| **R2** referenced-label citations named the wrong subject | Each citation passes the record's admitted typed subjects, from the artifact's support packet, to the inspector. A caller context counts only when it is one of them. Since R2-F1, all admitted subjects are kept, not just the first. The API adapter resolves against the original axiom's own subject. It keeps a supplied typed subject only for the same IRI and ontology (punning) and for axioms without a single subject (shared axioms). The inspector states the subject's kind and ontology. | All **35** referenced-label citations in the **33** profiles in the main app, plus the three in case review-01 (including ileum cancer → small intestine cancer, `DOID_10154`) through the study scope: About entity, kind, ontology, the literal against the live original axiom, and the original AST (full IRIs). Unit tests: wrong supplied subject, punned kind, shared `EquivalentClasses`, foreign-ontology subject. Typed multi-subject records: see [R2-F1](#r2-f1-follow-up--one-record-under-several-typed-subjects). |
 | **R3** failed comparison-data reads looked like missing evidence | The graph distinguishes loading, a successful absence ("No comparison was recorded" / "No comparison record is available for this view"), and failure (**Recorded comparisons: … Try again**). Features, selection and the view stay; an unauthorized read shows the message without Retry. | Main app and study scope: an injected 503 on the comparison read, then Retry — recorded comparison lines return with zoom, pan and the selected feature unchanged. An injected 403 offers no Retry. |
 | **R4** equivalence groups limited to one page | Bounded continuation with the service cursor, shown/total count, de-duplicated typed members that refocus the side, loading/error/Retry, and a fresh first page on any focus, scope or basis change. Copy keeps partial-ELK semantics ("a class not listed may still be equivalent"). | An injected 25-member group (20 per page, a failing later page, one duplicate) in the main app and the study scope: "19 of 24 shown" → error → Retry → "24 other classes", 24 distinct members; Asserted → ELK again reads the first page without a cursor; a member link refocuses by typed identity. |
 | **R5** comparison captures showed loading placeholders | The capture spec selects every description variant from served presentation metadata and captures only after the tag, heading, exact claim text and quotation styling are asserted and no loading placeholder remains. | New captures from the final environment for reviewed summary, reviewed side-by-side, reviewed grouped, paired extracts, one-sided extracts, the necessary-conditions template and the referenced-label profile, in main and study, 1440 and 375 px, light and dark (see Screenshots). The historical captures are retained unchanged. |
@@ -51,9 +57,87 @@ of claiming "No label in scope".
 - **Description quality:** low-information but accurate descriptions remain.
 - **Equivalence groups:** the retained ELK groups are singletons, so R4 is demonstrated with an
   injected group.
-- **Duplicate citation subjects:** if a cited record appears under several subjects in one
-  artifact's support packet, the inspector opens it about the first. The resolved original
-  axiom still decides when it names a single subject.
+- **Typed multi-subject records:** the review's audit found none of the 260 active Luna
+  explanations citing a record under several typed subjects. R2-F1 is therefore shown in the
+  browser with an injected second subject, and through the component and adapter with native
+  fixtures.
+
+## R2-F1 follow-up — one record under several typed subjects
+
+The [corrections review](explanation-s2-luna-frontend-corrections-review.md) reproduced one
+remaining typed-identity defect. One original record can belong to several typed entities: a
+punned IRI, or an axiom shared by two classes. The citation wrapper kept only the first such
+subject in the support packet and let it replace a correct caller context. Reversing the
+packet order therefore turned the inspector's individual into a class.
+
+**Correction (frontend only; `2547263`, `2d4600d`):**
+- **Keep every subject.** `citedSubjects` keeps every typed subject that the support packet's
+  facts and referenced labels admit for a record, de-duplicated by ontology/IRI/kind.
+- **Caller context.** `citationSubject` decides which subject a citation is about. The caller
+  context is the record's own entity in a shown context, then the block's entity. It is kept
+  only when its full ontology/IRI/kind identity equals an admitted subject. Otherwise a single
+  admitted subject is used. Several admitted subjects are passed on as candidates, with no
+  chosen subject. Packet order never decides.
+- **Original-axiom validation (unchanged).** This applies to the API adapter
+  (`resolvedFromAxiom`) and the static resolver (`resolveFact`). A supplied subject or candidate
+  must belong to the axiom's ontology. When the axiom names one subject, it must also have that
+  subject's IRI.
+  - A consistent supplied subject comes first, and the other consistent candidates follow.
+  - Several candidates without one are returned as explicitly ambiguous, in identity order.
+  - With neither, the axiom's own subject is used, as before.
+- **Inspector.** The shared inspector is used by both the main app and the study. It shows
+  **About** with **Also stored under (one shared original record)**. When the record is
+  ambiguous, it instead shows **Stored under N typed entities; this citation does not say which
+  one it is about**, listing each kind and ontology. For an ambiguous record it omits the
+  relation sentence, which presumes a single subject.
+- **The caller does not simply win.** When the artifact admits a single subject, a wrong focal
+  caller is still replaced, which is the original R2 case. A caller from another ontology is
+  never attached to the record.
+
+| Evidence | Result |
+|---|---|
+| The review's probe on its native punned label ([probe](explanation-s2-luna-r2-f1/identity_probe.cjs), [fixture](explanation-s2-luna-frontend-corrections-review/identity-fixture.json)), caller = the individual | Before, on the `0e6bebb` source: **class** in one order, individual in the other, so the result depends on order ([probe-before.json](explanation-s2-luna-r2-f1/probe-before.json)). After: **individual in both orders**, with the class listed as also stored under ([probe-after.json](explanation-s2-luna-r2-f1/probe-after.json)). |
+| Complete-path regression `src/lib/workspace/citationIdentity.test.ts` | Runs the real `GeneratedBlock` wrapper, the citation button's action and the API adapter. It uses native backend facts ([generator](explanation-s2-luna-r2-f1/native_fixtures.py)): the punned label, and an `EquivalentClasses` axiom stored under two classes. Covered: both packet orders; the caller as context record or as block subject; callers with a wrong kind, the wrong IRI (the focal entity) or a foreign ontology; a single admitted subject overriding a wrong caller; a referenced label; a legacy artifact without support subjects. **On the pre-fix source the three R2-F1 tests fail** and the R2 test passes. On the fix all 5 pass. |
+| Static resolver `resourceIndex.test.ts` | The shared practice record resolves about a matching caller; otherwise it is ambiguous with both subjects in identity order; a foreign caller is ambiguous. |
+| Browser, shared inspector (`luna-corrections.spec.ts`, R2-F1 block) | Uses the real ileum cancer profile (review-01, position 4). A punned individual copy of two real cited label records is injected into the served support packet by route interception, before the original in one test and after it in the other. In the main app and the study workspace, **"Target label"** opens about the class, with the individual also listed. **"Label of DOID:10154"** shows both typed subjects as unresolved: its caller is the focal entity, which is not admitted. The captures are byte-identical for the two orders. |
+
+[explanation-s2-luna-r2-f1/](explanation-s2-luna-r2-f1/) holds the probe and its before/after
+results, the fixture generator and four inspector captures (added-first; the added-last
+captures have the same SHA-256). Its [receipt](explanation-s2-luna-r2-f1/receipt.json) records
+the bindings, the per-test outcomes of both runs and the storage figures.
+
+**Verification of `2d4600d`.** Browser runs used `environment-frontend-2d4600d` on the Luna
+publication, with system Chrome through Playwright against HTTPS with application CSP.
+
+| Check | Result |
+|---|---|
+| Unit (`npm run test:unit`) | **131 passed**, 0 failed or skipped (125 before, plus the 5 complete-path tests and 1 order-independence test for `citationSubject`) |
+| Type check (`tsc --noEmit`) | passed |
+| Production build | Passed (Next.js 15.5.26 static export). A rebuild after the browser runs equals the bound output in all 62 files, apart from Next.js's random build ID. |
+| Acceptance set, run 1 (fresh environment) | **24 passed, 1 failed.** The R2 main-app test timed out waiting for "Label of DOID:4110": the mite infestation profile's description and comparison reads failed with `network_unreachable` (the browser's fetch was rejected) from the newly started exploration service, so the citation never rendered. All other tests passed, including R2 in the study and both R2-F1 tests (11 s and 17 s). The citation code is not on that path: the profile read happens before any citation is clicked. The service logs warnings only, so no server-side cause was recorded. |
+| Acceptance set, run 2 (same environment, same build) | **25 passed**, 0 failed, skipped or flaky, in 7.1 min. The full 24-case journey passed in 91 s; R2 main-app (all 35 referenced-label citations) in 52 s, compared with 51 s in the review; R2 study; both R2-F1 tests; R1, R3, R4, R6, the narrow-canvas tests, both hierarchy tests and the 8 assessment-recovery tests. |
+
+**Bindings.** Frontend source tree `e67b6235…` (`git rev-parse 2d4600d:explanations_visualizer`).
+Compiled output `~/Library/Caches/exact-om-review/luna-bundle-20261012/frontend-2d4600d`, tree
+hash `07bdf63e4954b1185a11e453f14eb597aaa34904e65039faea7fd28b7355ddb2`. Environment
+`environment-frontend-2d4600d` (PostgreSQL 19623, study HTTPS 19624, exploration HTTPS 19625).
+Its services run from the clean detached worktree `~/Library/Caches/exact-om-dev/s2dev/source-2d4600d`.
+The test publication is `review-20261013T020941-03e25f85da`, SHA-256 `c8d523a3…`. The source
+publication `51500ab8…`, package `07781b63…` and backend fingerprint `752b9144…` are unchanged.
+
+**Remaining limitations of R2-F1:**
+- **Injected browser case.** No active Luna artifact cites a record under several typed
+  subjects, so the rendered browser case is an injected copy (route interception). The native
+  punned and shared-axiom records run through the real component and adapter code, not through
+  a native publication served to the browser.
+- **Legacy artifacts.** Artifacts without support-packet subjects still treat the caller as a
+  hint checked against the axiom. An annotation fixes the subject's IRI but not its kind, so a
+  same-IRI caller of the wrong kind cannot be detected there. Without a caller, an annotation's
+  subject kind is still shown as class. Every Luna artifact carries support subjects.
+- **Wording not reviewed.** The ambiguity wording and layout have not had an owner design review.
+- **Run 1 failure not diagnosed.** The dropped service reads in run 1 were not investigated
+  further: the backend is out of scope, and the service has no access log. They did not recur in
+  run 2.
 
 ## Commits
 
@@ -61,9 +145,15 @@ of claiming "No label in scope".
 |---|---|
 | `f2bdf00` | R1–R4 and R6 corrections, inspector subject details, graph off-canvas cues and reflow, focus-label loading state; unit tests |
 | `bb9a1a6` | `e2e/luna-corrections.spec.ts`, `e2e/reviewData.ts`, the corrected capture spec `e2e/review-visual-s2.spec.ts` |
-| this handoff | this document, the receipt and screenshots; an optional evidence-capture helper in `luna-corrections.spec.ts` (test-only, `EXACT_E2E_SHOTS`) |
+| `0e6bebb` | this handoff, the receipt and screenshots; an optional evidence-capture helper in `luna-corrections.spec.ts` (test-only, `EXACT_E2E_SHOTS`) |
+| `2547263` | R2-F1: every admitted typed subject kept; caller context only on a full identity match; explicit ambiguity in the resolvers and the inspector; native fixtures and the complete-path regression `citationIdentity.test.ts` |
+| `2d4600d` | R2-F1 browser regression in `luna-corrections.spec.ts` (injected second subject, both orders, main app and study) |
+| R2-F1 handoff | this document's R2-F1 updates and [explanation-s2-luna-r2-f1/](explanation-s2-luna-r2-f1/) |
 
 ## Bindings
+
+These are the R1–R6 bindings (`bb9a1a6`). The current `2d4600d` bindings and checks are in
+[R2-F1](#r2-f1-follow-up--one-record-under-several-typed-subjects).
 
 | Identity | Value |
 |---|---|
@@ -84,7 +174,9 @@ in place.
 ## Verification
 
 All browser runs used system Chrome through Playwright, against the HTTPS services with normal
-CSP. "Final environment" means `environment-frontend-bb9a1a6` on the Luna publication.
+CSP. "Final environment" means `environment-frontend-bb9a1a6` on the Luna publication. This
+table is the R1–R6 verification of `bb9a1a6`. The R2-F1 build `2d4600d` was re-verified as
+described in its section.
 
 | Check | Result |
 |---|---|
@@ -125,21 +217,25 @@ as history.
 
 ## Reproduction
 
+The current build is `2d4600d` in `environment-frontend-2d4600d` (ports 19623–19625).
+`environment-frontend-bb9a1a6` (19613–19615) is retained as the R1–R6 binding; to use it,
+substitute its name, worktree and ports.
+
 ```sh
 PY=/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python
 LUNA=/Users/pedrocotovio/Library/Caches/exact-om-review/luna-bundle-20261012
-WT=/Users/pedrocotovio/Library/Caches/exact-om-dev/s2dev/source-bb9a1a6
+WT=/Users/pedrocotovio/Library/Caches/exact-om-dev/s2dev/source-2d4600d
 cd /Users/pedrocotovio/Developer/Repos/OM/Exact-OM
 export PYTHONDONTWRITEBYTECODE=1
 "$PY" -m tools.review_storage_budget check --growth-gb 1
-/usr/bin/env PYTHONSAFEPATH=1 PYTHONPATH="$WT" "$PY" -m tools.review_environment status --root "$LUNA/environment-frontend-bb9a1a6"
+/usr/bin/env PYTHONSAFEPATH=1 PYTHONPATH="$WT" "$PY" -m tools.review_environment status --root "$LUNA/environment-frontend-2d4600d"
 ```
 
 If stopped, start it with the same code and the bounded reservation in
-`environment-frontend-bb9a1a6/storage-reservation.json` (1 GB, 128 MiB per file):
+`environment-frontend-2d4600d/storage-reservation.json` (1 GB, 128 MiB per file):
 
 ```sh
-/usr/bin/env PYTHONSAFEPATH=1 PYTHONPATH="$WT" "$PY" -c 'import resource; resource.setrlimit(resource.RLIMIT_FSIZE,(134217728,134217728)); resource.setrlimit(resource.RLIMIT_CORE,(0,0)); from tools.review_environment import main; main()' start --root "$LUNA/environment-frontend-bb9a1a6"
+/usr/bin/env PYTHONSAFEPATH=1 PYTHONPATH="$WT" "$PY" -c 'import resource; resource.setrlimit(resource.RLIMIT_FSIZE,(134217728,134217728)); resource.setrlimit(resource.RLIMIT_CORE,(0,0)); from tools.review_environment import main; main()' start --root "$LUNA/environment-frontend-2d4600d"
 ```
 
 Browser tests need a private harness file (mode 0600, outside the repository) with `origin`,
@@ -147,10 +243,11 @@ Browser tests need a private harness file (mode 0600, outside the repository) wi
 without printing it. From `explanations_visualizer` with its locked dependencies:
 
 ```sh
-EXACT_E2E_URL=https://127.0.0.1:19615 EXACT_E2E_REVIEW_MAIN_URL=https://127.0.0.1:19615 EXACT_E2E_STUDY_V2_CONFIG=/private/path/harness.json npx playwright test e2e/study-review-journey.spec.ts e2e/review-hierarchy.spec.ts e2e/luna-corrections.spec.ts e2e/assessment-recovery.spec.ts
+EXACT_E2E_URL=https://127.0.0.1:19625 EXACT_E2E_REVIEW_MAIN_URL=https://127.0.0.1:19625 EXACT_E2E_STUDY_V2_CONFIG=/private/path/harness.json npx playwright test e2e/study-review-journey.spec.ts e2e/review-hierarchy.spec.ts e2e/luna-corrections.spec.ts e2e/assessment-recovery.spec.ts
 ```
 
-Add `EXACT_SCREENSHOT_DIR=<dir>` and `e2e/review-visual-s2.spec.ts` to recapture the evidence.
+Add `EXACT_E2E_SHOTS=<dir>` to capture the regression states (R2-F1, R3, R4, R6). To recapture
+the visual evidence, add `EXACT_SCREENSHOT_DIR=<dir>` and `e2e/review-visual-s2.spec.ts`.
 Never print or commit `environment.json`, keys, invitations, cookies or participant identifiers.
 
 ## Storage
@@ -159,8 +256,20 @@ Never print or commit `environment.json`, keys, invitations, cookies or particip
 |---|---|
 | Start of this pass (12 Oct, 22:42 UTC) | 50.049 GB |
 | Final (13 Oct, 00:40 UTC) | **50.361 GB** (118.6 GB filesystem free) |
+| R2-F1 pass start (13 Oct, after the review) | 50.406 GB |
+| R2-F1 pass final (13 Oct, 02:46 UTC) | **50.590 GB** (118.4 GB filesystem free) |
 
-This pass added:
+The R2-F1 pass added:
+- `environment-frontend-2d4600d` (125 MB, including its test sessions);
+- its frontend output (2.4 MB);
+- the clean worktree `source-2d4600d` (56 MB);
+- test output and captures in `s2dev/final-r2f1` (7.6 MB);
+- the evidence folder and native fixture in the repository (0.3 MB).
+
+It also re-used the existing Luna publication, package, data root, dependencies and toolchain,
+and changed no immutable or shared file.
+
+The R1–R6 pass added:
 - the new review environment (156 MB, including its test sessions);
 - the frontend output (2.3 MB);
 - the clean worktree (50 MB);
@@ -188,8 +297,11 @@ No dependency, dataset, bundle, publication, paid call or reasoner output was cr
 - R4's paging is demonstrated with an injected group: every retained ELK group is a singleton.
 - R6's cycles and long chains are injected: the review reproduced no cycle in the retained
   taxonomies, and none was needed to exercise the behaviour.
-- If one artifact lists the same record under several subjects, the inspector opens it about the
-  first, unless the original axiom itself names a single subject.
+- R2-F1's limits are listed in [its section](#r2-f1-follow-up--one-record-under-several-typed-subjects):
+  an injected browser case, legacy artifacts without support subjects, and ambiguity wording
+  without owner review.
+- Production deployment and restore have not been exercised. This is technical acceptance work,
+  not a human audit.
 
 **Data boundaries (unchanged):**
 - no recorded decision-stage events for the presented pairs;
@@ -201,7 +313,6 @@ No dependency, dataset, bundle, publication, paid call or reasoner output was cr
 - manual keyboard and screen-reader audits;
 - owner design review;
 - participant/pilot use;
-- production deployment and restore;
 - external review.
 
 Historical R16 was not reproduced. This is not a launch-readiness claim.
