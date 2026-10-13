@@ -677,8 +677,10 @@ def _tokenizer_backend(tokenizer, *, explicit):
 def encoder_identity(scorer, tokenizer, model, max_len):
     """Actual encoder weights and execution contract, independent of reporting labels."""
     import torch
+    from exact.impl.models.encoder_graph import GRAPH_EXECUTION, graph_enabled
 
     stable_tokenizer = _stable_tokenizer_identity_enabled()
+    graph_enabled()
     config = getattr(model, "config", None)
     revision = getattr(config, "_commit_hash", None)
     if (
@@ -748,6 +750,7 @@ def encoder_identity(scorer, tokenizer, model, max_len):
                 "EXACT_PAIR_CONTEXT_MATRIX_KERNEL",
                 "EXACT_PAIR_CONTEXT_ARITHMETIC",
                 "EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY",
+                *GRAPH_EXECUTION,
             )
         },
     }

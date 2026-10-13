@@ -28,6 +28,9 @@ def execution_options():
 
 def validate_batching_admission():
     """Keep the unqualified GPU path out of scientific runs, including replay."""
+    from exact.impl.models.encoder_graph import graph_enabled
+
+    graph_enabled()
     stable_identity = os.getenv("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY", "0")
     if stable_identity not in {"0", "1"}:
         raise ValueError("EXACT_ENCODER_STABLE_TOKENIZER_IDENTITY must be 0 or 1")

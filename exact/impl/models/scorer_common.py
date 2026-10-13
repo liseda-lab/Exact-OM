@@ -497,10 +497,21 @@ class ScorerCommonMixin:
     def _encode_texts(self, tokenizer, model, texts: List[str], max_len: int) -> torch.Tensor:
         enc = tokenizer(
             texts, padding=True, truncation=True, max_length=max_len, return_tensors="pt"
-        ).to(self.device)
-        with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
-            out = model(**enc).last_hidden_state
-        return self._pool(out, enc["attention_mask"])
+        )
+        observer = getattr(self, "_encoder_observer", None)
+        if observer is not None:
+            observer(model, enc)
+
+        def eager(inputs):
+            with torch.amp.autocast(device_type=self.device_type, enabled=self.fp16):
+                out = model(**inputs).last_hidden_state
+            return self._pool(out, inputs["attention_mask"])
+
+        if os.getenv("EXACT_ENCODER_CUDA_GRAPHS", "0") != "0":
+            from exact.impl.models.encoder_graph import encode_with_graph
+
+            return encode_with_graph(self, model, enc, eager)
+        return eager(enc.to(self.device))
 
     @torch.inference_mode()
     def encode_labels_batch(self, label_texts: List[str]) -> torch.Tensor:
