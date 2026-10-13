@@ -17,6 +17,8 @@ export interface HarnessConfig {
   study_revision: string;
   /** Directory holding the publication's assets (practice-explanations.json); defaults to the publication's. */
   assets?: string;
+  /** Optional non-secret build/data identities recorded with style diagnostics (HR1). */
+  identity?: Record<string, string | null>;
 }
 
 export const harness: HarnessConfig | null = process.env.EXACT_E2E_STUDY_V2_CONFIG ? JSON.parse(readFileSync(process.env.EXACT_E2E_STUDY_V2_CONFIG, "utf8")) : null;

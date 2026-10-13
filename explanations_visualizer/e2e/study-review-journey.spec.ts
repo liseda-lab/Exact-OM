@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page, type Response } from "@playwright/test";
 
+import { StyleDiagnostics } from "./styleDiagnostics";
 import { harness, harnessForms, recordTraffic, REVIEW_FORMS, scopedPath } from "./v2Harness";
 
 // The unseeded review journey on a forms/3 publication (23 C04/C05, 21 F01–F07): a new test
@@ -19,6 +20,16 @@ const shots = process.env.EXACT_E2E_SHOTS ?? null;
 test.use({ screenshot: "off", trace: "off", actionTimeout: 20_000, viewport: { width: 1280, height: 720 } });
 test.beforeEach(() => test.skip(!harness || harnessForms !== REVIEW_FORMS, "Set EXACT_E2E_STUDY_V2_CONFIG to a forms/3 review publication"));
 
+// HR1: the application stylesheet must still apply after each reload and stage change; the
+// diagnostics keep sanitized delivery evidence (see styleDiagnostics.ts).
+let styles: StyleDiagnostics | null = null;
+test.afterEach(async ({}, info) => {
+  await styles?.finish(info);
+  styles = null;
+});
+// Opt-in investigation only (spec 24 §3.3: at most ten): extra reloads at the assessment boundary.
+const boundaryReloads = Math.min(10, Number(process.env.EXACT_E2E_BOUNDARY_RELOADS ?? 0) || 0);
+
 async function noViolations(page: Page) {
   const result = await new AxeBuilder({ page }).withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"]).analyze();
   expect(result.violations.map((item) => `${item.id}: ${item.nodes.map((node) => node.target.join(" ")).join(", ")}`)).toEqual([]);
@@ -34,6 +45,7 @@ const snap = async (page: Page, name: string) => {
 test("review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports", async ({ page, context }) => {
   test.setTimeout(1_200_000);
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+  styles = await StyleDiagnostics.attach(page, "study-review-journey", harness!.identity ?? {});
   const traffic = recordTraffic(page);
   const progress: { status: number; body: { actions?: { action: string; fact_id?: string }[] } }[] = [];
   page.on("response", async (response: Response) => {
@@ -58,6 +70,7 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   ]);
   expect(exchange.postDataJSON()).toMatchObject({ client_contract: "study-review/1" });
   await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
+  await styles.expectStyled("study-entry");
   expect((await api()).forms.version).toBe(REVIEW_FORMS);
   await page.getByRole("button", { name: "I agree to take part", exact: true }).click();
 
@@ -116,8 +129,10 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   // Lesson 2: search, parent, child, and the instructed return to the compared concept.
   await page.getByRole("button", { name: "Next lesson", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: /^Lesson 2 of 6/ })).toBeFocused();
+  await styles.beforeNavigation("lesson-2 reload");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: /^Lesson 2 of 6/ })).toBeVisible();
+  await styles.expectStyled("lesson-2-reload");
   await page.getByRole("tab", { name: "Hierarchy", exact: true }).click();
   const practice = page.getByRole("region", { name: "Source ontology browser" });
   await practice.getByRole("combobox").fill("crate");
@@ -218,6 +233,7 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   await reports.nth(1).getByRole("button", { name: "Check practice report" }).click();
   await saved(page, 4);
   await snap(page, "journey-tutorial-lesson6");
+  await styles.expectStyled("lesson-6");
 
   // F02 assessment: server-graded, wrong answers retried, one question at a time.
   await page.getByRole("button", { name: "Go to the five questions", exact: true }).click();
@@ -255,8 +271,16 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   for (const label of [/is optional/, /combine methods/, /must use Protégé/]) await item.getByRole("checkbox", { name: label }).check();
   await item.getByRole("button", { name: "Check answer" }).click();
   await expect(item).toContainText("Not quite");
+  await styles.beforeNavigation("assessment reload");
   await page.reload();
   await expect(page.getByRole("heading", { level: 1, name: "Check your understanding" })).toBeVisible();
+  await styles.expectStyled("assessment-q5-reload");
+  for (let extra = 1; extra <= boundaryReloads; extra += 1) {
+    await styles.beforeNavigation(`assessment extra reload ${extra}`);
+    await page.reload();
+    await expect(page.getByRole("heading", { level: 1, name: "Check your understanding" })).toBeVisible();
+    await styles.expectStyled(`assessment-q5-extra-reload-${extra}`);
+  }
   await expect(item.getByRole("checkbox", { name: /must use Protégé/ })).toBeChecked();
   await item.getByRole("checkbox", { name: /must use Protégé/ }).uncheck();
   await item.getByRole("checkbox", { name: /After each source-and-candidates case/ }).check();
@@ -264,6 +288,8 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   await expect(item.getByText("Passed")).toBeVisible();
   await expect(page.locator(".question-nav button").filter({ hasText: "(passed)" })).toHaveCount(5);
   await page.getByRole("button", { name: "Finish the tutorial and start the scored cases" }).click();
+  await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible({ timeout: 60_000 });
+  await styles.expectStyled("first-case");
 
   // Scored cases (F03–F07): both conditions; methods change between cases.
   const conditions = new Set<string>();
@@ -285,12 +311,14 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
     await expect(page.getByRole("complementary", { name: "Candidates and your answer" })).toBeVisible();
     const current = await (await page.request.get(`${harness!.origin}/api/v1/study/cases/current`)).json();
     conditions.add(current.condition);
+    if (index === 0) styles.record({ type: "allocation", first_condition: current.condition });
     await expect(page.getByRole("button", { name: /^Add .* as rank 1$/ }).first()).toBeEnabled();
     if (current.condition === "ontology_baseline") {
       await expect(page.getByRole("tab")).toHaveCount(0);
       expect(current.workspace).toBeNull();
       if (!baselineSeen) {
         baselineSeen = true;
+        await styles.expectStyled(`first-baseline-case-${index + 1}`);
         await snap(page, "journey-case-baseline");
         await noViolations(page);
       }
@@ -301,6 +329,7 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
       if (!explored) {
         explored = true;
         await expect(page.locator(".entity-card-source .entity-title")).not.toBeEmpty();
+        await styles.expectStyled(`first-explanation-case-${index + 1}`);
         await snap(page, "journey-case-explanation");
         await noViolations(page);
         // F06: partial ELK is offered from the scope's navigation and explains itself.
@@ -355,8 +384,10 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
       await expect(page.locator("#consultation-other_method")).toBeFocused();
       await page.locator("#consultation-other_method").fill(methodName);
       await expect(page.locator(".save-indicator")).toContainText("Saved");
+      await styles.beforeNavigation("consultation reload");
       await page.reload();
       await expect(page.getByText("Your unfinished answer was restored from the study server.")).toBeVisible();
+      await styles.expectStyled("consultation-reload");
       await expect(page.getByRole("checkbox", { name: "Other method", exact: true })).toBeChecked();
       await snap(page, "journey-consultation");
       await noViolations(page);
@@ -391,6 +422,7 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   const final = await api();
   expect(final.stage).toBe("completed");
   expect(final.completed_cases).toBe(final.assigned_case_count);
+  await styles.expectStyled("completion");
   await snap(page, "journey-complete");
 
   // Only study routes; baseline cases read no workspace; no key material reached the page.
@@ -398,6 +430,8 @@ test("review journey: forms/3, tutorial recovery, both conditions, changing meth
   expect(traffic.requests.filter((request) => request.path.startsWith("/api/v1/study/workspace/") && !explanationScopes.has(decodeURIComponent(request.path.split("/")[5])))).toEqual([]);
   expect(requestErrors.filter((error) => !error.startsWith("422 PUT /api/v1/study/tutorial/progress"))).toEqual([]);
   expect(traffic.errors).toEqual([]);
+  // HR1: no application stylesheet transfer failed (a cancellation by a reload is not a failure).
+  expect(styles.summary().css_failed_not_canceled).toBe(0);
 
   // Exports (researcher page): analysis/4, method names only on request; familiarity never fills use.
   const exportPage = await context.newPage();
