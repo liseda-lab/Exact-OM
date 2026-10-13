@@ -404,6 +404,7 @@ def test_e4_runtime_keeps_pool_objective_and_solver_settings(tmp_path, monkeypat
 
 def test_frozen_checkpoint_sets_eval_and_declared_device(tmp_path, monkeypatch):
     import io
+    from dataclasses import dataclass
 
     import torch
 
@@ -431,11 +432,16 @@ def test_frozen_checkpoint_sets_eval_and_declared_device(tmp_path, monkeypatch):
         buffer,
     )
 
+    @dataclass(frozen=True)
+    class FrozenFixture:
+        worker_ownership: object = None
+
     def frozen(problem, loaded, **options):
         assert not loaded.training
         assert loaded.empty_bundle.device.type == "cpu"
         assert "device" not in options
-        return "checked"
+        return FrozenFixture()
 
     monkeypatch.setattr("exact.repair.pipeline.freeze_neural_round", frozen)
-    assert _freeze_worker(None, buffer.getvalue(), dict(device="cpu")) == "checked"
+    result = _freeze_worker(None, buffer.getvalue(), dict(device="cpu"))
+    assert result.worker_ownership == {"device": "cpu"}

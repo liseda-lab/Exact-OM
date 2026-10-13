@@ -30,6 +30,9 @@ def validate(plan, now):
     if plan.get("schema") != SCHEMA or plan.get("execution_authorized") is not True:
         raise ValueError("Conference TEST input preparation is not admitted")
     freeze = bound(plan["model_freeze_receipt"])
+    from tools.repair.fixed_endpoint_freeze import validate as validate_endpoint_freeze
+
+    validate_endpoint_freeze(freeze)
     schedule = bound(plan["schedule"])
     expected_models = {f"hgt-pair-{c}-s{s}" for s in (13, 37, 73)
                        for c in ("symbolic", "symbolic_plus_llm")}

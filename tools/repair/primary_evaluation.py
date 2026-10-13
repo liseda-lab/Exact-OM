@@ -482,6 +482,9 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
         if now() < manifest["not_before_epoch"] or not manifest.get("model_freeze_receipt"):
             raise ValueError("TEST remains closed until the model freeze")
         freeze = bound(manifest["model_freeze_receipt"])
+        from tools.repair.fixed_endpoint_freeze import validate as validate_endpoint_freeze
+
+        validate_endpoint_freeze(freeze)
         if (
             freeze.get("models") != manifest["models"]
             or len(manifest["models"]) != 6
