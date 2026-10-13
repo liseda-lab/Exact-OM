@@ -9,10 +9,10 @@ from exact.repair.workers import CallResult
 from tests.repair_primary_evaluation_test import fixture_manifest
 from tools.repair.historical_regression import binding
 from tools.repair.primary_evaluation import execute_rows
-from tools.repair.primary_failure_recovery import CAUSE, prior_costs
+from tools.repair.primary_failure_recovery import CAUSE, METADATA_CAUSE, prior_costs
 
 
-def recovery(tmp_path, *, detail=CAUSE, cleanup=True):
+def recovery(tmp_path, *, detail=CAUSE, cleanup=True, kind="feature"):
     original = fixture_manifest(tmp_path)
     work = tmp_path / "failed"
     row = original["rows"][0]
@@ -63,7 +63,7 @@ def recovery(tmp_path, *, detail=CAUSE, cleanup=True):
     write_artifact(
         tmp_path / "recovery.json",
         dict(
-            schema="exact-repair/primary-feature-boundary-recovery/v1",
+            schema=f"exact-repair/primary-{kind}-boundary-recovery/v1",
             manifest=binding(tmp_path / "manifest.json"),
             receipt=receipt,
             retirement=binding(tmp_path / "retirement.json"),
@@ -73,12 +73,15 @@ def recovery(tmp_path, *, detail=CAUSE, cleanup=True):
         original,
         source_commit="fixed",
         dispatch_nonce="new",
-        feature_boundary_recovery=binding(tmp_path / "recovery.json"),
+        **{kind + "_boundary_recovery": binding(tmp_path / "recovery.json")},
     )
 
 
-def test_failed_row_only_uses_remaining_budget_and_keeps_prior_cost(tmp_path, monkeypatch):
-    manifest = recovery(tmp_path)
+@pytest.mark.parametrize("kind,detail", [("feature", CAUSE), ("metadata", METADATA_CAUSE)])
+def test_failed_row_only_uses_remaining_budget_and_keeps_prior_cost(
+    tmp_path, monkeypatch, kind, detail
+):
+    manifest = recovery(tmp_path, kind=kind, detail=detail)
     assert prior_costs(manifest) == {"native": 7.0}
     calls = []
 
@@ -102,3 +105,8 @@ def test_failed_row_only_uses_remaining_budget_and_keeps_prior_cost(tmp_path, mo
 def test_unknown_cleanup_and_undiagnosed_outcomes_cannot_renew_a_row(tmp_path, detail, cleanup):
     with pytest.raises(ValueError, match="bounded, cleaned-up"):
         prior_costs(recovery(tmp_path, detail=detail, cleanup=cleanup))
+
+
+def test_metadata_recovery_cannot_replay_a_different_failure(tmp_path):
+    with pytest.raises(ValueError, match="bounded, cleaned-up"):
+        prior_costs(recovery(tmp_path, kind="metadata", detail=CAUSE))

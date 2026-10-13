@@ -14,6 +14,7 @@ from tools.repair.batch import sha
 from tools.repair.evaluation_ownership import (
     PROFILE,
     capacity,
+    external_pools,
     lane_for,
     partition,
     resources,
@@ -216,6 +217,18 @@ def test_terminal_pool_reused_by_real_native_consumer_without_regeneration(tmp_p
     second = execute_rows(consumer, tmp_path / "consumer", evaluator=operator.add)
     assert first == second
     assert len(list((work / "rows").iterdir())) == 1
+
+
+def test_retained_pool_requires_explicit_original_source_pin(tmp_path, monkeypatch):
+    consumer, producer, work, attempt = prepared_pool(tmp_path, monkeypatch)
+    consumer["source_commit"] = "corrected"
+    with pytest.raises(ValueError, match="source/schedule differs"):
+        external_pools(consumer)
+    consumer["pool_producers"]["shared-pool"]["source_commit"] = producer["source_commit"]
+    assert external_pools(consumer)["shared-pool"]["status"] == "complete"
+    consumer["pool_producers"]["shared-pool"]["source_commit"] = "wrong"
+    with pytest.raises(ValueError, match="source/schedule differs"):
+        external_pools(consumer)
 
 
 @pytest.mark.parametrize(

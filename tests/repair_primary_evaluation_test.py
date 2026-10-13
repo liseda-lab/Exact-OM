@@ -19,6 +19,7 @@ from tools.repair.primary_evaluation import (
     evaluate_input,
     execute_rows,
     remaining,
+    study_public_input,
 )
 
 
@@ -151,6 +152,73 @@ def test_native_row_executes_and_resumes_exact_receipt_without_replay(tmp_path, 
     Path(output["path"]).write_text("tampered")
     with pytest.raises(ValueError, match="checksum changed"):
         execute_rows(manifest, tmp_path / "run")
+
+
+def test_conference_native_accepts_retained_minimal_metadata_without_corruption_claim(
+    tmp_path, monkeypatch
+):
+    manifest = fixture_manifest(tmp_path)
+    case = manifest["cases"]["fixture"]
+    case.pop("family")
+    case.pop("control")
+    case.update(
+        cohort="conference", theory_scope="complete_source_ontologies_with_resolved_imports"
+    )
+    public_path = tmp_path / "public.json"
+    public = json.loads(public_path.read_text())
+    public["metadata"] = {k: case[k] for k in ("case_id", "structural_parent", "split")}
+    write_artifact(public_path, public)
+    manifest["public_inputs"]["fixture"] = binding(public_path)
+    before = public_path.read_bytes()
+    monkeypatch.setenv("EXACT_REPAIR_DEADLINE_EPOCH", str(time.time() + 100))
+    result = execute_rows(manifest, tmp_path / "run")
+    row = result["rows"][0]
+    assert row["status"] == "complete", row
+    assert row["result"]["logical_status"] == "VERIFIED_FEASIBLE"
+    assert row["result"]["family"] == "conference"
+    assert row["result"]["control"] == "not_applicable"
+    assert row["result"]["theory_scope"] == case["theory_scope"]
+    assert public_path.read_bytes() == before
+    with pytest.raises(ValueError, match="case/parent/split differs"):
+        study_public_input(public, dict(case, split="test"))
+    with pytest.raises(ValueError, match="scope conflicts"):
+        study_public_input(
+            dict(public, metadata={**public["metadata"], "control": "corrupted"}), case
+        )
+
+
+def test_conference_learned_receives_same_explicit_scope(tmp_path, monkeypatch):
+    case, public_ref, protocol = public_fixture(tmp_path)
+    public = json.loads((tmp_path / "public.json").read_text())
+    public["metadata"] = {k: case[k] for k in ("case_id", "structural_parent", "split")}
+    case.update(
+        cohort="conference", theory_scope="complete_source_ontologies_with_resolved_imports"
+    )
+    write_artifact(tmp_path / "public.json", public)
+    observed = []
+
+    def capture(record, settings, directory):
+        observed.append((record, settings))
+        return {"status": "captured"}
+
+    monkeypatch.setattr("tools.repair.corrective_study.evaluate_row", capture)
+    monkeypatch.setenv("EXACT_REPAIR_DEADLINE_EPOCH", str(time.time() + 100))
+    row = dict(
+        adapter=dict(operation="generated_learned"), settings=dict(execution="staged"), seed=13
+    )
+    evaluate_input(
+        row,
+        case,
+        binding(tmp_path / "public.json"),
+        protocol,
+        {},
+        None,
+        tmp_path / "learned",
+        time.time() + 50,
+        "cpu",
+    )
+    assert observed[0][0]["metadata"]["control"] == "not_applicable"
+    assert observed[0][1]["theory_scope"] == case["theory_scope"]
 
 
 def test_interrupted_case_cannot_renew_its_budget(tmp_path):

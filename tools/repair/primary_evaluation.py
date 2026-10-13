@@ -177,6 +177,19 @@ def _public_problem(public, case):
     return problem
 
 
+def study_public_input(public, case):
+    """Project declared Conference scope without inventing a corruption label."""
+    _public_problem(public, case)
+    if case.get("cohort") != "conference":
+        return public
+    metadata = dict(public["metadata"])
+    scope = dict(family="conference", control="not_applicable")
+    for key, value in scope.items():
+        if key in metadata and metadata[key] != value:
+            raise ValueError("Conference study scope conflicts with public metadata")
+    return dict(public, metadata={**metadata, **scope})
+
+
 def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, deadline, device):
     """Execute one row using observable inputs, frozen models and native checking."""
     from exact.repair.kernel import repair
@@ -194,6 +207,7 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
     )
     public, protocol = bound(public_ref), bound(protocol_ref)
     problem = _public_problem(public, case)
+    public = study_public_input(public, case)
     problem = dataclasses.replace(
         problem,
         budgets=dataclasses.replace(
@@ -240,6 +254,7 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
             public,
             dict(
                 arm="learned",
+                theory_scope=case.get("theory_scope", "complete_asserted_input"),
                 checkpoint=model,
                 protocol=protocol,
                 seconds=remaining(deadline),
@@ -259,6 +274,7 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
             public,
             dict(
                 arm=operation,
+                theory_scope=case.get("theory_scope", "complete_asserted_input"),
                 protocol=protocol,
                 seconds=remaining(deadline),
                 observable_queries=queries,
@@ -322,6 +338,7 @@ def evaluate_input(row, case, public_ref, protocol_ref, model, pool, directory, 
                 public,
                 dict(
                     arm="support_retention_surrogate",
+                    theory_scope=case.get("theory_scope", "complete_asserted_input"),
                     protocol=protocol,
                     seconds=remaining(deadline),
                     observable_queries=queries,

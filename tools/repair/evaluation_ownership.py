@@ -243,10 +243,9 @@ def external_pools(manifest):
                 row[k] != consumer[k] for k in ("case_id", "input_identity", "protocol")
             ):
                 raise ValueError("Shared pool dependency input/protocol differs")
-        if any(
-            producer.get(k) != manifest.get(k)
-            for k in ("schedule", "source_commit", "public_input_producer")
-        ):
+        if producer.get("source_commit") != contract.get(
+            "source_commit", manifest.get("source_commit")
+        ) or any(producer.get(k) != manifest.get(k) for k in ("schedule", "public_input_producer")):
             raise ValueError("Shared pool source/schedule differs")
         case_id = row["case_id"]
         if producer["public_inputs"].get(case_id) != manifest["public_inputs"].get(
