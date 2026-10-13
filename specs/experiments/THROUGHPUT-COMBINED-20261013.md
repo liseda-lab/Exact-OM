@@ -1,5 +1,14 @@
 # Combined batching and CUDA graph validation
 
+**Completed:** step `14372.283` exited successfully at 2026-10-13 02:44:57 UTC.
+Algorithmic invariants and cache checks passed. Batched scoring reached 39.995
+pairs/s (125.017 seconds for 5,000 pairs); the graph-enabled arm reached 36.927
+pairs/s with zero captures/replays. Graph acceleration remains unvalidated on
+this natural workload. The same 202 final mappings were retained in this bounded
+panel, with score/evidence/ranking drift reported and no paid calls. The user
+subsequently approved [G4 with batching and graphs off](G4-BATCHED-RESTART-20261013.md).
+The original launch-time authorization and handoff below are retained as history.
+
 The October 13 authorization covers implementation, short regression checks and
 one bounded offline validation. G4 and every other scientific run remain paused.
 The user reviews the results before approving any further execution.

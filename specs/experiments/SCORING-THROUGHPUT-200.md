@@ -1,7 +1,15 @@
 # Exact-OM scoring throughput contract: 200 cold unique pairs/second
 
 Recorded: 2026-10-09. Updated: 2026-10-13. Status:
-**combined_batch_graph_validation_running_scientific_execution_paused**.
+**batched_G4_restart_authorized_preparing**.
+
+Current amendment: the completed combined validation passed algorithmic and
+cache checks at 39.995 pairs/s for batched scoring on its fixed 5,000-pair panel.
+The user approved preparing and restarting G4 with graphs off. The 200-pair/s
+target is deferred as a prerequisite for this run; it is not claimed achieved.
+Recompute all eight G4 prediction cells consistently, reuse verified fitted state,
+and keep later experiments held. The [restart handoff](G4-BATCHED-RESTART-20261013.md)
+supersedes earlier execution-hold statements below for G4 only.
 
 Implementation evidence (updated 2026-10-10): [handoff](THROUGHPUT-IMPLEMENTATION-20261009.md).
 748 CPU regression tests passed on the final frozen source. Experimental H0

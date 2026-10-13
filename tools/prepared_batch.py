@@ -666,6 +666,19 @@ def validate_e25_replay_completion(scientific_step, reports, *, require_artifact
 
 
 def run_recipe(path):
+    """Apply an explicitly bound G4 fit-only restart for this worker invocation."""
+    recipe = read(path)
+    if recipe.get("g4_batched_restart"):
+        if recipe.get("scientific_step") != "G4":
+            raise ValueError("The batched fitted-state restart is scoped to G4")
+        from tools.recover_g4_batching import cell_configs
+
+        with cell_configs(verified(recipe["g4_batched_restart"])):
+            return _run_recipe(path)
+    return _run_recipe(path)
+
+
+def _run_recipe(path):
     from types import SimpleNamespace
 
     from exact.core.entities.configs.yaml_io import dump_yaml_document

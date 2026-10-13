@@ -3,7 +3,26 @@ kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
 updated_at: '2026-10-13'
-status: combined_batch_graph_validation_running_scientific_execution_paused
+status: batched_G4_restart_authorized_preparing
+g4_batched_restart_20261013:
+  handoff: specs/experiments/G4-BATCHED-RESTART-20261013.md
+  evidence_root: data/experiments-v2/g4-batched-restart-20261013-01
+  authorization: user_approved_prepare_and_restart_G4_only
+  run_id: G4-batched-restart-20261013
+  recipe: staged-32x64-mm-v1
+  prediction_cells: 8
+  old_prediction_rows_imported: 0
+  compatible_fitted_artifacts: checksum_bound_reuse
+  historical_charges: retained
+  controlled_synthetic_diagnostics: disabled_ordinary_inference_amendment
+  natural_evidence: preserved
+  CUDA_graphs: false
+  stable_tokenizer_identity: false
+  future_experiments: held_for_user_review
+  target_200_pairs_per_second: unachieved_deferred_as_G4_restart_prerequisite
+  measured_scoring_pairs_per_second: 39.99453634663465
+  full_pipeline_throughput: not_yet_measured
+  status: preparing
 combined_implementation_20261013:
   handoff: specs/experiments/THROUGHPUT-COMBINED-20261013.md
   evidence_root: data/experiments-v2/g4-combined-optimization-20261013-01
@@ -30,8 +49,9 @@ combined_implementation_20261013:
   performance_target_admission: open_requires_full_cold_multi_dataset_evidence
   supervisor: watch_only_single_allowlisted_validation_while_campaign_paused
   subsequent_queue_entries_allowed: false
-  scientific_restart_requires_new_user_approval: true
-  verification_status: implementation_and_short_checks_complete_long_validation_running
+  scientific_restart_requires_new_user_approval: false
+  approved_scientific_restart_scope: G4_only_staged_batching_graphs_off
+  verification_status: completed_algorithmic_invariants_and_cache_checks_passed
   source_revision: 2c0fd931cb036408b2e9d9e2716418ae2a2bc2d5
   implementation_commits: [e4c93a38, 0220f274, 2c0fd931]
   recipe_sha256: 7d351410644791ebcf7fd5c48423effe9f78c1797611ae32f2432fa314e38d8e
@@ -52,7 +72,17 @@ combined_implementation_20261013:
     retained_bytes_after_release: 0
     graph_retention_cap_bytes: 2147483648
     initial_512MiB_smoke: outputs_equal_replay_coverage_limited_by_retention_cap
-  long_validation_results: pending_user_review
+  long_validation_results: reviewed_user_approved_batched_G4_graphs_off
+  completed_UTC: '2026-10-13T02:44:57Z'
+  result_sha256: 65c6c42e4f71cd09788057a24da6448480ae366c30f34b74b61b7dc20cb9dfcb
+  measured_scoring_pairs_per_second:
+    sequential: 15.690543
+    staged_encoder: 39.994536
+    staged_encoder_CUDA_graph: 36.926910
+  natural_workload_graph_captures: 0
+  natural_workload_graph_replays: 0
+  final_mappings_each_variant: 202
+  fitted_score_max_absolute_difference: 0.00702721596
 implementation_20261013:
   handoff: specs/experiments/THROUGHPUT-IMPLEMENTATION-20261013.md
   evidence_root: data/experiments-v2/g4-optimization-implementation-20261012-01
