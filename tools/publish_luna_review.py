@@ -27,15 +27,18 @@ from tools.review_environment import AdmissionHashes, verify_assets, verify_work
 from tools.review_luna_bundle import contexts_for, freeze, read, verify_base
 
 
-def revised_manifest(previous, package, replacements, binding):
+def revised_manifest(previous, package, replacements, binding, *, prefix="luna-20261012"):
     """Explicit artifacts avoid directory scanning or rewriting an existing manifest."""
+    import re
+    if not re.fullmatch(r"[a-z0-9][a-z0-9-]{0,79}", prefix):
+        raise ValueError("Invalid immutable revision name")
     metadata = previous.model_dump(mode='json')
     artifacts = {a['path']: a for a in metadata['artifacts']}
     dependencies = metadata['provenance'].setdefault('description_dependencies', {})
     for old_id, result in replacements.items():
         if result['explanation_id'] == old_id:
             continue
-        rel = 'luna-20261012/explanations/' + result['explanation_id'][7:] + '.json'
+        rel = prefix + '/explanations/' + result['explanation_id'][7:] + '.json'
         freeze(package / rel, result)
         artifacts[rel] = Artifact(path=rel, sha256=file_hash(package / rel), size=(package / rel).stat().st_size).model_dump()
         metadata['explanations'].pop(old_id)
