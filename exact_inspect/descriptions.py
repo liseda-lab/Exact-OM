@@ -271,7 +271,6 @@ def validate_metadata_envelope(result):
         if (
             kind == "grounded_description"
             or support == "typed_template_support"
-            or result.get("support_packet") is not None
             or result.get("independent_review") is not None
             or support == "independently_reviewed"
         ):
@@ -285,6 +284,17 @@ def validate_metadata_envelope(result):
             support is not None and support != expected[1]
         ):
             raise ValueError("Preparation metadata differs from the recorded generation status")
+        if result.get("support_packet") is not None:
+            from .contracts import canonical_hash
+
+            packet = FactPacket.model_validate(result["support_packet"])
+            if (
+                canonical_hash(packet) != manifest.get("packet_hash")
+                or packet.task != result.get("task")
+                or [e.model_dump() for e in packet.entities] != result.get("entities")
+                or packet.selection.get("description_contract") is not None
+            ):
+                raise ValueError("Legacy support packet differs from its frozen generation")
         return
     packet = FactPacket.model_validate(result.get("support_packet"))
     if result.get("independent_review") is not None or support == "independently_reviewed":
@@ -343,7 +353,7 @@ def validate_prepared_support(result, contexts, policy):
         ]
         or manifest["ontology_context_hashes"] != packet.context_hashes
         or manifest["visibility_policy_hash"] != packet.policy_hash
-        or packet.selection.get("description_contract") != DESCRIPTION_VERSION
+        or packet.selection.get("description_contract") != manifest.get("description_contract")
         or canonical_hash(packet) != manifest["packet_hash"]
         or packet.policy_hash != policy.policy_hash
         or [e.model_dump() for e in packet.entities] != result["entities"]

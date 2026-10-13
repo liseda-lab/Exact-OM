@@ -171,6 +171,8 @@ def build_context_package(
             raise ValueError("Existing context belongs to a different ontology version")
         if existing.manifest.get("preparation_key") != preparation_key:
             raise ValueError("Existing context has incompatible preparation coverage")
+        if "category_counts" not in existing.manifest.get("completeness", {}):
+            raise ValueError("Legacy context lacks a category inventory; prepare a new revision")
         return existing
     destination.parent.mkdir(parents=True, exist_ok=True)
     lock = (destination.parent / ("." + destination.name + ".lock")).open("a+")
@@ -511,6 +513,9 @@ def build_context_package(
         connection.commit()
         persist()
         entity_count = connection.execute("SELECT count(*) FROM entities").fetchone()[0]
+        category_counts = dict(
+            connection.execute("SELECT category,count(*) FROM axioms GROUP BY category")
+        )
         connection.close()
         manifest = {
             "schema": CONTEXT_SCHEMA,
@@ -542,6 +547,7 @@ def build_context_package(
                 "domain_completeness": "not_established",
                 "entity_count": entity_count,
                 "axiom_count": axiom_count,
+                "category_counts": category_counts,
             },
             "diagnostics": typed_node(snapshot.diagnostics),
             "runtime": {

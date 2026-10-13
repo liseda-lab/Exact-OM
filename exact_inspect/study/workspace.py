@@ -231,7 +231,10 @@ def _admit_explanation(value, case, policy, contexts):
                     pass
             else:
                 raise ValueError("Workspace citation has no permitted typed subject")
-    if result["manifest"].get("description_contract") == "exact-description/2":
+    if (
+        result.get("support_packet") is not None
+        or result["manifest"].get("description_contract") == "exact-description/2"
+    ):
         from ..descriptions import validate_prepared_support
 
         validate_prepared_support(result, contexts, policy)

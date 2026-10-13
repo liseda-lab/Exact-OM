@@ -199,6 +199,10 @@ def build_explanation_resource(
         ):
             raise ValueError("Generated artifact does not match its permitted input packet")
         output = ExplanationOutput(claims=result["claims"])
+        if result.get("support_packet") is not None:
+            from ..descriptions import validate_prepared_support
+
+            validate_prepared_support(result, contexts, policy)
         reviewed = result.get("independent_review") is not None
         review_hash = None
         if reviewed:

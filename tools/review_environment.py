@@ -1028,6 +1028,8 @@ def serve(config, role, nonce):
         return value
 
     phase("backend_identity", lambda: verify_backend(config))
+    if os.environ.get("EXACT_REVIEW_READ_DIAGNOSTICS") == "1":
+        os.environ["EXACT_READ_DIAGNOSTICS"] = str(Path(config["root"]) / "logs" / (role + "-reads.jsonl"))
     if role == "study":
         from urllib.parse import quote
 

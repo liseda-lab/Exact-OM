@@ -40,6 +40,25 @@ TABLES = {
 }
 
 
+# An explicit review-navigation choice, not an obsolescence classifier or OWL edge.
+# Bind both ontology identity and prepared bytes: unrelated DOID versions do not inherit it.
+CURATED_DEFAULTS = {
+    "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500": {
+        "context_sha256": "sha256:d18cc163a3bcc4546029e08e347fe7d896848353fcb03df95cda3bd25660c99a",
+        "iri": "http://purl.obolibrary.org/obo/DOID_4",
+        "rationale": "Curated review starting point: disease. All recorded roots remain accessible; this choice makes no claim about other entities' obsolescence.",
+        "revision": "review-navigation/20261013",
+    }
+}
+
+
+class EntrySelection(WireModel):
+    kind: Literal["prepared_order", "curated_default"]
+    revision: str | None = None
+    rationale: str | None = None
+    assertion: Literal["navigation_only"] = "navigation_only"
+
+
 class EntryPoint(WireModel):
     entity: EntityRef
     preferred_label: PreferredLabel
@@ -60,6 +79,7 @@ class EntryPointPage(Page[EntryPoint]):
         NAVIGATION_CONTRACT
     )
     default_entity: EntityRef | None = None
+    selection: EntrySelection = Field(default_factory=lambda: EntrySelection(kind="prepared_order"))
     basis: str
     completeness: dict[str, Any]
     inference: dict[str, Any]
@@ -189,9 +209,18 @@ def entry_points(
         raise ValueError("Unsupported entry-point kind or basis")
     info = metadata(context, policy, basis=basis)
     navigation = prepared(context, basis)
+    choice = CURATED_DEFAULTS.get(context.ontology_version_id)
+    if not (
+        choice
+        and kind == "class"
+        and basis in {"literal_asserted", "structural_navigation"}
+        and choice["context_sha256"] == context.manifest["artifacts"]["context.sqlite"]
+    ):
+        choice = None
     scope = context._scope(
         {
             "operation": "entry_points",
+            "entry_selection": canonical_hash(choice) if choice else None,
             "kind": kind,
             "language": language,
             "navigation": navigation.identity if navigation else None,
@@ -241,16 +270,43 @@ def entry_points(
         total = db.execute(
             "SELECT count(*) FROM entries WHERE basis=? AND kind=?", (basis, kind)
         ).fetchone()[0]
-        rows = db.execute(
-            "SELECT * FROM entries WHERE basis=? AND kind=? AND ordinal>? ORDER BY ordinal LIMIT ?",
-            (basis, kind, last, limit + 1),
-        ).fetchall()
-        default = db.execute(
-            "SELECT iri FROM entries WHERE basis=? AND kind=? ORDER BY ordinal LIMIT 1",
-            (basis, kind),
-        ).fetchone()
+        preferred = (
+            db.execute(
+                "SELECT * FROM entries WHERE basis=? AND kind=? AND iri=?",
+                (basis, kind, choice["iri"]),
+            ).fetchone()
+            if choice
+            else None
+        )
+        # Only promote an already admitted root; never manufacture a new hierarchy entry.
+        excluded = preferred["iri"] if preferred else ""
+        rows = list(
+            db.execute(
+                "SELECT * FROM entries WHERE basis=? AND kind=? AND ordinal>? AND iri<>? ORDER BY ordinal LIMIT ?",
+                (basis, kind, last, excluded, limit + 1),
+            ).fetchall()
+        )
+        if preferred and cursor is None:
+            rows.insert(0, {**dict(preferred), "ordinal": -1})
+        default = (
+            preferred
+            or db.execute(
+                "SELECT * FROM entries WHERE basis=? AND kind=? ORDER BY ordinal LIMIT 1",
+                (basis, kind),
+            ).fetchone()
+        )
+        if preferred:
+            extra["selection"] = {
+                "kind": "curated_default",
+                "revision": choice["revision"],
+                "rationale": choice["rationale"],
+                "assertion": "navigation_only",
+            }
+    # First page is the declared starting choice. Continuation exposes the complete
+    # original inventory, including obsolete or unclassified roots, without hiding any.
+    page_limit = 1 if preferred and cursor is None else limit
     items = []
-    for row in rows[:limit]:
+    for row in rows[:page_limit]:
         entity = _ref(context.ontology_version_id, row["iri"], kind)
         items.append(
             {
@@ -261,14 +317,14 @@ def entry_points(
             }
         )
     extra["default_entity"] = (
-        _ref(context.ontology_version_id, default[0], kind) if default else None
+        _ref(context.ontology_version_id, default["iri"], kind) if default else None
     )
     return {
         **context._page(
             items,
             total,
             scope,
-            next_key=rows[limit - 1]["ordinal"] if len(rows) > limit else None,
+            next_key=rows[page_limit - 1]["ordinal"] if len(rows) > page_limit else None,
             status="partial" if basis == PARTIAL_BASIS else None,
             reason="Partial taxonomy; absence is unknown" if basis == PARTIAL_BASIS else None,
         ),

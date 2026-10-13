@@ -527,7 +527,7 @@ class ExplanationJobs:
                     else (
                         "grounding-descriptions/2"
                         if descriptive
-                        else "grounding-excerpts-and-comparisons/5"
+                        else "grounding-excerpts-and-comparisons/6"
                     )
                 )
             ),
@@ -572,7 +572,7 @@ class ExplanationJobs:
             prior_identity = {}
             prior = self.root
             can_replay = False
-            for revision in (() if descriptive else (4, 3, 2)):
+            for revision in (() if descriptive else (5, 4, 3, 2)):
                 candidate_identity = {
                     **identity,
                     "implementation": f"grounding-excerpts-and-comparisons/{revision}",
@@ -740,6 +740,9 @@ class ExplanationJobs:
                 "task": packet.task,
                 "entities": [e.model_dump() for e in packet.entities],
                 "claims": claims,
+                # Exact-extract jobs need the same authoritative typed citation subjects
+                # as prose jobs. Old results remain immutable on resume.
+                "support_packet": packet.model_dump(mode="json"),
                 "grounding_status": "validated",
                 "limitations": list(
                     dict.fromkeys(packet.missingness + output.limitations + reasons)

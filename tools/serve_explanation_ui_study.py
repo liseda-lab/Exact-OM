@@ -1,8 +1,9 @@
 """Serve a synthetic three-case ranking study locally for frontend development.
 
 Builds study resources from a package made by ``tools.build_explanation_ui_fixture``
-with the real study builder, store and API (SQLite test mode), publishes it as a
-synthetic study and prints test invitation links. Nothing here is a real study.
+with the real study builder, store and API (SQLite or dedicated PostgreSQL), publishes
+a new synthetic study revision, and supports private harness configuration. Nothing
+here is a real study. Native TLS serves the compiled frontend under normal CSP.
 
 The study API only accepts its configured HTTPS origin. This harness binds to loopback
 and presents the browser's ``http://localhost:<port>`` origin as that HTTPS origin; this
@@ -299,22 +300,34 @@ def main() -> None:
     parser.add_argument("--frontend-dir", type=Path, default=Path("explanations_visualizer/out"))
     parser.add_argument("--port", type=int, default=8766)
     parser.add_argument("--invitations", type=int, default=3)
+    parser.add_argument("--output", type=Path, help="New private study revision directory")
+    parser.add_argument("--database-url", help="Dedicated test PostgreSQL database URL")
+    parser.add_argument("--tls-cert", type=Path)
+    parser.add_argument("--tls-key", type=Path)
+    parser.add_argument(
+        "--config", type=Path, help="Private browser harness; avoids printing invitations"
+    )
     args = parser.parse_args()
     frontend = args.frontend_dir.resolve()
     if not (frontend / "participate" / "index.html").is_file():
         parser.error("Build the frontend first: cd explanations_visualizer && npm run build")
-    out = args.fixture.resolve() / "study"
-    out.mkdir(exist_ok=True)
+    out = (args.output or args.fixture.resolve() / "study").resolve()
+    if out.exists() and any(out.iterdir()):
+        parser.error(
+            "Choose a new study output directory; existing publications and sessions are preserved"
+        )
+    out.mkdir(parents=True, exist_ok=True)
     database = out / "study.sqlite3"
-    database.unlink(missing_ok=True)
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error("Both TLS certificate and key are required")
 
     from exact_inspect.study import create_study_app
     from exact_inspect.study.models import Publish
 
-    origin = "https://localhost:8443"
+    origin = f"https://127.0.0.1:{args.port}" if args.tls_cert else "https://localhost:8443"
     researcher = secrets.token_urlsafe(32)
     app = create_study_app(
-        f"sqlite:///{database}",
+        args.database_url or f"sqlite:///{database}",
         secrets.token_urlsafe(32),
         researcher,
         origin,
@@ -349,13 +362,35 @@ def main() -> None:
                 }
             await self.inner(scope, receive, send)
 
-    print("Synthetic study (development only). Test invitation links:")
-    for item in issued["invitations"]:
-        print(f"  http://localhost:{args.port}{item['invitation']}")
-    print(f"Researcher page: http://localhost:{args.port}/admin/  token: {researcher}")
+    if args.config:
+        import os
+
+        config = {
+            "origin": origin if args.tls_cert else f"http://localhost:{args.port}",
+            "researcher_token": researcher,
+            "study_revision": frozen["definition"]["study_revision"],
+            "publication": str(out / "publication.json"),
+        }
+        fd = os.open(args.config, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w") as stream:
+            json.dump(config, stream)
+        print("Synthetic study ready; browser credentials saved privately", flush=True)
+    else:
+        print("Synthetic study (development only). Test invitation links:")
+        for item in issued["invitations"]:
+            print(f"  http://localhost:{args.port}{item['invitation']}")
+        print(f"Researcher page: http://localhost:{args.port}/admin/  token: {researcher}")
     import uvicorn
 
-    uvicorn.run(LoopbackOrigin(app), host="127.0.0.1", port=args.port, log_level="info")
+    uvicorn.run(
+        app if args.tls_cert else LoopbackOrigin(app),
+        host="127.0.0.1",
+        port=args.port,
+        log_level="warning",
+        access_log=False,
+        ssl_certfile=str(args.tls_cert) if args.tls_cert else None,
+        ssl_keyfile=str(args.tls_key) if args.tls_key else None,
+    )
 
 
 if __name__ == "__main__":

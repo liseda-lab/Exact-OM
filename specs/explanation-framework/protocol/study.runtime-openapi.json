@@ -6215,6 +6215,9 @@
               }
             ]
           },
+          "selection": {
+            "$ref": "#/components/schemas/EntrySelection"
+          },
           "basis": {
             "type": "string",
             "title": "Basis"
@@ -6241,6 +6244,52 @@
           "inference"
         ],
         "title": "EntryPointPage"
+      },
+      "EntrySelection": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "prepared_order",
+              "curated_default"
+            ],
+            "title": "Kind"
+          },
+          "revision": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revision"
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rationale"
+          },
+          "assertion": {
+            "type": "string",
+            "const": "navigation_only",
+            "title": "Assertion",
+            "default": "navigation_only"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind"
+        ],
+        "title": "EntrySelection"
       },
       "Event": {
         "properties": {

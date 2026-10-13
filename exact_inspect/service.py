@@ -857,7 +857,10 @@ def create_prepared_app(
         active = service()
         result = active.resource(explanation_id, "explanations")
         try:
-            if result["manifest"].get("description_contract") == "exact-description/2":
+            if (
+                result.get("support_packet") is not None
+                or result["manifest"].get("description_contract") == "exact-description/2"
+            ):
                 contexts = {
                     entity["ontology_version_id"]: active.context(entity["ontology_version_id"])
                     for entity in result["entities"]
@@ -1013,4 +1016,7 @@ def create_prepared_app(
     from .frontend import mount_frontend
 
     mount_frontend(app, frontend_dir, profile=profile)
+    from .read_diagnostics import ReadDiagnostics
+
+    app.add_middleware(ReadDiagnostics)
     return app

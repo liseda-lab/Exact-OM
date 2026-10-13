@@ -627,6 +627,9 @@ def create_study_app(
     mount_frontend(
         app, frontend_dir, profile="study", strict_styles=True, index_redirect="/participate/"
     )
+    from ..read_diagnostics import ReadDiagnostics
+
+    app.add_middleware(ReadDiagnostics)
     return app
 
 

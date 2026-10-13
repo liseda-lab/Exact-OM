@@ -55,9 +55,9 @@ def copy_study_runtime(app_root):
                 )
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(source_path, target)
-    assert "exact_inspect/study" in copied
+    assert "exact_inspect" in copied
     assert not (app_root / "exact").exists()
-    assert not (app_root / "exact_inspect/__init__.py").exists()
+    assert (app_root / "exact_inspect/__init__.py").is_file()
     return copied
 
 
@@ -85,6 +85,9 @@ class ForbidMatcher(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0, ForbidMatcher())
 from exact_inspect.study.api import create_study_app
 from exact_inspect.descriptions import validate_prepared_support
+from exact_inspect.readable_descriptions import presentation
+from exact_inspect.postmigration_contracts import PartialInferenceMetadata
+from exact_inspect.read_diagnostics import ReadDiagnostics
 assert callable(validate_prepared_support)
 assets = app_root / 'study-assets'
 assets.mkdir()
@@ -129,4 +132,4 @@ print(json.dumps({'copied_runtime_import': 'passed', 'route_count': len(paths), 
     ):
         assert f"exact_inspect.{module}" in receipt["loaded_local_modules"]
     assert receipt["route_count"] > 20
-    assert len(copied) > 3
+    assert len(copied) >= 1
