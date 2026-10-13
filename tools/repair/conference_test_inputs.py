@@ -131,7 +131,9 @@ def run(plan, output):
     ledger = read(plan["ledger_path"])
     validate_owner(plan, ledger)
     first = ledger["stages"]["evaluation"]["started_epoch"]
-    deadline = min(plan["deadline_epoch"], first + 40*3600,
+    from tools.repair.fixed_endpoint_freeze import repair_deadline
+
+    deadline = min(plan["deadline_epoch"], repair_deadline(plan, first),
                    float(os.environ["EXACT_REPAIR_DEADLINE_EPOCH"]))
     output = Path(output); output.mkdir(parents=True, exist_ok=True)
     identity = canonical_hash(plan)

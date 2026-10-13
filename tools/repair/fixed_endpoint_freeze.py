@@ -64,3 +64,25 @@ def validate(freeze):
         or freeze.get("models") != models(freeze["noise_aware_dev_freeze"])
     ):
         raise ValueError("TEST model bindings differ from the authorized fixed endpoints")
+
+
+def repair_deadline(manifest, first_admission):
+    """An authorized earlier opening preserves the absolute measurement deadline."""
+    if "opening_amendment" not in manifest:
+        return first_admission + 40 * 3600
+    amendment = bound(manifest["opening_amendment"])
+    authorization = bound(amendment["authorization"])
+    schedule = bound(manifest["schedule"])
+    original = bound(amendment["original_schedule"])
+    if (
+        amendment.get("schema") != "exact-repair/early-test-opening/v1"
+        or authorization.get("decision") != "Start TEST as soon as ready"
+        or manifest["not_before_epoch"] != amendment["new_opening_epoch"]
+        or schedule["models_freeze_epoch"] != amendment["new_opening_epoch"]
+        or manifest["deadline_epoch"] != original["measurements_deadline_epoch"]
+        or schedule["measurements_deadline_epoch"] != original["measurements_deadline_epoch"]
+        or schedule["final_annotation_aggregation_reserve_seconds"]
+        != original["final_annotation_aggregation_reserve_seconds"]
+    ):
+        raise ValueError("Early TEST opening changed its authorization, deadline or final reserve")
+    return manifest["deadline_epoch"] - schedule["final_annotation_aggregation_reserve_seconds"]

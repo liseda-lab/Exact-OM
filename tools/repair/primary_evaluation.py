@@ -540,9 +540,11 @@ def execute_rows(manifest, output, *, evaluator=bounded_evaluate_input, now=time
         first = stage.get("stages", {}).get(stage_name, {}).get("started_epoch")
         if first is None:
             raise ValueError("Evaluation first admission must be durably reserved")
+        from tools.repair.fixed_endpoint_freeze import repair_deadline
+
         limit = min(
             manifest["deadline_epoch"],
-            first + (66 if engineering else 40) * 3600,
+            first + 66 * 3600 if engineering else repair_deadline(manifest, first),
             float(os.environ.get("EXACT_REPAIR_DEADLINE_EPOCH", "inf")),
         )
         from tools.repair.evaluation_ownership import external_pools
