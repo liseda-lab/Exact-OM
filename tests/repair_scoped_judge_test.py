@@ -69,6 +69,8 @@ def models():
 def native(wire):
     answers = {}
     for k, q in wire["questions"].items():
+        if q["type"] == "choice":
+            assert len(q["criteria"]) >= 2, "Provider requires at least two choices"
         if q["type"] == "score":
             answers[k] = dict(
                 type="score",
@@ -146,6 +148,10 @@ def test_missing_criterion_keeps_null_without_discarding_known_scores():
         choice="missing", probabilities=dict(sufficient=0, missing=1, contradictory=0)
     )
     wire = s.filter_scores(s.packet(c, ss, models()), gate)
+    assert set(wire["questions"]["meaning_retention:source"]["criteria"]) == {
+        "D1",
+        "no_supported_source",
+    }
     assert all(not k.startswith("collateral") for k in wire["questions"])
     answer = s.parse(native(wire), wire, "score", models()["decisions"])
     result = s.assessment(ss, dict(valid=True, answers=answer), gate)
@@ -283,3 +289,74 @@ def test_report_keeps_conflicts_and_duplicate_reuse_out_of_order_accuracy():
         r["score_order_test"].startswith("not independent") for r in report["repeat_order_audits"]
     )
     assert not any(p["eligible"] for p in report["pairs"])
+
+
+def test_recovery_requires_confirmed_rejection_and_unchanged_gate(tmp_path, monkeypatch):
+    from tools.repair.scoped_judge_recovery import replacement_wire
+
+    c, mm = case(), models()
+    slots = s.schedule([c])[1:3]
+    for slot in slots:
+        wire = s.packet(c, slot, mm)
+        for key, q in wire["questions"].items():
+            if key.endswith(":source"):
+                q["criteria"].pop("no_supported_source", None)
+        path = tmp_path / (slot["stage"] + ".json")
+        immutable(path, wire)
+        slot["packet"] = binding(path)
+    original = dict(
+        slots=slots,
+        models=mm,
+        ledger_directory=str(tmp_path / "ledger"),
+        deadline_epoch=time.time() + 1000,
+        budget_phase="development",
+    )
+    immutable(
+        tmp_path / "ledger/phase-reservations.json",
+        dict(
+            reservations={
+                canonical_hash(("development", slot["id"])): dict(
+                    request_basis=canonical_hash(original), state="reserved"
+                )
+                for slot in slots
+            }
+        ),
+    )
+
+    def handler(request):
+        wire = json.loads(request.content)
+        if any(
+            q["type"] == "choice" and len(q["criteria"]) == 1 for q in wire["questions"].values()
+        ):
+            return httpx.Response(
+                400, json=dict(error=dict(message="OpenAI Decisions needs at least 2 choices"))
+            )
+        return httpx.Response(200, json=native(wire))
+
+    real_init = OpenRouterClient.__init__
+
+    def init(self, *args, **kwargs):
+        real_init(self, *args, **kwargs)
+        self._client.close()
+        self._client = httpx.Client(transport=httpx.MockTransport(handler))
+
+    monkeypatch.setattr(OpenRouterClient, "__init__", init)
+    monkeypatch.setenv("SCOPED_TEST_KEY", "test-only")
+    kwargs = dict(parser=s.parse, score_filter=s.filter_scores)
+    gate = s.old.one(original, slots[0], tmp_path / "out", **kwargs)
+    failed = s.old.one(original, slots[1], tmp_path / "out", gate, **kwargs)
+    assert gate["valid"] and not failed["valid"]
+    request = read(tmp_path / "out" / slots[1]["id"] / "request.json")
+    fixed = replacement_wire(original, slots[1], failed, gate, request, c)
+    assert all(len(q["criteria"]) >= 2 for q in fixed["questions"].values())
+    assert fixed == s.filter_scores(s.packet(c, slots[1], mm), gate)
+    with pytest.raises(ValueError, match="resample"):
+        replacement_wire(original, slots[1], {**failed, "valid": True}, gate, request, c)
+    changed = copy.deepcopy(gate)
+    changed["answers"]["meaning_retention"]["choice"] = "missing"
+    with pytest.raises(ValueError, match="gate"):
+        replacement_wire(original, slots[1], failed, changed, request, c)
+    changed_case = copy.deepcopy(c)
+    changed_case["scope"]["meaning_retention"] = "New semantic scope"
+    with pytest.raises(ValueError, match="changes more"):
+        replacement_wire(original, slots[1], failed, gate, request, changed_case)

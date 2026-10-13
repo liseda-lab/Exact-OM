@@ -200,6 +200,10 @@ def packet(case, slot, models):
         }
         if not sources:
             raise ValueError("Authored contract lacks authored source provenance")
+        if len(sources) == 1:
+            # Decisions requires at least two choice alternatives. This also
+            # lets the judge reject the sole supplied source as ungrounded.
+            sources["no_supported_source"] = "No supplied meaning source supports this assessment."
         for k in chat.CRITERIA:
             prefix = COMMON + f"\nAssess ONLY {k} for plan under its declared scope. "
             if slot["stage"] == "gate":
@@ -439,6 +443,8 @@ def assessment(slot, receipt, gate=None):
                 and values[k] is not None
                 and grounding[k]["finding"].get("type") == "choice"
                 and grounding[k]["source"].get("type") == "choice"
+                and grounding[k]["finding"].get("choice") != "unknown"
+                and grounding[k]["source"].get("choice") != "no_supported_source"
             )
             for k in chat.CRITERIA
         )
