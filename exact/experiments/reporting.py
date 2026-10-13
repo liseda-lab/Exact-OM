@@ -24,7 +24,7 @@ from exact.ontology.versions import ontology_execution_identity
 from exact.runs.reader import RunReader
 from exact.utils.data import read_table
 from exact.utils.fitted_artifacts import fingerprint, freeze_json
-from exact.utils.provenance import sha256_file
+from exact.utils.provenance import sha256_file, sha256_path
 
 from .paper_metrics import PRFMetrics, SourceConfusion, recompute_global_prf
 from .statistics import paired_bootstrap
@@ -286,8 +286,8 @@ def inspect_dataset_task(
         "task": config.data.task,
         "representation": {"source": source_format, "target": target_format},
         "inputs": {
-            "source": {"path": str(resolved.source), "sha256": sha256_file(resolved.source)},
-            "target": {"path": str(resolved.target), "sha256": sha256_file(resolved.target)},
+            "source": {"path": str(resolved.source), "sha256": sha256_path(resolved.source)},
+            "target": {"path": str(resolved.target), "sha256": sha256_path(resolved.target)},
             "reference": (
                 {
                     "path": str(resolved.full_reference),

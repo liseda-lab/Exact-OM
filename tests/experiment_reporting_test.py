@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import shutil
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -84,6 +86,62 @@ def test_inventory_uses_materialized_counts_and_declared_split(tmp_path: Path, m
     assert row["candidate_pool"]["candidate_pairs"] == 3
     assert row["candidate_pool"]["coverage"] == 0.5
     assert row["split_availability"] == ["test", "train", "valid"]
+
+
+def test_inventory_hashes_native_directory_inputs(tmp_path: Path, monkeypatch) -> None:
+    fixture = Path(__file__).parent / "fixtures/kg_csv"
+    source = tmp_path / "source"
+    target = tmp_path / "target"
+    shutil.copytree(fixture, source)
+    shutil.copytree(fixture, target)
+    monkeypatch.setattr(
+        reporting,
+        "resolve_alignment_inputs",
+        lambda **kwargs: SimpleNamespace(
+            source=source, target=target, full_reference=None, candidates=None
+        ),
+    )
+
+    def inspect():
+        return inspect_dataset_task(
+            ConfigModel(),
+            experiment_id="G4",
+            task_id="native-directory",
+            stage="screen",
+            split_role="development",
+            reference_role="valid",
+            reference_completeness="partial",
+            capabilities=[],
+            cache_root=tmp_path / "inventory-cache",
+        )
+
+    files = {
+        p.relative_to(source).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in source.rglob("*")
+        if p.is_file()
+    }
+    expected = hashlib.sha256(
+        json.dumps(files, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    first = inspect()
+    assert first["representation"] == {"source": "csv-kg", "target": "csv-kg"}
+    assert first["entity_counts"]["source"]["class"] == 3
+    assert first["datalog_fact_count"]["source"] > 0
+    assert first["inputs"]["source"] == {"path": str(source), "sha256": expected}
+    assert first["inputs"]["target"] == {"path": str(target), "sha256": expected}
+    # Provenance covers nested files as well as the descriptor's parsed tables.
+    nested = source / "metadata"
+    nested.mkdir()
+    extra = nested / "provenance.txt"
+    extra.write_text("original")
+    added = inspect()
+    assert added["inputs"]["source"]["sha256"] != expected
+    extra.write_text("changed")
+    changed = inspect()
+    assert changed["inputs"]["source"] != added["inputs"]["source"]
+    assert changed["inputs"]["target"] == first["inputs"]["target"]
+    extra.rename(nested / "renamed.txt")
+    assert inspect()["inputs"]["source"] != changed["inputs"]["source"]
 
 
 def test_metric_macros_do_not_hide_missing_task_seed_cells() -> None:
