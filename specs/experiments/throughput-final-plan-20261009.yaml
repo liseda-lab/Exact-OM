@@ -3,7 +3,7 @@ kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
 updated_at: '2026-10-13'
-status: batched_G4_restart_authorized_preparing
+status: batched_G4_running
 g4_batched_restart_20261013:
   handoff: specs/experiments/G4-BATCHED-RESTART-20261013.md
   evidence_root: data/experiments-v2/g4-batched-restart-20261013-01
@@ -22,7 +22,20 @@ g4_batched_restart_20261013:
   target_200_pairs_per_second: unachieved_deferred_as_G4_restart_prerequisite
   measured_scoring_pairs_per_second: 39.99453634663465
   full_pipeline_throughput: not_yet_measured
-  status: preparing
+  status: running
+  worker_step: '14372.286'
+  supervisor_step: '14372.285'
+  execution_source: 51ab682750ff3c4c6d4994ea4e572220f184c892
+  supervisor_source: f9e052db524e90dc1b62c395ecfb7982b6199a3d
+  later_queue_entries_held: 7
+  actual_configuration_preflight: eight_cells_passed_no_identity_mismatches
+  historical_producers_verified: 31
+  upstream_status_gates_verified: 42
+  diagnostic_null_policy_compatibility: fixed_without_historical_rerun
+  shared_experiment_tree_ceiling_GiB: 1280
+  local_cache_tree_ceiling_GiB: 192
+  local_numerical_cache_disk_cap_GiB: 128
+  paid_spending_policy: unchanged
 combined_implementation_20261013:
   handoff: specs/experiments/THROUGHPUT-COMBINED-20261013.md
   evidence_root: data/experiments-v2/g4-combined-optimization-20261013-01

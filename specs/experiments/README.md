@@ -8,6 +8,8 @@ consistently across all eight G4 cells; verified compatible fitted artifacts and
 native preparation are reused. Later experiments remain held. The measured
 39.995 pairs/s covers the scoring phase, not whole-run throughput; 200 pairs/s
 remains unachieved and is no longer a prerequisite for this authorized G4 run.
+The restart is running as Slurm step `14372.286`, supervised by `14372.285`;
+all seven later queue entries are held for user review.
 
 **Implementation update, 2026-10-10 — not deployed:**
 [Implementation handoff and measured evidence](THROUGHPUT-IMPLEMENTATION-20261009.md)

@@ -1,7 +1,7 @@
 # Exact-OM scoring throughput contract: 200 cold unique pairs/second
 
 Recorded: 2026-10-09. Updated: 2026-10-13. Status:
-**batched_G4_restart_authorized_preparing**.
+**batched_G4_running** (worker `14372.286`, supervisor `14372.285`).
 
 Current amendment: the completed combined validation passed algorithmic and
 cache checks at 39.995 pairs/s for batched scoring on its fixed 5,000-pair panel.
