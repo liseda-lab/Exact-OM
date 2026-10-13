@@ -1,16 +1,28 @@
 # Exact-OM scoring throughput contract: 200 cold unique pairs/second
 
-Recorded: 2026-10-09. Status: **implemented_with_failed_gpu_batching_acceptance_not_deployed**.
+Recorded: 2026-10-09. Updated: 2026-10-13. Status:
+**corrective_fixes_verified_full_throughput_admission_open_scientific_execution_paused**.
 
 Implementation evidence (updated 2026-10-10): [handoff](THROUGHPUT-IMPLEMENTATION-20261009.md).
 748 CPU regression tests passed on the final frozen source. Experimental H0
 batching measured 12.103 cold unique pairs/s on an RTX 2060 SUPER and failed discrete evidence parity; it is
 blocked from scientific use. Final fitted recipes and RTX 4090 verification remain
-pending. On October 12 the user requested a G4 checkpoint pause and optimization
+pending at that review. On October 12 the user requested a G4 checkpoint pause and optimization
 review before continuing. The [updated review](THROUGHPUT-REVIEW-20261010.md)
 identifies repeated multi-GB fitted-artifact hashing, a mandatory-validation
 exception gap, and additional batching checks. No optimized GPU throughput is
-claimed; the numerical and scientific acceptance criteria remain binding.
+claimed by that review; the numerical and scientific acceptance criteria remain binding.
+
+The [October 13 implementation handoff](THROUGHPUT-IMPLEMENTATION-20261013.md)
+records the hashing fix, independently controlled batching and fitted-recipe
+qualification. On the 600-pair RTX 4090 panel, conservative execution preserves
+ordinary and fitted outputs exactly across cold, warm and partial caches; tokenizer identity
+normalization and encoder regrouping fail discrete parity. These failed options
+remain default-off and scientifically blocked. The 200-pair target is not met.
+G4 stopped at its committed 9,728-example checkpoint. The user
+requires a new approval before G4 or any other scientific experiment restarts;
+passing optimization tests does not release this hold. Earlier failed batching
+receipts remain valid historical failures, not evidence for the corrected path.
 
 Original October 9 inspection: checkout `328b9c5a`, then-running G4 source:
 `035a1a569c73620ce7c9fdbd41758ebd9eb8aa7f`, frozen under
@@ -245,6 +257,12 @@ inventory explicitly identifies retained public-input fixes and their tests.
   handling. Changed, missing or unreadable required artifacts must fail even with
   caching disabled or a cached score available. Any inventory/stat optimization
   must preserve byte validation and mutation/replacement detection.
+- Verified artifact reuse must bind the complete sorted path/device/inode/size/
+  mtime/ctime inventory. Rehash on admission, process changes, explicit forced
+  verification or inventory drift; check the inventory again after hashing.
+  Check required inputs at outer scorer entry and return, including cache-hit,
+  hosted, disabled-cache and gradient paths. Count real artifact opens and bytes
+  in regressions, rather than only mocked fingerprint calls.
 - Group bounded local cache writes into transactions. Flush and release any write
   transaction before network waits, long training or yielding ownership. A
   per-batch context is not permission to hold a shared SQLite writer through a
@@ -281,6 +299,19 @@ consumers. Cache failure remains an optimization miss, not a changed prediction.
 - Preserve model/tokenizer/revision/precision/hardware/role identity and the
   existing reviewed compatibility check. Cache sharing across roles is admitted
   only through T05's explicitly label-independent primitive contract.
+- Tokenizer invocation state must not spuriously invalidate unchanged semantics.
+  Removing transient backend padding/truncation state is permitted only for the
+  known encoder implementation that explicitly supplies those settings; retain
+  all semantic tokenizer components and bind the execution mode in cache keys.
+  This change stays qualification-only until multi-chunk cold, warm and partial
+  cache checks establish unchanged evidence, prompts and fitted decisions. Custom
+  encoders retain their full backend state. The October 13 GPU check failed this
+  condition: changed first-touch FP16 vector reuse propagates to facts and ranks.
+  Do not treat semantic tokenizer equivalence as proof of output equivalence.
+- Avoid copying unchanged model weights solely because a tokenizer or namespace
+  identity changed. Memoize only the existing weight byte digest with process,
+  tensor identity/storage/version/shape/dtype guards; preserve the complete final
+  identity payload. Unversioned inference tensors must continue to disable reuse.
 
 **Done when:** cold/warm outputs retain order and duplicates; corrupted/truncated
 rows, connection restart, concurrent readers, interrupted commits, incompatible
@@ -334,6 +365,14 @@ packet bytes as well as selected facts: score formatting can change prompts even
 when fact membership stays constant. Larger batching remains conditional on this
 proof; no tolerance or new numerical convention is approved by the performance
 target.
+
+The corrected path independently controls scheduling (`legacy`/`staged`), encoder
+calls (`legacy`/`batch`), matrix operations (`mm`/`bmm`) and arithmetic placement
+(`device`/`cpu`). Conservative defaults retain the original call order, shapes
+and reductions. Packed transfers may combine completed values but not change the
+operations producing them. Channel-cache hits must bypass both block preparation
+and a redundant second cache lookup. Direct helper and cached-channel entry
+points enforce the same qualification restriction as `forward()`.
 
 **Done when:** adversarial fixtures and real-data parity satisfy section 5, all
 source groups remain complete, and measurements show actual larger context

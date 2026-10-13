@@ -2,8 +2,135 @@ schema_version: 1
 kind: implementation_and_scientific_design_spec_not_campaign_lock
 specification_id: throughput-and-mixed-scale-final-20261009
 recorded_at: '2026-10-09'
-updated_at: '2026-10-12'
-status: implemented_with_failed_gpu_batching_acceptance_not_deployed
+updated_at: '2026-10-13'
+status: corrective_fixes_verified_full_throughput_admission_open_scientific_execution_paused
+implementation_20261013:
+  handoff: specs/experiments/THROUGHPUT-IMPLEMENTATION-20261013.md
+  evidence_root: data/experiments-v2/g4-optimization-implementation-20261012-01
+  authorization: implementation_and_isolated_unpaid_validation_only
+  scientific_restart_requires_new_user_approval: true
+  G4_checkpoint_examples_committed: 9728
+  G4_active_cell_examples_total: 12047
+  G4_stop_time_UTC: '2026-10-12T23:46:38Z'
+  forced_signal_required: false
+  supervisor_dispatch_and_recovery: paused
+  preserve_allocation: '14372'
+  mandatory_artifact_validation:
+    status: implemented_regression_verified
+    initial_full_hash_seconds: 1.35665
+    initial_artifact_bytes_hashed: 2261814184
+    initial_process_logical_read_bytes: 2261858876
+    repeated_validations: 100
+    repeated_validation_seconds_total: 0.17034
+    repeated_artifact_content_read_bytes: 0
+    content_identity_format_changed: false
+  independent_encoder_weight_digest:
+    source_commit: bc8e9bb0
+    status: implemented_CPU_byte_count_and_identity_verified
+    existing_digest_payload_changed: false
+    scientific_numerics_changed: false
+    included_in_frozen_GPU_run: false
+  encoder_identity_check_reuse:
+    source_commit: 64d52bce
+    status: implemented_CPU_lookup_and_mutation_verified
+    scope: one_resident_and_persistent_lookup_invocation_only
+    public_direct_call_still_validates: true
+    subsequent_invocation_still_validates: true
+    benchmark_warm_lookups: 400
+    redundant_identity_calls: 800
+    corrected_identity_calls: 400
+    redundant_lookup_seconds_median: 0.7891
+    corrected_lookup_seconds_median: 0.4237
+    included_in_frozen_GPU_run: false
+    historical_cache_reuse_requires_verified_source_binding: true
+  conservative_batching_prefix:
+    GPU: RTX_4090
+    rows_per_mode: 198
+    modes: [cold, warm, replay]
+    ordinary_evidence_parity: exact_pass
+    maximum_absolute_error: 0
+    legacy_cold_seconds: 43.7442718
+    strict_cold_seconds: 43.943
+    speedup_established: false
+    fitted_selector_parity_established: false
+    warm_mode_reencoded_due_to_tokenizer_identity: true
+  tokenizer_identity_fix:
+    status: implemented_GPU_parity_failed_first_touch_FP16_reuse_changes
+    default_enabled: false
+    scientific_use_admitted: false
+  fitted_GPU_check:
+    source_commit: fe6b580359c1ce3bbca373ded0c9fc9557e5c252
+    receipt_root: data/experiments-v2/g4-optimization-implementation-20261012-01/fitted-g4-600-01
+    step: '14372.278'
+    status: completed_primary_candidate_rejected_conservative_ordinary_and_fitted_parity_passed
+    candidate_pairs_before_exact_prefilter: 600
+    modes: [cold, warm, partial]
+    paid_calls_allowed: false
+    fixture_predictions_promotable: false
+    hosted_fixture_calls: 0
+    hosted_request_parity_coverage: vacuous_no_calls_in_this_panel
+    baseline_seconds: {cold: 85.962105, warm: 30.595724, partial: 15.314310}
+    rejected_candidate_seconds: {cold: 74.332621, warm: 16.263715, partial: 10.787013}
+    conservative_retained_feature_seconds: {cold: 50.174517, warm: 24.923947, partial: 10.004012}
+    partial_fresh_pairs: 200
+    conservative_ordinary_max_absolute_error: 0
+    conservative_ordinary_discrete_differences: 0
+    conservative_fitted_selector_parity: exact_pass_saved_input_CPU_replay_all_three_modes
+    conservative_CPU_replay_step: '14372.280'
+    conservative_CPU_replay_receipt: fitted-g4-600-01/cpu-fitted-replay/summary.json
+    baseline_CPU_reconstruction_canonical_byte_equal: true
+    conservative_CPU_fitted_decisions_canonical_byte_equal: true
+    baseline_vs_conservative_mappings_policy_and_anchors_equal: true
+    candidate_final_mapping_membership_equal: true
+    candidate_ordinary_and_fitted_ranks_equal: false
+    native_preparation_seconds_per_primary_arm: [590.326890, 589.089792]
+    fitted_selector_extraction_seconds_per_mode_approximately: 2
+    tokenizer_only_reproduces_rejected_candidate: true
+    extra_causal_checks:
+      scope: cold_only_600_ordinary_rows_retained_native_and_features
+      schedule_only: {seconds: 49.386718, parity: exact_pass}
+      matrix_only:
+        seconds: 50.120526
+        parity: exact_pass
+        scope: legacy_scheduling_single_job_matrices_not_staged_multi_pair_qualification
+      encoder_only: {seconds: 49.581915, parity: failed, discrete_differences: 99}
+      staged_encoder: {seconds: 18.769521, parity: failed, discrete_differences: 205}
+      cpu_arithmetic: {seconds: 52.552737, parity: exact_here_prior_H0_failure_remains}
+      numerical_cache_disabled: {seconds: 45.998246, parity: exact_pass}
+  CUDA_graph_feasibility:
+    receipt_root: data/experiments-v2/g4-optimization-implementation-20261012-01/cuda-graph-fixed-branch-01
+    step: '14372.279'
+    explicit_user_approval_received: true
+    status: passed_encoder_only_synthetic_feasibility
+    synthetic_shape_encoder_cases: 10
+    changed_inputs_bitwise_equal: true
+    max_absolute_error: 0
+    context_call_speedup_range: [2.22, 3.64]
+    label_call_speedup_range: [3.03, 4.92]
+    graph_capture_seconds_per_shape_range: [0.18, 0.22]
+    timed_input_copies_and_output_clone: true
+    timed_tokenization_and_CPU_mask_predicate: false
+    runtime_integration_implemented: false
+    scientific_use_admitted: false
+    measured_pairs_per_second: false
+    paid_calls: 0
+  CPU_verification:
+    source_commit: 64d52bce
+    passed: 426
+    test_files: 23
+    architecture_contracts_kept: 5
+    architecture_contracts_broken: 0
+    scoped_mypy: passed
+    full_repository_mypy: 25_errors_in_9_other_files
+    junit: data/experiments-v2/g4-optimization-implementation-20261012-01/cpu-regressions-final-64d52bce.xml
+  checkpoint_continuation:
+    generic_resume_safe: false
+    required: source_bound_G4_checkpoint_and_fitted_state_compatibility_import
+    originals_preserved: true
+    implementation_status: separate_open_restart_gate
+  throughput_200_pairs_per_second: not_established
+  full_dataset_one_day_forecast: not_established
+  scientific_experiments_restarted: false
 review_20261012:
   handoff: specs/experiments/THROUGHPUT-REVIEW-20261010.md
   evidence_root: data/experiments-v2/g4-performance-audit-20261012-01
@@ -255,15 +382,15 @@ work_packages:
     depends_on: []
   T02:
     title: Batch numerical-cache context without hosted-response replay bypass
-    status: implemented_fixture_verified_final_recipe_gpu_pending
+    status: implemented_artifact_and_600_pair_GPU_verified_hosted_paths_CPU_regression_only_GPU_unexercised
     depends_on: [T01]
   T03:
     title: Retained encoder-cache connections and bounded bulk input/output
-    status: implemented_fixture_verified_final_recipe_gpu_pending
+    status: implemented_conservative_600_pair_GPU_parity_pass_tokenizer_normalization_failed
     depends_on: [T01]
   T04:
     title: Two-phase context batching and vectorized numerical reductions
-    status: implemented_experimental_gpu_parity_failed_scientific_use_rejected
+    status: conservative_600_pair_ordinary_parity_pass_fast_encoder_batching_failed_not_admitted
     depends_on: [T01, T02, T03]
   T05:
     title: Dependency-scoped primitive reuse and durable training-aggregate references
