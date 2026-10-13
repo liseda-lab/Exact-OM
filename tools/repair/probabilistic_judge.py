@@ -380,6 +380,16 @@ def parse_response(response, wire, stage, model):
 
 
 def one(plan, slot, directory, gate=None, *, parser=parse_response, score_filter=score_packet):
+    if "retry_policy" in plan:
+        from tools.repair.judge_retry import run
+
+        if gate is not None or slot["stage"] != "chat":
+            raise ValueError("Bounded judge retries currently support ungated Chat requests only")
+        return run(plan, slot, directory, lambda p, s, d: _one(p, s, d, parser=parser))
+    return _one(plan, slot, directory, gate, parser=parser, score_filter=score_filter)
+
+
+def _one(plan, slot, directory, gate=None, *, parser=parse_response, score_filter=score_packet):
     directory = Path(directory) / slot["id"]
     with locked(directory / "receipt.lock"):
         wire = bound(slot["packet"])

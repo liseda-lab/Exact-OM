@@ -1,5 +1,34 @@
 # October corrective repair campaign
 
+## 13 October: bounded future LLM failure recovery
+
+The user authorized one or two retries for future failed calls. Read
+[BOUNDED-JUDGE-RETRIES-20261013.md](BOUNDED-JUDGE-RETRIES-20261013.md) and registry
+`active_judge_failure_retries`. This prospective amendment overrides older
+one-shot/no-unknown-recovery instructions for new, explicitly bound annotation
+plans only. Do not reopen completed DEV or change its observed labels.
+
+The future TEST annotation task must use the shared Chat request worker with the
+frozen `retry_policy`, preserve all physical receipts and count one logical vote
+per chain. Retry transient failures at most twice, with one neutral formatting
+reminder for malformed output. Unknown/tie/disagreement and schema-valid semantic
+conflict remain data. Diagnose permanent failures; preserve unknown costs and
+restart-persistent counters. No paid qualification reruns are requested here.
+
+The authorized attempt contingency is TEST462/total1384, preserving the original
+154 presentations (128 comparisons +26 swaps), other phase limits and the $35
+ceiling. All mandatory baseline calls must be reserved first. The bound campaign
+amendment is authoritative over the older TEST154/total1076 request-cap snapshots;
+it changes neither logical sample size nor any historical reservation. Stop
+additional retries at budget/deadline limits while continuing eligible work.
+
+All six endpoints remain fixed. Proceed with the prepared native TEST jobs and
+independent Gemini assessment at the recorded opening time; use a separate bound
+schedule amendment if the user authorizes an earlier opening. Routine preparation
+and recovery are autonomous. The supervisor implementation, two unsuccessful
+technical-repair limit, five-minute interval and action-only email policy stay
+unchanged.
+
 ## 13 October: authorized noise-aware DEV supersedes the perfection gate
 
 This section is authoritative over the historical holds below. The user approved

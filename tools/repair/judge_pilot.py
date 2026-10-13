@@ -270,6 +270,10 @@ def validate(plan):
     return costs
 
 
+class BudgetExceeded(ValueError):
+    """An additional request cannot fit the unchanged campaign limits."""
+
+
 def reserve(plan, costs):
     """Atomically admit the complete panel; preserve every historical budget row.
 
@@ -308,11 +312,14 @@ def reserve(plan, costs):
         records = [*state["reservations"].values(), *fresh.values()]
         if (
             len(records) > state.get("total_request_limit", 704)
-            or sum(r["phase"] == "development" for r in records)
-            > state["request_limits"]["development"]
+            or any(r["phase"] not in state["request_limits"] for r in records)
+            or any(
+                sum(r["phase"] == phase for r in records) > limit
+                for phase, limit in state["request_limits"].items()
+            )
             or sum(r["reserved_cost_usd"] for r in records) > state["cost_ceiling_usd"]
         ):
-            raise ValueError("Complete pilot exceeds the unchanged campaign budget")
+            raise BudgetExceeded("Complete pilot exceeds the unchanged campaign budget")
         for key, value in fresh.items():
             state["reservations"][key] = dict(value, state="reserved", admitted_epoch=time.time())
         write_artifact(path, state)

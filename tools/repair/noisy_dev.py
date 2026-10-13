@@ -21,6 +21,7 @@ from exact.repair.records import canonical_hash
 from tools.repair import categorical_dev as legacy, scoped_judge as scoped
 from tools.repair.batch import read
 from tools.repair.historical_regression import binding
+from tools.repair.judge_retry import cost_summary
 from tools.repair.shared_release import authenticate, bound, immutable
 
 VERSION = "exact-repair/noise-aware-dev/v1"
@@ -485,10 +486,15 @@ def summarize(plan, cases, links, records):
         test_opened=False,
         semantic_truth_qualified=False,
         observation_integrity_checked=True,
-        reported_cost_usd=sum(r.get("usage", {}).get("cost", 0) or 0 for r in records),
-        cost_complete=all("cost" in r.get("usage", {}) for r in records),
-        technical_unavailable=sum(r["status"] != "received" for r in records),
-        technical_review_required=any(r["status"] != "received" for r in records),
+        **cost_summary(records),
+        technical_unavailable=sum(
+            r["status"] != "received" or r.get("technical_failure_kind") is not None
+            for r in records
+        ),
+        technical_review_required=any(
+            r["status"] != "received" or r.get("technical_failure_kind") is not None
+            for r in records
+        ),
     )
 
 
