@@ -1,3 +1,6 @@
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+
 import { expect, test, type Locator, type Page, type Route } from "@playwright/test";
 
 import { artifactFor, inspectCandidate, openMainPair, reviewCases, reviewMain, settledDescriptions, studyCaseInExplanation, type Artifact, type CaseDef, type EntityRef } from "./reviewData";
@@ -9,6 +12,14 @@ import { harness, harnessForms, REVIEW_FORMS, scopedPath } from "./v2Harness";
 // states (R3, R4) and synthetic cycles/chains (R6) are injected into otherwise real responses
 // and are labelled as such. Requires EXACT_E2E_REVIEW_MAIN_URL and a forms/3 harness.
 test.use({ viewport: { width: 1440, height: 900 }, screenshot: "off", trace: "off" });
+
+/** Optional evidence of a verified state (EXACT_E2E_SHOTS); injected states are named as such. */
+async function evidence(target: Page | Locator, name: string) {
+  const directory = process.env.EXACT_E2E_SHOTS;
+  if (!directory) return;
+  mkdirSync(directory, { recursive: true });
+  await target.screenshot({ path: join(directory, `${name}.png`) });
+}
 test.beforeEach(() => test.skip(!reviewMain || !harness || harnessForms !== REVIEW_FORMS, "Set EXACT_E2E_REVIEW_MAIN_URL and a forms/3 EXACT_E2E_STUDY_V2_CONFIG"));
 
 const categories = (artifact: Artifact) => new Set(artifact.claims.map((claim) => claim.category));
@@ -191,6 +202,7 @@ async function expectGraphRecovery(page: Page) {
   const comparisons = graph.locator("section").filter({ has: page.getByRole("heading", { name: "Recorded comparisons" }) });
   await expect(comparisons.getByRole("alert")).toContainText("Recorded comparisons");
   await expect(comparisons.getByText(/No comparison (record is available|was recorded)/)).toHaveCount(0);
+  await evidence(page.locator(".graph-wrap"), `r3-injected-failure-${workspaceName(page)}`);
   // Features stay usable while comparison data is unavailable.
   const feature = graph.locator('[data-tour="graph-feature"]').first();
   await expect(feature).toBeVisible();
@@ -208,7 +220,10 @@ async function expectGraphRecovery(page: Page) {
   expect(after.pan.x).toBeCloseTo(before.pan.x, 1);
   expect(after.pan.y).toBeCloseTo(before.pan.y, 1);
   await expect(feature).toHaveAttribute("aria-pressed", "true");
+  await evidence(page.locator(".graph-wrap"), `r3-after-retry-${workspaceName(page)}`);
 }
+
+const workspaceName = (page: Page) => (page.url().includes("/participate") ? "study" : "main");
 
 test.describe("R3 a failed comparison-data read is a failure with Retry, not an absence", () => {
   const dense = () => reviewCases().find((item) => item.case_id === "review-02")!;
@@ -284,6 +299,7 @@ async function expectEquivalents(page: Page, browser: Locator, requests: string[
   await group.getByRole("button", { name: "Try again" }).click();
   await expect(group.locator(".child-list li")).toHaveCount(24);
   await expect(group.locator(".section-head .meta")).toHaveText("24 other classes");
+  await evidence(group, `r4-injected-group-${workspaceName(page)}`);
   const ids = await group.locator(".child-list .iri").allTextContents();
   expect(new Set(ids).size).toBe(24);
   // A basis change drops the group; returning reads its first page again, never the old cursor.
@@ -351,6 +367,7 @@ async function expectAncestry(page: Page, browser: Locator) {
   const toA = browser.locator(".tree-cycle").filter({ hasText: "urn:test:A" });
   await toA.getByRole("button", { name: "Show where it appears" }).click();
   await expect(browser.getByRole("button", { name: "urn:test:A", exact: true })).toBeFocused();
+  await evidence(browser.locator(".tree").first(), `r6-injected-cycles-${workspaceName(page)}`);
   expect(await browser.getByRole("button", { name: /^Show parents of / }).evaluateAll((nodes) => nodes.some((node) => (node as HTMLButtonElement).disabled))).toBe(false);
   // A punned parent (same IRI, another kind) is a distinct identity, not a cycle.
   await expand("urn:test:pun");
@@ -359,6 +376,8 @@ async function expectAncestry(page: Page, browser: Locator) {
   for (let level = 1; level <= 12; level += 1) await expand(`urn:test:chain-${level}`);
   const limit = browser.locator(".tree-limit");
   await expect(limit).toContainText("12 levels are shown under one focus.");
+  await limit.scrollIntoViewIfNeeded();
+  await evidence(page, `r6-injected-depth-limit-${workspaceName(page)}`);
   await limit.getByRole("button", { name: "Continue from urn:test:chain-13" }).click();
   await expect(browser.locator(".focus-card .iri")).toHaveText("urn:test:chain-13");
   await expect(browser.getByRole("button", { name: "Show parents of urn:test:chain-14" })).toBeEnabled();
