@@ -6,6 +6,7 @@ are separately marked as regressions; old gold and evidence stay immutable.
 """
 
 from pathlib import Path
+import re
 
 from tools.repair import judge_controls, scoped_judge as judge
 from tools.repair.batch import read
@@ -13,7 +14,13 @@ from tools.repair.historical_regression import binding
 from tools.repair.shared_release import bound, immutable
 
 
-def build(previous_cases, directory):
+def build(
+    previous_cases,
+    directory,
+    *,
+    namespace="scoped_qualification_20261012",
+    label_substitutions=None
+):
     directory = Path(directory)
     vocabulary = dict(
         AcceptedSubmission="CertifiedDevice",
@@ -43,12 +50,19 @@ def build(previous_cases, directory):
         allowed = {k: dict(a=["full"], b=["full"]) for k in judge.chat.CRITERIA}
         allowed["assertion_fidelity"]["b"] = ["none", "limited", "mixed"]
         overrides[name] = allowed
+    if label_substitutions:
+        pattern = re.compile(
+            "|".join(re.escape(k) for k in sorted(label_substitutions, key=len, reverse=True))
+        )
+        rename = lambda text: pattern.sub(lambda m: label_substitutions[m.group()], text)
+        vocabulary = {k: rename(v) for k, v in vocabulary.items()}
+        definitions = {k: rename(v) for k, v in definitions.items()}
     refs = judge_controls.controls(
         directory / "fresh",
         background_count=16,
         names=tuple(definitions),
         vocabulary=vocabulary,
-        namespace="scoped_qualification_20261012",
+        namespace=namespace,
         definitions=definitions,
         gold_overrides=overrides,
     )
@@ -112,6 +126,9 @@ def build(previous_cases, directory):
             )
     for ref in refs:
         source = bound(ref["packet"])
+        scope = scopes[source["case"]]
+        if label_substitutions:
+            scope = tuple(rename(text) for text in scope)
         cases.append(
             dict(
                 id="fresh_" + source["case"],
@@ -119,7 +136,7 @@ def build(previous_cases, directory):
                 fresh=True,
                 freshness="unexposed vocabulary/definition instantiation of an existing logical template",
                 repeats=1,
-                scope=dict(zip(judge.chat.CRITERIA, scopes[source["case"]])),
+                scope=dict(zip(judge.chat.CRITERIA, scope)),
                 payload=source["payload"],
                 gold=source["gold"],
                 source=ref["packet"],

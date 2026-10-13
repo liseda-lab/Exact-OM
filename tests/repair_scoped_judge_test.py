@@ -17,7 +17,7 @@ def case():
     plan = dict(
         plan_id="p",
         theory_hash="theory",
-        content=["S subClassOf T"],
+        content=["Complete reconstructed theory:\nOntology(\n  SubClassOf(<urn:S> <urn:T>)\n)\n"],
         query_outcomes={"focal": "true"},
         policy_hash="policy",
         query_basis_hash="queries",
@@ -111,6 +111,8 @@ def test_canonical_reuse_binds_full_context_and_preserves_repeats():
     assert set(s.units(c)).isdisjoint(s.units(d))
     d = copy.deepcopy(c)
     d["payload"]["plan_b"]["query_outcomes"]["focal"] = "false"
+    d["payload"]["plan_b"]["plan_id"] = "other"
+    d["payload"]["context"]["plan_b_id"] = "other"
     assert len(s.units(d)) == 2
 
 
@@ -203,14 +205,17 @@ def test_chat_grounding_and_unknown_consistency_are_validated():
 @pytest.mark.parametrize("embedded", [False, True])
 def test_unary_citation_cannot_borrow_another_plans_entailment(embedded):
     c = case()
+    c["payload"]["plan_b"]["plan_id"] = "other"
+    c["payload"]["context"]["plan_b_id"] = "other"
     fact = dict(plan_id="other", outcome="false")
     c["payload"]["evidence"]["F1"] = (
         dict(kind="native_entailment", text=json.dumps(fact))
         if embedded
         else dict(kind="native_query", **fact)
     )
-    slot = s.schedule([c])[0]
+    slot = dict(kind="plan", side="a", model="chat", stage="chat")
     wire = s.packet(c, slot, models())
+    assert "F1" not in json.loads(wire["messages"][1]["content"])["evidence"]
     answer = {
         k: dict(
             anchor="full", finding="supported", reason="A supplied fact", evidence_ids=["D1", "F1"]
@@ -222,7 +227,7 @@ def test_unary_citation_cannot_borrow_another_plans_entailment(embedded):
         provider="OpenAI",
         choices=[dict(finish_reason="stop", message=dict(content=json.dumps(answer)))],
     )
-    with pytest.raises(ValueError, match="another plan"):
+    with pytest.raises(ValueError, match="foreign grounding"):
         s.parse(response, wire, "chat", models()["chat"])
 
 

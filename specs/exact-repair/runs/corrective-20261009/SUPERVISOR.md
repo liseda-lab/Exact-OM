@@ -1,5 +1,30 @@
 # October corrective repair campaign
 
+## 13 October: user-authorized Luna Chat evidence projection qualification
+
+The user selected Luna Chat and instructed “Ok please fix and check.” This
+supersedes the no-further-paid-qualification instruction below for the frozen
+50-request plan at `qualification/scoped-judge-20261013-001/plan.json`.
+Read [the new protocol](PROJECTED-CHAT-20261013.md). Root owns this correction
+and semantic review while MANUAL_CONTROL exists. Preserve all existing incident
+histories and study holds; do not send duplicate routine emails or run competing
+repairs. The existing supervisor code and five-minute interval are unchanged.
+
+Use deterministic plan-owned facts, typed current/original content and explicit
+pair owners. The same criteria, gold, tolerances and independence rules apply.
+All 63 offline tests and fresh native control checks passed. Execute Luna Chat
+only; preserve the failed Chat/Decisions panels. Do not resample judgments until
+they pass or mistake structured JSON for semantic qualification. Broader DEV
+requires the saved final audit. If qualified, prepare one coherent new evaluator
+protocol across all six existing models, preserving seed pairing and full
+selection coverage. TRAIN labels/checkpoints stay intact; TEST remains sealed.
+
+The explicit new qualification adds 50 engineering request slots: total965 =
+calibration91 + TRAIN251 + DEV469 + TEST154. It reserves at most$0.4055079,
+making cumulative exposure$23.21443865/$35. All historical reservations, billed
+and unknown costs and Slurm usage remain cumulative. The qualification deadline
+remains14October17UTC. Await root's final review/handoff for next eligibility.
+
 ## 13 October: corrected scoped test complete; semantic qualification still fails
 
 This section supersedes the older matched-pilot status and quotas below. The user
