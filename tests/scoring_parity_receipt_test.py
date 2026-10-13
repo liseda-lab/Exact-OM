@@ -113,3 +113,101 @@ def test_cli_exit_status_matches_durable_parity_receipt(tmp_path, monkeypatch, p
             main()
         assert error.value.code == 1
     assert json.loads(output.read_text())["status"] == ("passed" if passes else "failed")
+
+
+def fitted_outputs(tmp_path):
+    from exact.runs.store import ExplanationStore, _atomic_json
+    from exact.utils.provenance import sha256_file
+
+    manifest = tmp_path / "fitted-manifest.json"
+    _atomic_json(manifest, {"namespace": "qualification_only"})
+    paths = (tmp_path / "baseline", tmp_path / "candidate")
+    for root in paths:
+        records = rows()
+        for row in records:
+            row["original_query_id"] = "q1"
+        ExplanationStore(root / "cold/ordinary-evidence").append(records)
+        _atomic_json(root / "cold.json", {"chunks": [{"rows": 2, "query_ids": ["q1"]}]})
+        _atomic_json(root / "measurement.json", {
+            "namespace": "qualification_only", "paid_calls": 0,
+            "fixture_outputs_promotable": False,
+            "fitted_manifest": {"path": str(manifest), "sha256": sha256_file(manifest)},
+        })
+        _atomic_json(root / "cold/fitted-decisions.json", {
+            "namespace": "qualification_only", "policy": {"threshold": 0.7},
+            "protected_pairs": [], "mappings": [["s", "a"]],
+            "rows": [{"Src": "s", "Tgt": target, "S_final": 0.5} for target in ("a", "b")],
+        })
+        _atomic_json(root / "cold/selector-evidence.json", records)
+        _atomic_json(root / "cold/hosted-fixtures.json", [
+            {"role": "decision", "prompt": "support=0.867", "probability": 0.5},
+        ])
+    return paths
+
+
+def test_fitted_comparison_checks_saved_decisions_and_exact_prompts(tmp_path):
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    result = compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+    assert result["status"] == result["fitted_selector_mapping_parity"] == "passed"
+    assert result["fitted"]["historical_paid_prediction_parity_established"] is False
+
+
+@pytest.mark.parametrize("mode", ["warm", "partial", "replay"])
+def test_fitted_parity_reads_the_requested_cache_mode(tmp_path, mode):
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    for root in (baseline, candidate):
+        (root / "cold").rename(root / mode)
+        (root / "cold.json").rename(root / (mode + ".json"))
+    result = compare(baseline, candidate, tmp_path / "parity.json", fitted=True, mode=mode)
+    assert result["status"] == "passed"
+    assert result["compared_mode"] == mode
+
+
+@pytest.mark.parametrize("change", ["rank", "mapping", "policy", "anchors", "prompt", "evidence"])
+def test_fitted_comparison_does_not_hide_discrete_drift(tmp_path, change):
+    import json
+    from exact.runs.store import _atomic_json
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    filename = {"prompt": "hosted-fixtures", "evidence": "selector-evidence"}.get(
+        change, "fitted-decisions"
+    )
+    path = candidate / "cold" / (filename + ".json")
+    value = json.loads(path.read_text())
+    if change == "rank":
+        value["rows"][1]["S_final"] += 1e-7  # Within tolerance, but a different winner.
+    elif change == "mapping":
+        value["mappings"] = [["s", "b"]]
+    elif change == "policy":
+        value["policy"]["threshold"] += 1e-7
+    elif change == "anchors":
+        value["protected_pairs"] = [["s", "a"]]
+    elif change == "prompt":
+        value[0]["prompt"] = "support=0.868"
+    else:
+        value[0]["context_triples"].reverse()
+    _atomic_json(path, value)
+    result = compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+    assert result["status"] == result["fitted_selector_mapping_parity"] == "failed"
+
+
+def test_fitted_parity_rejects_different_cohorts_and_changed_bindings(tmp_path):
+    import json
+    from exact.runs.store import _atomic_json
+    from tools.compare_scoring_parity import compare
+
+    baseline, candidate = fitted_outputs(tmp_path)
+    path = candidate / "cold.json"
+    original = json.loads(path.read_text())
+    _atomic_json(path, {"chunks": original["chunks"] * 2})
+    with pytest.raises(ValueError, match="equal complete cohorts"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)
+    _atomic_json(path, original)
+    (tmp_path / "fitted-manifest.json").write_text('{}')
+    with pytest.raises(ValueError, match="Changed fitted qualification manifest"):
+        compare(baseline, candidate, tmp_path / "parity.json", fitted=True)

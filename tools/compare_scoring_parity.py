@@ -103,12 +103,61 @@ def compare_records(left, right, *, tolerance=1e-5, ordinary_only=False):
             "status": "passed" if not discrete and not numeric else "failed"}
 
 
-def compare(left_path, right_path, output, *, ordinary_only=False):
-    left_receipt = json.loads((left_path / "cold.json").read_text())
-    right_receipt = json.loads((right_path / "cold.json").read_text())
+def compare_fitted(left_path, right_path, *, ordinary_only=False, mode="cold"):
+    """Compare the same bounded fitted cohort, including prompts and extraction."""
+    measurements = [json.loads((root / "measurement.json").read_text())
+                    for root in (left_path, right_path)]
+    for measurement in measurements:
+        binding = measurement.get("fitted_manifest")
+        if (not binding or measurement.get("namespace") != "qualification_only"
+                or measurement.get("paid_calls") != 0
+                or measurement.get("fixture_outputs_promotable") is not False):
+            raise ValueError("Fitted parity requires isolated unpaid fixture measurements")
+        if sha256_file(Path(binding["path"])) != binding["sha256"]:
+            raise ValueError("Changed fitted qualification manifest")
+    if measurements[0]["fitted_manifest"] != measurements[1]["fitted_manifest"]:
+        raise ValueError("Fitted parity requires the same admitted fitted recipe")
+
+    decisions, evidence, prompts = [], [], []
+    for root in (left_path, right_path):
+        decisions.append(json.loads((root / mode / "fitted-decisions.json").read_text()))
+        evidence.append(json.loads((root / mode / "selector-evidence.json").read_text()))
+        prompts.append(json.loads((root / mode / "hosted-fixtures.json").read_text()))
+    rows = []
+    for result in decisions:
+        if result.get("namespace") != "qualification_only":
+            raise ValueError("Scientific outputs cannot enter fitted fixture parity")
+        rows.append([
+            {**row, "src_iri": row["Src"], "tgt_iri": row["Tgt"],
+             "confidences": {field: row[field] for field in
+                             ("S_final", "S_base", "S_struct", "s_label") if field in row}}
+            for row in result["rows"]
+        ])
+    row_parity = compare_records(*rows)
+    evidence_parity = compare_records(*evidence, ordinary_only=ordinary_only)
+    # Policy, protected exact anchors and final mapping membership are discrete.
+    metadata_equal = ({key: value for key, value in decisions[0].items() if key != "rows"}
+                      == {key: value for key, value in decisions[1].items() if key != "rows"})
+    prompts_equal = prompts[0] == prompts[1]
+    passed = (row_parity["status"] == evidence_parity["status"] == "passed"
+              and metadata_equal and prompts_equal)
+    return {"status": "passed" if passed else "failed",
+            "scope": "same_bounded_cohort_with_synthetic_hosted_responses",
+            "rows": row_parity, "selector_evidence": evidence_parity,
+            "extraction_policy_anchors_and_mappings_equal": metadata_equal,
+            "exact_hosted_fixture_inputs_and_responses_equal": prompts_equal,
+            "hosted_fixture_records": [len(value) for value in prompts],
+            "historical_paid_prediction_parity_established": False}
+
+
+def compare(left_path, right_path, output, *, ordinary_only=False, fitted=False, mode="cold"):
+    if mode not in {"cold", "warm", "replay", "partial"}:
+        raise ValueError("Unknown cache comparison mode")
+    left_receipt = json.loads((left_path / (mode + ".json")).read_text())
+    right_receipt = json.loads((right_path / (mode + ".json")).read_text())
     count = sum(chunk["rows"] for chunk in left_receipt["chunks"])
-    left = list(ExplanationStore(left_path / "cold/ordinary-evidence", read_only=True).iter_all())
-    right = list(itertools.islice(ExplanationStore(right_path / "cold/ordinary-evidence", read_only=True).iter_all(), count))
+    left = list(ExplanationStore(left_path / mode / "ordinary-evidence", read_only=True).iter_all())
+    right = list(itertools.islice(ExplanationStore(right_path / mode / "ordinary-evidence", read_only=True).iter_all(), count))
     if len(left) != count:
         raise ValueError("Legacy numerator differs from durably stored ordinary records")
     prefix = right_receipt["chunks"][:len(left_receipt["chunks"])]
@@ -135,11 +184,22 @@ def compare(left_path, right_path, output, *, ordinary_only=False):
                 start += chunk["rows"]
     receipt = {**compare_records(left, right, ordinary_only=ordinary_only), "schema_version": 1,
                "namespace": "qualification_only", "query_boundaries_equal": boundaries,
-               "baseline": {"path": str(left_path), "cold_sha256": sha256_file(left_path / "cold.json")},
-               "candidate": {"path": str(right_path), "cold_sha256": sha256_file(right_path / "cold.json")},
+               "compared_mode": mode,
+               "baseline": {"path": str(left_path), mode + "_sha256": sha256_file(left_path / (mode + ".json"))},
+               "candidate": {"path": str(right_path), mode + "_sha256": sha256_file(right_path / (mode + ".json"))},
                "hosted_quality_established": False, "fitted_selector_mapping_parity": "pending"}
     if not boundaries:
         receipt["status"] = "failed"
+    if fitted:
+        if (not boundaries or len(left_receipt["chunks"]) != len(right_receipt["chunks"])
+                or count != sum(chunk["rows"] for chunk in right_receipt["chunks"])):
+            raise ValueError("Fitted selector parity requires equal complete cohorts, not a prefix")
+        receipt["fitted"] = compare_fitted(
+            left_path, right_path, ordinary_only=ordinary_only, mode=mode,
+        )
+        receipt["fitted_selector_mapping_parity"] = receipt["fitted"]["status"]
+        if receipt["fitted"]["status"] != "passed":
+            receipt["status"] = "failed"
     _atomic_json(output, receipt)
     return receipt
 
@@ -150,8 +210,12 @@ def main():
         parser.add_argument("--" + name, type=Path, required=True)
     parser.add_argument("--ordinary-only", action="store_true",
                         help="Exclude only the two declared synthetic-diagnostic payload paths")
+    parser.add_argument("--fitted", action="store_true",
+                        help="Also require fitted selectors, mappings and exact hosted fixture parity")
+    parser.add_argument("--mode", choices=("cold", "warm", "replay", "partial"), default="cold")
     args = parser.parse_args()
-    result = compare(args.baseline, args.candidate, args.output, ordinary_only=args.ordinary_only)
+    result = compare(args.baseline, args.candidate, args.output,
+                     ordinary_only=args.ordinary_only, fitted=args.fitted, mode=args.mode)
     print(json.dumps({k: result[k] for k in ("status", "compared_rows", "max_absolute_error", "numeric_mismatch_count", "discrete_mismatch_count")}, indent=2))
     if result["status"] != "passed":
         raise SystemExit(1)
