@@ -30,3 +30,24 @@ The fixed six endpoints, TEST schedules, split boundaries, independent Gemini
 assessment, bounded annotation retries, $35 ceiling,16October23UTC measurement
 deadline and final8h reserve remain unchanged. See the live registry's
 `active_conference_metadata_recovery` for authenticated preparation and receipts.
+
+## Canonical greedy lookup exposed after metadata recovery
+
+Both replacements completed their first row with UNKNOWN, which remains a
+scientific result. Native14451.230 then failed in `observable_score_greedy`:
+publisher `EquivalentClasses` axioms are normalized into two `SubClassOf`
+candidate axioms, so raw tuple equality could not locate the keep candidate.
+Compare canonical forms instead, without rewriting original inputs or changing
+the candidate language. This separate cause is diagnosed from the actual input.
+
+The linked native continuation retains its completed first row (including all
+229.584290266037 seconds and its prior metadata charge) without replay. Only
+the failed greedy row is retried, with its1.2181239128112793 seconds subtracted
+from the unchanged300-second budget. Original receipts and artifact hashes are
+retained through `retained_row`; downstream assessment must resolve that binding
+when locating a retained row's payload. The second native shard uses the corrected
+source too. The live inference replacement and its successor stay unchanged.
+
+Use repair_attempt2 under the existing native recovery chain and root incident;
+no counter reset or additional same-cause attempt is introduced. The failure
+history now distinguishes the repaired metadata boundary from canonical lookup.
