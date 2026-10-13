@@ -459,6 +459,7 @@ class ExplanationJobs:
         prompt: str | None = None,
         max_repairs: int = 2,
         stopped: Callable[[], bool] = lambda: False,
+        previous_context_hashes: list[str] | None = None,
     ) -> dict[str, Any]:
         """Prepare one explanation explicitly; identical dependencies reuse verified output."""
         if not 0 <= max_repairs <= 2:
@@ -585,6 +586,30 @@ class ExplanationJobs:
                 ):
                     prior_identity, prior, can_replay = candidate_identity, candidate_path, True
                     break
+            if (
+                not can_replay
+                and not descriptive
+                and packet.task == "entity_profile"
+                and packet.selection.get("context_binding") == "raw-context/1"
+                and previous_context_hashes is not None
+                and len(previous_context_hashes) == len(packet.entities)
+            ):
+                # A context repair may change unrelated entities. Revalidate the
+                # saved exact-extract response only when every semantic input,
+                # policy, prompt and provider setting is identical. The new
+                # artifact still binds the new context bytes and gets a new ID.
+                candidate_identity = {
+                    **identity,
+                    "packet": {**identity["packet"], "context_hashes": previous_context_hashes},
+                }
+                candidate_path = self.root / canonical_hash(candidate_identity)[7:]
+                request_path = candidate_path / "request.json"
+                if (
+                    candidate_path != directory
+                    and request_path.exists()
+                    and json.loads(request_path.read_bytes()) == candidate_identity
+                ):
+                    prior_identity, prior, can_replay = candidate_identity, candidate_path, True
             reasons: list[str] = []
             call = provider or self._provider
             for attempt in range(max_repairs + 1):
@@ -611,6 +636,11 @@ class ExplanationJobs:
                             "source_request": canonical_hash(prior_identity),
                             "repair": "response revalidation and provenance metadata revision",
                             "new_provider_dispatch_required": False,
+                            **({
+                                "context_binding_revalidated": True,
+                                "previous_context_hashes": prior_identity["packet"]["context_hashes"],
+                                "current_context_hashes": identity["packet"]["context_hashes"],
+                            } if prior_identity["packet"] != identity["packet"] else {}),
                         },
                     )
                 messages = [

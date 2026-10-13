@@ -566,6 +566,15 @@ class Preparation:
                 if (profiles_path / "profiles.json").exists()
                 else {}
             )
+            prior_context_hashes = {}
+            if self.resume_from and (self.resume_from / "preparation.json").is_file():
+                previous = json.loads((self.resume_from / "preparation.json").read_bytes())
+                locator = previous.get("outputs", {}).get("context-index")
+                if locator:
+                    prior_stage = relative_path(self.resume_from, locator)
+                    for loc in json.loads((prior_stage / "contexts.json").read_bytes()).values():
+                        raw = json.loads((relative_path(prior_stage, loc) / "manifest.json").read_bytes())
+                        prior_context_hashes[raw["ontology_version_id"]] = raw["artifacts"]["context.sqlite"]
             packets = {}
             for entry in self.lock.entities:
                 context = contexts[entry["ontology"]]
@@ -600,6 +609,10 @@ class Preparation:
                         packet,
                         profile,
                         prompt=self.lock.profile_prompt,
+                        previous_context_hashes=(
+                            [prior_context_hashes[entity.ontology_version_id]]
+                            if entity.ontology_version_id in prior_context_hashes else None
+                        ),
                         stopped=lambda: (self.root / "STOP").exists(),
                     )
                     atomic_json(destination / "profiles.json", profile_rows)

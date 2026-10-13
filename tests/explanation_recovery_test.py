@@ -221,6 +221,11 @@ def test_classifier_repair_rebuilds_context_and_only_changed_generation_records(
     assert result["outputs"]["acquire-verify"] == before["outputs"]["acquire-verify"]
     assert result["outputs"]["context-index"] != before["outputs"]["context-index"]
     assert len(calls) == 5  # Only one changed profile and its comparison are regenerated.
+    rebound = [json.loads(p.read_bytes()) for p in (repaired / "generations").glob("*/revalidation.json")]
+    rebound = [r for r in rebound if r.get("context_binding_revalidated")]
+    assert len(rebound) == 1
+    assert rebound[0]["previous_context_hashes"] != rebound[0]["current_context_hashes"]
+    assert rebound[0]["new_provider_dispatch_required"] is False
     assert all(
         fact["category"] != "definitions" for packet in calls[3:] for fact in packet["facts"]
     )
