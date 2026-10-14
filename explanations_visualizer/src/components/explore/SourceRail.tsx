@@ -180,6 +180,7 @@ export function CandidateList({
   /** Typed targets of the current prepared example (HR2); tagged, never filtered or re-ranked. */
   prepared?: EntityRef[];
 }) {
+  const preparedCount = candidates.filter((candidate) => prepared.some((target) => target.ontology_version_id === candidate.target.ontology_version_id && target.iri === candidate.target.iri && target.kind === candidate.target.kind)).length;
   const ontology = candidates[0]?.target.ontology_version_id;
   const label = useLabels(ontology, candidates.map((candidate) => candidate.target.iri));
   const narrow = useNarrow();
@@ -193,7 +194,7 @@ export function CandidateList({
         </h2>
         <span className="meta">{candidates.length ? `${candidates.length}${complete ? "" : ` of ${total ?? "more"}`}` : ""}</span>
       </div>
-      {prepared.length > 0 && candidates.length > 0 && <p className="meta rail-sub">{prepared.length} of these candidates are prepared for this review; the order is the matcher&apos;s.</p>}
+      {prepared.length > 0 && candidates.length > 0 && <p className="meta rail-sub">{preparedCount} of these loaded candidates are prepared for this review; the order is the matcher&apos;s.</p>}
       {candidates.length > 0 && <p className="meta rail-sub">{orderDescription(basis)}{rankOf(candidates[0], basis) !== null ? "; numbers are the recorded ranks" : "; numbers are positions in this list"}</p>}
       {!complete && (
         <p className="note note-warn">

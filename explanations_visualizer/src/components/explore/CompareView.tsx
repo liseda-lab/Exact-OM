@@ -10,7 +10,7 @@
 // catalogue offers one), then the run's first source. Prepared examples sit beside All sources;
 // neither filters nor re-ranks the run's sources and candidates.
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronLeft, IconChevronRight } from "@/components/common/Icons";
@@ -23,7 +23,7 @@ import { CandidateList, SourcePicker } from "@/components/explore/SourceRail";
 import { PairWorkspace, type Focus, type PairNavigation, type RevealRequest } from "@/components/workspace/PairWorkspace";
 import { getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
-import { caseForSource, examplePair, landingChoice, savedChoiceFor, type ReviewCase, type SavedChoice } from "@/lib/reviewCatalogue";
+import { caseForSource, examplePair, landingChoice, savedChoiceFor, sourceListMode, type ReviewCase, type SavedChoice } from "@/lib/reviewCatalogue";
 import type { Candidate, EntityKind, EntityRef, Page, PairTrace, SourceSummary } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
 import { useNarrow } from "@/lib/useMedia";
@@ -39,7 +39,7 @@ const FIRST_LOAD_PAGES = 5;
 const PAGE = 100;
 /** A slow catalogue read never blocks ordinary browsing for longer than this. */
 const CATALOGUE_WAIT_MS = 8_000;
-/** A linked pair beyond the first load is looked for in at most this many further pages. */
+/** Each automatic linked-pair or prepared-target search reads at most this many further pages. */
 const PAIR_SEARCH_PAGES = 20;
 const CHOICE_KEY = "exact.compare.choice";
 
@@ -78,8 +78,8 @@ export function CompareView() {
   // The bound development-review catalogue (exploration only); absent on generic bundles.
   const catalogue = useReviewCatalogue(state.phase === "ready" ? packageId : null);
   const runIds = useMemo(() => state.runs.map((item) => item.run_id), [state.runs]);
-  const examples = catalogue.state.status === "available" && runIds.includes(catalogue.state.catalogue.source_run_id) ? catalogue.state.catalogue : null;
-  const otherRun = catalogue.state.status === "available" && !examples;
+  const otherRun = catalogue.state.status === "available" && !runIds.includes(catalogue.state.catalogue.source_run_id);
+  const examples = catalogue.state.status === "available" && !otherRun && catalogue.state.catalogue.cases.length ? catalogue.state.catalogue : null;
 
   // Sources: first page, then explicit "load more".
   const [extraSources, setExtraSources] = useState<SourceSummary[]>([]);
@@ -109,10 +109,10 @@ export function CompareView() {
   const sourceKind = source?.entity.kind ?? kindOf(params.get("sk"));
   const sourceRef = useMemo<EntityRef | null>(() => (sourceIri && run ? { ontology_version_id: source?.entity.ontology_version_id ?? run.source_ontology_version_id, iri: sourceIri, kind: sourceKind } : null), [sourceIri, run, source, sourceKind]);
   const activeCase = examples && runId === examples.source_run_id ? caseForSource(examples, sourceRef) : null;
-  const mode: SourceMode = listMode ?? (examples || catalogue.state.status === "loading" ? (sourceIri && !activeCase && examples ? "all" : "examples") : "all");
 
   // First entry; a late catalogue never overrides a source already chosen or All sources.
   const [waited, setWaited] = useState(false);
+  const mode = sourceListMode({ requested: listMode, catalogue: catalogue.state, hasExamples: Boolean(examples), hasSource: Boolean(sourceIri), sourceIsExample: Boolean(activeCase), waited });
   useEffect(() => {
     const timer = window.setTimeout(() => setWaited(true), CATALOGUE_WAIT_MS);
     return () => window.clearTimeout(timer);
@@ -161,39 +161,63 @@ export function CompareView() {
   const [more, setMore] = useState<{ key: string | null; items: Candidate[]; cursor: string | null; loading: boolean; error: unknown }>({ key: null, items: [], cursor: null, loading: false, error: null });
   const continued = more.key === candidateKey ? more : null;
   const cursor = continued ? continued.cursor : first.data?.cursor ?? null;
+  const candidateRead = useRef<AbortController | null>(null);
+  const cancelCandidateRead = useCallback(() => {
+    candidateRead.current?.abort();
+    candidateRead.current = null;
+    setMore((previous) => previous.loading ? { ...previous, loading: false } : previous);
+  }, []);
+  // Back/Forward and deliberate choices both cancel obsolete continuation reads. The identity
+  // guard also discards a response that completed just as the visitor made another choice.
+  useEffect(() => cancelCandidateRead, [candidateKey, pairId, mode, cancelCandidateRead]);
   const loadMoreCandidates = useCallback(async () => {
-    if (!runId || !sourceIri || !cursor) return;
+    if (!runId || !sourceIri || !cursor || candidateRead.current) return;
+    const controller = new AbortController();
+    candidateRead.current = controller;
     const base = continued ?? { key: candidateKey, items: [], cursor, loading: false, error: null };
     setMore({ ...base, loading: true, error: null });
     try {
-      const page = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId)}/candidates`, { source: sourceIri, source_kind: sourceKind, limit: PAGE, cursor });
-      setMore({ key: candidateKey, items: [...base.items, ...page.items], cursor: page.next_cursor, loading: false, error: null });
+      const page = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId)}/candidates`, { source: sourceIri, source_kind: sourceKind, limit: PAGE, cursor }, controller.signal);
+      if (!controller.signal.aborted && candidateRead.current === controller)
+        setMore({ key: candidateKey, items: [...base.items, ...page.items], cursor: page.next_cursor, loading: false, error: null });
     } catch (error) {
-      setMore({ ...base, loading: false, error });
+      if (!controller.signal.aborted && candidateRead.current === controller) setMore({ ...base, loading: false, error });
+    } finally {
+      if (candidateRead.current === controller) candidateRead.current = null;
     }
   }, [runId, sourceIri, sourceKind, cursor, continued, candidateKey]);
   const loaded = useMemo(() => [...(first.data?.items ?? []), ...(continued?.items ?? [])], [first.data, continued]);
   const { ordered, basis } = useMemo(() => orderCandidates(loaded), [loaded]);
   const candidate = ordered.find((item) => item.pair_id === pairId) ?? null;
-  // No pair chosen: a prepared example opens its first prepared candidate in matcher order;
-  // otherwise the matcher's first candidate, as before.
+  const preparedCandidate = activeCase ? examplePair(ordered, activeCase) : null;
+  // Choosing an example never silently opens an unrelated target. While the catalogue or its
+  // candidate pages resolve, the visitor can still choose any loaded candidate deliberately.
   useEffect(() => {
     if (!ordered.length || candidate || pairId) return;
-    const preferred = mode === "examples" && activeCase ? examplePair(ordered, activeCase) : null;
-    setParams({ pair: (preferred ?? ordered[0]).pair_id }, "replace");
-  }, [ordered, candidate, pairId, mode, activeCase, setParams]);
-  // An explicit pair is never replaced silently: it is looked for in this source's further
-  // candidate pages (bounded), and if it is not there the page says so and offers a choice.
-  const searchKey = `${candidateKey}|${pairId}`;
+    if (mode === "examples" && catalogue.state.status === "loading") return;
+    if (mode === "examples" && activeCase) {
+      if (preparedCandidate) setParams({ pair: preparedCandidate.pair_id }, "replace");
+    } else setParams({ pair: ordered[0].pair_id }, "replace");
+  }, [ordered, candidate, pairId, mode, activeCase, preparedCandidate, catalogue.state.status, setParams]);
+  // A linked pair and a catalogue's typed target use the same bounded continuation. The budget
+  // pauses, rather than converts, a prepared-example request. Further reads require a choice.
+  const searchKey = `${candidateKey}|${pairId ?? (mode === "examples" ? activeCase?.case_id : "")}`;
   const [searched, setSearched] = useState<{ key: string; pages: number }>({ key: "", pages: 0 });
   const searchedPages = searched.key === searchKey ? searched.pages : 0;
   const pairMissing = Boolean(pairId && !candidate && first.data && !first.loading);
+  const exampleMissing = Boolean(!pairId && mode === "examples" && activeCase && !preparedCandidate && first.data && !first.loading);
   useEffect(() => {
-    if (!pairMissing || !cursor || continued?.loading || continued?.error || searchedPages >= PAIR_SEARCH_PAGES) return;
+    if (!(pairMissing || exampleMissing) || !cursor || continued?.loading || continued?.error || searchedPages >= PAIR_SEARCH_PAGES) return;
     setSearched({ key: searchKey, pages: searchedPages + 1 });
     void loadMoreCandidates();
-  }, [pairMissing, cursor, continued?.loading, continued?.error, searchedPages, searchKey, loadMoreCandidates]);
-  const pairNotFound = pairMissing && !continued?.loading && (!cursor || searchedPages >= PAIR_SEARCH_PAGES || Boolean(continued?.error));
+  }, [pairMissing, exampleMissing, cursor, continued?.loading, continued?.error, searchedPages, searchKey, loadMoreCandidates]);
+  const searchStopped = !continued?.loading && (!cursor || searchedPages >= PAIR_SEARCH_PAGES || Boolean(continued?.error));
+  const pairNotFound = pairMissing && searchStopped;
+  const exampleNotFound = exampleMissing && searchStopped;
+  const continueSearch = () => {
+    setSearched({ key: searchKey, pages: 0 });
+    if (continued?.error) void loadMoreCandidates();
+  };
 
   // Deliberate choices are kept for this exact package and run only (spec 24 HR2 §3).
   const remember = useCallback(
@@ -204,17 +228,20 @@ export function CompareView() {
   );
   const chooseExample = useCallback(
     (item: ReviewCase) => {
+      cancelCandidateRead();
+      setSearched({ key: "", pages: 0 });
       remember(item.source.iri, item.source.kind, null);
       setParams({ ...(examples && examples.source_run_id !== runId ? { run: examples.source_run_id } : {}), source: item.source.iri, sk: item.source.kind, pair: null, list: "examples", hs: null, hsk: null, ht: null, htk: null });
     },
-    [remember, setParams, examples, runId],
+    [remember, setParams, examples, runId, cancelCandidateRead],
   );
   const choosePair = useCallback(
     (item: Candidate) => {
+      cancelCandidateRead();
       remember(item.source.iri, item.source.kind, item.pair_id);
       setParams({ pair: item.pair_id, ht: null, htk: null });
     },
-    [remember, setParams],
+    [remember, setParams, cancelCandidateRead],
   );
 
   const sourceEntity = candidate?.source ?? source?.entity ?? null;
@@ -305,13 +332,14 @@ export function CompareView() {
           selectedIri={sourceIri}
           header={
             <>
-              {(examples || catalogue.state.status === "loading") && <SourceModeSwitch mode={mode} onMode={(next) => setParams({ list: next })} examples={examples?.cases.length ?? null} sources={sources.data?.total_count ?? null} />}
-              <CatalogueNotice state={catalogue.state} otherRun={otherRun} onRetry={catalogue.reload} />
+              {(examples || catalogue.state.status === "loading") && <SourceModeSwitch mode={mode} onMode={(next) => { cancelCandidateRead(); setParams({ list: next }); }} examples={examples?.cases.length ?? null} sources={sources.data?.total_count ?? null} />}
+              <CatalogueNotice state={catalogue.state} otherRun={otherRun} onRetry={catalogue.reload} requested={listMode === "examples"} />
             </>
           }
           onSelect={(item) => {
+            cancelCandidateRead();
             remember(item.entity.iri, item.entity.kind, null);
-            setParams({ source: item.entity.iri, sk: item.entity.kind, pair: null, list: examples ? "all" : null, hs: null, hsk: null, ht: null, htk: null });
+            setParams({ source: item.entity.iri, sk: item.entity.kind, pair: null, list: "all", hs: null, hsk: null, ht: null, htk: null });
           }}
         >
           {mode === "examples" ? <ExampleList state={catalogue.state} otherRun={otherRun} currentCaseId={activeCase?.case_id ?? null} onChoose={chooseExample} /> : null}
@@ -334,10 +362,11 @@ export function CompareView() {
       </aside>
 
       <div className="compare-main" id="main" tabIndex={-1}>
-        {!candidate && !pairNotFound && (first.loading || sources.loading || (!sourceIri && !linked.error && !(sources.data && !allSources.length)) || pairMissing) && (
+        {!candidate && !pairNotFound && !exampleNotFound && (first.loading || sources.loading || (!sourceIri && !linked.error && !(sources.data && !allSources.length)) || pairMissing || exampleMissing) && (
           <div aria-busy="true">
             {!sourceIri && catalogue.state.status === "loading" && <p className="meta">Opening a prepared example…</p>}
             {pairMissing && <p className="meta">Finding the linked pair among this source&apos;s candidates…</p>}
+            {exampleMissing && <p className="meta">Finding a prepared target among this source&apos;s candidates…</p>}
             <Skeleton lines={6} />
           </div>
         )}
@@ -356,6 +385,16 @@ export function CompareView() {
             </div>
           </div>
         ) : null}
+        {exampleNotFound && (
+          <div className="note note-warn" role="alert">
+            <p>{continued?.error ? "A prepared target could not be resolved because a candidate page failed to load." : cursor ? `The prepared-target search paused after ${PAIR_SEARCH_PAGES} further pages. No prepared target was found among the ${ordered.length} loaded candidates.` : "None of this example's prepared targets is present in this source's candidate list."}</p>
+            <p>No unprepared candidate has been selected automatically. You can choose a loaded candidate or browse all sources.</p>
+            <div className="note-actions">
+              {cursor && <button type="button" className="btn btn-sm" onClick={continueSearch}>{continued?.error ? "Retry prepared-target search" : "Continue prepared-target search"}</button>}
+              <button type="button" className="btn btn-sm" onClick={() => { cancelCandidateRead(); setParams({ list: "all" }); }}>Browse all sources</button>
+            </div>
+          </div>
+        )}
         {pairNotFound && (
           <div className="note note-warn" role="alert">
             <p>The linked pair is not among this source&apos;s {ordered.length} loaded candidates in this run.</p>
@@ -373,7 +412,7 @@ export function CompareView() {
             </div>
           </div>
         )}
-        {!candidate && !first.loading && first.data && !ordered.length && (
+        {!candidate && !exampleMissing && !first.loading && first.data && !ordered.length && (
           <div className="note">
             <p>No candidate pair is available for this source.</p>
             {examples && (

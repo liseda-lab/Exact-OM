@@ -103,6 +103,20 @@ export function examplePair<T extends { pair_id: string; target: EntityRef }>(or
   return ordered.find((candidate) => item.targets.some((target) => sameEntity(target, candidate.target))) ?? null;
 }
 
+/** A requested examples URL must not hide ordinary browsing when discovery cannot serve it. */
+export function sourceListMode(input: {
+  requested: "examples" | "all" | null;
+  catalogue: CatalogueState;
+  hasExamples: boolean;
+  hasSource: boolean;
+  sourceIsExample: boolean;
+  waited: boolean;
+}): "examples" | "all" {
+  if (input.requested === "all") return "all";
+  if (!input.hasExamples && (input.catalogue.status !== "loading" || input.waited)) return "all";
+  return input.requested ?? (input.hasSource && input.hasExamples && !input.sourceIsExample ? "all" : "examples");
+}
+
 /** A deliberate choice kept for one exact package and run only (spec 24 HR2 §3). */
 export interface SavedChoice {
   package_id: string;

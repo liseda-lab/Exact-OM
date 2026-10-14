@@ -5,7 +5,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { caseForSource, catalogueStateFromError, examplePair, IncompatibleCatalogue, landingChoice, parseCatalogue, savedChoiceFor } from "./reviewCatalogue.ts";
+import { caseForSource, catalogueStateFromError, examplePair, IncompatibleCatalogue, landingChoice, parseCatalogue, savedChoiceFor, sourceListMode } from "./reviewCatalogue.ts";
 
 // Labelled fixture with the live catalogue's shape (exact-review-about/1): two cases, typed
 // sources and five typed targets each. The IRIs are synthetic; no React code names real ones.
@@ -117,4 +117,16 @@ test("participant and shared workspace code never reads the review catalogue (HR
     const text = readFileSync(file, "utf8");
     assert.ok(!/review-bundle|reviewCatalogue|PreparedExamples/.test(text), `${file.slice(src.length)} must not reach the review catalogue`);
   }
+});
+
+
+test("an examples URL keeps ordinary browsing when its catalogue cannot supply examples (HR2-A)", () => {
+  const base: Parameters<typeof sourceListMode>[0] = { requested: "examples", catalogue: { status: "loading" }, hasExamples: false, hasSource: true, sourceIsExample: false, waited: false };
+  assert.equal(sourceListMode(base), "examples");
+  assert.equal(sourceListMode({ ...base, waited: true }), "all");
+  for (const catalogue of [{ status: "absent" }, { status: "failed", reason: "unreachable", error: null }, { status: "available", catalogue: parseCatalogue({ ...raw, cases: [] }) }, { status: "available", catalogue: parseCatalogue({ ...raw, source_run_id: "other" }) }] as const)
+    assert.equal(sourceListMode({ ...base, catalogue }), "all");
+  assert.equal(sourceListMode({ ...base, catalogue: { status: "available", catalogue: parseCatalogue(raw) }, hasExamples: true }), "examples");
+  // A deliberate choice of ordinary browsing still wins when discovery recovers.
+  assert.equal(sourceListMode({ ...base, requested: "all", catalogue: { status: "available", catalogue: parseCatalogue(raw) }, hasExamples: true }), "all");
 });

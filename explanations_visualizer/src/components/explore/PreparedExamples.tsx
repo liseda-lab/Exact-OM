@@ -34,7 +34,7 @@ const FAILURE_TEXT: Record<string, string> = {
 };
 
 /** Visible reasons the examples are not offered; never an empty list presented as complete. */
-export function CatalogueNotice({ state, otherRun, onRetry }: { state: CatalogueState; otherRun: boolean; onRetry: () => void }) {
+export function CatalogueNotice({ state, otherRun, onRetry, requested = false }: { state: CatalogueState; otherRun: boolean; onRetry: () => void; requested?: boolean }) {
   if (state.status === "failed")
     return (
       <div className="note note-warn catalogue-note" role="status">
@@ -44,7 +44,14 @@ export function CatalogueNotice({ state, otherRun, onRetry }: { state: Catalogue
         </button>
       </div>
     );
-  if (state.status === "available" && otherRun) return <p className="note catalogue-note">The prepared examples belong to a saved run that is not in this bundle.</p>;
+  const unavailable = state.status === "available" && otherRun
+    ? "The prepared examples belong to a saved run that is not in this bundle."
+    : state.status === "available" && !state.catalogue.cases.length
+      ? "No prepared examples are listed for this bundle. All sources remain available."
+      : state.status === "absent" && requested
+        ? "Prepared examples are not available in this bundle. All sources remain available."
+        : null;
+  if (unavailable) return <p className="note catalogue-note">{unavailable}{" "}<button type="button" className="link-btn" onClick={onRetry}>Try again</button></p>;
   return null;
 }
 
