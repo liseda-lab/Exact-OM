@@ -15,10 +15,10 @@ from contextlib import closing
 from pathlib import Path
 
 from .artifacts import atomic_json
+from .context_semantics import _json, _ref
 from .contracts import canonical_hash, file_hash
-from .context_semantics import _ref, _json
 from .navigation import PARTIAL_BASIS, PARTIAL_CONTRACT, PARTIAL_FILE
-from .navigation_prepare import _SQL, _entries, _TOP, _BOTTOM
+from .navigation_prepare import _BOTTOM, _SQL, _TOP, _entries
 
 ADMISSION = "exact-elk-partial-admission/1"
 VERSIONS = {"pyelk-reasoner": "0.2.1", "pyowl-core": "0.2.1"}

@@ -6,6 +6,7 @@ from typing import Annotated, Literal
 
 from pydantic import Field, field_validator, model_validator
 
+from ..review_metadata import ReviewBundleSummary
 from .models import (
     Asset,
     Candidate,
@@ -21,7 +22,6 @@ from .models import (
     StudyState,
 )
 from .workspace import WorkspaceScope
-from ..review_metadata import ReviewBundleSummary
 
 Method = Literal[
     "protege",

@@ -81,6 +81,7 @@ def test_existing_receipt_cannot_overwrite_private_input(tmp_path):
 
 def test_main_catalogue_binds_24_frozen_typed_cases_and_participant_projection_withholds_them():
     from copy import deepcopy
+
     from tools.verify_review_environment import validate_catalogues
 
     cases = []

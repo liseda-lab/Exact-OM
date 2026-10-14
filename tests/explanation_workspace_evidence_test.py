@@ -11,7 +11,10 @@ from exact_inspect.context import build_context_package
 from exact_inspect.contracts import VisibilityPolicy, file_hash
 from exact_inspect.models import SelectedEvidence
 from exact_inspect.study.store import StudyStore
-from exact_inspect.study.workspace import build_workspace_scope, validate_publication_workspaces
+from exact_inspect.study.workspace import (
+    build_workspace_scope,
+    validate_publication_workspaces,
+)
 from tests.explanation_study_workspace_test import Store, client_for
 
 
@@ -21,12 +24,14 @@ class EvidenceStore(Store):
 
 def prepared_evidence(tmp_path):
     context = build_context_package(
-        core.load_snapshot(b"""Ontology(
+        core.load_snapshot(
+            b"""Ontology(
                 Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
                 AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Source")
                 AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:B> "Target")
                 AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:A> "PRIVATE HIDDEN DEFINITION")
-            )"""),
+            )"""
+        ),
         tmp_path / "original",
     )
     version = context.ontology_version_id

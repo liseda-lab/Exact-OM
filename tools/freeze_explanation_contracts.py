@@ -7,14 +7,17 @@ import json
 import tempfile
 from pathlib import Path
 
+from exact_inspect.description_review import IndependentDescriptionReview
+from exact_inspect.postmigration_contracts import (
+    DescriptionPresentation,
+    PartialInferenceMetadata,
+)
+from exact_inspect.review_metadata import ReviewBundleSummary
+from exact_inspect.service import create_prepared_app
 from exact_inspect.study.api import create_study_app
 from exact_inspect.study.models import Publish
 from exact_inspect.study.resources import ExplanationResource
 from exact_inspect.study.v2_models import TutorialDefinition
-from exact_inspect.service import create_prepared_app
-from exact_inspect.review_metadata import ReviewBundleSummary
-from exact_inspect.postmigration_contracts import PartialInferenceMetadata, DescriptionPresentation
-from exact_inspect.description_review import IndependentDescriptionReview
 
 
 def snapshots():

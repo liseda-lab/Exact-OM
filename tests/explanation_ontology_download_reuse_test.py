@@ -15,19 +15,26 @@ from exact_inspect.context_resources import (
     validate_ontology_resource,
 )
 from exact_inspect.context_semantics import decode_payload, typed_node
-from exact_inspect.contracts import VisibilityPolicy, canonical_hash, canonical_json, file_hash
+from exact_inspect.contracts import (
+    VisibilityPolicy,
+    canonical_hash,
+    canonical_json,
+    file_hash,
+)
 from tools.review_ontology_downloads import reuse_ontology_download
 
 
 @pytest.fixture
 def prepared(tmp_path):
     original = build_context_package(
-        core.load_snapshot(b"""Ontology(
+        core.load_snapshot(
+            b"""Ontology(
         Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
         SubClassOf(<urn:A> <urn:B>)
         AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Alpha")
         AnnotationAssertion(<http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#P207> <urn:A> "PRIVATE")
-        )"""),
+        )"""
+        ),
         tmp_path / "original",
     )
     policy = VisibilityPolicy()

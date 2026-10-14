@@ -13,8 +13,8 @@ from exact_inspect.study.workspace import (
     build_workspace_scope,
     validate_publication_workspaces,
 )
-from tests.explanation_workspace_evidence_test import EvidenceStore, prepared_evidence
 from tests.explanation_study_workspace_test import client_for
+from tests.explanation_workspace_evidence_test import EvidenceStore, prepared_evidence
 
 
 def inputs(tmp_path):

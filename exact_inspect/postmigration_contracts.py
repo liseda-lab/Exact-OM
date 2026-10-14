@@ -1,7 +1,9 @@
 """Versioned additive contracts for partial navigation and description presentation."""
 
-from typing import Literal, Any
+from typing import Any, Literal
+
 from pydantic import Field
+
 from .contracts import WireModel
 
 

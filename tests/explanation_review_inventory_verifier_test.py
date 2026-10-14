@@ -5,7 +5,12 @@ from types import SimpleNamespace
 
 import pytest
 
-from tools.verify_review_environment import Journey, VerificationError, environment, inventory
+from tools.verify_review_environment import (
+    Journey,
+    VerificationError,
+    environment,
+    inventory,
+)
 
 
 def pages():

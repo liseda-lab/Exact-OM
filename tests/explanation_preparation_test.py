@@ -376,20 +376,28 @@ def test_named_context_revision_preserves_legacy_preparation_keys(prepared, tmp_
 
 def test_legacy_support_uses_context_bytes_and_verified_export_lineage(prepared):
     import copy
+
     from exact_inspect.artifacts import validate_bundle
     from exact_inspect.context import OntologyContext
     from exact_inspect.descriptions import validate_prepared_support
 
     lock, package, _, _ = prepared
     manifest = validate_bundle(package)
-    contexts = {oid: OntologyContext(package.parent / loc) for oid, loc in manifest.ontologies.items()}
+    contexts = {
+        oid: OntologyContext(package.parent / loc) for oid, loc in manifest.ontologies.items()
+    }
     for loc in manifest.explanations.values():
         result = json.loads((package.parent / loc).read_bytes())
         packet = result["support_packet"]
         assert packet["selection"]["context_binding"] == "raw-context/1"
         for entity, digest in zip(packet["entities"], packet["context_hashes"]):
             assert digest != entity["ontology_version_id"]
-            assert contexts[entity["ontology_version_id"]].manifest["policy_filter"]["source_context_sha256"] == digest
+            assert (
+                contexts[entity["ontology_version_id"]].manifest["policy_filter"][
+                    "source_context_sha256"
+                ]
+                == digest
+            )
         validate_prepared_support(result, contexts, lock.policy)
         forged = copy.deepcopy(result)
         forged["support_packet"]["context_hashes"][0] = packet["entities"][0]["ontology_version_id"]

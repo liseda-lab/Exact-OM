@@ -18,10 +18,16 @@ from exact_inspect.context_resources import _native_admitted_axiom
 from exact_inspect.contracts import DomainError, VisibilityPolicy, file_hash
 from exact_inspect.decisions import DecisionStore, import_run
 from exact_inspect.decisions_export import export_policy_run
-from exact_inspect.evidence_metadata import filter_evidence_items, pair_evidence_metadata
+from exact_inspect.evidence_metadata import (
+    filter_evidence_items,
+    pair_evidence_metadata,
+)
 from exact_inspect.models import SelectedEvidence
 from exact_inspect.service import create_prepared_app
-from exact_inspect.study.workspace import build_workspace_scope, validate_publication_workspaces
+from exact_inspect.study.workspace import (
+    build_workspace_scope,
+    validate_publication_workspaces,
+)
 from tests.explanation_workspace_evidence_test import EvidenceStore, client_for
 
 

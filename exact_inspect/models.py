@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from .postmigration_contracts import DescriptionPresentation
-
 from typing import Annotated, Any, Literal
 
 from pydantic import ConfigDict, Field, JsonValue, model_serializer, model_validator
@@ -12,6 +10,7 @@ from .contracts import Availability, EntityRef, Page, Scope, Score, WireModel
 from .description_review import IndependentDescriptionReview
 from .evidence_metadata import ExactMatchBasis, PairEvidenceMetadata
 from .generation import FactPacket
+from .postmigration_contracts import DescriptionPresentation
 
 
 class ResourceModel(WireModel):

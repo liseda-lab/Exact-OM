@@ -573,7 +573,7 @@ class ExplanationJobs:
             prior_identity = {}
             prior = self.root
             can_replay = False
-            for revision in (() if descriptive else (5, 4, 3, 2)):
+            for revision in () if descriptive else (5, 4, 3, 2):
                 candidate_identity = {
                     **identity,
                     "implementation": f"grounding-excerpts-and-comparisons/{revision}",
@@ -636,11 +636,17 @@ class ExplanationJobs:
                             "source_request": canonical_hash(prior_identity),
                             "repair": "response revalidation and provenance metadata revision",
                             "new_provider_dispatch_required": False,
-                            **({
-                                "context_binding_revalidated": True,
-                                "previous_context_hashes": prior_identity["packet"]["context_hashes"],
-                                "current_context_hashes": identity["packet"]["context_hashes"],
-                            } if prior_identity["packet"] != identity["packet"] else {}),
+                            **(
+                                {
+                                    "context_binding_revalidated": True,
+                                    "previous_context_hashes": prior_identity["packet"][
+                                        "context_hashes"
+                                    ],
+                                    "current_context_hashes": identity["packet"]["context_hashes"],
+                                }
+                                if prior_identity["packet"] != identity["packet"]
+                                else {}
+                            ),
                         },
                     )
                 messages = [

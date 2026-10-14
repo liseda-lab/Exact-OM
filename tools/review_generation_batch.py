@@ -12,9 +12,7 @@ from pathlib import Path
 from exact_inspect.artifacts import atomic_json
 from exact_inspect.contracts import canonical_hash, file_hash
 from exact_inspect.description_review import build_review_request
-from exact_inspect.descriptions import (
-    PROFILE_PROSE_PROMPT_V5,
-)
+from exact_inspect.descriptions import PROFILE_PROSE_PROMPT_V5
 from exact_inspect.generation import (
     ExplanationOutput,
     FactPacket,

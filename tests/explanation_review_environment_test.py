@@ -452,6 +452,7 @@ def test_real_postgresql_restart_preserves_database_and_owned_identity(tmp_path)
         # Exercise closure through the real authenticated API and owned PostgreSQL,
         # using invented ontology content solely for publication mechanics.
         from fastapi.testclient import TestClient
+
         from exact_inspect.study.api import create_study_app
         from tests.explanation_review_publication_test import review_fixture
 

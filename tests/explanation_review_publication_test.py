@@ -1,7 +1,7 @@
 """Actual HTTP admission and negotiation for real-data development purpose."""
 
-from copy import deepcopy
 import os
+from copy import deepcopy
 
 import pytest
 from fastapi.testclient import TestClient
@@ -176,8 +176,8 @@ def test_development_purpose_cannot_bypass_research_approval_or_adjudication(tmp
 
 
 def test_exact_frozen_publication_retry_does_not_apply_new_reachability(tmp_path, monkeypatch):
-    from exact_inspect.study.store import StudyStore
     from exact_inspect.study import tutorial
+    from exact_inspect.study.store import StudyStore
 
     payload = publication_v2(tmp_path)
     store = StudyStore(

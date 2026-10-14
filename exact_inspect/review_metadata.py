@@ -1,8 +1,10 @@
 """Public-safe metadata shared by exploration and the provisional study."""
 
 from typing import Literal
+
 from pydantic import Field, model_serializer
-from .contracts import WireModel, EntityRef
+
+from .contracts import EntityRef, WireModel
 
 
 class ReviewOntology(WireModel):

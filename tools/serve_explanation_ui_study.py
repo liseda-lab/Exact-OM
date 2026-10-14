@@ -255,7 +255,9 @@ def publication(fixture: Path, out: Path) -> dict:
                 "construction_provenance": {
                     "original_candidate_ids": [c["candidate_id"] for c in candidates],
                     "original_scores": {c["candidate_id"]: c["score"] for c in candidates},
-                    "original_ranks": {c["candidate_id"]: c["display_position"] for c in candidates},
+                    "original_ranks": {
+                        c["candidate_id"]: c["display_position"] for c in candidates
+                    },
                     "replacement_rule": "No replacements. Synthetic matcher pool and c1 mechanical key; not ontology-equivalence evidence.",
                 },
                 "original_production_ranks": {

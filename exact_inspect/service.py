@@ -49,7 +49,7 @@ from .models import (
     RunSummary,
     SelectedEvidence,
 )
-from .navigation import EntryPointPage, PreparedHierarchyPage, PreparedEquivalentsPage
+from .navigation import EntryPointPage, PreparedEquivalentsPage, PreparedHierarchyPage
 from .review_metadata import ReviewBundleSummary
 
 

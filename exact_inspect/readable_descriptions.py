@@ -1,7 +1,9 @@
 """Conservative readable templates with bound labels and explicit display semantics."""
 
 from __future__ import annotations
+
 import copy
+
 from .contracts import canonical_hash, canonical_json
 
 RENDER_REVISION = "typed-readable/3"
@@ -115,8 +117,8 @@ def excerpt(text, limit=360):
 
 
 def profile_templates(packet):
+    from .descriptions import _iri, render_expression
     from .generation import Claim
-    from .descriptions import render_expression, _iri
 
     labels = {
         (f["subject"]["ontology_version_id"], f["subject"]["iri"], f["subject"]["kind"]): f
@@ -275,8 +277,8 @@ def revise(previous, contexts, policy):
     """Keep independent approvals byte-for-byte; version changed deterministic outputs."""
     if previous.get("support_status") == "independently_reviewed":
         return previous
-    from .generation import FactPacket, grounding, ExplanationOutput
     from .descriptions import selected_support, validate_prepared_support
+    from .generation import ExplanationOutput, FactPacket, grounding
 
     packet = enrich(FactPacket.model_validate(previous["support_packet"]), contexts, policy)
     claims = (

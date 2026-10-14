@@ -6,7 +6,11 @@ import pytest
 
 from exact_inspect.contracts import canonical_hash
 from exact_inspect.evidence_metadata import evidence_completeness
-from tools.verify_review_environment import Journey, VerificationError, validate_pair_metadata
+from tools.verify_review_environment import (
+    Journey,
+    VerificationError,
+    validate_pair_metadata,
+)
 
 
 def metadata_inputs():

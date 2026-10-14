@@ -1,10 +1,11 @@
 """Public review metadata is bounded, explicit and never a raw private manifest."""
 
 from fastapi.testclient import TestClient
+
 from exact_inspect.artifacts import publish_bundle
 from exact_inspect.contracts import VisibilityPolicy
-from exact_inspect.service import create_prepared_app
 from exact_inspect.review_metadata import ReviewBundleSummary
+from exact_inspect.service import create_prepared_app
 
 
 def test_about_endpoint_has_same_strict_public_shape_used_by_study(tmp_path):

@@ -599,9 +599,9 @@ class TimingAcknowledgement(StrictModel):
     acknowledged_segment_id: Identifier
 
 
+from .review_models import DevelopmentReviewDefinition  # noqa: E402
+
 # Additive v2 publication dispatch leaves all legacy model defaults and bytes intact.
 from .v2_models import StudyDefinitionV2  # noqa: E402
-
-from .review_models import DevelopmentReviewDefinition  # noqa: E402
 
 Publish.model_rebuild()

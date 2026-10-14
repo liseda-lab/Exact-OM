@@ -8,18 +8,22 @@ from typing import Annotated
 from uuid import uuid4
 
 import pytest
-from pydantic import Field
 from fastapi.testclient import TestClient
+from pydantic import Field
 
 from exact_inspect.study.api import create_study_app
 from exact_inspect.study.models import EntityRef, Publish
 from exact_inspect.study.store import StudyStore
 from exact_inspect.study.tutorial import entity_key, walk_entities
-from exact_inspect.study.v2_models import StudyStateV2, TutorialAction, TutorialProgressMutation
+from exact_inspect.study.v2_models import (
+    StudyStateV2,
+    TutorialAction,
+    TutorialProgressMutation,
+)
 from tests.explanation_corrective_http_test import corrected, mutate, reach_tutorial
-from tests.explanation_study_v2_test import actions_for
-from tests.explanation_study_v2_fixtures import publication_v2
 from tests.explanation_study_test import ADMIN, ORIGIN, SECRET, invite
+from tests.explanation_study_v2_fixtures import publication_v2
+from tests.explanation_study_v2_test import actions_for
 
 
 def test_missing_action_kind_cannot_complete_parent_navigation(corrected):

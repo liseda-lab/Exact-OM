@@ -36,10 +36,12 @@ from exact_inspect.study.workspace import _admit_explanation
 @pytest.fixture
 def reviewed_fixture(tmp_path):
     context = build_context_package(
-        core.load_snapshot(b"""Ontology(
+        core.load_snapshot(
+            b"""Ontology(
         Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
         Declaration(ObjectProperty(<urn:p>))
-        SubClassOf(<urn:A> ObjectSomeValuesFrom(<urn:p> <urn:B>)))"""),
+        SubClassOf(<urn:A> ObjectSomeValuesFrom(<urn:p> <urn:B>)))"""
+        ),
         tmp_path / "context",
     )
     entity = EntityRef(ontology_version_id=context.ontology_version_id, iri="urn:A", kind="class")

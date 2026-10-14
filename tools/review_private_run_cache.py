@@ -4,8 +4,8 @@ import json
 import uuid
 from pathlib import Path
 
-from exact.runs.reader import RunReader
 from exact.runs.decisions import feature_terms
+from exact.runs.reader import RunReader
 from exact_inspect import decisions
 from exact_inspect.artifacts import atomic_json
 from exact_inspect.contracts import DomainError, canonical_hash, file_hash

@@ -32,8 +32,8 @@ from ..contracts import (
     encode_cursor,
     file_hash,
 )
-from ..generation import Claim
 from ..evidence_metadata import PairEvidenceMetadata
+from ..generation import Claim
 from ..models import (
     AxiomResponse,
     EntityContextResponse,
@@ -44,13 +44,13 @@ from ..models import (
     LabelsResponse,
     SelectedEvidence,
 )
-from ..sqlite_safety import readonly_connection
 from ..navigation import (
-    EntryPointPage,
-    PreparedHierarchyPage,
-    PreparedEquivalentsPage,
     NAVIGATION_CONTRACT,
+    EntryPointPage,
+    PreparedEquivalentsPage,
+    PreparedHierarchyPage,
 )
+from ..sqlite_safety import readonly_connection
 from .models import Identifier, StrictModel
 
 
@@ -208,8 +208,8 @@ def _admit_explanation(value, case, policy, contexts):
         or result["entities"][1] not in [c["entity"] for c in case["candidates"]]
     ):
         raise ValueError("Comparison is not an active-case ordered pair")
-    from ..readable_descriptions import label_facts
     from ..generation import FactPacket
+    from ..readable_descriptions import label_facts
 
     reference_labels = (
         label_facts(FactPacket.model_validate(result["support_packet"]))

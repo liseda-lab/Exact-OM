@@ -72,12 +72,20 @@ class AdmissionHashes:
     def __call__(self, path):
         path = Path(path).resolve(strict=True)
         stat = path.stat()
+
         # A read may update access time without changing the immutable input.
         # Still bind content metadata, identity and hardlink/protection state.
         def identity(value):
-            return (value.st_dev, value.st_ino, value.st_mode, value.st_nlink,
-                    getattr(value, "st_flags", 0), value.st_size,
-                    value.st_mtime_ns, value.st_ctime_ns)
+            return (
+                value.st_dev,
+                value.st_ino,
+                value.st_mode,
+                value.st_nlink,
+                getattr(value, "st_flags", 0),
+                value.st_size,
+                value.st_mtime_ns,
+                value.st_ctime_ns,
+            )
 
         key = (path, *identity(stat))
         if key not in self.checked:
@@ -1029,7 +1037,9 @@ def serve(config, role, nonce):
 
     phase("backend_identity", lambda: verify_backend(config))
     if os.environ.get("EXACT_REVIEW_READ_DIAGNOSTICS") == "1":
-        os.environ["EXACT_READ_DIAGNOSTICS"] = str(Path(config["root"]) / "logs" / (role + "-reads.jsonl"))
+        os.environ["EXACT_READ_DIAGNOSTICS"] = str(
+            Path(config["root"]) / "logs" / (role + "-reads.jsonl")
+        )
     if role == "study":
         from urllib.parse import quote
 

@@ -18,9 +18,7 @@ from exact_inspect.artifacts import atomic_json, publish_bundle, validate_bundle
 from exact_inspect.context import OntologyContext
 from exact_inspect.context_resources import export_ontology_resource
 from exact_inspect.contracts import EntityRef, canonical_hash, file_hash
-from exact_inspect.decisions import (
-    _feature_items,
-)
+from exact_inspect.decisions import _feature_items
 from exact_inspect.decisions_export import export_policy_run
 from exact_inspect.descriptions import (
     DESCRIPTION_VERSION,

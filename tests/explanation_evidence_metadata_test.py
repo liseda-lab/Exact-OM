@@ -334,12 +334,14 @@ def test_real_policy_hidden_and_missing_originals_keep_api_tombstones(tmp_path):
     from exact_inspect.contracts import file_hash
 
     context = build_context_package(
-        core.load_snapshot(b"""Ontology(
+        core.load_snapshot(
+            b"""Ontology(
           Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
           AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Visible label")
           AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:A> "PRIVATE HIDDEN SOURCE")
           AnnotationAssertion(<http://purl.obolibrary.org/obo/IAO_0000115> <urn:B> "PRIVATE HIDDEN TARGET")
-        )"""),
+        )"""
+        ),
         tmp_path / "ontology",
     )
     oid = context.ontology_version_id

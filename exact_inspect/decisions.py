@@ -596,12 +596,14 @@ def import_run(
     }
     inventory_hash = dependency_inventory_hash(dependencies)
     with sqlite3.connect(database) as connection:
-        connection.executescript("""CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
+        connection.executescript(
+            """CREATE TABLE pairs (id TEXT PRIMARY KEY, source TEXT NOT NULL,
             source_kind TEXT NOT NULL, target TEXT NOT NULL, target_kind TEXT NOT NULL,
             candidate TEXT NOT NULL, trace TEXT NOT NULL, evidence TEXT NOT NULL);
             CREATE INDEX pair_source ON pairs(source, source_kind, id);
             CREATE TABLE sources(id TEXT PRIMARY KEY, iri TEXT, kind TEXT, payload TEXT);
-            CREATE INDEX source_order ON sources(id);""")
+            CREATE INDEX source_order ON sources(id);"""
+        )
         for key, record in records.items():
             source, target = bindings[key]
             raw = raw_decisions.get(key, record.get("candidate_decision") or {})

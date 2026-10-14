@@ -17,9 +17,9 @@ import subprocess
 import sys
 import tempfile
 import time
-from threading import Timer
 from contextlib import closing
 from pathlib import Path
+from threading import Timer
 
 from .artifacts import atomic_json
 from .context_semantics import KINDS, _allowed, _json, _ref, decode_payload, typed_node
@@ -117,7 +117,7 @@ def _entries(
                 labels[key] = value[0] if value and value[0] else ""
             return labels[key]
 
-        for basis in ([inferred_basis] if only_inferred else BASES[:3]):
+        for basis in [inferred_basis] if only_inferred else BASES[:3]:
             if basis == inferred_basis and not inferred:
                 continue
             for kind in sorted(KINDS):
@@ -323,6 +323,7 @@ def _classify(
     context, db, directory, policy, *, timeout_seconds, max_memory_bytes, source_snapshot
 ):
     import pyowl_core as core
+
     from exact.ontology.reasoning import load_reasoner
     from exact.ontology.store import OwlOntologySource
 

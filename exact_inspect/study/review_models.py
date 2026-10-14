@@ -1,10 +1,12 @@
 """Real-data development review is a versioned purpose, never a launch approval."""
 
 from typing import Literal
+
 from pydantic import Field, model_validator
+
+from ..review_metadata import ReviewBundleSummary
 from .models import Identifier, StrictModel
 from .v2_models import StudyDefinitionV2
-from ..review_metadata import ReviewBundleSummary
 
 
 class ReviewProvenance(StrictModel):

@@ -573,8 +573,12 @@ class Preparation:
                 if locator:
                     prior_stage = relative_path(self.resume_from, locator)
                     for loc in json.loads((prior_stage / "contexts.json").read_bytes()).values():
-                        raw = json.loads((relative_path(prior_stage, loc) / "manifest.json").read_bytes())
-                        prior_context_hashes[raw["ontology_version_id"]] = raw["artifacts"]["context.sqlite"]
+                        raw = json.loads(
+                            (relative_path(prior_stage, loc) / "manifest.json").read_bytes()
+                        )
+                        prior_context_hashes[raw["ontology_version_id"]] = raw["artifacts"][
+                            "context.sqlite"
+                        ]
             packets = {}
             for entry in self.lock.entities:
                 context = contexts[entry["ontology"]]
@@ -611,7 +615,8 @@ class Preparation:
                         prompt=self.lock.profile_prompt,
                         previous_context_hashes=(
                             [prior_context_hashes[entity.ontology_version_id]]
-                            if entity.ontology_version_id in prior_context_hashes else None
+                            if entity.ontology_version_id in prior_context_hashes
+                            else None
                         ),
                         stopped=lambda: (self.root / "STOP").exists(),
                     )

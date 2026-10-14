@@ -3,7 +3,11 @@
 import httpx
 import pytest
 
-from tools.verify_review_environment import Journey, VerificationError, validate_response_csp
+from tools.verify_review_environment import (
+    Journey,
+    VerificationError,
+    validate_response_csp,
+)
 
 POLICY = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'"
 ORIGIN = "https://127.0.0.1:19184"

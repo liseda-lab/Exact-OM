@@ -9,8 +9,8 @@ from exact_inspect.context import build_context_package
 from exact_inspect.contracts import EntityRef, VisibilityPolicy
 from exact_inspect.descriptions import (
     description_templates,
-    prepare_description_packet,
     preparation_metadata,
+    prepare_description_packet,
 )
 from exact_inspect.generation import ExplanationOutput, entity_packet, grounding
 
@@ -18,14 +18,16 @@ from exact_inspect.generation import ExplanationOutput, entity_packet, grounding
 @pytest.fixture
 def packet(tmp_path):
     context = build_context_package(
-        core.load_snapshot(b"""Ontology(
+        core.load_snapshot(
+            b"""Ontology(
       Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
       Declaration(ObjectProperty(<urn:p>))
       AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "A label")
       SubClassOf(<urn:A> ObjectAllValuesFrom(<urn:p> <urn:B>))
       SubClassOf(<urn:A> ObjectSomeValuesFrom(<urn:p> <urn:B>))
       SubClassOf(<urn:A> ObjectMinCardinality(2 <urn:p> <urn:B>))
-    )"""),
+    )"""
+        ),
         tmp_path / "context",
     )
     entity = EntityRef(ontology_version_id=context.ontology_version_id, iri="urn:A", kind="class")
@@ -76,12 +78,13 @@ def test_punned_property_cannot_receive_a_class_necessary_condition(packet):
 
 def test_prepared_description_is_revalidated_at_actual_api(packet, tmp_path):
     from fastapi.testclient import TestClient
+
     from exact_inspect.artifacts import atomic_json, publish_bundle
     from exact_inspect.context import OntologyContext
+    from exact_inspect.descriptions import validate_prepared_support
     from exact_inspect.generation import ExplanationJobs, GenerationProfile
     from exact_inspect.service import create_prepared_app as create_app
     from exact_inspect.study.builder import build_explanation_resource
-    from exact_inspect.descriptions import validate_prepared_support
 
     context = OntologyContext(tmp_path / "context")
     policy = VisibilityPolicy(ontology_ids=(context.ontology_version_id,))

@@ -6,8 +6,6 @@ structured OWL values retain the public constructor shape without a serving pars
 
 from __future__ import annotations
 
-from ..postmigration_contracts import DescriptionPresentation
-
 from collections.abc import Iterator
 from typing import Annotated, Any, Literal
 
@@ -20,6 +18,7 @@ from ..description_review import (
     IndependentReviewSupport,
     validate_receipt_claims,
 )
+from ..postmigration_contracts import DescriptionPresentation
 from .models import EntityRef, Identifier, StrictModel
 from .owl_ast import validate_annotation, validate_axiom
 
