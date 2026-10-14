@@ -17,7 +17,7 @@
 // summary). Evidence from development-review sessions only; never participant data.
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { expect, type CDPSession, type Page, type TestInfo } from "@playwright/test";
@@ -25,6 +25,10 @@ import { expect, type CDPSession, type Page, type TestInfo } from "@playwright/t
 const OUTPUT = process.env.EXACT_E2E_STYLE_DIAGNOSTICS ?? null;
 const EXPORT_DIR = process.env.EXACT_E2E_EXPORT_DIR ?? null;
 const MAX_EVENTS = 600;
+// Diagnostic work only: these limits never retry, cancel or modify a browser request.
+const MAX_CSS_BYTES = 1_048_576;
+const MAX_PENDING_HASHES = 4;
+const HASH_TIMEOUT_MS = 2_000;
 /** An inline icon is 1–1.5rem; an unstyled one fills its container (HR1 showed ~900 px). */
 export const MAX_STYLED_ICON_PX = 64;
 
@@ -53,6 +57,8 @@ interface NetworkRecord {
   mime: string | null;
   declared_length: string | null;
   content_encoding: string | null;
+  server_read_id: string | null;
+  server_asset_sha256: string | null;
   encoded_bytes: number | null;
   decoded_bytes: number;
   outcome: "pending" | "finished" | "failed";
@@ -60,6 +66,8 @@ interface NetworkRecord {
   canceled: boolean | null;
   blocked: string | null;
   body_sha256: string | null;
+  body_hash_status: "not_requested" | "pending" | "available" | "size_limit" | "budget_limit" | "timeout" | "unavailable";
+  export_hash_status: "not_requested" | "matched" | "mismatch" | "size_limit" | "unavailable";
   matches_export: boolean | null;
 }
 
@@ -114,8 +122,8 @@ function installRecorder(maxEvents: number) {
   document.addEventListener("securitypolicyviolation", (event) =>
     push({ type: "csp-violation", directive: event.effectiveDirective, blocked: event.blockedURI.startsWith("http") ? path(event.blockedURI) : event.blockedURI.slice(0, 16), source: path(event.sourceFile), line: event.lineNumber }),
   );
-  window.addEventListener("error", (event) => push({ type: "page-error", message: String(event.message).slice(0, 160), source: path(event.filename) }));
-  window.addEventListener("unhandledrejection", (event) => push({ type: "unhandled-rejection", message: String((event.reason as Error)?.message ?? event.reason).slice(0, 160) }));
+  window.addEventListener("error", (event) => push({ type: "page-error", error_type: /^(Error|TypeError|ReferenceError|SyntaxError|RangeError|AbortError|NetworkError|SecurityError)$/.test(event.error?.name ?? "") ? event.error.name : "unknown", source: path(event.filename) }));
+  window.addEventListener("unhandledrejection", (event) => push({ type: "unhandled-rejection", error_type: /^(Error|TypeError|ReferenceError|SyntaxError|RangeError|AbortError|NetworkError|SecurityError)$/.test((event.reason as Error)?.name ?? "") ? (event.reason as Error).name : "unknown" }));
   window.addEventListener("pagehide", () => push({ type: "pagehide" }));
 }
 
@@ -164,6 +172,8 @@ export class StyleDiagnostics {
   readonly lifecycle: Record<string, unknown>[] = [];
   readonly documents: { document: number; events: Record<string, unknown>[] }[] = [];
   private readonly byId = new Map<string, NetworkRecord>();
+  private readonly pendingHashes = new Set<Promise<void>>();
+  private finishing = false;
   private readonly started = Date.now();
   private cdp: CDPSession | null = null;
   private failures = 0;
@@ -179,10 +189,10 @@ export class StyleDiagnostics {
       if (frame === page.mainFrame()) diagnostics.note({ type: "navigated", page: safePath(frame.url(), new URL(frame.url()).origin) });
     });
     page.on("load", () => diagnostics.note({ type: "load" }));
-    page.on("pageerror", (error) => diagnostics.note({ type: "pageerror", message: error.message.slice(0, 160) }));
+    page.on("pageerror", (error) => diagnostics.note({ type: "pageerror", error_type: /^(Error|TypeError|ReferenceError|SyntaxError|RangeError|AbortError|NetworkError|SecurityError)$/.test(error.name) ? error.name : "unknown" }));
     page.on("requestfailed", (request) => {
       if (request.resourceType() === "stylesheet" || request.resourceType() === "document")
-        diagnostics.note({ type: "requestfailed", resource: request.resourceType(), path: safePath(request.url(), new URL(request.url()).origin), error: request.failure()?.errorText ?? null });
+        diagnostics.note({ type: "requestfailed", resource: request.resourceType(), path: safePath(request.url(), new URL(request.url()).origin), error: /^net::ERR_[A-Z_]+$/.test(request.failure()?.errorText ?? "") ? request.failure()!.errorText : "unknown" });
     });
     return diagnostics;
   }
@@ -199,7 +209,10 @@ export class StyleDiagnostics {
   private async watchNetwork() {
     const cdp = await this.page.context().newCDPSession(this.page);
     this.cdp = cdp;
-    await cdp.send("Network.enable");
+    await cdp.send("Network.enable", {
+      maxResourceBufferSize: MAX_CSS_BYTES,
+      maxTotalBufferSize: MAX_PENDING_HASHES * MAX_CSS_BYTES,
+    });
     const relevant = (type: string | undefined, path: string) => type === "Stylesheet" || type === "Document" || path.startsWith("/_next/static/css/");
     cdp.on("Network.requestWillBeSent", (event) => {
       const origin = new URL(event.documentURL || event.request.url).origin;
@@ -216,6 +229,8 @@ export class StyleDiagnostics {
         mime: null,
         declared_length: null,
         content_encoding: null,
+        server_read_id: null,
+        server_asset_sha256: null,
         encoded_bytes: null,
         decoded_bytes: 0,
         outcome: "pending",
@@ -223,10 +238,11 @@ export class StyleDiagnostics {
         canceled: null,
         blocked: null,
         body_sha256: null,
+        body_hash_status: "not_requested",
+        export_hash_status: "not_requested",
         matches_export: null,
       };
-      if (this.network.length < MAX_EVENTS) this.network.push(record);
-      this.byId.set(event.requestId, record);
+      if (this.network.length < MAX_EVENTS) { this.network.push(record); this.byId.set(event.requestId, record); }
     });
     cdp.on("Network.requestServedFromCache", (event) => {
       const record = this.byId.get(event.requestId);
@@ -240,6 +256,8 @@ export class StyleDiagnostics {
       record.mime = event.response.mimeType;
       record.declared_length = headers["content-length"] ?? null;
       record.content_encoding = headers["content-encoding"] ?? null;
+      record.server_read_id = /^[a-f0-9]{32}$/.test(headers["x-exact-read-id"] ?? "") ? headers["x-exact-read-id"] : null;
+      record.server_asset_sha256 = /^[a-f0-9]{64}$/.test(headers["x-exact-asset-sha256"] ?? "") ? headers["x-exact-asset-sha256"] : null;
       if (event.response.fromServiceWorker) record.from_cache = "service_worker";
       else if (event.response.fromPrefetchCache) record.from_cache = "prefetch";
       else if (event.response.fromDiskCache) record.from_cache = "disk";
@@ -254,32 +272,89 @@ export class StyleDiagnostics {
       if (!record) return;
       record.outcome = "finished";
       record.encoded_bytes = event.encodedDataLength;
-      if (record.path.startsWith("/_next/static/css/")) void this.hashBody(record);
+      if (record.path.startsWith("/_next/static/css/")) this.queueHash(record);
     });
     cdp.on("Network.loadingFailed", (event) => {
       const record = this.byId.get(event.requestId);
       if (!record) return;
       record.outcome = "failed";
-      record.error = event.errorText;
+      record.error = /^net::ERR_[A-Z_]+$/.test(event.errorText) ? event.errorText : "unknown";
       record.canceled = event.canceled ?? null;
       record.blocked = event.blockedReason ?? null;
     });
   }
 
+  private queueHash(record: NetworkRecord) {
+    if (this.finishing || this.pendingHashes.size >= MAX_PENDING_HASHES) {
+      record.body_hash_status = this.finishing ? "unavailable" : "budget_limit";
+      return;
+    }
+    record.body_hash_status = "pending";
+    const task: Promise<void> = this.hashBody(record).finally(() => this.pendingHashes.delete(task));
+    this.pendingHashes.add(task);
+  }
+
   private async hashBody(record: NetworkRecord) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const body = await this.cdp!.send("Network.getResponseBody", { requestId: record.id });
+      const declared = Number(record.declared_length);
+      if (record.decoded_bytes > MAX_CSS_BYTES || (Number.isFinite(declared) && declared > MAX_CSS_BYTES)) {
+        record.body_hash_status = "size_limit";
+        return;
+      }
+      const body = await Promise.race([
+        this.cdp!.send("Network.getResponseBody", { requestId: record.id }),
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), HASH_TIMEOUT_MS); }),
+      ]);
+      if (body === null) {
+        record.body_hash_status = "timeout";
+        return;
+      }
+      // The CDP buffer is capped above. Check the encoded representation before another
+      // allocation, then the actual decoded size; compressed transfer size is not body size.
+      const decodedSize = body.base64Encoded
+        ? Math.ceil(body.body.length / 4) * 3 - (body.body.endsWith("==") ? 2 : body.body.endsWith("=") ? 1 : 0)
+        : Buffer.byteLength(body.body, "utf8");
+      if (decodedSize > MAX_CSS_BYTES) {
+        record.body_hash_status = "size_limit";
+        return;
+      }
       const bytes = body.base64Encoded ? Buffer.from(body.body, "base64") : Buffer.from(body.body, "utf8");
+      if (bytes.length > MAX_CSS_BYTES) {
+        record.body_hash_status = "size_limit";
+        return;
+      }
       record.body_sha256 = createHash("sha256").update(bytes).digest("hex");
+      record.body_hash_status = "available";
       if (EXPORT_DIR) {
         try {
-          record.matches_export = createHash("sha256").update(readFileSync(join(EXPORT_DIR, record.path))).digest("hex") === record.body_sha256;
+          // Read at most the limit plus one sentinel byte even if an export changes mid-read.
+          const expected = Buffer.alloc(MAX_CSS_BYTES + 1);
+          const fd = openSync(join(EXPORT_DIR, record.path), "r");
+          let size = 0;
+          try {
+            while (size < expected.length) {
+              const read = readSync(fd, expected, size, expected.length - size, size);
+              if (read === 0) break;
+              size += read;
+            }
+          } finally {
+            closeSync(fd);
+          }
+          if (size > MAX_CSS_BYTES) {
+            record.export_hash_status = "size_limit";
+            return;
+          }
+          record.matches_export = createHash("sha256").update(expected.subarray(0, size)).digest("hex") === record.body_sha256;
+          record.export_hash_status = record.matches_export ? "matched" : "mismatch";
         } catch {
-          record.matches_export = null;
+          record.export_hash_status = "unavailable";
         }
       }
     } catch {
-      record.body_sha256 = null;
+      record.body_hash_status = "unavailable";
+    } finally {
+      if (timer !== undefined) clearTimeout(timer);
     }
   }
 
@@ -343,6 +418,8 @@ export class StyleDiagnostics {
       css_pending: css.filter((record) => record.outcome === "pending").length,
       css_from: css.reduce<Record<string, number>>((counts, record) => ({ ...counts, [record.from_cache]: (counts[record.from_cache] ?? 0) + 1 }), {}),
       css_export_mismatch: css.filter((record) => record.matches_export === false).length,
+      css_completed_hash_unknown: css.filter((record) => record.outcome === "finished" && record.body_hash_status !== "available").length,
+      css_export_unknown: EXPORT_DIR ? css.filter((record) => record.outcome === "finished" && record.matches_export === null).length : null,
     };
   }
 
@@ -354,6 +431,10 @@ export class StyleDiagnostics {
   }
 
   async finish(info?: TestInfo) {
+    // Each pending operation has its own two-second deadline. Settle them before saving
+    // evidence/detaching; a late body must not silently change a receipt after it is written.
+    this.finishing = true;
+    await Promise.allSettled([...this.pendingHashes]);
     await this.captureDocuments();
     this.write(info);
     await this.cdp?.detach().catch(() => undefined);

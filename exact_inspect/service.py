@@ -402,7 +402,11 @@ def create_prepared_app(
             response = await call_next(request)
         finally:
             request_service.reset(token)
-        response.headers["Cache-Control"] = "no-store"
+        from .public_assets import public_asset_cache
+
+        response.headers["Cache-Control"] = (
+            public_asset_cache(request.scope, response.status_code) or "no-store"
+        )
         response.headers["X-Content-Type-Options"] = "nosniff"
         return response
 

@@ -16,6 +16,14 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from starlette.requests import Request
+
+from .public_assets import (
+    IMMUTABLE_CACHE,
+    PUBLIC_ASSET_SCOPE,
+    build_public_asset_registry,
+)
+
 EXPLORATION_PAGES = frozenset({"", "browse"})
 LOCAL_ONLY_PAGES = frozenset({"library"})
 STUDY_PAGES = frozenset({"participate", "admin"})
@@ -95,6 +103,7 @@ def mount_frontend(
         # API-only deployment: no page routes exist, exactly as before a frontend was built.
         return
     root = frontend_dir.resolve()
+    public_assets = build_public_asset_registry(root)
 
     def not_found() -> Any:
         return JSONResponse(
@@ -113,7 +122,7 @@ def mount_frontend(
         return not_found()
 
     @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
-    def frontend(path: str):
+    def frontend(path: str, request: Request):
         if path.startswith("api/") or path == "api":
             return not_found()
         if path.startswith("_next/") or path in {"favicon.ico", "icon.svg"}:
@@ -121,9 +130,23 @@ def mount_frontend(
             if asset is None:
                 return not_found()
             media_type = mimetypes.guess_type(asset.name)[0] or "application/octet-stream"
+            admitted = public_assets.get(path)
+            if admitted is not None:
+                if asset != admitted.path or not admitted.unchanged():
+                    return JSONResponse(
+                        status_code=503,
+                        content={
+                            "code": "frontend_asset_changed",
+                            "message": "Frontend build changed; restart with a verified export",
+                            "retryable": False,
+                        },
+                        headers={"Cache-Control": "no-store"},
+                    )
+                request.scope[PUBLIC_ASSET_SCOPE] = admitted
             response = FileResponse(asset, media_type=media_type)
-            if path.startswith("_next/static/"):
-                response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+            response.headers["Cache-Control"] = IMMUTABLE_CACHE if admitted else "no-store"
+            if admitted is not None:
+                response.headers["ETag"] = '"' + admitted.sha256 + '"'
             return response
         page = path.strip("/")
         if page == "" and index_redirect:

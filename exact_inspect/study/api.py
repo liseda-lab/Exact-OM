@@ -135,7 +135,11 @@ class StudyProtectionMiddleware:
             if message["type"] == "http.response.start":
                 message = {**message, "headers": list(message.get("headers", []))}
                 headers = MutableHeaders(scope=message)
-                headers["Cache-Control"] = "private, no-store"
+                from ..public_assets import public_asset_cache
+
+                headers["Cache-Control"] = (
+                    public_asset_cache(scope, message["status"]) or "private, no-store"
+                )
                 headers["Referrer-Policy"] = "no-referrer"
                 headers["X-Content-Type-Options"] = "nosniff"
                 # Keep the document's exact script hashes and strict style policy.

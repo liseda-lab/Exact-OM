@@ -22,6 +22,7 @@ const variants = [
   { name: "desktop-light", width: 1440, height: 1000, scheme: "light" as const, scale: 1 },
   { name: "desktop-dark", width: 1440, height: 1000, scheme: "dark" as const, scale: 1 },
   { name: "375-light", width: 375, height: 812, scheme: "light" as const, scale: 1 },
+  { name: "375-200pct-light", width: 375, height: 812, scheme: "light" as const, scale: 2 },
   { name: "320-200pct-dark", width: 320, height: 720, scheme: "dark" as const, scale: 2 },
 ];
 
