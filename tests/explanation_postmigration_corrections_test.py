@@ -416,10 +416,28 @@ def test_private_stage_resume_and_changed_source_fail_closed(tmp_path):
     target = tmp_path / "target"
     checkpoint = tmp_path / "staged.json"
     private_copy(source / "context.sqlite", target / "context.sqlite")
+    # Reads may update access time; they must preserve every content/identity/protection
+    # field. The former whole-stat assertion intermittently rejected legitimate reads.
+    protected_fields = (
+        "st_dev",
+        "st_ino",
+        "st_mode",
+        "st_nlink",
+        "st_uid",
+        "st_gid",
+        "st_size",
+        "st_mtime_ns",
+        "st_ctime_ns",
+        "st_flags",
+    )
     before = (source / "context.sqlite").stat()
     stage_tree(source, target, checkpoint)
     stage_tree(source, target, checkpoint)
-    assert before == (source / "context.sqlite").stat()
+    after = (source / "context.sqlite").stat()
+    assert {key: getattr(before, key, None) for key in protected_fields} == {
+        key: getattr(after, key, None) for key in protected_fields
+    }
+    assert (source / "context.sqlite").read_bytes() == b"unchanged"
     assert (target / "context.sqlite").stat().st_nlink == 1
     atomic_json(source / "package.json", {"identity": "changed"})
     with pytest.raises(ValueError, match="identity changed"):
