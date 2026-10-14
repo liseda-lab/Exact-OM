@@ -1,0 +1,52 @@
+exact_inspect/study/resources.py:262:1: E402 module level import not at top of file
+exact_inspect/study/tutorial.py:362:32: E741 ambiguous variable name 'l'
+exact_inspect/study/tutorial.py:385:13: E741 ambiguous variable name 'l'
+exact_inspect/study/tutorial.py:454:25: E741 ambiguous variable name 'l'
+exact_inspect/study/tutorial.py:480:38: E741 ambiguous variable name 'l'
+exact_inspect/study/tutorial.py:484:48: E741 ambiguous variable name 'l'
+tests/experiments_notifications_test.py:158:5: E306 expected 1 blank line before a nested definition, found 0
+tests/experiments_supervision_test.py:96:5: E306 expected 1 blank line before a nested definition, found 0
+tests/experiments_supervisor_email_test.py:216:5: E306 expected 1 blank line before a nested definition, found 0
+tests/experiments_supervisor_notifications_test.py:249:5: E306 expected 1 blank line before a nested definition, found 0
+tests/explanation_cluster_hermit_test.py:12:1: E402 module level import not at top of file
+tests/explanation_cluster_hermit_test.py:222:9: E306 expected 1 blank line before a nested definition, found 0
+tests/explanation_cluster_hermit_test.py:237:9: E306 expected 1 blank line before a nested definition, found 0
+tests/explanation_description_prompt_test.py:16:1: F401 'exact_inspect.generation.ExplanationOutput' imported but unused
+tests/explanation_integration_contract_test.py:17:1: F401 'tests.explanation_corrective_http_test.corrected' imported but unused
+tests/explanation_integration_contract_test.py:17:1: F401 'tests.explanation_corrective_http_test.reach_tutorial' imported but unused
+tests/explanation_integration_contract_test.py:18:1: F401 'tests.explanation_study_test.service' imported but unused
+tests/explanation_integration_contract_test.py:23:14: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_contract_test.py:31:63: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_contract_test.py:31:74: F811 redefinition of unused 'service' from line 18
+tests/explanation_integration_contract_test.py:49:62: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_contract_test.py:130:57: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_contract_test.py:156:49: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_contract_test.py:275:66: F811 redefinition of unused 'corrected' from line 17
+tests/explanation_integration_position_test.py:9:1: F401 'tests.explanation_corrective_http_test.corrected' imported but unused
+tests/explanation_integration_position_test.py:13:63: F811 redefinition of unused 'corrected' from line 9
+tests/explanation_integration_position_test.py:33:59: F811 redefinition of unused 'corrected' from line 9
+tests/explanation_integration_position_test.py:56:73: F811 redefinition of unused 'corrected' from line 9
+tests/explanation_integration_position_test.py:145:74: F811 redefinition of unused 'corrected' from line 9
+tests/explanation_integration_position_test.py:218:69: F811 redefinition of unused 'corrected' from line 9
+tests/explanation_luna_overlay_test.py:3:1: F401 'json' imported but unused
+tests/explanation_ncit_hermit_datatypes_test.py:3:1: F401 'json' imported but unused
+tests/explanation_ncit_hermit_datatypes_test.py:10:1: E402 module level import not at top of file
+tests/explanation_postmigration_corrections_test.py:15:1: F401 'exact_inspect.contracts.canonical_hash' imported but unused
+tests/explanation_study_v2_test.py:21:1: F401 'exact_inspect.study.v2_models.TutorialDefinition' imported but unused
+tests/explanation_study_workspace_test.py:5:1: F401 'copy' imported but unused
+tests/explanation_telemetry_policy_test.py:223:5: F811 redefinition of unused 'corrected' from line 10
+tests/explanation_tutorial_entity_contract_test.py:23:1: F401 'tests.explanation_corrective_http_test.corrected' imported but unused
+tests/explanation_tutorial_entity_contract_test.py:29:64: F811 redefinition of unused 'corrected' from line 23
+tests/explanation_tutorial_entity_contract_test.py:51:61: F811 redefinition of unused 'corrected' from line 23
+tests/explanation_tutorial_entity_contract_test.py:114:70: F811 redefinition of unused 'corrected' from line 23
+tests/prepared_batch_control_test.py:16:13: F811 redefinition of unused 'example' from line 11
+tools/cluster_elk_taxonomy.py:241:21: E731 do not assign a lambda expression, use a def
+tools/cluster_hermit_taxonomy.py:250:21: E731 do not assign a lambda expression, use a def
+tools/compose_review_publication.py:20:1: F401 'time' imported but unused
+tools/compose_review_publication.py:22:1: F401 'contextlib.closing' imported but unused
+tools/review_description_quality.py:170:9: E731 do not assign a lambda expression, use a def
+tools/review_elk_taxonomy.py:91:9: E731 do not assign a lambda expression, use a def
+tools/verify_backend_followup.py:45:5: E731 do not assign a lambda expression, use a def
+tools/verify_composed_review.py:10:1: F401 'copy' imported but unused
+tools/verify_composed_review.py:13:1: F401 'time' imported but unused
+tools/verify_luna_publication.py:11:1: F401 'json' imported but unused

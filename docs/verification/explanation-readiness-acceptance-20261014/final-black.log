@@ -1,0 +1,22 @@
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/campaign_request_accounting_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/explanation_ncit_hermit_datatypes_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/e19_precision_recovery_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_supervisor_email_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/exact/experiments/notifications.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/explanation_cluster_hermit_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/frozen_inference_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tools/complete_hermit_declarations.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_notifications_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/graph_provenance_storage_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tools/prepare_ncit_hermit_datatypes.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/exact/experiments/dispatch.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_supervisor_notifications_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_supervision_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/exact/experiments/supervision.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_dispatch_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tools/cluster_hermit_taxonomy.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tests/experiments_supervisor_cli_test.py
+would reformat /Users/pedrocotovio/Developer/Repos/OM/Exact-OM/tools/supervise_experiments.py
+
+Oh no! 💥 💔 💥
+19 files would be reformatted, 767 files would be left unchanged.

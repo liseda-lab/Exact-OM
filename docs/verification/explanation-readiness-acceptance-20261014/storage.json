@@ -1,0 +1,431 @@
+{
+  "initial_bytes": 51800378750,
+  "initial_filesystem_free_bytes": 117650501632,
+  "measurements": [
+    {
+      "checked_at": "2026-10-14T11:46:10.359301+00:00",
+      "bytes": 51800378750,
+      "filesystem_free_bytes": 117650501632,
+      "growth_bytes": 200000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:48:32.416032+00:00",
+      "bytes": 51832403038,
+      "filesystem_free_bytes": 117613617152,
+      "growth_bytes": 200000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:50:36.038114+00:00",
+      "bytes": 51831674078,
+      "filesystem_free_bytes": 117624070144,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:52:54.191341+00:00",
+      "bytes": 51831690494,
+      "filesystem_free_bytes": 117610541056,
+      "growth_bytes": 250000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:53:07.008932+00:00",
+      "bytes": 51831764222,
+      "filesystem_free_bytes": 117610381312,
+      "growth_bytes": 250000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:53:41.798948+00:00",
+      "bytes": 51927234430,
+      "filesystem_free_bytes": 117512556544,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:54:54.177966+00:00",
+      "bytes": 51927674430,
+      "filesystem_free_bytes": 117515116544,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:59:46.656903+00:00",
+      "bytes": 51920528485,
+      "filesystem_free_bytes": 117525315584,
+      "growth_bytes": 400000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T11:59:58.448913+00:00",
+      "bytes": 51920602213,
+      "filesystem_free_bytes": 117524951040,
+      "growth_bytes": 400000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:01:03.056031+00:00",
+      "bytes": 51696607142,
+      "filesystem_free_bytes": 117755170816,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:06:13.839377+00:00",
+      "bytes": 51696676806,
+      "filesystem_free_bytes": 117752111104,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:06:25.148694+00:00",
+      "bytes": 51696750534,
+      "filesystem_free_bytes": 117750800384,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:06:59.076359+00:00",
+      "bytes": 51696853062,
+      "filesystem_free_bytes": 118784663552,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:07:50.249035+00:00",
+      "bytes": 51696914502,
+      "filesystem_free_bytes": 118790873088,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:08:06.107412+00:00",
+      "bytes": 51696988230,
+      "filesystem_free_bytes": 118790303744,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:09:14.885298+00:00",
+      "bytes": 51699855590,
+      "filesystem_free_bytes": 118791397376,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:09:48.428678+00:00",
+      "bytes": 51699917030,
+      "filesystem_free_bytes": 118788698112,
+      "growth_bytes": 600000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:10:05.065326+00:00",
+      "bytes": 51699990758,
+      "filesystem_free_bytes": 118786334720,
+      "growth_bytes": 600000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:26:21.482021+00:00",
+      "bytes": 52101702448,
+      "filesystem_free_bytes": 118400528384,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:27:19.350080+00:00",
+      "bytes": 52101759792,
+      "filesystem_free_bytes": 118396977152,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:27:43.594792+00:00",
+      "bytes": 52101907696,
+      "filesystem_free_bytes": 118395572224,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:28:38.081241+00:00",
+      "bytes": 52116029606,
+      "filesystem_free_bytes": 118384988160,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:29:12.324225+00:00",
+      "bytes": 52116115750,
+      "filesystem_free_bytes": 118385979392,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:29:33.823455+00:00",
+      "bytes": 52116193574,
+      "filesystem_free_bytes": 118385401856,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:32:19.691930+00:00",
+      "bytes": 52218539238,
+      "filesystem_free_bytes": 115052785664,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:32:24.088131+00:00",
+      "bytes": 52218539238,
+      "filesystem_free_bytes": 115052474368,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:37:26.774925+00:00",
+      "bytes": 52227238374,
+      "filesystem_free_bytes": 114996056064,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:37:47.813489+00:00",
+      "bytes": 52227316198,
+      "filesystem_free_bytes": 115002277888,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:39:34.245298+00:00",
+      "bytes": 52228566438,
+      "filesystem_free_bytes": 115048132608,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:40:45.427937+00:00",
+      "bytes": 52228623782,
+      "filesystem_free_bytes": 115050344448,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:41:04.959602+00:00",
+      "bytes": 52228701606,
+      "filesystem_free_bytes": 115048210432,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:55:26.461749+00:00",
+      "bytes": 52290003430,
+      "filesystem_free_bytes": 114964983808,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:58:56.033736+00:00",
+      "bytes": 52290064902,
+      "filesystem_free_bytes": 114925957120,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T12:59:22.234540+00:00",
+      "bytes": 52290142726,
+      "filesystem_free_bytes": 114922967040,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:01:28.241110+00:00",
+      "bytes": 52294951750,
+      "filesystem_free_bytes": 114911875072,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:01:48.085569+00:00",
+      "bytes": 52294140742,
+      "filesystem_free_bytes": 114907168768,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:02:15.887548+00:00",
+      "bytes": 52294226790,
+      "filesystem_free_bytes": 114903732224,
+      "growth_bytes": 1000000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:10:46.186675+00:00",
+      "bytes": 52306180454,
+      "filesystem_free_bytes": 114910535680,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:11:21.457309+00:00",
+      "bytes": 52306303334,
+      "filesystem_free_bytes": 114912899072,
+      "growth_bytes": 1500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:16:51.943071+00:00",
+      "bytes": 52306438854,
+      "filesystem_free_bytes": 114936377344,
+      "growth_bytes": 500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:17:44.452286+00:00",
+      "bytes": 52306516678,
+      "filesystem_free_bytes": 114894508032,
+      "growth_bytes": 500000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:18:18.091541+00:00",
+      "bytes": 52306832102,
+      "filesystem_free_bytes": 114897842176,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:19:23.479428+00:00",
+      "bytes": 52306897638,
+      "filesystem_free_bytes": 114943746048,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:20:01.915865+00:00",
+      "bytes": 52306541286,
+      "filesystem_free_bytes": 114946363392,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:20:15.772598+00:00",
+      "bytes": 52306602726,
+      "filesystem_free_bytes": 114946498560,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:21:13.125800+00:00",
+      "bytes": 52306664166,
+      "filesystem_free_bytes": 114957643776,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:21:27.376907+00:00",
+      "bytes": 52305717990,
+      "filesystem_free_bytes": 114955370496,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:22:19.834020+00:00",
+      "bytes": 52305783526,
+      "filesystem_free_bytes": 114958102528,
+      "growth_bytes": 100000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:22:34.752131+00:00",
+      "bytes": 52310061414,
+      "filesystem_free_bytes": 114952372224,
+      "growth_bytes": 0,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:25:32.962500+00:00",
+      "bytes": 52310184358,
+      "filesystem_free_bytes": 114959491072,
+      "growth_bytes": 50000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    {
+      "checked_at": "2026-10-14T13:26:58.391672+00:00",
+      "bytes": 52310274470,
+      "filesystem_free_bytes": 114955427840,
+      "growth_bytes": 50000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    }
+  ],
+  "max_observed_bytes": 52310274470,
+  "last": {
+    "checked_at": "2026-10-14T13:26:58.391672+00:00",
+    "bytes": 52310274470,
+    "filesystem_free_bytes": 114955427840,
+    "growth_bytes": 50000000,
+    "status": "allowed",
+    "limit_bytes": 100000000000
+  },
+  "detached_reservation_bytes": 1500000000,
+  "largest_foreground_reservation_bytes": 1500000000,
+  "conservative_combined_reservation_bytes": 3000000000,
+  "conservative_peak_bytes": 55310274470,
+  "hard_limit_bytes": 100000000000,
+  "safety_reserve_bytes": 5000000000,
+  "filesystem_free_reserve_bytes": 30000000000,
+  "measurement_caveat": "Point samples plus conservative reservations; cooperative guard is not an operating system quota."
+}

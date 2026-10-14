@@ -1,0 +1,1101 @@
+{
+  "schema": "exact-static-delivery-verification/1",
+  "started_at": "2026-10-14T12:37:48.164703+00:00",
+  "checks": 81,
+  "failures": [],
+  "profiles": {
+    "exploration": [
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "1843921cf39047598fede11aa05ae4e2",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 10.6,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "HEAD",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "b9fb02cc3b834c178f16cb824faa6de1",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 0,
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 0,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": null,
+          "head_body_empty": true,
+          "offloaded": null,
+          "elapsed_ms": 2.17,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "3547",
+          "etag": "\"bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "320ed60852d647f98ce0fa904efcf2ec",
+          "x-exact-asset-sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        },
+        "received_bytes": 3547,
+        "body_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 3547,
+          "sent_bytes": 3547,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 3.29,
+          "asset_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        }
+      },
+      {
+        "method": "HEAD",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "3547",
+          "etag": "\"bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "60e5b28ab42646268542b0f61b68bbc9",
+          "x-exact-asset-sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        },
+        "received_bytes": 0,
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 3547,
+          "sent_bytes": 0,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": null,
+          "head_body_empty": true,
+          "offloaded": null,
+          "elapsed_ms": 2.16,
+          "asset_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "text/html; charset=utf-8",
+          "content-length": "10565",
+          "etag": "\"4b961642c3c520c845e0670fe1f36c0c\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 10565,
+        "body_sha256": "76bd720fbbe15459b2e1bf63d28e97a7bd4dc697809a718d1b9c38aa6657a1fd",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": true,
+          "script_no_unsafe_inline": true,
+          "connect_self": true,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "html"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "application/json",
+          "content-length": "378",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "968531929fea421dae293d7619ab0ce3",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 378,
+        "body_sha256": "a5ede7f36646818b1bc5551d5bb93f21758f0bbcc60a9398b5409b85a32279f6",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "health"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "profile_denial"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "missing_asset"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "9370793c923c444784f280b6f913a9d1",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "missing_api"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "3a926518ca014fa898f905faad90f176",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "private_resource"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "3e6574a8e94a4d4a8da676cffc3d0586",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "client_close_1",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 7.96,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "77d3e44ef98f46aa98b3819852852ccd",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "after_close_1",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 4.25,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "c6392d3293c7454cabc7f583caff6bdb",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "client_close_2",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 9.12,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "62abeab3e7e04cceb18dcb7150640539",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "after_close_2",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 4.49,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "a6ea737e625c4adb9eb673afbbea2d73",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "client_close_3",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 7.98,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "ba64d188bd434f01a72e4b9b5f20b047",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": false,
+          "strict_styles": false
+        },
+        "check": "after_close_3",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 4.36,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      }
+    ],
+    "study": [
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "5d351c742b334194aa1ed7b4a0c7d12a",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 6.76,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "HEAD",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "871bdaba32984d78b2e178d377b377e4",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 0,
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 0,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": null,
+          "head_body_empty": true,
+          "offloaded": null,
+          "elapsed_ms": 1.52,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "3547",
+          "etag": "\"bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "4a7ecf6b347a4139a4f0157e754d5271",
+          "x-exact-asset-sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        },
+        "received_bytes": 3547,
+        "body_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 3547,
+          "sent_bytes": 3547,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 3.06,
+          "asset_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        }
+      },
+      {
+        "method": "HEAD",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "3547",
+          "etag": "\"bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "96c8eeaadc624c5eae227ac91f4f012a",
+          "x-exact-asset-sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        },
+        "received_bytes": 0,
+        "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "css",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 3547,
+          "sent_bytes": 0,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": null,
+          "head_body_empty": true,
+          "offloaded": null,
+          "elapsed_ms": 1.87,
+          "asset_sha256": "bc034825d30d22a50cf3001c2e14fab5db15109f86b95f7a9ff3f690ccdd0a4b"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "text/html; charset=utf-8",
+          "content-length": "9105",
+          "etag": "\"3ab5d9e879315e9187d094a4786578bc\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 9105,
+        "body_sha256": "db9b9bdbdb3cb3d0b747f9856305e3b3d76d4e9dd4430eafb8ded77288de6ccb",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": true,
+          "script_no_unsafe_inline": true,
+          "connect_self": true,
+          "object_none": true,
+          "strict_styles": true
+        },
+        "check": "html"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "application/json",
+          "content-length": "53",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 53,
+        "body_sha256": "51e215857885cea2738e919a0a76c324e63390e2ec4ef307305a80f7046019ac",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "health"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "profile_denial"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "missing_asset"
+      },
+      {
+        "method": "GET",
+        "status": 404,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "application/json",
+          "content-length": "71",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "eba27fbc168e41648aa898ab24db4472",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 71,
+        "body_sha256": "099ee56fcaeb16ae2c6328b560b1d59de376ad6fbda4cfd25373bb8a70844ab2",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "missing_api"
+      },
+      {
+        "method": "GET",
+        "status": 401,
+        "headers": {
+          "cache-control": "private, no-store",
+          "content-type": "application/json",
+          "content-length": "32",
+          "etag": "",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "298b4889c80c417c84eca3edd6779d3c",
+          "x-exact-asset-sha256": ""
+        },
+        "received_bytes": 32,
+        "body_sha256": "5bb3cd74e645c356cd3b400eff618b731be5bd4c966790fec56c4e08bd0acfb7",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "private_resource"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "aa71167646c64ecab8296646b548489b",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "client_close_1",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 7.71,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "81b6e941d99e4595b986806f1e10245f",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "after_close_1",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 4.13,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "7c0ad2ec5b8a4d1080434048533cb9b2",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "client_close_2",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 6.76,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "c7c7b85b71c54f6f93f35fb921c70f22",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "after_close_2",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 3.45,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/javascript; charset=utf-8",
+          "content-length": "429952",
+          "etag": "\"a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "6acc85e5beef4ee9af25bc0201e21daf",
+          "x-exact-asset-sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "received_bytes": 1024,
+        "body_sha256": "3ac5c4a452f04aa44878cfa6af3f7f701403aec96455de1fd518a7fe1dd57ad0",
+        "client_close_attempt": true,
+        "receive_buffer_bytes": 2048,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "client_close_3",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 429952,
+          "sent_bytes": 429952,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 6.36,
+          "asset_sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4"
+        },
+        "interpretation": "server_completed"
+      },
+      {
+        "method": "GET",
+        "status": 200,
+        "headers": {
+          "cache-control": "public, max-age=31536000, immutable",
+          "content-type": "text/css; charset=utf-8",
+          "content-length": "71010",
+          "etag": "\"167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d\"",
+          "x-content-type-options": "nosniff",
+          "x-exact-read-id": "4a964ec6330d47998bb6664e0e48f3a1",
+          "x-exact-asset-sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        },
+        "received_bytes": 71010,
+        "body_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d",
+        "client_close_attempt": false,
+        "receive_buffer_bytes": 405888,
+        "csp_checks": {
+          "script_hashes": false,
+          "script_no_unsafe_inline": true,
+          "connect_self": false,
+          "object_none": true,
+          "strict_styles": false
+        },
+        "check": "after_close_3",
+        "server_observation": {
+          "status": 200,
+          "declared_length": 71010,
+          "sent_bytes": 71010,
+          "complete": true,
+          "disconnect_seen": false,
+          "error_type": null,
+          "length_matches": true,
+          "head_body_empty": null,
+          "offloaded": null,
+          "elapsed_ms": 3.36,
+          "asset_sha256": "167c1f989ec9b8f0327d7b0d31f30db8cac90a87b8bc1e050079871edbf68a0d"
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Client closure does not prove a server interruption; terminal observations are reported separately.",
+    "Successful delivery checks do not establish or repair the original HR1 cause.",
+    "No authenticated participant or researcher requests are made."
+  ],
+  "binding": {
+    "frontend": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+    "package": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+    "publication": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+    "source_publication": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+    "certificate": "e5e4c3c0a6a0e73a61e3f7df7ff48d93a8a305e9317981683294d64a002074ab"
+  },
+  "backend": {
+    "git_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+    "source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+    "file_count": 58
+  },
+  "interruption_asset": {
+    "sha256": "a30f738949b2dd4e436428bffaae12be7d028a4b721c60ddb85369d656784ea4",
+    "bytes": 429952
+  },
+  "status": "passed",
+  "finished_at": "2026-10-14T12:37:48.486339+00:00"
+}

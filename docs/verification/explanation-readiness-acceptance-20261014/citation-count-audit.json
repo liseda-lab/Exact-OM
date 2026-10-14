@@ -1,0 +1,133 @@
+{
+  "additional_unique_response_bodies": 0,
+  "audited_at": "2026-10-14T13:15:23.360230+00:00",
+  "conclusion": "336 and 337 are traversal-dependent scoped resolution-operation counts, not an invariant corpus citation total. The same 324 distinct response bodies occur in both audits. A shared referenced label is deduplicated inside a scope when the first two relevant artifacts are encountered together; encountering the shared artifact first in another scope adds one later resolution. No new citation content or data drift is evidenced.",
+  "counter_definition": {
+    "artifact_selection": "Only artifacts newly added to the global shared descriptions set in the current case are processed for citation requests. Within a workspace a previously encountered typed fact is not fetched again.",
+    "key": [
+      "workspace_prefix",
+      "canonical_hash(typed_fact_subject)",
+      "fact_id"
+    ],
+    "scope_membership": {
+      "sha256:3c840d21b5466db5b1616436e65740bafb0fd32ece440ebd9a7b71f160d48fcb": [
+        "review-20",
+        "review-22"
+      ],
+      "sha256:912e36dfd70f9628c56bf9aee58e5a07e49ea86c1b8eaae624ecaedb0a31ba41": [
+        "review-20"
+      ],
+      "sha256:ef7696b85fe19621cf001fefecc98ca9fdaf98ce0d0a109ff78cba65584d242a": [
+        "review-21"
+      ]
+    },
+    "source": "tools/verify_luna_publication.py:LunaJourney.pair_metadata"
+  },
+  "distinct_response_body_sets_equal": true,
+  "limitations": [
+    "324 describes distinct successful fact-response bodies observed by these audits; it is not a total for the full matcher corpus or every possible citation/scope combination.",
+    "Global first-encounter artifact selection means this counter does not enumerate every citation in every eligible workspace.",
+    "This audit explains the count difference without replacing or rerunning either API verification."
+  ],
+  "method": "Read-only comparison of saved response-body hashes, verifier counting code and retained typed original-fact serialization. No requests, generation or data changes.",
+  "missing_unique_response_bodies": 0,
+  "only_multiplicity_change": {
+    "category": "labels",
+    "fact_id": "sha256:717170bca2c6ccb72445322b9a391ec4c06170d425ccf11e6410d41ea26a1c4f",
+    "final_occurrences": 3,
+    "identity_confirmation": "Original stored axiom was read with SQLite mode=ro and immutable=1, projected with _fact_view and serialized through Fact. Resulting bytes match the recorded response SHA-256 exactly.",
+    "predecessor_occurrences": 2,
+    "response_body_sha256": "18cdd72829bceb18e5767f7a00d6988acf587958b5bacb49d0f0a7134c64488e",
+    "subject": {
+      "iri": "http://purl.obolibrary.org/obo/DOID_0111229",
+      "kind": "class",
+      "ontology_version_id": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500"
+    },
+    "value": "congenital muscular dystrophy-dystroglycanopathy type A"
+  },
+  "runs": {
+    "final": {
+      "aggregate_citation_counter": 337,
+      "aggregate_receipt_path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-api/verification.json",
+      "aggregate_receipt_sha256": "b859a6881af238d71d08e94f211c947260fc603542b8039edc3a0dcc5892450e",
+      "distinct_response_bodies": 324,
+      "journeys": [
+        {
+          "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-api/journey-1.json",
+          "scoped_resolution_operations": 172,
+          "sha256": "b798f6a55aa552f3f79d53850f5e72033e7fec65031f8a56765b9d508caaf6d4",
+          "status": "passed"
+        },
+        {
+          "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-api/journey-2.json",
+          "scoped_resolution_operations": 165,
+          "sha256": "fd16b6fe870f14b0d133377e1601440cb282c742c28f024d05f922c5a3fd7b7b",
+          "status": "passed"
+        }
+      ],
+      "relevant_artifact_first_encounters": [
+        {
+          "artifact_id": "sha256:ef7696b85fe19621cf001fefecc98ca9fdaf98ce0d0a109ff78cba65584d242a",
+          "explanation_scope_ordinal_zero_based": 11,
+          "journey_file": "journey-1.json"
+        },
+        {
+          "artifact_id": "sha256:3c840d21b5466db5b1616436e65740bafb0fd32ece440ebd9a7b71f160d48fcb",
+          "explanation_scope_ordinal_zero_based": 5,
+          "journey_file": "journey-2.json"
+        },
+        {
+          "artifact_id": "sha256:912e36dfd70f9628c56bf9aee58e5a07e49ea86c1b8eaae624ecaedb0a31ba41",
+          "explanation_scope_ordinal_zero_based": 8,
+          "journey_file": "journey-2.json"
+        }
+      ],
+      "scoped_resolution_operations": 337
+    },
+    "predecessor": {
+      "aggregate_citation_counter": 336,
+      "aggregate_receipt_path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/api-verification/verification.json",
+      "aggregate_receipt_sha256": "c8751fa991076f209ac41b71845e0cbeca4f0863f367fdd0af1d75024f7f613d",
+      "distinct_response_bodies": 324,
+      "journeys": [
+        {
+          "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/api-verification/journey-1.json",
+          "scoped_resolution_operations": 172,
+          "sha256": "6783c7b70a3433098ecc18420c1d2851cec8a6a7adb92f040b193d11ffabc108",
+          "status": "passed"
+        },
+        {
+          "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/api-verification/journey-2.json",
+          "scoped_resolution_operations": 0,
+          "sha256": "46f3abed0f5461b49062f8accca528fd019be512cf8bd7b44492ff8f06d2fdd7",
+          "status": "allocation_only"
+        },
+        {
+          "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013/api-verification/journey-3.json",
+          "scoped_resolution_operations": 164,
+          "sha256": "a39ff15bfd8043bddc5bf8bed0dd2c0fd81b95371921a495e02fb3fa12cb1e70",
+          "status": "passed"
+        }
+      ],
+      "relevant_artifact_first_encounters": [
+        {
+          "artifact_id": "sha256:ef7696b85fe19621cf001fefecc98ca9fdaf98ce0d0a109ff78cba65584d242a",
+          "explanation_scope_ordinal_zero_based": 2,
+          "journey_file": "journey-1.json"
+        },
+        {
+          "artifact_id": "sha256:3c840d21b5466db5b1616436e65740bafb0fd32ece440ebd9a7b71f160d48fcb",
+          "explanation_scope_ordinal_zero_based": 4,
+          "journey_file": "journey-3.json"
+        },
+        {
+          "artifact_id": "sha256:912e36dfd70f9628c56bf9aee58e5a07e49ea86c1b8eaae624ecaedb0a31ba41",
+          "explanation_scope_ordinal_zero_based": 4,
+          "journey_file": "journey-3.json"
+        }
+      ],
+      "scoped_resolution_operations": 336
+    }
+  },
+  "schema": "exact-citation-count-audit/1"
+}

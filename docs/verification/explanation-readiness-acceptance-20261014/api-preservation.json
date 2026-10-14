@@ -1,0 +1,252 @@
+{
+  "cases": 24,
+  "citations": 337,
+  "descriptions": 260,
+  "hierarchy": [
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    },
+    {
+      "basis": "literal_asserted",
+      "curated_entries": 4189,
+      "main_pages": 43,
+      "pages": 43
+    },
+    {
+      "basis": "structural_navigation",
+      "curated_entries": 4189,
+      "main_pages": 43,
+      "pages": 43
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:f0eb1e950708e13bfd4afa5a931d137541b2abf5c488d6f3148880aa144588e0",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:0931ef11a1d1e113dd591393ab50e06e9fa1b7c1a4a52173fb8af0c522416fca",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0040045",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:425b59cbdd412ab130bc65886a1ee285243dc825b59e9edd21e0e500f2544ca6",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8adc94587a8bb0b7fda69764ec3a8d50cc21145cefc96fb27ad3ea514c96ca3b",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:20d7d0b6a0aa6bb24d4020b4765d920e3e99604d35928c8f41b8bd90d4d4e49c",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 2,
+      "entity": "http://purl.obolibrary.org/obo/DOID_0002116",
+      "ontology": "sha256:26054e89dafcade53c821c0cc1a0b00574ec59becc81f6a930fc7474e44ab500",
+      "ordered_sha256": "sha256:8c1c4cf287acb9318f51cab94ef8319129794c3a5d686d82925866f00264385f",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:e8090c5d11d911a8e790d70876a472eac084f56efaba1783006176de35a0b489",
+      "pages": 2
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b315da625a0bced11f02e1ab80c2b220193959f7da5d1eba3201825d910a279d",
+      "pages": 2
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "parents",
+      "edges": 2,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100063",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:6c5dfc32435cca2db8a6464b8778edc5a6f9772f07e9232da291149944f61726",
+      "pages": 2
+    },
+    {
+      "basis": "literal_asserted",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8be95f3eab909993aef8e038d58e55305338441ff73b38ac831895a960ccf1c",
+      "pages": 4
+    },
+    {
+      "basis": "structural_navigation",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:b78750bf89a47601c85dc7e1b53a913529cc7f2c82cc8bbdfc5707790b077314",
+      "pages": 4
+    },
+    {
+      "basis": "elk_inferred_partial",
+      "direction": "children",
+      "edges": 4,
+      "entity": "http://ncicb.nci.nih.gov/xml/owl/EVS/Thesaurus.owl#C100021",
+      "ontology": "sha256:8e6d8c97f60dacd597184ebb255017d7d9b25e4b5afbf9318f14865af2d2e3d9",
+      "ordered_sha256": "sha256:d8914e0d8879ef0586e5bf2ffcc22e2fd10fa7b8cf7ef6a35a48f0c689532052",
+      "pages": 4
+    }
+  ],
+  "pairs": 120,
+  "preservation": {
+    "checks": {
+      "cases": 24,
+      "new_claims": 17,
+      "pairs": 120,
+      "prior_claims_preserved": 291,
+      "selected_records": 3443
+    },
+    "matcher_and_context_artifacts_unchanged": true,
+    "package_id": "sha256:55acbf149864181695c4aa19817131682ef615f307c13993172a87fd5eef322c",
+    "protected_predecessor_stats_unchanged": true,
+    "source_publication_sha256": "sha256:3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+    "status": "passed"
+  },
+  "schema": "exact-backend-followup-verification/1",
+  "status": "passed"
+}

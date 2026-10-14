@@ -1,0 +1,32 @@
+{
+  "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+  "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+  "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+  "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+  "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+  "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+  "study_revision": "review-20261014T123129-31902966fc",
+  "environment_id": "6205ddfa9a264beab2a54612ddcc8379",
+  "certificate_sha256": "e5e4c3c0a6a0e73a61e3f7df7ff48d93a8a305e9317981683294d64a002074ab",
+  "certificate_spki": "WbLmculjnG86/SodK/bBJ2ZzMS+pH6TdB7Of11Vfk9Q=",
+  "ports": {
+    "exploration": 19675,
+    "postgres": 19673,
+    "study": 19674
+  },
+  "runtime_versions": {
+    "fastapi": "0.116.2",
+    "psycopg": "3.3.6",
+    "pydantic": "2.13.4",
+    "pyowl-core": "0.2.1",
+    "python": "3.12.3",
+    "uvicorn": "0.35.0"
+  },
+  "postgres_version": "postgres (PostgreSQL) 16.2",
+  "source": "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/source-fd47dcac",
+  "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-fd47dcac",
+  "package": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package-definition-review-20261013.json",
+  "source_publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication-definition-review-20261013.json",
+  "publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac/publications/review-20261014T123129-31902966fc.json",
+  "environment": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac"
+}

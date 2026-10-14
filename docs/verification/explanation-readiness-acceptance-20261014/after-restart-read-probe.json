@@ -1,0 +1,2218 @@
+{
+  "schema": "exact-browser-read-probe/1",
+  "phase": "after_restart",
+  "started_at": "2026-10-14T13:17:46.901Z",
+  "status": "passed",
+  "normal": [
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "9f7bb6566fec4ba7b8efb1636e931420",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 852
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "234edfbe64ab43ca8d28e24220af41ab",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 448
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "ae7cf14b65ab491587a6b5e2922c752a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 854
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "0170b6e9546549bc95f3e499a20c85ec",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 506
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "6e0e78efb96046028438363fbf45bb0c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 7
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "ecb4564e149d4292912eeda0dace9eb0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 846
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "d5459e1782d84c56b39060f402d5f483",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 7
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "ab3e07805b1b42769b2e92bf2fdb2428",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 940
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "32f22ded8dc74923aafc0d558b706ea4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 158
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "713a5fb13b044220905a0031790cfffc",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 328
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "d8e634731b744f179845181143a60679",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 308
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "b7fd16dd7f8748b782ac1f6ace2fd349",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 513
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "3ee1bcc1948943c8a4bdc3489a16517b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "08468151b7cd4a4e95dbbd2d10524173",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 78
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "5d33b36c459146e581a7ec2b12330105",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "1c7917be335c43f992695e3e94a44e51",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 90
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "54f3b403847548cb9d1eed62bb4b98ea",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "f877e960b6614b9b9b8534053373ebe8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "b000b1954260415397167abd59f82997",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "bea6f549b9f741d89b84ad02f0234f2a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "7c4570ffa3e54dceb60f820259c5a35a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "ce43fc7966ef4112a1199d24efef21a5",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 65
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "f8c388895147415881d4739457743ce8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "2f00ff2017d5456b9665503558d7086c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 79
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "c27de00eb9964e7b94490683143a6aad",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "8da37905a90c4b0a9510b663f40ebedd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 61
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c861b57df39047598dfab63516e04d4d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "262499808a9441cda664d10a50adcdfd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 76
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "6de2808194a54a34868aceb7fd16f264",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "be1c1dd9bdf74dd0997488755e48f78a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 65
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "0ff5148341ac4c73831a2d14e0e6dcda",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "5f48a7fe031b44858bc0e41fa25388a0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 84
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "cdce2251c44c47248fec225c420c7c45",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 13
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "6aa9cd77f7e04fa6a84bed98d5ca5160",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 75
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "34f984b9782e4503a3393e54581e63d9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "03073a27ef10481eae7bcd56b47b6643",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 93
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "85273569cbd64470a0491529939baedb",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "5c6e1ea8e8df45ab9aa08d73441dcd3a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 65
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "12b980cf34d24407b9cacb1ab586f841",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "9202b6cfb0334183b562cfc6ae83c337",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 82
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "d61869f8b6f448878f199f74ce9a50ed",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "359726033d964e6299c8d1bac501b584",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 64
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "d23cbbf926724e839030cab1c9e81f99",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "78b01b83442e4d7fbec656533d376d70",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 78
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "211d38d6e23747ed88ab1b8857fbaf40",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "caaba5b115d144f79ee0c3500cf11d70",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 63
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "9afec7d50c6b46fbad154e044e9ec366",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "5bb97b656beb4da8be768d17f76139b8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 78
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "a73f61084d92459d9490fcdd82629967",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "108459c601e94fd38eb37a65cd416248",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 64
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "7d9df279d8674a5b8ad616e0115edfe8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "687b54be2f7f4d09a284c18a06716565",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 79
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "f4a7ff5136cc4c9bb82660c3962f8656",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "5ae0e1ce88d9474688b98efd241b9e9f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "a1e2e51fd50c4e79b1aceb84e781b08f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "cd03984e62884d689a3bf05b0f09f5e5",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 69
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "db3fbc2d32de4fcdb7beab0d491625d4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "3818ecd20cd44270b2fb0b2b90dea0e2",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 60
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "5657b397b52743308a12bc937f4c46de",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "7b170f02df3145028ceb60719cbb5762",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 74
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "6bc559028ef346c388145b7c2d956db6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "8240bdb20715429998fd4f994226e893",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 61
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "f3c8bc04f5c94f1c8bb8e28f3dd6622c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "39c0ec181ff14c4783d3ecde1bfdfd28",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 75
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "401a7bb9b8024328b6bc54e8fb8574f4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "a9fb15f2e1e043fdb9f5efb27fee10df",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 61
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "de58c3632181434dbe5dad5f18db90ba",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "4202a53a549c42f3b743ff241d8b84a6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 75
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "0f14c676107e46debb0fb27ffb9b63e1",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "4a18653ada8141c8904b0c55ef34cea4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 57
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "1129312a0f5b424b9660659b82a82d0d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "01539f586f5b497799072a2007da3572",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "64ba4aea7f2542efb5363f3074e1d7bc",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "48ee594cf86b4c1fa1c5fd8ada3c593c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 55
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "e5afffddc1b64ec1b99e3854d321830d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "1b3ff025d69541b888ac603c1ab69aec",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "58eb7bf06e474738adad5d4d5f859d9e",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "5734f9a3be164455ad65b70c2bfacd62",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 58
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "9843cfaa5a4b4ae4b9c3dcfef802ecbe",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "8d921ab3824b470a8c903210f110e0b8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 71
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "08c740631d194d01bad48aad7b76bf4a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "0afdfa7dc4f543d0aafe37d81923d5e8",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 86
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "5fa986158960457a868ee2389cbbd0cd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "f3790c35185041999a98f43c14703107",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 100
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "70ae63a4907e436182bef67eaa2ee62e",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "f054a7f5c847429a842232b500e7bed0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 92
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c210c98a1e6547dbbe93a5fd515a6d26",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "af9a14a114e34a0fa6f3c68b35d9c9aa",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 106
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "e73ff0c267e24f97a1d5f28313f8a8b3",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "fa8376b83a2e4caba165762cf80f2a92",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 88
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "a9a9d7a5adcf471ea946f3c65f2d7316",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "57afeab71609412a850a0c61233393d6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 100
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "c77bf9cc27284862a84f2abeed02c355",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "3e384abb490d483699b1daf6caad7d8d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 94
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "294d84ba08d7419b924e5ba643973aa9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "5c011f5bfc8746b5b6429d68cff67885",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 106
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "8e253850e0c145089085e7a0616f7192",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "82791bb61c7a423ea77f75fc2ae9f0fb",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 89
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "1ccdf3fe63f54acdb0986369082668fd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "14277cb215bf49a8acd80eb6081148a6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 101
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "3df8397674e64c479de02b2c9f178f7b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "024ed92a7f8743fd98608c91263a62e4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 89
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "000cac3275aa4546b8fd609dbb38e0f0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "0bf7a1566cad487391221a8f418b5b3a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 101
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "ff65d5e9a42f471bab4382df255f052f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 13
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "28eb50b9df43479db2037f80c333f0f4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 95
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "b7f0fcb9e8e944c8873c61226eb60dd7",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 13
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "0d78690deab4426bb5625b9656af6f91",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 107
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "3e5949c47f0849e9b7cab31b2a4f392d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "4b70e109ea474802b7797a11839ae6ed",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 91
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "5ed35115695a4629b6be673834fd31ed",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "6553141ca20c4109bd0cc235d8799644",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 105
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "064e51b24c1344f1a5b638ba27ff9d55",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "226c1d4f82d640b7aab89ebfb634cd0c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 92
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "715e72350b5a4b2084e16bbd0495d9b6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "0b92e6ab843649798dc982de5b024172",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 106
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "c1fba40cfc15411db7d189aa7cd7f38e",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "55719c8a5ba34f768adcd4de18002aa2",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 94
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "a7dd4044d37c47979d3a515cfb6cf922",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "eb84af4226294b7d9c229948ad906678",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 111
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "2db5761bf36947a586bf12412b35d30b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 28
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "4bf55da4ea66452494420442c603bc7b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 231
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c4cc31f235704f5bbd62d034f62403c7",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 33
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "983d85eb500c406f96107a6bbe315e30",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 231
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "00d497f5394e47418a75877123d0c00b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "f2734aa30a7c424887a9ce867cb301b1",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 442
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c28be7b4e09d46549586d878247b3054",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "c42973cc0a86432c83747a0fa3cd3cfd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 550
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "0bb1d6127478430b9c7700f4228e2a3a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 67
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "baab0465655744e38d751313ec17df0a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 436
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "22fc9e1afddb4048a8ea745900069be3",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "d1995dc570304baf96bb4aeec93f1540",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 536
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "c7a1a666808f423db5f969e53b6e65e9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 52
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "ccf9adf996b743c7bb4cca42b2491824",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 372
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "38485b715fd4496bb9184c200cec288a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 54
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "7f3baeb039bc40d8ad21e41536d0534d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 487
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "bdf076aae894428a81ca85ba29357670",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 53
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "c80d85fc7a9d4c68ad538783c23a859b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 498
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "e64adb92fc2c4b5bbff364d5687d3453",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 58
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "df58b56d234c48e0a45be4b301c2c3d0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 617
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "25f8ac19b6554b308e78840ba8a00a78",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 41
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "3636c15c83284d88850215ba999e744f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 381
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "67ff34ef312347d89be6a85d5ce790c9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 50
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "6e701b729bcb4a59b0d0cbc1cece24d6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 508
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "ddfa51030a474379975d694d01fff93a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "8a2168595a114c44a86b655d165743c4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 427
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c0a75d64e89145858d6e827ea2b652be",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "84ded1d5761147ce9036d2b751f31d25",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 539
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "5bef65665a8947f08de8a57cc771ac3e",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 47
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "032625ff61124fe5935372154d398871",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 444
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "f97caf3a11344e07895d1b182bfee33b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 50
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "c725aea16a4d4c8e87c5e649ed7cd44f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 563
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "f63a47ebf67d41c1968fb388765f4536",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "8567016840ed4ddc93c14f69a8e01a3c",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 436
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "0acfdeb197b94cf1b087f20412b70126",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "66db8843d946402f8e1bc27b237e52fd",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 534
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "9c4f155a935d4bb18d4e6f63fc494cee",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 37
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "e77ecaf3e7ef40aeb56cceb2c38b1e03",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 359
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "a87fb719049144a89fca8a20d59651af",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 40
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "5d56ff4f716844d08890b0fa44485eb6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 450
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "d4b51057547c45889aebaf4db28f021a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 99
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "ab7974e920a749f0937c50887837ee94",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 290
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "c0209472b88442b1b0101ac90c2e11e6",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 188
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "8296d8bff57340c697305109b98c06e4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 421
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "1f59c37bf4bb4721b8219b761f341425",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "1d5d226b3fa1437b8c9242978549a1d0",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 63
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "bbff19b5af0948d78d2888a5ed218463",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "9dc19afee6974e48807793bf3b919532",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 76
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "9372bb5207d148f1899ddffdf3ea4843",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "35755ee642374fd48971f70cb5d1d820",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 54
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "51c8408a03e54ff48c7ee9ee73aaad68",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "cfcbe17110274fd39b0be3766be3e190",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 69
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "2fd539e606c24c65bad257b3018793ef",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "1f9a5c8b41a348d5b2491c7f079afb3f",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 65
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "876312a95b364ae890f88ed69b7e21e9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 12
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "910b50c2c2e14efca0a2aaaea8dc655a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 75
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "438536b83ab24f26877f8b79c0d074b9",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "34d1b6df0cf2491196386375701cbf07",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 56
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "84cc209bf80746ac8d56e2d4d6282064",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "29c1be1350b14f499ed733eb0e587a24",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "bd2302f4878745e1b5d9b6b05793ae53",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "1101db1c50ef44e99f1cca8ed7e50d4b",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 57
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "61d2d9c0466f4097a86bc01cbb98cf42",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "36467d4668664492a100f4b56fee62df",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 70
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "cb42ac239b594aefac6fa191ad448354",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "61442f4f5a264eafb2c95fea692a7289",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 53
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "09aaa50ac91449b4a7ffd71eadcbdbb7",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 8
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "87cf38160be24c1284b1be74f323c654",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 67
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "397e08608b594d83986ca8b754a1a54d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 11
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "eb431a0ef3ea48a181bb617c9699c977",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 54
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "0f0dca697b394233b78c748bb14365b4",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 10
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "3f817e9da5ae4a629d84f53f1c271979",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 68
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "f9d239bfd8904dd1938fd2a0bef4792a",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "bdab7e9cffda431baa3df48da40c8e6d",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 57
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "d394748475314944b4df7998f659cd13",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "ea226616f11a49909da8394220d9f6fb",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 70
+    },
+    {
+      "category": "profile_discovery",
+      "status": 200,
+      "bytes": 902,
+      "declared_length": 902,
+      "read_id": "cac312a5c5ee4eb28b7bb81f5444eaef",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "profile",
+      "status": 200,
+      "bytes": 14953,
+      "declared_length": 14953,
+      "read_id": "c95d6dbd899641edbf8b89371fc8c107",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 53
+    },
+    {
+      "category": "comparisons",
+      "status": 200,
+      "bytes": 1083,
+      "declared_length": 1083,
+      "read_id": "1857556037eb4ad2853c492c23739876",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 9
+    },
+    {
+      "category": "context",
+      "status": 200,
+      "bytes": 32122,
+      "declared_length": 32122,
+      "read_id": "72e0bbe3fdde400398f966379d20ecc5",
+      "csp_present": false,
+      "body_shape_valid": true,
+      "elapsed_ms": 69
+    }
+  ],
+  "aborts": [
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError",
+    "AbortError"
+  ],
+  "reloads": [
+    {
+      "completed": true,
+      "elapsed_ms": 59
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 56
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 94
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 106
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 139
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 147
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 114
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 161
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 134
+    },
+    {
+      "completed": true,
+      "elapsed_ms": 129
+    }
+  ],
+  "streams": [
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "0269fa4b120a4d3b9acfdad8c1cdce29",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "d75ee2507477412f8c44e1e6886c7a1c",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "ee3df8009ef94ccea89c465ae8a009ca",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "86501ff97a1646b9a3fe2c347ca1234d",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "d38451933fc442b28ccbe1b00242c129",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "9b748c15ae5e403aa031aff28f27cfb7",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "5cf896ac7915436dbfd6fad7f5e5d329",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "b701adc33c9e4e93b913e556ad5b80f5",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "082191a794234d34a83de2c07eb9310d",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    },
+    {
+      "status": 200,
+      "first_bytes": 2612,
+      "done_on_first": false,
+      "read_id": "4a67d92ef791490e99217a48fbacffe1",
+      "interpretation": "client cancellation attempt; not proof of incomplete server transmission"
+    }
+  ],
+  "request_failures": [
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_abort",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    },
+    {
+      "mode": "intentional_stream_cancel",
+      "error": "net::ERR_ABORTED"
+    }
+  ],
+  "document_csp": "default-src 'self'; script-src 'self' 'sha256-z+BtGa7ZRx8VWS6faHHV11vxu4AaNo5nrjjMF0JgiXY=' 'sha256-OBTN3RiyCV4Bq7dFqZ5a2pAXjnCcCYeTJMO2I/LYKeo=' 'sha256-PK2CHCaJnFDernXxlYu0LF8Ne1NH1rjkc7uRKWz+Tog=' 'sha256-Q0Lfq4WEGKfuN8TjzwXtYm/wVtUtPa1OR64OqxyZhwg=' 'sha256-xLP5QIbvR88RAxDKoSWqs6CVxNIRu17hhr7S/Q6hlU0=' 'sha256-FhLHRUQz4c4ntLU9VkfEesX7PnzNLENSe/16Hi523Kk=' 'sha256-A/7K/hs/Q8KHZ73Y2Rd+n/pIUy54qfx1vnUV0WOM/KY=' 'sha256-bg+CWjI8RppcgHYH6RuW4z4OnLAUEUPDXRoYUo9Tyok='; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+  "finished_at": "2026-10-14T13:17:59.500Z"
+}

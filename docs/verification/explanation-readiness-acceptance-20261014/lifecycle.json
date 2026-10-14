@@ -1,0 +1,54 @@
+{
+  "schema": "exact-readiness-lifecycle/1",
+  "before": {
+    "test_sessions": 47,
+    "stages": {
+      "tutorial": 8,
+      "case": 35,
+      "completed": 4
+    },
+    "states_sha256": "1af1208c31c96cb307d3f62a79da7da6a1ba2e5c9b5aa394186a01284f0fe4b2"
+  },
+  "actions": [
+    {
+      "action": "status",
+      "returncode": 0,
+      "receipt": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle-0-status.json"
+    },
+    {
+      "action": "stop",
+      "returncode": 0,
+      "receipt": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle-1-stop.json"
+    },
+    {
+      "action": "status",
+      "returncode": 0,
+      "receipt": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle-2-status.json"
+    },
+    {
+      "action": "start",
+      "returncode": 0,
+      "receipt": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle-3-start.json"
+    },
+    {
+      "action": "status",
+      "returncode": 0,
+      "receipt": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle-4-status.json"
+    }
+  ],
+  "detached_aggregate_reservation_bytes": 1500000000,
+  "file_limit_bytes": 134217728,
+  "core_limit_bytes": 0,
+  "after": {
+    "test_sessions": 47,
+    "stages": {
+      "tutorial": 8,
+      "case": 35,
+      "completed": 4
+    },
+    "states_sha256": "1af1208c31c96cb307d3f62a79da7da6a1ba2e5c9b5aa394186a01284f0fe4b2"
+  },
+  "state_preserved": true,
+  "fresh_session_returncode": 0,
+  "status": "passed"
+}

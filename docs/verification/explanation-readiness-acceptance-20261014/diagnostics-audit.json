@@ -1,0 +1,82 @@
+{
+  "schema": "exact-readiness-retained-diagnostics-audit/1",
+  "files": [
+    {
+      "file": "exploration-reads.jsonl",
+      "bytes": 432830,
+      "permissions": "0o600",
+      "rows": 1980,
+      "schemas": {
+        "exact-read-diagnostic/1": 1912,
+        "exact-static-transfer/1": 68
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    },
+    {
+      "file": "exploration-reads.jsonl.1",
+      "bytes": 1048454,
+      "permissions": "0o600",
+      "rows": 4349,
+      "schemas": {
+        "exact-read-diagnostic/1": 3383,
+        "exact-static-transfer/1": 966
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    },
+    {
+      "file": "exploration-reads.jsonl.2",
+      "bytes": 1048291,
+      "permissions": "0o600",
+      "rows": 4391,
+      "schemas": {
+        "exact-read-diagnostic/1": 3395,
+        "exact-static-transfer/1": 996
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    },
+    {
+      "file": "study-reads.jsonl",
+      "bytes": 935801,
+      "permissions": "0o600",
+      "rows": 4082,
+      "schemas": {
+        "exact-read-diagnostic/1": 4082
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    },
+    {
+      "file": "study-reads.jsonl.1",
+      "bytes": 1048479,
+      "permissions": "0o600",
+      "rows": 4447,
+      "schemas": {
+        "exact-read-diagnostic/1": 3947,
+        "exact-static-transfer/1": 500
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    },
+    {
+      "file": "study-reads.jsonl.2",
+      "bytes": 1048381,
+      "permissions": "0o600",
+      "rows": 4367,
+      "schemas": {
+        "exact-static-transfer/1": 894,
+        "exact-read-diagnostic/1": 3473
+      },
+      "error_types": {},
+      "incomplete_finishes": 0
+    }
+  ],
+  "limitation": "Bounded rotated window, not a record of every earlier event. Send completion is not TCP/client completion.",
+  "service_exception_counts": {
+    "study.log": 0,
+    "exploration.log": 0,
+    "postgres.log": 0
+  }
+}

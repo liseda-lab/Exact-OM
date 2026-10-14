@@ -1,0 +1,1276 @@
+{
+  "schema": "exact-readiness-closure/1",
+  "recorded_at": "2026-10-14T13:26:58.890106+00:00",
+  "reviewed_starting_commit": "de2cddac9190a94dcc0362ce96bfa69c8692c80a",
+  "implementation_commits": [
+    {
+      "commit": "3211cd7bf4887bb07485cd863db9d57304766626",
+      "subject": "style(explanations): apply pinned Black and isort formatting",
+      "changed_paths": [
+        "exact_inspect/decisions.py",
+        "exact_inspect/generation.py",
+        "exact_inspect/models.py",
+        "exact_inspect/navigation_prepare.py",
+        "exact_inspect/partial_elk.py",
+        "exact_inspect/postmigration_contracts.py",
+        "exact_inspect/preparation.py",
+        "exact_inspect/readable_descriptions.py",
+        "exact_inspect/review_metadata.py",
+        "exact_inspect/service.py",
+        "exact_inspect/study/models.py",
+        "exact_inspect/study/resources.py",
+        "exact_inspect/study/review_models.py",
+        "exact_inspect/study/v2_models.py",
+        "exact_inspect/study/workspace.py",
+        "tests/explanation_evidence_metadata_test.py",
+        "tests/explanation_evidence_subject_test.py",
+        "tests/explanation_independent_review_test.py",
+        "tests/explanation_luna_overlay_test.py",
+        "tests/explanation_luna_pipeline_test.py",
+        "tests/explanation_luna_review_test.py",
+        "tests/explanation_model_comparison_test.py",
+        "tests/explanation_ontology_download_reuse_test.py",
+        "tests/explanation_preparation_test.py",
+        "tests/explanation_recovery_test.py",
+        "tests/explanation_review_catalogue_test.py",
+        "tests/explanation_review_descriptions_test.py",
+        "tests/explanation_review_environment_test.py",
+        "tests/explanation_review_http_verifier_test.py",
+        "tests/explanation_review_inventory_verifier_test.py",
+        "tests/explanation_review_pair_verifier_test.py",
+        "tests/explanation_review_publication_test.py",
+        "tests/explanation_review_verifier_test.py",
+        "tests/explanation_tutorial_entity_contract_test.py",
+        "tests/explanation_workspace_evidence_test.py",
+        "tests/explanation_workspace_pair_metadata_test.py",
+        "tools/freeze_explanation_contracts.py",
+        "tools/prepare_review_bundle.py",
+        "tools/publish_luna_review.py",
+        "tools/review_environment.py",
+        "tools/review_generation_batch.py",
+        "tools/review_luna_bundle.py",
+        "tools/review_model_comparison.py",
+        "tools/review_private_run_cache.py",
+        "tools/serve_explanation_ui_study.py",
+        "tools/verify_backend_followup.py"
+      ]
+    },
+    {
+      "commit": "c230bc21c637c3f6a4da8eb4934c6a1b2566dad0",
+      "subject": "fix(explore): resolve prepared targets without blocking source browsing",
+      "changed_paths": [
+        "explanations_visualizer/e2e/review-independent-edges.spec.ts",
+        "explanations_visualizer/src/components/explore/CompareView.tsx",
+        "explanations_visualizer/src/components/explore/PreparedExamples.tsx",
+        "explanations_visualizer/src/components/explore/SourceRail.tsx",
+        "explanations_visualizer/src/lib/reviewCatalogue.test.ts",
+        "explanations_visualizer/src/lib/reviewCatalogue.ts"
+      ]
+    },
+    {
+      "commit": "392b104e87cd2b5528bbdd1bc2c76ca485b800a0",
+      "subject": "fix(delivery): preserve verified static caching and observe bounded transfers",
+      "changed_paths": [
+        "exact_inspect/frontend.py",
+        "exact_inspect/public_assets.py",
+        "exact_inspect/read_diagnostics.py",
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "explanations_visualizer/e2e/readiness-visual.spec.ts",
+        "explanations_visualizer/e2e/static-delivery.spec.ts",
+        "explanations_visualizer/e2e/styleDiagnostics.ts",
+        "explanations_visualizer/playwright.config.ts",
+        "tests/explanation_static_delivery_test.py",
+        "tools/verify_static_delivery.py"
+      ]
+    },
+    {
+      "commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+      "subject": "test(preservation): distinguish access time from immutable file state",
+      "changed_paths": [
+        "tests/explanation_postmigration_corrections_test.py"
+      ]
+    }
+  ],
+  "binding": {
+    "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+    "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+    "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+    "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+    "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+    "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+    "study_revision": "review-20261014T123129-31902966fc",
+    "environment_id": "6205ddfa9a264beab2a54612ddcc8379",
+    "certificate_sha256": "e5e4c3c0a6a0e73a61e3f7df7ff48d93a8a305e9317981683294d64a002074ab",
+    "certificate_spki": "WbLmculjnG86/SodK/bBJ2ZzMS+pH6TdB7Of11Vfk9Q=",
+    "ports": {
+      "exploration": 19675,
+      "postgres": 19673,
+      "study": 19674
+    },
+    "runtime_versions": {
+      "fastapi": "0.116.2",
+      "psycopg": "3.3.6",
+      "pydantic": "2.13.4",
+      "pyowl-core": "0.2.1",
+      "python": "3.12.3",
+      "uvicorn": "0.35.0"
+    },
+    "postgres_version": "postgres (PostgreSQL) 16.2",
+    "source": "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/source-fd47dcac",
+    "frontend": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-fd47dcac",
+    "package": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/package/package-definition-review-20261013.json",
+    "source_publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/postmigration-20261011/combined/publication-definition-review-20261013.json",
+    "publication": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac/publications/review-20261014T123129-31902966fc.json",
+    "environment": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac"
+  },
+  "runtime_contract_sha256": {
+    "description-presentation.runtime-schema.json": "c2b1dc19843216f2722057871d600252f8e868202244568ee8b11c355d5ec0eb",
+    "description-review.runtime-schema.json": "77ec2ca9e08b8c557b695d889dc507767f5b3a80f91bf994ef33d8957df811f4",
+    "exploration.runtime-openapi.json": "d55604f36c91b780cb1ad5505a6fe7c98c1126f03a0b45c5142bc57b62e4a218",
+    "partial-inference.runtime-schema.json": "fbb8f19f73608e90b97f621b03a2770420e0db95588d1cf1a79367f75246e531",
+    "review-about.runtime-schema.json": "b89e1af6bd34b6ea49053050bf333a6f32241a1dd9921930f0ed9a563d3c9626",
+    "study-publication.runtime-schema.json": "bf0bd2211b772824d255e535b18367bf2310eb786b4f04ba0f3d6c222284c2f1",
+    "study-resource.runtime-schema.json": "99b74818a8153c3d1f5e236bf6a7d9c16cc1bf48011afd08012fb88a010280f3",
+    "study-tutorial.runtime-schema.json": "f43a26ced867b7f2a1a4a86506cbd0daa7fd3eee3ddc42597372e2631375c619",
+    "study.runtime-openapi.json": "c8af708f3d54398e4cf52eefd46b365862b658b2bb08a0629b23f92d120f68f9"
+  },
+  "unrelated_tracked_hashes_preserved": {
+    "specs/explanation-framework/00-status-and-scope.md": "dbf479c15e55dd723b06d2d93b6b19c606785be3bb47d42200a9bbbcb44841cf",
+    "specs/explanation-framework/03-ontology-context.md": "ac30c079faf4b690f3d35e0c4c9b2c1140478fd80c15e830f099c98e201bf3c6",
+    "specs/explanation-framework/05-generated-explanations.md": "affc79aadd8062fb98b0065e8a2dd34fa3e979b63441629c50c4748a43d85490",
+    "specs/explanation-framework/13-study-questionnaires.md": "4605702cfed62827435efa3a7517238d225bee89aedb5ec6eb965a16a750d8f2",
+    "specs/explanation-framework/17-integration-corrective-programme.md": "e2605eecdb347b629766c5b206258d77aed0ac5f4b67530d31b3490a5797267d",
+    "specs/explanation-framework/AGENT-HANDOFF.md": "069d19a885ddbd127dd34b71e11b3054cbbd012dd49a1d9655cd3e302c56bca9",
+    "specs/explanation-framework/README.md": "9b689c7b89350d1576de20bb2be48774951f8523f5f8d46778c7484c582b714c"
+  },
+  "original_dirty_status": [
+    " M specs/explanation-framework/00-status-and-scope.md",
+    " M specs/explanation-framework/03-ontology-context.md",
+    " M specs/explanation-framework/05-generated-explanations.md",
+    " M specs/explanation-framework/13-study-questionnaires.md",
+    " M specs/explanation-framework/17-integration-corrective-programme.md",
+    " M specs/explanation-framework/AGENT-HANDOFF.md",
+    " M specs/explanation-framework/README.md",
+    "?? AGENTS.md",
+    "?? deploy/sbatch/explanation_elk.sh",
+    "?? deploy/sbatch/explanation_hermit.sh",
+    "?? docs/verification/explanation-elk-cluster-handoff.md",
+    "?? docs/verification/explanation-elk-cluster/",
+    "?? docs/verification/explanation-hermit-cluster-handoff.md",
+    "?? docs/verification/explanation-hermit-cluster/",
+    "?? docs/verification/explanation-human-review-readiness-20261013.md",
+    "?? docs/verification/explanation-human-review-readiness-20261013/",
+    "?? docs/verification/explanation-ncit-hermit-resubmission.md",
+    "?? docs/verification/explanation-ncit-hermit-resubmission/",
+    "?? docs/verification/explanation-postmigration-backend-review.md",
+    "?? docs/verification/explanation-postmigration-backend-review/",
+    "?? docs/verification/explanation-postmigration-data-review.md",
+    "?? docs/verification/explanation-postmigration-data-review/",
+    "?? docs/verification/explanation-product-review-backend-s1-followup-review.md",
+    "?? docs/verification/explanation-product-review-backend-s1-followup-review/",
+    "?? docs/verification/explanation-product-review-backend-s1-review.md",
+    "?? docs/verification/explanation-product-review-backend-s1-review/",
+    "?? docs/verification/explanation-product-review-frontend-s0-followup-2-review.md",
+    "?? docs/verification/explanation-product-review-frontend-s0-followup-2-review/",
+    "?? docs/verification/explanation-product-review-frontend-s0-followup-review.md",
+    "?? docs/verification/explanation-product-review-frontend-s0-followup-review/",
+    "?? docs/verification/explanation-product-review-frontend-s0-review.md",
+    "?? docs/verification/explanation-product-review-frontend-s0-review/",
+    "?? docs/verification/explanation-readiness-frontend-independent-review-20261014.md",
+    "?? docs/verification/explanation-readiness-frontend-independent-review-20261014/",
+    "?? docs/verification/explanation-s2-luna-frontend-corrections-review.md",
+    "?? docs/verification/explanation-s2-luna-frontend-corrections-review/",
+    "?? docs/verification/explanation-s2-luna-independent-review.md",
+    "?? docs/verification/explanation-s2-luna-independent-review/",
+    "?? docs/verification/explanation-s2-luna-r2-f1-review.md",
+    "?? docs/verification/explanation-s2-luna-r2-f1-review/",
+    "?? docs/verification/explanation-storage-cleanup-20261011.md",
+    "?? docs/verification/explanation-storage-cleanup-20261011/",
+    "?? exact-repair-first-tests-20260929.tar.gz",
+    "?? exact-repair-preliminary-results-20261007.tar.gz",
+    "?? specs/explanation-framework/20-review-corrective-programme.md",
+    "?? specs/explanation-framework/21-review-frontend-corrections.md",
+    "?? specs/explanation-framework/22-review-backend-and-data.md",
+    "?? specs/explanation-framework/23-postmigration-data-and-elk-corrections.md",
+    "?? specs/explanation-framework/24-human-review-readiness-corrections.md",
+    "?? specs/explanation-framework/evidence/product-review-20261007.md",
+    "?? tests/explanation_cluster_elk_test.py",
+    "?? tests/explanation_cluster_hermit_test.py",
+    "?? tests/explanation_ncit_hermit_datatypes_test.py",
+    "?? tests/explanation_review_storage_budget_test.py",
+    "?? tools/cluster_elk_taxonomy.py",
+    "?? tools/cluster_hermit_taxonomy.py",
+    "?? tools/complete_hermit_declarations.py",
+    "?? tools/prepare_ncit_hermit_datatypes.py",
+    "?? tools/review_storage_budget.py"
+  ],
+  "original_private_environment_preserved": true,
+  "observed_api_citation_operations": 337,
+  "historical_api_citation_operations": 336,
+  "distinct_observed_fact_response_bodies_in_both_runs": 324,
+  "citation_counter_is_corpus_size": false,
+  "conclusions": {
+    "implementation": "HR2-A/B, verified public cache delivery, bounded diagnostics and owned HR3 cleanup implemented and affected checks passed",
+    "human_local_review": "available with explicit unresolved technical limitations; not a clean integrated technical acceptance",
+    "full_ci": "not passed",
+    "launch": "not ready"
+  },
+  "unresolved": [
+    {
+      "id": "HR1",
+      "priority": "P1",
+      "owner": "frontend/backend integration",
+      "disposition": "not reproduced; original cause unknown; cache defect correction is not causal closure"
+    },
+    {
+      "id": "G4-latency",
+      "priority": "P2",
+      "owner": "backend performance",
+      "disposition": "synthetic fixture context_p95 0.5156448660418391 seconds exceeds 0.5 gate; publication refusal is correct; cause unestablished",
+      "overall_warm_p95_seconds": 0.5142434274312109,
+      "context_p95_seconds": 0.5156448660418391,
+      "queries": 100,
+      "readers": 4,
+      "context_reads_over_500ms": 5,
+      "context_reads": 25
+    },
+    {
+      "id": "repository-quality",
+      "owner": "respective module owners",
+      "disposition": "19 Black /10 isort /52 flake8 /48 mypy residual findings documented; no new owned lint errors"
+    },
+    {
+      "id": "release-and-human-gates",
+      "disposition": "Docker execution, production-volume deployment/restore, historical R16/profile-read cause, legacy packetless citation boundary, manual accessibility, pilot, owner and final ontology/case admission remain open"
+    }
+  ],
+  "original_failure_evidence": [
+    "../explanation-human-review-readiness-20261013/receipt.json",
+    "../explanation-readiness-frontend-independent-review-20261014/receipt.json"
+  ],
+  "raw_evidence": [
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/after-restart-read-probe.json",
+      "sha256": "b774bc7ffc9d95ae724891d069c8c3809ebbc81177f43bae88d51d19eb2dae92",
+      "bytes": 56907
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/api-checks.json",
+      "sha256": "20c280d9a12daeb5e0c99f6b81d97be68630b1b777cd0ee61b8794d9a4a5de05",
+      "bytes": 1196
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/atime-regression.xml",
+      "sha256": "1ff468d3b79833525612d7336e8bbf1bfc1d5f3769c0d372ab275c6d7f174657",
+      "bytes": 4036
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/backend-checks.json",
+      "sha256": "1c1128b6493784015619fee999e7d25737b15914e13ead95389410775aeb900a",
+      "bytes": 5795
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/backend-regressions.log",
+      "sha256": "efa54b95f8b3be328c6db064e5fbf1b77129487b3540541378817bcf0a818b32",
+      "bytes": 9242
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/backend-regressions.xml",
+      "sha256": "2e01987729d746bdc6f8d5b3f9edc13df03a0f3386290932832a2c674e814b46",
+      "bytes": 70509
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/baseline-flake8.log",
+      "sha256": "304819bc1ad2c6198876e3dc6ffef2edb638e003be7867563ac5d9a586d06ce8",
+      "bytes": 59161
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/baseline-mypy.log",
+      "sha256": "a86eba5c8d9180f12fa839cb6f6a1634061f7eb0f3de5242ffb12825c8e3bccb",
+      "bytes": 11019
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/baseline.json",
+      "sha256": "cf72a0594ff63b15f6d3d784ca1c5253bf183e61f94785582dee6a709863b22c",
+      "bytes": 6703
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/binding.json",
+      "sha256": "24840bd63796956f8af95861d0476cdac5824931beae1d5946d0bb5c38c7f84f",
+      "bytes": 1940
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/black-baseline.log",
+      "sha256": "803eec281be189426cb41cc0c38062fd1296cf2c5fde9f961e007410f89d5fec",
+      "bytes": 4008
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/black-mechanical.log",
+      "sha256": "ebf84d9568b379b2fa824b8a67251d4ba456e965218fdeaf8982638fab5b343e",
+      "bytes": 1048
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-captures.json",
+      "sha256": "603c33ddf7ae79ed0767c283764247f60795dbaef425fc59da17c969dd6f7038",
+      "bytes": 14225
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-captures.log",
+      "sha256": "1b020d5a371c58a35d66f8d71fcefdba63e4e8eb3f32dc845e32ad7bfad9b5fb",
+      "bytes": 1556
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-final.json",
+      "sha256": "91f8267be0bda97af9a23ac1606930473dd45e4575f3fb6c4f7aac20693adcc8",
+      "bytes": 89003
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-final.log",
+      "sha256": "864c9638c5b5e986d482930c7c686f18039694f1cf4c666878eb30c08940373c",
+      "bytes": 13219
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-focused.json",
+      "sha256": "de78f41167447c6be084e58347cc832c421441dc10e44ce0f6151dbf16786e18",
+      "bytes": 17798
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-focused.log",
+      "sha256": "2e194dc020dd1a4d4531408f96bab43b143edfae415ef40dbf36bc8da8db770d",
+      "bytes": 2443
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-opposite.json",
+      "sha256": "9dd6ea6cc031f2db55008323abb0972b937876fc1b6d5eb8127ace4a5aa38ee4",
+      "bytes": 3353
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/browser-opposite.log",
+      "sha256": "f9161ffc7a512fe999a9f910a7811a477ac13f9c599c17827f6cf509d13a0fe2",
+      "bytes": 386
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/contracts.log",
+      "sha256": "c4c85605dddb7eb35b425f3965e22355f6867c9e0987dd69d687249c6cbe996f",
+      "bytes": 35
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/detached-reservation.json",
+      "sha256": "0a0b048848b31d15474419d949e17847d4cc5047947d22678b01610c5885a7b8",
+      "bytes": 197
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/docstrings.log",
+      "sha256": "2be747546ef43eb8fa208f29bbdf865d2dfbbffdb51f57659136dcd500eb3970",
+      "bytes": 47
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-api.log",
+      "sha256": "7770df7d72826b7809e12c4e58cc3ce0257a6a33c90589391406b5b600175669",
+      "bytes": 10069
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-black.log",
+      "sha256": "b214db6a3f2c08b2ece59d4798e406bc63cfb9e2a64e3d4c733d004cf0883081",
+      "bytes": 2011
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-contracts.log",
+      "sha256": "c4c85605dddb7eb35b425f3965e22355f6867c9e0987dd69d687249c6cbe996f",
+      "bytes": 35
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-isort.log",
+      "sha256": "befb4a014150f52f4fe36b09d6f4ea105bdbd1ab4e45375661a80485c3a183bf",
+      "bytes": 1414
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-paths.json",
+      "sha256": "25a970a43ac41237821cfab6e063daa0cc76427141b3ade4799f21be3554a381",
+      "bytes": 1571
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/flake8.log",
+      "sha256": "30286fb866aab915a96da8b22334392ac0bc3f0eb69e7a2046a3bd42d8ec550f",
+      "bytes": 5187
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/focused-browser-command.log",
+      "sha256": "890ecdf745ae0ebc1e73f1ec7cac07f1673a8e82acee56fc3c0da0fd8d1bcb43",
+      "bytes": 10
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/format-baseline.json",
+      "sha256": "c906d2af245608689c999dec1330fa54096dfbb0658beeb1e4cb940ca9a82ca3",
+      "bytes": 103
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-build-final.log",
+      "sha256": "d1e132bf7c09c749a63eec682dede7f1f51729ea231c565127aad9afc08524f2",
+      "bytes": 1317
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-checks-final.json",
+      "sha256": "ec98cb21a7b2b39d2880a921a2cdda5b7ca879bf90b47dfceadfb4bb1512631b",
+      "bytes": 401
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-checks.json",
+      "sha256": "22ce419b0c141670fa97e3f1d04037b9c476983d8d0b84ece6ee377fdfbf5866",
+      "bytes": 134
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-typecheck-final.log",
+      "sha256": "1a3a07fae012463041a79312ea7d07106d63acf0df43289a4d84aa22275de447",
+      "bytes": 59
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-typecheck.log",
+      "sha256": "34f1c110242abd9004f35703a961f62dfc254e130494c456e19a81bf9b522e33",
+      "bytes": 256
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-unit-final.log",
+      "sha256": "0bed629b3eeced956984c73f784b688213bbb376694cb3dd205d984ba3cbd12a",
+      "bytes": 25556
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/imports.log",
+      "sha256": "70ec09ac61a5e8886242d0cb54057d82bd2bd61357649246cb1a91c8289f36c3",
+      "bytes": 1095
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/isort-baseline.log",
+      "sha256": "7ef76c9a0808e510db45a51431c0dbd7074f8f71619b41f20bbbe7b04ee60eb8",
+      "bytes": 6822
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/isort-mechanical.log",
+      "sha256": "c1358a6b08972eef0b94f7bda2ce4eb6ef1979ab41b4cd81b731faa68b5a0574",
+      "bytes": 3546
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/lifecycle.json",
+      "sha256": "a90f10d74a13b0067e9bb5b4a1e2680481f0f815d78e2d7661943efac2579819",
+      "bytes": 1597
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/mechanical-paths.json",
+      "sha256": "b58f64a223d1510b5a828cc5de50ba710a87f4aadaf05bffa97edafcfc3791af",
+      "bytes": 1961
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/mechanical-review.json",
+      "sha256": "47d36bab1d9edec3c56c801b916fb634347761d07bcae094df02942916cae509",
+      "bytes": 5503
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/mypy.log",
+      "sha256": "eddfaf5687fcc2c663b95f6b64572892ff5f2a52cda83c851bf42001311ce6c1",
+      "bytes": 11019
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/network-checks.json",
+      "sha256": "16d8108f434306b4ba862c4ce38457ad4497f41ee94087f7ba7352183432d865",
+      "bytes": 790
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/next-journey-order.json",
+      "sha256": "3b136f08bf63e938cc779eb6f25b964f493d5bcfa1e15454a33a83015a74926b",
+      "bytes": 190
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/normal-read-probe.json",
+      "sha256": "75c239968ad2dcad1eca5d15396197fb554c10bb88de65ee4af7a03bde6bcf30",
+      "bytes": 56935
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/normal-read-probe.log",
+      "sha256": "83edaa8d702657051dc692bdb3ed6985b23ccdce43e58dd4c9dbc7a243f76d30",
+      "bytes": 124
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/owned-black.log",
+      "sha256": "8b52e6474a7af0105b5d2f877e19991b954665a28a0e61c3684adb68cab3cb49",
+      "bytes": 112
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/owned-flake8.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/owned-isort.log",
+      "sha256": "705f1937f337386c0f3cdf1454e106c4714d96ff09972bec552488e49883cff5",
+      "bytes": 97
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/owned-verification.json",
+      "sha256": "582d27e7b9caf5d9aa63dc15c49e8206d436487535a920d9fd5c04c2d99996bd",
+      "bytes": 323
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/post-restart-resume.json",
+      "sha256": "10358188ecdb086470a7f26fddefcdb3ee80b091306b41350ac58e1756c3e029",
+      "bytes": 895
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/prepare.log",
+      "sha256": "5a6e462f17efd2ddb735f19c86ab098b30d01a69d3940a8c1f8abf4e4e5a3960",
+      "bytes": 658
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/quality-install.json",
+      "sha256": "cdc30e4d1d1596582e896e07cb5123454462417f396b2f09cbe6a911248cb881",
+      "bytes": 281
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/quality-install.log",
+      "sha256": "abc86a5eca1c1c9b29b9ce88f7b94565a5088adce65ac98d2777a928aae9ccc2",
+      "bytes": 8701
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/start.log",
+      "sha256": "34f3e3e45aa98bc0f022b759b162de6384f288522f01dba431b687b1afc7fd68",
+      "bytes": 1207
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-before.xml",
+      "sha256": "a8712a67c78e70cb7b790ea2e9260a306fd858e85abda523d3ee5c8e2ecfb482",
+      "bytes": 5228
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-focused.log",
+      "sha256": "3fdf7de5bdd997f06a9265f3761ee34f48d7a1336c541504688e6557759007ff",
+      "bytes": 99
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-focused.xml",
+      "sha256": "2f59f8a98a792023afbbd39680f2cc3faa448ee24c2f8f081ed9246fd9fc9c59",
+      "bytes": 3577
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-transfer-command.log",
+      "sha256": "7cca6a10406a8cfdc5611cf01d6b3b09aded86de11f5035cc6b3ca4f13cf31f3",
+      "bytes": 51
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-transfer.json",
+      "sha256": "f19572c728eac3f7fadc3312703dbf4d31a4b3f34ced6c4a72c5b75c7f72ca3b",
+      "bytes": 40425
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/typecheck-focused.log",
+      "sha256": "1a3a07fae012463041a79312ea7d07106d63acf0df43289a4d84aa22275de447",
+      "bytes": 59
+    },
+    {
+      "path": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/visual-capture-command.log",
+      "sha256": "4316ba16d72f19ba78981cfc86c7779779221e4cdd71615f3fd2d10f85798f46",
+      "bytes": 11
+    },
+    {
+      "path": "/private/tmp/exact-readiness-packaging-2-guard.log",
+      "sha256": "6a89feb320d5ebd55304dfed88a4c6dff38f15a69b6d714b3872ec035f3de50f",
+      "bytes": 119430
+    },
+    {
+      "path": "/private/tmp/exact-readiness-packaging-guard.log",
+      "sha256": "df11d9aa20fa65806385fe2ebcfc7c5507c87c6b86cb2a85f306df510f7baf96",
+      "bytes": 119035
+    }
+  ],
+  "storage": {
+    "initial_bytes": 51800378750,
+    "initial_filesystem_free_bytes": 117650501632,
+    "measurements": [
+      {
+        "checked_at": "2026-10-14T11:46:10.359301+00:00",
+        "bytes": 51800378750,
+        "filesystem_free_bytes": 117650501632,
+        "growth_bytes": 200000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:48:32.416032+00:00",
+        "bytes": 51832403038,
+        "filesystem_free_bytes": 117613617152,
+        "growth_bytes": 200000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:50:36.038114+00:00",
+        "bytes": 51831674078,
+        "filesystem_free_bytes": 117624070144,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:52:54.191341+00:00",
+        "bytes": 51831690494,
+        "filesystem_free_bytes": 117610541056,
+        "growth_bytes": 250000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:53:07.008932+00:00",
+        "bytes": 51831764222,
+        "filesystem_free_bytes": 117610381312,
+        "growth_bytes": 250000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:53:41.798948+00:00",
+        "bytes": 51927234430,
+        "filesystem_free_bytes": 117512556544,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:54:54.177966+00:00",
+        "bytes": 51927674430,
+        "filesystem_free_bytes": 117515116544,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:59:46.656903+00:00",
+        "bytes": 51920528485,
+        "filesystem_free_bytes": 117525315584,
+        "growth_bytes": 400000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T11:59:58.448913+00:00",
+        "bytes": 51920602213,
+        "filesystem_free_bytes": 117524951040,
+        "growth_bytes": 400000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:01:03.056031+00:00",
+        "bytes": 51696607142,
+        "filesystem_free_bytes": 117755170816,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:06:13.839377+00:00",
+        "bytes": 51696676806,
+        "filesystem_free_bytes": 117752111104,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:06:25.148694+00:00",
+        "bytes": 51696750534,
+        "filesystem_free_bytes": 117750800384,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:06:59.076359+00:00",
+        "bytes": 51696853062,
+        "filesystem_free_bytes": 118784663552,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:07:50.249035+00:00",
+        "bytes": 51696914502,
+        "filesystem_free_bytes": 118790873088,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:08:06.107412+00:00",
+        "bytes": 51696988230,
+        "filesystem_free_bytes": 118790303744,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:09:14.885298+00:00",
+        "bytes": 51699855590,
+        "filesystem_free_bytes": 118791397376,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:09:48.428678+00:00",
+        "bytes": 51699917030,
+        "filesystem_free_bytes": 118788698112,
+        "growth_bytes": 600000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:10:05.065326+00:00",
+        "bytes": 51699990758,
+        "filesystem_free_bytes": 118786334720,
+        "growth_bytes": 600000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:26:21.482021+00:00",
+        "bytes": 52101702448,
+        "filesystem_free_bytes": 118400528384,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:27:19.350080+00:00",
+        "bytes": 52101759792,
+        "filesystem_free_bytes": 118396977152,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:27:43.594792+00:00",
+        "bytes": 52101907696,
+        "filesystem_free_bytes": 118395572224,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:28:38.081241+00:00",
+        "bytes": 52116029606,
+        "filesystem_free_bytes": 118384988160,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:29:12.324225+00:00",
+        "bytes": 52116115750,
+        "filesystem_free_bytes": 118385979392,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:29:33.823455+00:00",
+        "bytes": 52116193574,
+        "filesystem_free_bytes": 118385401856,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:32:19.691930+00:00",
+        "bytes": 52218539238,
+        "filesystem_free_bytes": 115052785664,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:32:24.088131+00:00",
+        "bytes": 52218539238,
+        "filesystem_free_bytes": 115052474368,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:37:26.774925+00:00",
+        "bytes": 52227238374,
+        "filesystem_free_bytes": 114996056064,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:37:47.813489+00:00",
+        "bytes": 52227316198,
+        "filesystem_free_bytes": 115002277888,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:39:34.245298+00:00",
+        "bytes": 52228566438,
+        "filesystem_free_bytes": 115048132608,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:40:45.427937+00:00",
+        "bytes": 52228623782,
+        "filesystem_free_bytes": 115050344448,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:41:04.959602+00:00",
+        "bytes": 52228701606,
+        "filesystem_free_bytes": 115048210432,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:55:26.461749+00:00",
+        "bytes": 52290003430,
+        "filesystem_free_bytes": 114964983808,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:58:56.033736+00:00",
+        "bytes": 52290064902,
+        "filesystem_free_bytes": 114925957120,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T12:59:22.234540+00:00",
+        "bytes": 52290142726,
+        "filesystem_free_bytes": 114922967040,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:01:28.241110+00:00",
+        "bytes": 52294951750,
+        "filesystem_free_bytes": 114911875072,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:01:48.085569+00:00",
+        "bytes": 52294140742,
+        "filesystem_free_bytes": 114907168768,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:02:15.887548+00:00",
+        "bytes": 52294226790,
+        "filesystem_free_bytes": 114903732224,
+        "growth_bytes": 1000000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:10:46.186675+00:00",
+        "bytes": 52306180454,
+        "filesystem_free_bytes": 114910535680,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:11:21.457309+00:00",
+        "bytes": 52306303334,
+        "filesystem_free_bytes": 114912899072,
+        "growth_bytes": 1500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:16:51.943071+00:00",
+        "bytes": 52306438854,
+        "filesystem_free_bytes": 114936377344,
+        "growth_bytes": 500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:17:44.452286+00:00",
+        "bytes": 52306516678,
+        "filesystem_free_bytes": 114894508032,
+        "growth_bytes": 500000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:18:18.091541+00:00",
+        "bytes": 52306832102,
+        "filesystem_free_bytes": 114897842176,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:19:23.479428+00:00",
+        "bytes": 52306897638,
+        "filesystem_free_bytes": 114943746048,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:20:01.915865+00:00",
+        "bytes": 52306541286,
+        "filesystem_free_bytes": 114946363392,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:20:15.772598+00:00",
+        "bytes": 52306602726,
+        "filesystem_free_bytes": 114946498560,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:21:13.125800+00:00",
+        "bytes": 52306664166,
+        "filesystem_free_bytes": 114957643776,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:21:27.376907+00:00",
+        "bytes": 52305717990,
+        "filesystem_free_bytes": 114955370496,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:22:19.834020+00:00",
+        "bytes": 52305783526,
+        "filesystem_free_bytes": 114958102528,
+        "growth_bytes": 100000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:22:34.752131+00:00",
+        "bytes": 52310061414,
+        "filesystem_free_bytes": 114952372224,
+        "growth_bytes": 0,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:25:32.962500+00:00",
+        "bytes": 52310184358,
+        "filesystem_free_bytes": 114959491072,
+        "growth_bytes": 50000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      },
+      {
+        "checked_at": "2026-10-14T13:26:58.391672+00:00",
+        "bytes": 52310274470,
+        "filesystem_free_bytes": 114955427840,
+        "growth_bytes": 50000000,
+        "status": "allowed",
+        "limit_bytes": 100000000000
+      }
+    ],
+    "max_observed_bytes": 52310274470,
+    "last": {
+      "checked_at": "2026-10-14T13:26:58.391672+00:00",
+      "bytes": 52310274470,
+      "filesystem_free_bytes": 114955427840,
+      "growth_bytes": 50000000,
+      "status": "allowed",
+      "limit_bytes": 100000000000
+    },
+    "detached_reservation_bytes": 1500000000,
+    "largest_foreground_reservation_bytes": 1500000000,
+    "conservative_combined_reservation_bytes": 3000000000,
+    "conservative_peak_bytes": 55310274470,
+    "hard_limit_bytes": 100000000000,
+    "safety_reserve_bytes": 5000000000,
+    "filesystem_free_reserve_bytes": 30000000000,
+    "measurement_caveat": "Point samples plus conservative reservations; cooperative guard is not an operating system quota."
+  },
+  "screenshots": {
+    "synthetic_fault_images_prefix": "hr2-absent, hr2-failed, hr2-prepared-target",
+    "seeded_visual_cases": true,
+    "browser_journey_training_seeded": false,
+    "inspection": "Root inspected saved public main/Browse and synthetic empty study views. At200% narrow layouts require long vertical scrolling and wrap IRIs. No new loss of styling or horizontal overflow observed; not a manual accessibility or usability acceptance."
+  },
+  "adjacent_evidence": [
+    {
+      "path": "after-restart-read-probe.json",
+      "sha256": "b774bc7ffc9d95ae724891d069c8c3809ebbc81177f43bae88d51d19eb2dae92",
+      "bytes": 56907
+    },
+    {
+      "path": "api-preservation.json",
+      "sha256": "b859a6881af238d71d08e94f211c947260fc603542b8039edc3a0dcc5892450e",
+      "bytes": 10023
+    },
+    {
+      "path": "binding.json",
+      "sha256": "24840bd63796956f8af95861d0476cdac5824931beae1d5946d0bb5c38c7f84f",
+      "bytes": 1940
+    },
+    {
+      "path": "citation-count-audit.json",
+      "sha256": "72914184c2f401b5c6a1be165da8b73e514b144cdf105faaa311996aa8c89c33",
+      "bytes": 6777
+    },
+    {
+      "path": "diagnostics-audit.json",
+      "sha256": "baa4d0df4a6e761b16c398a2f143b413407dd3092e53eff7e33ad9524b4fbd15",
+      "bytes": 2010
+    },
+    {
+      "path": "docstrings.log",
+      "sha256": "2be747546ef43eb8fa208f29bbdf865d2dfbbffdb51f57659136dcd500eb3970",
+      "bytes": 47
+    },
+    {
+      "path": "final-black.log",
+      "sha256": "b214db6a3f2c08b2ece59d4798e406bc63cfb9e2a64e3d4c733d004cf0883081",
+      "bytes": 2011
+    },
+    {
+      "path": "final-isort.log",
+      "sha256": "befb4a014150f52f4fe36b09d6f4ea105bdbd1ab4e45375661a80485c3a183bf",
+      "bytes": 1414
+    },
+    {
+      "path": "flake8.log",
+      "sha256": "30286fb866aab915a96da8b22334392ac0bc3f0eb69e7a2046a3bd42d8ec550f",
+      "bytes": 5187
+    },
+    {
+      "path": "hr2-absent-catalogue-source-browsing.png",
+      "sha256": "611d15704b60da3b3958d96086dedafef5c3b82b845eb5acbaaf9554e1e871fc",
+      "bytes": 163898
+    },
+    {
+      "path": "hr2-all-sources-desktop-dark.png",
+      "sha256": "6e8c9e9dec63b99bc16c5b4193006cedc75f96d2f972a7487db408a615282b7a",
+      "bytes": 302270
+    },
+    {
+      "path": "hr2-all-sources-desktop-light.png",
+      "sha256": "86fd6b41d6422394aad4ea37f783ccf271ec13820cfdda3ed789994a4e24d887",
+      "bytes": 305597
+    },
+    {
+      "path": "hr2-catalogue-failed-desktop-light.png",
+      "sha256": "ae78bd7ab5c2f7e7871a839c1db46335fb447d9c4c18f1aca744664bdfda3ec1",
+      "bytes": 297938
+    },
+    {
+      "path": "hr2-examples-open-320-200pct-dark.png",
+      "sha256": "b44e8f330912a70ea7a0caee39caeb549f69470448c78b639fcf2bc54799fe1f",
+      "bytes": 26494
+    },
+    {
+      "path": "hr2-examples-open-375-200pct-light.png",
+      "sha256": "b564112cfd960f5ae47676b03a1f83f67cd118174e33168156f7fa51f4c20113",
+      "bytes": 38698
+    },
+    {
+      "path": "hr2-examples-open-375-light.png",
+      "sha256": "ba4cfaad9408f30fbd6aa3b69bb5c41248dc379c88468415b4112bd5c473de3c",
+      "bytes": 64118
+    },
+    {
+      "path": "hr2-failed-candidate-page-retry.png",
+      "sha256": "adc5cb23b280a5cc1ea80b19928d851d04bfb0757a182fea8ecf77ffa65e4ba0",
+      "bytes": 133293
+    },
+    {
+      "path": "hr2-landing-320-200pct-dark.png",
+      "sha256": "7a6b282a7c281ebe53aae045e986b994bf24578058d3c5615ccca805e3ef2fce",
+      "bytes": 23829
+    },
+    {
+      "path": "hr2-landing-375-200pct-light.png",
+      "sha256": "b564112cfd960f5ae47676b03a1f83f67cd118174e33168156f7fa51f4c20113",
+      "bytes": 38698
+    },
+    {
+      "path": "hr2-landing-375-light.png",
+      "sha256": "71c77a1721b55ac30faa0ba80c35a16bed8af7cee07b03b4ad95e034af22f634",
+      "bytes": 60742
+    },
+    {
+      "path": "hr2-landing-desktop-dark.png",
+      "sha256": "9eaa30d09c8fd1bfcef73a94e3680250b9873804550df543f35d910dbdfc37c3",
+      "bytes": 312145
+    },
+    {
+      "path": "hr2-landing-desktop-light.png",
+      "sha256": "17c820dc31895c8d3eac9a57763f788e659158a6d5d2c835acf4f8504a43b9b3",
+      "bytes": 315315
+    },
+    {
+      "path": "hr2-prepared-target-search-paused.png",
+      "sha256": "38f57287c529750d01c344f437cea63f338721ef8075f8f278202a590e1ce22a",
+      "bytes": 148724
+    },
+    {
+      "path": "hr2-prepared-targets-exhausted.png",
+      "sha256": "160316629875816a30c5a5c1068c243015aea14ad266fac0c68074d3eec4c0a2",
+      "bytes": 127278
+    },
+    {
+      "path": "hr4-entry-list-320-200pct-dark.png",
+      "sha256": "20190cfceb6c4150c91dd23ef755a0e326dda7f99f812322bc29f6442804c6f6",
+      "bytes": 29474
+    },
+    {
+      "path": "hr4-entry-list-375-200pct-light.png",
+      "sha256": "a3fe4266cd80f92f2fe2cd17617e17b7d21565fc765b4bf823c77b25c197d9d7",
+      "bytes": 39879
+    },
+    {
+      "path": "hr4-entry-list-375-light.png",
+      "sha256": "d15c65cc53a713eb1c9b6761ad3d300bec65535c03ba26483c79aa0a9f5243ce",
+      "bytes": 55201
+    },
+    {
+      "path": "hr4-entry-list-desktop-dark.png",
+      "sha256": "77330431b738448c02ce730e5690909db4d5d5c05cd7911792f20e0457237a3a",
+      "bytes": 168917
+    },
+    {
+      "path": "hr4-entry-list-desktop-light.png",
+      "sha256": "540b370eae62aea7abd4a630ab7a1da04e57067592730fce9e7c9b713d1fd29a",
+      "bytes": 170562
+    },
+    {
+      "path": "hr4-suggested-start-320-200pct-dark.png",
+      "sha256": "6d44c2e261c7aebc485384038b87f950671d5d5f903a17f8996019b51cda87c1",
+      "bytes": 27489
+    },
+    {
+      "path": "hr4-suggested-start-375-200pct-light.png",
+      "sha256": "b06ea15b9192c9de1f67be92be695ca926d4ebf2d1deb12e4ccdd3979eedc3bd",
+      "bytes": 38269
+    },
+    {
+      "path": "hr4-suggested-start-375-light.png",
+      "sha256": "6e840be7533861f3aeaf7746a04b11ba1c75dc131fd369de5363841755ceb764",
+      "bytes": 57668
+    },
+    {
+      "path": "hr4-suggested-start-desktop-dark.png",
+      "sha256": "3d9b6f3e0b5d1536c641d34ece79e30a209d5d36341e89b36b91988b08fd4396",
+      "bytes": 169660
+    },
+    {
+      "path": "hr4-suggested-start-desktop-light.png",
+      "sha256": "98e902416d4fe995745d984c4231d7296be11ca5d9d03c6c2047066bc76dc7ac",
+      "bytes": 171421
+    },
+    {
+      "path": "imports.log",
+      "sha256": "6fd3a858937113adeb2ab64a75c5015df5e3c4015b2d0804558cd05d0205d95d",
+      "bytes": 1094
+    },
+    {
+      "path": "lifecycle.json",
+      "sha256": "a90f10d74a13b0067e9bb5b4a1e2680481f0f815d78e2d7661943efac2579819",
+      "bytes": 1597
+    },
+    {
+      "path": "mypy.log",
+      "sha256": "eddfaf5687fcc2c663b95f6b64572892ff5f2a52cda83c851bf42001311ce6c1",
+      "bytes": 11019
+    },
+    {
+      "path": "normal-read-probe.json",
+      "sha256": "75c239968ad2dcad1eca5d15396197fb554c10bb88de65ee4af7a03bde6bcf30",
+      "bytes": 56935
+    },
+    {
+      "path": "post-restart-resume.json",
+      "sha256": "10358188ecdb086470a7f26fddefcdb3ee80b091306b41350ac58e1756c3e029",
+      "bytes": 895
+    },
+    {
+      "path": "quality.json",
+      "sha256": "92546cdbf429dce5ddc69e1b3f70f7981b0f21a017f702079f6ca73d4311e37e",
+      "bytes": 7927
+    },
+    {
+      "path": "static-transfer.json",
+      "sha256": "f19572c728eac3f7fadc3312703dbf4d31a4b3f34ced6c4a72c5b75c7f72ca3b",
+      "bytes": 40425
+    },
+    {
+      "path": "storage.json",
+      "sha256": "55318c4bc5246cf5867b24961c02e05cccfbc3eff87fe377fa5cf3d71623354e",
+      "bytes": 12738
+    },
+    {
+      "path": "study-case-after-reload-320-200pct-dark.png",
+      "sha256": "a654b870d3f76e29662f0c0cffd534567c32103f2aa52ac02cd37dec775935e2",
+      "bytes": 33261
+    },
+    {
+      "path": "study-case-after-reload-375-200pct-light.png",
+      "sha256": "88a5679a512ea0f478bcc2c0564e7b709095c9760348dd745241f2998379bcc0",
+      "bytes": 43586
+    },
+    {
+      "path": "study-case-after-reload-375-light.png",
+      "sha256": "528a9a723557e19a138bc51e4c31acc600f65663a17da2b3f6101fd28fbdc8c6",
+      "bytes": 64670
+    },
+    {
+      "path": "study-case-after-reload-desktop-dark.png",
+      "sha256": "0cbab079eeb4265f10218ac32863abb248c3a8b9cdc27738bf447947a87869b0",
+      "bytes": 266846
+    },
+    {
+      "path": "tests.json",
+      "sha256": "20458bde6c75db71039ff06a864a34e5cf617295e8801e159123eab3f56d8857",
+      "bytes": 156335
+    }
+  ],
+  "verification_runtime_versions": {
+    "node": "24.21.0",
+    "playwright": "1.63.0",
+    "chrome": "155.0.8059.79"
+  },
+  "self_review": {
+    "peer_read_only_binding_and_document_review": "passed with two minor documentation corrections applied",
+    "known_credential_scan": "passed",
+    "local_markdown_links": "all resolved",
+    "original_failure_evidence_hashes": {
+      "readiness_20261013": 19,
+      "independent_20261014": 8
+    },
+    "scope": "internal agent self-review and peer audit, not new external human acceptance"
+  },
+  "sanitized_log_normalization": {
+    "imports.log": "Trailing display whitespace removed in adjacent copy; original log and digest retained in raw_evidence."
+  }
+}

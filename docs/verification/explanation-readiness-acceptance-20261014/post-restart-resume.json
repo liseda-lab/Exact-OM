@@ -1,0 +1,21 @@
+{
+  "schema": "exact-readiness-post-restart-resume/1",
+  "status": "passed",
+  "study_revision": "review-20261014T123129-31902966fc",
+  "operation": "supported administrator reissue, invitation exchange, cookie-authenticated state read",
+  "test_sessions_reissued": 1,
+  "test_session_origin": "created by this closure pass; current revision only",
+  "completed_cases": 24,
+  "stage": "completed",
+  "state_bytes_unchanged": true,
+  "state_sha256": "b3b4be97d8af739c339f6121de8c9f36d06f03d70c31c65f2de7df114dd28d70",
+  "invitation_generation_increment": 1,
+  "credentials_recorded": false,
+  "private_invitation_retained": false,
+  "missing_origin_rejected": 403,
+  "initial_helper_failures": [
+    "Missing tools module path before any request",
+    "Missing required Origin header on initial exchange after one invitation rotation"
+  ],
+  "invitation_rotations_total_for_this_owned_test": 2
+}

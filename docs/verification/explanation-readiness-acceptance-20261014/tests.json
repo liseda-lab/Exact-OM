@@ -1,0 +1,4601 @@
+{
+  "backend_broad": {
+    "receipt": "backend-regressions.xml",
+    "tests": 398,
+    "failures": 2,
+    "skipped": 3,
+    "seconds": 872.811,
+    "cases": [
+      {
+        "name": "test_raw_context_export_has_complete_inventory_and_legacy_resume_is_explicit",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.063,
+        "status": "passed"
+      },
+      {
+        "name": "test_curated_default_pages_keep_all_roots_and_cursor_binding",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.398,
+        "status": "passed"
+      },
+      {
+        "name": "test_curated_default_main_and_scoped_api_parity",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.492,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_generation_retains_punned_and_shared_support_subjects",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.257,
+        "status": "passed"
+      },
+      {
+        "name": "test_diagnostics_preserve_stream_cancellation_and_exclude_secrets",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_v2_http_tutorial_event_scope_and_late_timing_receipts",
+        "class": "tests.explanation_corrective_http_test",
+        "seconds": 10.441,
+        "status": "passed"
+      },
+      {
+        "name": "test_corrected_schema_inventory_auth_and_scope_session_binding",
+        "class": "tests.explanation_corrective_http_test",
+        "seconds": 10.852,
+        "status": "passed"
+      },
+      {
+        "name": "test_label_extract_has_exact_support_and_legacy_null_projection_is_read_only",
+        "class": "tests.explanation_description_metadata_test",
+        "seconds": 0.078,
+        "status": "passed"
+      },
+      {
+        "name": "test_short_comparison_is_typed_description_and_admits_at_resource_boundary",
+        "class": "tests.explanation_description_metadata_test",
+        "seconds": 0.163,
+        "status": "passed"
+      },
+      {
+        "name": "test_fallback_status_cannot_be_promoted_by_available_templates",
+        "class": "tests.explanation_description_metadata_test",
+        "seconds": 0.059,
+        "status": "passed"
+      },
+      {
+        "name": "test_one_sided_label_is_not_promoted_to_comparative_description",
+        "class": "tests.explanation_description_metadata_test",
+        "seconds": 0.089,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_and_workspace_reject_modern_labels_on_legacy_artifact",
+        "class": "tests.explanation_description_metadata_test",
+        "seconds": 0.253,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_producer_effects_remain_distinct_and_never_infer_exact_basis",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.038,
+        "status": "passed"
+      },
+      {
+        "name": "test_saved_basis_requires_precise_inputs_and_typed_pair_scope",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_counts_preserve_source_only_unresolved_withheld_and_unsupported_list_links",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_no_selected_unexported_and_request_failure_are_not_one_empty_state",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_only_explicit_recorded_bridges_can_connect_both_sides_and_punned_entities",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_http_lists_all_selected_statuses_with_scoped_original_links",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.625,
+        "status": "passed"
+      },
+      {
+        "name": "test_additive_description_contract_preserves_legacy_generation_manifest_hash",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_origin_missingness_does_not_erase_recorded_projection_limitation",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_policy_hidden_and_missing_originals_keep_api_tombstones",
+        "class": "tests.explanation_evidence_metadata_test",
+        "seconds": 0.245,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_retained_neighbour_main_read_and_new_policy_export_agree",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.419,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_retained_neighbour_scoped_admission_and_legacy_http_keep_all_records[False]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.284,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_retained_neighbour_scoped_admission_and_legacy_http_keep_all_records[True]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.328,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[foreign_evidence]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.408,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[typed_pair]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.285,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[bridge_pair]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.29,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[channel]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.281,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[family]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.283,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_neighbour_metadata_still_rejects_unadmitted_identities_over_http[visible_fact]",
+        "class": "tests.explanation_evidence_subject_test",
+        "seconds": 0.286,
+        "status": "passed"
+      },
+      {
+        "name": "test_portable_context_removes_forbidden_rows_qualifiers_and_original_bytes",
+        "class": "tests.explanation_export_policy_test",
+        "seconds": 0.149,
+        "status": "passed"
+      },
+      {
+        "name": "test_portable_context_cannot_be_relabelled_as_broader_policy",
+        "class": "tests.explanation_export_policy_test",
+        "seconds": 0.101,
+        "status": "passed"
+      },
+      {
+        "name": "test_original_fact_ids_survive_physical_filtering",
+        "class": "tests.explanation_export_policy_test",
+        "seconds": 0.095,
+        "status": "passed"
+      },
+      {
+        "name": "test_portable_derivative_provenance_preserves_pins_without_private_notes",
+        "class": "tests.explanation_export_policy_test",
+        "seconds": 0.132,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_physically_filtered_context_preserves_exact_visible_axioms_and_counts",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.146,
+        "status": "passed"
+      },
+      {
+        "name": "test_public_native_roundtrip_covers_complex_asserted_structures",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.078,
+        "status": "passed"
+      },
+      {
+        "name": "test_structural_recovery_rejects_unadmitted_changes[unknown_constructor]",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_structural_recovery_rejects_unadmitted_changes[extra_field]",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_structural_recovery_rejects_unadmitted_changes[missing_field]",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_structural_recovery_rejects_unadmitted_changes[wrong_kind]",
+        "class": "tests.explanation_filtered_ontology_export_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_identity_preserves_punning_literal_language_and_policy",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_cursor_rejects_query_policy_and_snapshot_changes",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_page_distinguishes_unknown_count_and_absence",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_generation_replay_prompt_invalidation_and_candidate_independence",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.025,
+        "status": "passed"
+      },
+      {
+        "name": "test_unknown_citations_and_unsupported_paraphrase_never_become_approved",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.02,
+        "status": "passed"
+      },
+      {
+        "name": "test_response_saved_replays_after_validation_crash_and_copy",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.023,
+        "status": "passed"
+      },
+      {
+        "name": "test_comparison_rejects_unrestricted_profiles_and_is_score_blind",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.028,
+        "status": "passed"
+      },
+      {
+        "name": "test_portable_import_reopen_and_failure_preserves_selection",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.022,
+        "status": "passed"
+      },
+      {
+        "name": "test_archive_abuse_rejected[duplicate]",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_archive_abuse_rejected[symlink]",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_archive_abuse_rejected[bomb]",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.006,
+        "status": "passed"
+      },
+      {
+        "name": "test_archive_abuse_rejected[unmanifested]",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_lru_bounds_bytes_entries_and_mutable_readers",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_hosted_profiles_have_no_import_and_local_import_is_inert",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.161,
+        "status": "passed"
+      },
+      {
+        "name": "test_serve_imports_no_training_or_ontology_runtime",
+        "class": "tests.explanation_framework_test",
+        "seconds": 1.156,
+        "status": "passed"
+      },
+      {
+        "name": "test_stage_locks_and_selective_repair_do_not_require_future_bindings",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.046,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_stage_relocates_and_corruption_fails_closed",
+        "class": "tests.explanation_framework_test",
+        "seconds": 0.079,
+        "status": "passed"
+      },
+      {
+        "name": "test_each_profile_serves_only_its_own_pages",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.074,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_misses_assets_and_traversal_never_fall_through_to_pages",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.052,
+        "status": "passed"
+      },
+      {
+        "name": "test_html_policy_allows_exact_inline_scripts_only",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.017,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_only_deployment_mounts_no_page_routes",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.01,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_binds_public_inventory_without_promoting_original_source_gate",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.471,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[changed_receipt]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.388,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[missing_receipt]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.31,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[wrong_package]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.486,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[answer_key]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.433,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[secret]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.139,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[traversal]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.801,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[false_pass]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.116,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[wrong_lock]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.506,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[wrong_claim_audit]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.106,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_unbound_or_private_inputs[failed_measurement]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.841,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_publishes_ontology_without_importing_parser_or_models",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.538,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_ontology_resource_mismatch[context]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.117,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_ontology_resource_mismatch[ontology]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.478,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_ontology_resource_mismatch[policy]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.817,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_ontology_resource_mismatch[bytes]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.02,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_ontology_resource_mismatch[duplicate]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.574,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_binds_separate_public_http_measurements",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.516,
+        "status": "failed"
+      },
+      {
+        "name": "test_handoff_rejects_incompatible_http_evidence[package]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.694,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_incompatible_http_evidence[schema]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.484,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_incompatible_http_evidence[missing_check]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.732,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_incompatible_http_evidence[failed_check]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.065,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_rejects_incompatible_http_evidence[status]",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 3.726,
+        "status": "passed"
+      },
+      {
+        "name": "test_handoff_preserves_failed_http_receipt_without_promoting_unrun_gate",
+        "class": "tests.explanation_handoff_test",
+        "seconds": 4.106,
+        "status": "passed"
+      },
+      {
+        "name": "test_prose_remains_fallback_until_separate_review_and_cache_is_immutable",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.077,
+        "status": "passed"
+      },
+      {
+        "name": "test_review_binds_every_input_and_selected_claim",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.075,
+        "status": "passed"
+      },
+      {
+        "name": "test_provider_cannot_supply_its_own_review_receipt",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.061,
+        "status": "passed"
+      },
+      {
+        "name": "test_originals_policy_resource_and_workspace_are_rechecked",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.15,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[claims]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.28,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[limitations]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.292,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[support_reasons]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.269,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[fixture_provenance]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.287,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[manifest_failed]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.29,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_http_serves_reviewed_prose_and_rejects_edited_claims[manifest_ambiguous]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.279,
+        "status": "passed"
+      },
+      {
+        "name": "test_valid_receipt_cannot_override_the_admitted_original_ast",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.075,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[digest]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.116,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[manifest]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.121,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[receipt]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.121,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[packet]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.112,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[status]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.125,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_review_support_binds_the_actual_generation_manifest[extra]",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.118,
+        "status": "passed"
+      },
+      {
+        "name": "test_nested_review_model_cannot_bypass_generation_binding",
+        "class": "tests.explanation_independent_review_test",
+        "seconds": 0.118,
+        "status": "passed"
+      },
+      {
+        "name": "test_runtime_extension_preserves_publication_and_v1_state",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 15.94,
+        "status": "passed"
+      },
+      {
+        "name": "test_current_case_serializes_frozen_workspace_descriptor",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 16.537,
+        "status": "passed"
+      },
+      {
+        "name": "test_encoded_scope_identifier_retains_authorization",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 13.091,
+        "status": "passed"
+      },
+      {
+        "name": "test_broken_required_workspace_is_typed_503[missing]",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 12.121,
+        "status": "passed"
+      },
+      {
+        "name": "test_broken_required_workspace_is_typed_503[invalid]",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 12.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_broken_required_workspace_is_typed_503[changed_index]",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 12.035,
+        "status": "passed"
+      },
+      {
+        "name": "test_broken_required_workspace_is_typed_503[asset_root]",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 11.698,
+        "status": "passed"
+      },
+      {
+        "name": "test_full_frozen_context_http_paging_and_original_identity",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 59.576,
+        "status": "passed"
+      },
+      {
+        "name": "test_page_readiness_is_local_and_does_not_restart_case_clock",
+        "class": "tests.explanation_integration_contract_test",
+        "seconds": 16.805,
+        "status": "passed"
+      },
+      {
+        "name": "test_tutorial_position_only_mutation_survives_http_reload",
+        "class": "tests.explanation_integration_position_test",
+        "seconds": 17.827,
+        "status": "passed"
+      },
+      {
+        "name": "test_omitted_lesson_position_preserves_saved_position",
+        "class": "tests.explanation_integration_position_test",
+        "seconds": 21.273,
+        "status": "passed"
+      },
+      {
+        "name": "test_position_shapes_assessment_drafts_conflicts_and_completed_help",
+        "class": "tests.explanation_integration_position_test",
+        "seconds": 19.901,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_progress_read_normalization_and_saved_receipt_replay",
+        "class": "tests.explanation_integration_position_test",
+        "seconds": 17.791,
+        "status": "passed"
+      },
+      {
+        "name": "test_historical_consultation_receipt_replays_without_new_fields",
+        "class": "tests.explanation_integration_position_test",
+        "seconds": 15.903,
+        "status": "passed"
+      },
+      {
+        "name": "test_observation_oracles_survive_reload_retry_and_restart[durations0-True]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 16.747,
+        "status": "passed"
+      },
+      {
+        "name": "test_observation_oracles_survive_reload_retry_and_restart[durations1-True]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 5.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_observation_oracles_survive_reload_retry_and_restart[durations2-True]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 5.249,
+        "status": "passed"
+      },
+      {
+        "name": "test_observation_oracles_survive_reload_retry_and_restart[durations3-True]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 5.072,
+        "status": "passed"
+      },
+      {
+        "name": "test_observation_oracles_survive_reload_retry_and_restart[durations4-False]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 5.156,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_selector_preserves_publication_defaults_and_saved_artifacts",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 6.805,
+        "status": "passed"
+      },
+      {
+        "name": "test_researcher_cli_export_selector_is_explicit[None]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 0.01,
+        "status": "passed"
+      },
+      {
+        "name": "test_researcher_cli_export_selector_is_explicit[exact-study-analysis/3]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_new_fixture_cli_freezes_export_three_explicitly[None]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 0.017,
+        "status": "passed"
+      },
+      {
+        "name": "test_new_fixture_cli_freezes_export_three_explicitly[exact-study-analysis/2]",
+        "class": "tests.explanation_integration_timing_test",
+        "seconds": 0.017,
+        "status": "passed"
+      },
+      {
+        "name": "test_overlay_and_portable_export_preserve_predecessor_and_shared_inode",
+        "class": "tests.explanation_luna_overlay_test",
+        "seconds": 0.036,
+        "status": "passed"
+      },
+      {
+        "name": "test_retaining_predecessor_allocates_no_description_copy",
+        "class": "tests.explanation_luna_overlay_test",
+        "seconds": 0.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_complete_pipeline_rejects_missing_review_and_preserves_old_publication[True]",
+        "class": "tests.explanation_luna_pipeline_test",
+        "seconds": 17.404,
+        "status": "passed"
+      },
+      {
+        "name": "test_complete_pipeline_rejects_missing_review_and_preserves_old_publication[False]",
+        "class": "tests.explanation_luna_pipeline_test",
+        "seconds": 17.56,
+        "status": "passed"
+      },
+      {
+        "name": "test_interrupted_small_index_is_reused_only_when_identical",
+        "class": "tests.explanation_luna_pipeline_test",
+        "seconds": 12.303,
+        "status": "passed"
+      },
+      {
+        "name": "test_admission_hash_ignores_read_access_time_but_rejects_content_changes",
+        "class": "tests.explanation_luna_pipeline_test",
+        "seconds": 0.007,
+        "status": "passed"
+      },
+      {
+        "name": "test_reviewed_endpoint_labels_cross_main_frozen_and_scoped_boundaries",
+        "class": "tests.explanation_luna_review_test",
+        "seconds": 0.447,
+        "status": "passed"
+      },
+      {
+        "name": "test_review_request_rejects_unbound_typed_label[kind-object_property]",
+        "class": "tests.explanation_luna_review_test",
+        "seconds": 0.087,
+        "status": "passed"
+      },
+      {
+        "name": "test_review_request_rejects_unbound_typed_label[iri-urn:outside]",
+        "class": "tests.explanation_luna_review_test",
+        "seconds": 0.086,
+        "status": "passed"
+      },
+      {
+        "name": "test_frozen_review_rejects_changed_reference_label_even_with_rebound_receipt",
+        "class": "tests.explanation_luna_review_test",
+        "seconds": 0.234,
+        "status": "passed"
+      },
+      {
+        "name": "test_provider_never_becomes_approved_without_receipt",
+        "class": "tests.explanation_luna_review_test",
+        "seconds": 0.084,
+        "status": "passed"
+      },
+      {
+        "name": "test_corrected_labels_reach_both_models_without_changing_input",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_wrong_typed_reference_label_is_rejected",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_invalid_citations_are_not_admitted[ids0]",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_invalid_citations_are_not_admitted[ids1]",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_reference_label_is_a_valid_citation_but_no_semantic_approval_is_returned",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_unadmitted_relation_missingness_and_fields_fail[updates0-claim_or_relation_contract]",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_unadmitted_relation_missingness_and_fields_fail[updates1-invented_missingness]",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_unadmitted_relation_missingness_and_fields_fail[updates2-invalid_json_or_schema]",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_truncated_output_is_not_accepted",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_wire_byte_cap_precedes_dispatch",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_frozen_study_files_cannot_be_silently_replaced",
+        "class": "tests.explanation_model_comparison_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_prior_full_export_reuses_exact_filtered_child_and_preserves_failure",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.223,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[parent]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.135,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[policy]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.148,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[scope]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.14,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[documents]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.155,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[counts]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.159,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_cache_rejects_same_version_with_different_context_binding[preparation_key]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.174,
+        "status": "passed"
+      },
+      {
+        "name": "test_reuse_does_not_install_or_replace_unverified_inputs[resource]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.16,
+        "status": "passed"
+      },
+      {
+        "name": "test_reuse_does_not_install_or_replace_unverified_inputs[receipt]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.172,
+        "status": "passed"
+      },
+      {
+        "name": "test_reuse_does_not_install_or_replace_unverified_inputs[parity]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.147,
+        "status": "passed"
+      },
+      {
+        "name": "test_reuse_does_not_install_or_replace_unverified_inputs[pending]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.134,
+        "status": "passed"
+      },
+      {
+        "name": "test_reuse_does_not_install_or_replace_unverified_inputs[existing]",
+        "class": "tests.explanation_ontology_download_reuse_test",
+        "seconds": 0.128,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_contract_pages_equivalents_empty_and_old_basis",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.597,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[checksum]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.264,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[policy]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.271,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[scope]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.258,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[input_identity]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.288,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[resource_tamper]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.244,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[consistency]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.256,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[timeout]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.262,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[missing_endpoint]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.26,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[duplicate_group]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.268,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[cycle]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.295,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[truncated]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.308,
+        "status": "passed"
+      },
+      {
+        "name": "test_readable_necessary_conditions_citations_and_frozen_resource",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.773,
+        "status": "passed"
+      },
+      {
+        "name": "test_layer_composition_preserves_evidence_and_rejects_changed_scores",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_import_uses_canonical_recorded_qualifiers_without_guessing",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.068,
+        "status": "passed"
+      },
+      {
+        "name": "test_private_stage_resume_and_changed_source_fail_closed",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.061,
+        "status": "failed"
+      },
+      {
+        "name": "test_partial_materialization_resume_published_and_scope_guard",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.297,
+        "status": "passed"
+      },
+      {
+        "name": "test_frozen_description_presentation_cannot_invent_two_sided_scope",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.676,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_description_admits_only_bound_reference_labels",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.539,
+        "status": "passed"
+      },
+      {
+        "name": "test_source_inventory_comparison_is_semantic_but_preserves_all_values",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_cursor_cannot_reuse_unavailable_complete_only_basis",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.292,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_ancestor_graph_uses_same_bounded_artifact[literal_asserted]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.531,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_ancestor_graph_uses_same_bounded_artifact[elk_inferred_partial]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.597,
+        "status": "passed"
+      },
+      {
+        "name": "test_composition_refuses_duplicate_latest_evidence_identity",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_navigation_admission_reuses_verified_bytes_but_rejects_replacement",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.382,
+        "status": "passed"
+      },
+      {
+        "name": "test_prepare_profiles_comparison_portable_reads_and_no_runtime_work",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 7.41,
+        "status": "passed"
+      },
+      {
+        "name": "test_outer_manifest_prevents_inner_manifest_and_database_tampering",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.726,
+        "status": "passed"
+      },
+      {
+        "name": "test_policy_and_prompt_repairs_reuse_verified_upstream_stages",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 1.403,
+        "status": "passed"
+      },
+      {
+        "name": "test_demo_requires_explicit_development_admission",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.784,
+        "status": "passed"
+      },
+      {
+        "name": "test_frontend_discovery_routes_are_bounded_and_policy_scoped",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 1.229,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_adapter_preserves_originals_and_rejects_forged_comparisons",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 1.45,
+        "status": "passed"
+      },
+      {
+        "name": "test_bind_lock_pins_bytes_without_parsing_and_rejects_changed_input",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.179,
+        "status": "passed"
+      },
+      {
+        "name": "test_verified_context_reuse_never_reparses_and_checks_binding",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.804,
+        "status": "passed"
+      },
+      {
+        "name": "test_prepared_api_rejects_wrong_cursor_key_types_and_streams_filtered_axioms",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.639,
+        "status": "passed"
+      },
+      {
+        "name": "test_named_context_revision_preserves_legacy_preparation_keys",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.556,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_support_uses_context_bytes_and_verified_export_lineage",
+        "class": "tests.explanation_preparation_test",
+        "seconds": 0.521,
+        "status": "passed"
+      },
+      {
+        "name": "test_unreviewed_limitations_cannot_smuggle_claims",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.033,
+        "status": "passed"
+      },
+      {
+        "name": "test_reordered_entity_worklist_and_comparison_only_prompt_repair",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 1.149,
+        "status": "passed"
+      },
+      {
+        "name": "test_import_job_cancellation_replay_and_restart",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.015,
+        "status": "passed"
+      },
+      {
+        "name": "test_local_import_handle_can_be_cancelled_before_upload",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.12,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[2-False]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.021,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[2-True]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.023,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[3-False]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.026,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[3-True]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.024,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[4-False]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.025,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[4-True]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.023,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[5-False]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.022,
+        "status": "passed"
+      },
+      {
+        "name": "test_validator_repair_reuses_saved_response_without_provider_dispatch[5-True]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.02,
+        "status": "passed"
+      },
+      {
+        "name": "test_abrupt_exit_after_response_save_replays_from_relocated_directory",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 1.501,
+        "status": "passed"
+      },
+      {
+        "name": "test_classifier_repair_rebuilds_context_and_only_changed_generation_records",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.927,
+        "status": "passed"
+      },
+      {
+        "name": "test_accounting_distinguishes_wire_attempts_replays_and_unmeasured_history[False]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.017,
+        "status": "passed"
+      },
+      {
+        "name": "test_accounting_distinguishes_wire_attempts_replays_and_unmeasured_history[True]",
+        "class": "tests.explanation_recovery_test",
+        "seconds": 0.011,
+        "status": "passed"
+      },
+      {
+        "name": "test_about_endpoint_has_same_strict_public_shape_used_by_study",
+        "class": "tests.explanation_review_catalogue_test",
+        "seconds": 0.283,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_definition_gets_necessary_scope_without_equivalence",
+        "class": "tests.explanation_review_descriptions_test",
+        "seconds": 0.078,
+        "status": "passed"
+      },
+      {
+        "name": "test_description_contract_does_not_change_legacy_support",
+        "class": "tests.explanation_review_descriptions_test",
+        "seconds": 0.072,
+        "status": "passed"
+      },
+      {
+        "name": "test_label_alone_is_not_a_description",
+        "class": "tests.explanation_review_descriptions_test",
+        "seconds": 0.073,
+        "status": "passed"
+      },
+      {
+        "name": "test_punned_property_cannot_receive_a_class_necessary_condition",
+        "class": "tests.explanation_review_descriptions_test",
+        "seconds": 0.076,
+        "status": "passed"
+      },
+      {
+        "name": "test_prepared_description_is_revalidated_at_actual_api",
+        "class": "tests.explanation_review_descriptions_test",
+        "seconds": 0.569,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_identity_is_path_independent_and_ignores_private_data",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.452,
+        "status": "passed"
+      },
+      {
+        "name": "test_documentation_commit_keeps_recorded_backend_provenance",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.396,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[exact_inspect/service.py]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.323,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[exact_inspect/study/api.py]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.321,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[exact_inspect/study/owl_ast_schema.json]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.478,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[exact_inspect/study/migrations/001_initial.sql]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.368,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[exact_inspect/study/new_runtime.py]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.323,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[tools/review_environment.py]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.334,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[pyproject.toml]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.363,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_source_drift_refuses_restart_without_rewriting_identity[deploy/render/exact_study_requirements.txt]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.371,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_backend_identity_is_actionable_and_never_migrated",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_backend_identity_refuses_missing_sources_or_outside_symlinks",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.226,
+        "status": "passed"
+      },
+      {
+        "name": "test_refuses_research_expired_or_old_protocol_publications",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_fresh_revision_preserves_source_and_previous_publication_bytes",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.01,
+        "status": "passed"
+      },
+      {
+        "name": "test_asset_hash_size_and_path_admission",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_durable_paths_and_port_collisions",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_prepare_refuses_to_reinitialize_existing_database",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_owned_child_can_stop_but_reused_identity_cannot",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.272,
+        "status": "passed"
+      },
+      {
+        "name": "test_tls_validates_san_expiry_and_matching_private_key",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.661,
+        "status": "passed"
+      },
+      {
+        "name": "test_new_session_is_test_only_with_private_token_receipt",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_start_failure_rolls_back_only_newly_started_owned_processes",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.442,
+        "status": "passed"
+      },
+      {
+        "name": "test_real_postgresql_restart_preserves_database_and_owned_identity",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.002,
+        "status": "skipped"
+      },
+      {
+        "name": "test_workspace_hash_preflight_is_independent_of_exploration_bundle",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.017,
+        "status": "passed"
+      },
+      {
+        "name": "test_readiness_does_not_accept_a_replacement_listener",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_certificate_renewal_preserves_old_files_and_database",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.738,
+        "status": "passed"
+      },
+      {
+        "name": "test_new_revision_recovers_after_interrupted_admission",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.013,
+        "status": "passed"
+      },
+      {
+        "name": "test_exploration_readiness_uses_actual_registered_route",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.104,
+        "status": "passed"
+      },
+      {
+        "name": "test_macos_python_exec_keeps_start_time_and_complete_owned_arguments",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_http_health_timeout_stays_short_while_publication_can_wait",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_status_exposes_closure_before_showing_study_link[True-False]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_status_exposes_closure_before_showing_study_link[False-True]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_status_exposes_closure_before_showing_study_link[False-False]",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_status_does_not_inspect_an_unowned_database",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_start_detects_exited_child_without_waiting_for_admission_timeout",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_service_wait_rechecks_identity_after_readiness_probe",
+        "class": "tests.explanation_review_environment_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[None-csp_present]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[-csp_present]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[default-src 'self'; frame-ancestors 'none'; object-src *; base-uri 'none'-csp_object-src]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[default-src 'self'; frame-ancestors 'none'; object-src 'none'; -csp_base-uri]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; script-src 'unsafe-eval'-csp_no_unsafe_eval]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_or_weakened_study_csp_cannot_pass_successful_http_response[default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'none'; default-src *-csp_unique_directives]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_policy_required_but_exploration_api_has_no_invented_csp_contract",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_html_requires_actual_strict_script_and_style_directives[False]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_html_requires_actual_strict_script_and_style_directives[True]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[False-consent]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[False-tutorial]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[False-case]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[False-consultation]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[False-completed]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[True-consent]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[True-tutorial]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[True-case]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[True-consultation]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_state_checks_catalogue_before_allocation_through_baseline[True-completed]",
+        "class": "tests.explanation_review_http_verifier_test",
+        "seconds": 0.003,
+        "status": "passed"
+      },
+      {
+        "name": "test_full_inventory_exhaustion_is_deterministic_and_retains_only_sample_identities",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_total_stable]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_unique_typed_entities]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_page_count]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_exhaustive_count]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_cursor_progress]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_duplicate_or_unstable_inventory_cannot_pass[<lambda>-inventory_exact_total_available]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_require_real_class_edges_and_check_continuation[None]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_require_real_class_edges_and_check_continuation[empty]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_require_real_class_edges_and_check_continuation[count]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_require_real_class_edges_and_check_continuation[parity]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_require_real_class_edges_and_check_continuation[presence]",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_read_surfaces_try_another_real_class_when_first_focal_class_has_no_edges",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_empty_probe_selection_does_not_hide_main_study_edge_disagreement",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_probe_selection_does_not_treat_unavailable_hierarchy_as_empty",
+        "class": "tests.explanation_review_inventory_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_identical_public_pair_metadata_preserves_counts_and_typed_identity",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-metadata_candidate_binding]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-metadata_target_binding]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-metadata_main_pair_binding]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-same_public_pair_metadata]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-unique_selected_evidence]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-metadata_selected_status_counts]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_mismatched_public_pair_contracts_fail[<lambda>-selected_evidence_typed_subject]",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_only_explicit_legacy_synthetic_fixture_may_have_no_pair_metadata",
+        "class": "tests.explanation_review_pair_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_review_purpose_is_explicit_and_test_only_at_actual_api",
+        "class": "tests.explanation_review_publication_test",
+        "seconds": 18.414,
+        "status": "passed"
+      },
+      {
+        "name": "test_development_purpose_cannot_bypass_research_approval_or_adjudication",
+        "class": "tests.explanation_review_publication_test",
+        "seconds": 12.144,
+        "status": "passed"
+      },
+      {
+        "name": "test_exact_frozen_publication_retry_does_not_apply_new_reachability",
+        "class": "tests.explanation_review_publication_test",
+        "seconds": 16.475,
+        "status": "passed"
+      },
+      {
+        "name": "test_review_case_catalogue_cannot_claim_different_presented_entities",
+        "class": "tests.explanation_review_publication_test",
+        "seconds": 12.215,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_resume_preserves_publication_and_all_resource_bytes",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 11.99,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[publication]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 14.619,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[catalogue]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 12.804,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[asset]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 11.232,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[receipt]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 10.193,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[index]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 10.979,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[context_manifest]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 10.64,
+        "status": "passed"
+      },
+      {
+        "name": "test_completed_review_refuses_changed_publication_or_root_resources[context_db]",
+        "class": "tests.explanation_review_resume_test",
+        "seconds": 10.41,
+        "status": "passed"
+      },
+      {
+        "name": "test_dynamic_required_forms_use_frozen_codes",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_wrong_assessment_is_valid_but_different[single]",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_wrong_assessment_is_valid_but_different[multiple]",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_wrong_assessment_is_valid_but_different[match]",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_wrong_assessment_is_valid_but_different[match_and_single]",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_failure_receipt_records_status_without_private_response_or_request",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_existing_receipt_cannot_overwrite_private_input",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_main_catalogue_binds_24_frozen_typed_cases_and_participant_projection_withholds_them",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_empty_catalogue_is_only_optional_for_explicit_synthetic_fixture",
+        "class": "tests.explanation_review_verifier_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[public_demo]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.091,
+        "status": "passed"
+      },
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[study]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.329,
+        "status": "passed"
+      },
+      {
+        "name": "test_unverified_assets_pages_private_reads_and_errors_remain_no_store[public_demo]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.132,
+        "status": "passed"
+      },
+      {
+        "name": "test_unverified_assets_pages_private_reads_and_errors_remain_no_store[study]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.365,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_mutation_cannot_keep_immutable_cache_and_new_files_are_not_admitted",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.086,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_only_cannot_expose_or_cache_export_files",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.078,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_correlate_completion_without_secrets[GET]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.309,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_correlate_completion_without_secrets[HEAD]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.313,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[cancel]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.016,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[send_error]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.014,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[incomplete]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.014,
+        "status": "passed"
+      },
+      {
+        "name": "test_offloaded_static_delivery_does_not_claim_observed_completion[GET]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.012,
+        "status": "passed"
+      },
+      {
+        "name": "test_offloaded_static_delivery_does_not_claim_observed_completion[HEAD]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.012,
+        "status": "passed"
+      },
+      {
+        "name": "test_diagnostic_output_is_bounded_and_new_rotations_stay_private",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.464,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_docker_source_subset_cold_imports_without_matcher_or_native_parser",
+        "class": "tests.explanation_study_image_contents_test",
+        "seconds": 2.712,
+        "status": "passed"
+      },
+      {
+        "name": "test_reusable_invitation_cookie_loss_reissue_revocation_and_no_preview_allocation",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.819,
+        "status": "passed"
+      },
+      {
+        "name": "test_consent_setup_form_and_practice_gates",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.512,
+        "status": "passed"
+      },
+      {
+        "name": "test_idempotent_submit_draft_race_and_frozen_first_response",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.498,
+        "status": "passed"
+      },
+      {
+        "name": "test_full_flow_baseline_bypass_consultation_resume_and_completion",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.694,
+        "status": "passed"
+      },
+      {
+        "name": "test_events_dedup_gaps_pause_visibility_and_timing",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.513,
+        "status": "passed"
+      },
+      {
+        "name": "test_form_branching_exclusive_options_drafts_and_free_text_export",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.518,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_immutability_hashes_and_frozen_questionnaires",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.56,
+        "status": "passed"
+      },
+      {
+        "name": "test_restarted_store_and_export_secrets_excluded",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.747,
+        "status": "passed"
+      },
+      {
+        "name": "test_http_origin_cache_validation_admin_and_closed_states",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.537,
+        "status": "passed"
+      },
+      {
+        "name": "test_counterbalance_assignment_is_once_and_invites_do_not_consume_slots",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.771,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoring_all_checked_in_oracles_and_separate_denominators",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.002,
+        "status": "passed"
+      },
+      {
+        "name": "test_ranking_and_consultation_semantics_are_strict",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_postgresql_real_restart_and_backup_restore",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.513,
+        "status": "skipped"
+      },
+      {
+        "name": "test_answer_save_survives_telemetry_loss_and_validation_never_echoes_secrets",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.521,
+        "status": "passed"
+      },
+      {
+        "name": "test_csv_exports_are_reproducible_safe_and_authenticated",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.507,
+        "status": "passed"
+      },
+      {
+        "name": "test_expired_invitation_and_exposed_case_id_remain_closed",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.445,
+        "status": "passed"
+      },
+      {
+        "name": "test_published_synthetic_presets_run_through_real_allocator[20]",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.825,
+        "status": "passed"
+      },
+      {
+        "name": "test_published_synthetic_presets_run_through_real_allocator[24]",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.65,
+        "status": "passed"
+      },
+      {
+        "name": "test_complete_synthetic_http_client_flow",
+        "class": "tests.explanation_study_test",
+        "seconds": 1.49,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rejects_untyped_or_policy_mismatched_resources",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.524,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rejects_explanation_resources_from_another_case[entity]",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.469,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rejects_explanation_resources_from_another_case[claim]",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.52,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rejects_explanation_resources_from_another_case[candidate]",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.885,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoring_and_exports_preserve_missingness_and_condition_denominators",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.676,
+        "status": "passed"
+      },
+      {
+        "name": "test_consultation_wording_and_component_forms_are_frozen",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.584,
+        "status": "passed"
+      },
+      {
+        "name": "test_asset_paths_cannot_alias_or_overwrite_publication_files",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.607,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_openapi_has_strict_participant_outputs",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.946,
+        "status": "passed"
+      },
+      {
+        "name": "test_cookie_switch_rejects_stale_session_write_at_equal_revision",
+        "class": "tests.explanation_study_test",
+        "seconds": 0.748,
+        "status": "passed"
+      },
+      {
+        "name": "test_every_participant_write_checks_session_binding_before_store_work",
+        "class": "tests.explanation_study_test",
+        "seconds": 1.301,
+        "status": "passed"
+      },
+      {
+        "name": "test_v2_setup_explicit_submit_and_legacy_payload_denial",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 14.484,
+        "status": "passed"
+      },
+      {
+        "name": "test_tutorial_progress_validation_drafts_and_restart",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 12.605,
+        "status": "passed"
+      },
+      {
+        "name": "test_attempts_are_server_graded_append_only_and_allocation_once",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 13.139,
+        "status": "passed"
+      },
+      {
+        "name": "test_consultation_drafts_are_presentation_bound_and_report_not_inferred",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 13.586,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rejects_missing_training_wrong_hash_roles_and_order",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 13.235,
+        "status": "passed"
+      },
+      {
+        "name": "test_v1_canonical_publication_bytes_and_state_unchanged",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 0.198,
+        "status": "passed"
+      },
+      {
+        "name": "test_new_live_v1_is_rejected_but_historical_republish_preserves_bytes",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 0.204,
+        "status": "passed"
+      },
+      {
+        "name": "test_v2_competing_tutorial_writes_and_crash_atomicity",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 17.238,
+        "status": "passed"
+      },
+      {
+        "name": "test_v2_postgresql_backup_restore_preserves_training_and_draft",
+        "class": "tests.explanation_study_v2_test",
+        "seconds": 14.667,
+        "status": "skipped"
+      },
+      {
+        "name": "test_workspace_navigates_complete_index_and_resolves_late_fact",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 1.098,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_authorizes_every_read_including_labels_and_cursors[baseline]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.691,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_authorizes_every_read_including_labels_and_cursors[next_case]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.773,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_authorizes_every_read_including_labels_and_cursors[paused]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.707,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_authorizes_every_read_including_labels_and_cursors[no_consent]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.714,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_cursors_bind_query_session_generation_and_presentation",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.593,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_rejects_changed_index_and_unprepared_capability",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.594,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_rejects_path_escape_and_missing_v2_scopes",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.554,
+        "status": "passed"
+      },
+      {
+        "name": "test_workspace_serving_import_does_not_load_native_owl_or_matchers",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 2.02,
+        "status": "passed"
+      },
+      {
+        "name": "test_synthetic_help_in_baseline_cannot_authorize_scored_workspace",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.979,
+        "status": "passed"
+      },
+      {
+        "name": "test_tutorial_disjointness_covers_navigation_beyond_focal_case_entities[entity]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.75,
+        "status": "passed"
+      },
+      {
+        "name": "test_tutorial_disjointness_covers_navigation_beyond_focal_case_entities[annotation]",
+        "class": "tests.explanation_study_workspace_test",
+        "seconds": 0.696,
+        "status": "passed"
+      },
+      {
+        "name": "test_missing_action_kind_cannot_complete_parent_navigation",
+        "class": "tests.explanation_tutorial_entity_contract_test",
+        "seconds": 15.585,
+        "status": "passed"
+      },
+      {
+        "name": "test_explicit_types_invalid_types_and_atomic_rejections",
+        "class": "tests.explanation_tutorial_entity_contract_test",
+        "seconds": 15.252,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_entity_default_and_frozen_v2_bytes_remain_compatible",
+        "class": "tests.explanation_tutorial_entity_contract_test",
+        "seconds": 14.589,
+        "status": "passed"
+      },
+      {
+        "name": "test_entity_key_does_not_infer_action_evidence",
+        "class": "tests.explanation_tutorial_entity_contract_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_explicit_action_preserves_legacy_frozen_resource_defaults",
+        "class": "tests.explanation_tutorial_entity_contract_test",
+        "seconds": 13.494,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_evidence_keeps_all_rows_but_redacts_raw_projections[False]",
+        "class": "tests.explanation_workspace_evidence_test",
+        "seconds": 0.401,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_evidence_keeps_all_rows_but_redacts_raw_projections[True]",
+        "class": "tests.explanation_workspace_evidence_test",
+        "seconds": 0.367,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_sanitization_keeps_typed_subject_admission",
+        "class": "tests.explanation_workspace_evidence_test",
+        "seconds": 0.142,
+        "status": "passed"
+      },
+      {
+        "name": "test_actual_scoped_http_metadata_and_authorization",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.424,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_index_and_nested_scope_serialization_remain_unchanged",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.33,
+        "status": "passed"
+      },
+      {
+        "name": "test_cross_pair_and_unlinked_comparisons_fail_admission[<lambda>0]",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.136,
+        "status": "passed"
+      },
+      {
+        "name": "test_cross_pair_and_unlinked_comparisons_fail_admission[<lambda>1]",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.148,
+        "status": "passed"
+      },
+      {
+        "name": "test_cross_pair_and_unlinked_comparisons_fail_admission[<lambda>2]",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.379,
+        "status": "passed"
+      },
+      {
+        "name": "test_cross_pair_and_unlinked_comparisons_fail_admission[<lambda>3]",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.151,
+        "status": "passed"
+      },
+      {
+        "name": "test_publication_rechecks_tampered_metadata_before_serving",
+        "class": "tests.explanation_workspace_pair_metadata_test",
+        "seconds": 0.193,
+        "status": "passed"
+      }
+    ]
+  },
+  "atime_fix_affected_module": {
+    "receipt": "atime-regression.xml",
+    "tests": 25,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 10.456,
+    "cases": [
+      {
+        "name": "test_partial_contract_pages_equivalents_empty_and_old_basis",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.509,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[checksum]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.199,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[policy]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.21,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[scope]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.208,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[input_identity]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.206,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[resource_tamper]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.259,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[consistency]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.198,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[timeout]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.204,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[missing_endpoint]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.212,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[duplicate_group]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.231,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[cycle]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.225,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_admission_fails_closed[truncated]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.217,
+        "status": "passed"
+      },
+      {
+        "name": "test_readable_necessary_conditions_citations_and_frozen_resource",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 2.289,
+        "status": "passed"
+      },
+      {
+        "name": "test_layer_composition_preserves_evidence_and_rejects_changed_scores",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.004,
+        "status": "passed"
+      },
+      {
+        "name": "test_import_uses_canonical_recorded_qualifiers_without_guessing",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.072,
+        "status": "passed"
+      },
+      {
+        "name": "test_private_stage_resume_and_changed_source_fail_closed",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.038,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_materialization_resume_published_and_scope_guard",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.263,
+        "status": "passed"
+      },
+      {
+        "name": "test_frozen_description_presentation_cannot_invent_two_sided_scope",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.671,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_description_admits_only_bound_reference_labels",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.477,
+        "status": "passed"
+      },
+      {
+        "name": "test_source_inventory_comparison_is_semantic_but_preserves_all_values",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_partial_cursor_cannot_reuse_unavailable_complete_only_basis",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.264,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_ancestor_graph_uses_same_bounded_artifact[literal_asserted]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.473,
+        "status": "passed"
+      },
+      {
+        "name": "test_scoped_ancestor_graph_uses_same_bounded_artifact[elk_inferred_partial]",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.449,
+        "status": "passed"
+      },
+      {
+        "name": "test_composition_refuses_duplicate_latest_evidence_identity",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_navigation_admission_reuses_verified_bytes_but_rejects_replacement",
+        "class": "tests.explanation_postmigration_corrections_test",
+        "seconds": 0.277,
+        "status": "passed"
+      }
+    ]
+  },
+  "static_focused": {
+    "receipt": "static-focused.xml",
+    "tests": 22,
+    "failures": 0,
+    "skipped": 0,
+    "seconds": 5.385,
+    "cases": [
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[public_demo]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.064,
+        "status": "passed"
+      },
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[study]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.171,
+        "status": "passed"
+      },
+      {
+        "name": "test_unverified_assets_pages_private_reads_and_errors_remain_no_store[public_demo]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.053,
+        "status": "passed"
+      },
+      {
+        "name": "test_unverified_assets_pages_private_reads_and_errors_remain_no_store[study]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.18,
+        "status": "passed"
+      },
+      {
+        "name": "test_export_mutation_cannot_keep_immutable_cache_and_new_files_are_not_admitted",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.048,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_only_cannot_expose_or_cache_export_files",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.042,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_correlate_completion_without_secrets[GET]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.169,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_correlate_completion_without_secrets[HEAD]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.222,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[cancel]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.007,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[send_error]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_static_diagnostics_preserve_interruption_and_subsequent_read[incomplete]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.005,
+        "status": "passed"
+      },
+      {
+        "name": "test_diagnostic_output_is_bounded_and_new_rotations_stay_private",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.24,
+        "status": "passed"
+      },
+      {
+        "name": "test_each_profile_serves_only_its_own_pages",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.049,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_misses_assets_and_traversal_never_fall_through_to_pages",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.028,
+        "status": "passed"
+      },
+      {
+        "name": "test_html_policy_allows_exact_inline_scripts_only",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.011,
+        "status": "passed"
+      },
+      {
+        "name": "test_api_only_deployment_mounts_no_page_routes",
+        "class": "tests.explanation_frontend_serving_test",
+        "seconds": 0.008,
+        "status": "passed"
+      },
+      {
+        "name": "test_raw_context_export_has_complete_inventory_and_legacy_resume_is_explicit",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.049,
+        "status": "passed"
+      },
+      {
+        "name": "test_curated_default_pages_keep_all_roots_and_cursor_binding",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.374,
+        "status": "passed"
+      },
+      {
+        "name": "test_curated_default_main_and_scoped_api_parity",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.34,
+        "status": "passed"
+      },
+      {
+        "name": "test_legacy_generation_retains_punned_and_shared_support_subjects",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.217,
+        "status": "passed"
+      },
+      {
+        "name": "test_diagnostics_preserve_stream_cancellation_and_exclude_secrets",
+        "class": "tests.explanation_backend_followup_test",
+        "seconds": 0.001,
+        "status": "passed"
+      },
+      {
+        "name": "test_study_docker_source_subset_cold_imports_without_matcher_or_native_parser",
+        "class": "tests.explanation_study_image_contents_test",
+        "seconds": 1.413,
+        "status": "passed"
+      }
+    ]
+  },
+  "original_static_regression": {
+    "receipt": "static-before.xml",
+    "tests": 2,
+    "failures": 2,
+    "skipped": 0,
+    "seconds": 1.279,
+    "cases": [
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[public_demo]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.011,
+        "status": "failed"
+      },
+      {
+        "name": "test_verified_css_keeps_immutable_cache_through_profile_protection[study]",
+        "class": "tests.explanation_static_delivery_test",
+        "seconds": 0.187,
+        "status": "failed"
+      }
+    ]
+  },
+  "frontend_unit": {
+    "passed": 142,
+    "skipped": 0
+  },
+  "browser": {
+    "focused": {
+      "stats": {
+        "startTime": "2026-10-14T12:38:03.908Z",
+        "duration": 47773.757,
+        "expected": 14,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "workers": 1,
+      "retries": [
+        0
+      ],
+      "tests": [
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "review: an explicit examples view falls back to source browsing when the catalogue is absent (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3225,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "review: a prepared example resolves its target beyond the initial candidate pages (injected paging)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3168,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a empty catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1981,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a unavailable run catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2072,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a failed catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1822,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: a source chosen while catalogue recovery is pending wins over its late response (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2274,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: absent target exhausts honestly without automatic substitution (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1860,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: wrong typed identity exhausts honestly without automatic substitution (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1919,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: the page budget pauses and explicit continuation can resolve a later target (injected paging)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2687,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: a failed candidate continuation keeps the reason and resumes only on retry (injected failure)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2013,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: an intervening candidate choice cancels target resolution and defeats its late response (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2491,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: an intervening another example choice cancels target resolution and defeats its late response (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3269,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "static-delivery.spec.ts",
+          "title": "verified public CSS is complete and reused on exploration reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1692,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "static-delivery.spec.ts",
+          "title": "verified public CSS is complete and reused on study reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1422,
+              "retry": 0
+            }
+          ]
+        }
+      ]
+    },
+    "final": {
+      "stats": {
+        "startTime": "2026-10-14T12:41:06.003Z",
+        "duration": 828544.334,
+        "expected": 69,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "workers": 1,
+      "retries": [
+        0
+      ],
+      "tests": [
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "single choice: the saved answer stays authoritative; this tab's answer is kept, survives reload, and is dropped by choice",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9436,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "multi-part: this tab's answer replaces the newer one only when the participant chooses it; the choice survives reload in both tabs",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10303,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "independent questions: an answer whose saved value is unchanged is saved again automatically, beside the other tab's answer",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7370,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "saved A, in-flight B, latest A, reload: A stays visible while B is acknowledged, and Check answer submits A",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7734,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "multi-part with distinct A, B and C: C stays visible while B is acknowledged and is saved last",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 8379,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "terminal replay failure after another question changed: the latest answer stays visible and is saved again safely",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7944,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "terminal replay failure after the same question changed elsewhere: the saved answer is shown and the restored latest answer is kept for a choice",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10904,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "assessment-recovery.spec.ts",
+          "title": "a delayed acknowledgement of an older answer never replaces the newer visible one; Check answer submits the newer one",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6162,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app: all nine affected comparisons, and genuine extracts keep quotation",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 64425,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "study workspace: the same nine in explanation cases",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 102286,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app: every referenced-label citation in the 33 profiles",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 76228,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "study workspace: the same citations in an explanation case resolve through the scope",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 20969,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app and study, added subject before the original",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 16275,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app and study, added subject after the original",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 24263,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app: failure, then Retry restores recorded comparisons in the same view and selection",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4621,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "study workspace: the scoped read fails once and recovers; a refused scope offers no Retry",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 17201,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app: a 25-member group",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1903,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "study workspace: the same group through the scope",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 13572,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "main app: cycle return links, a continuation at the depth limit, punned identities",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2794,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "study workspace: the same through the scope",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 28476,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "375 px, 100% text, light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 14127,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "luna-corrections.spec.ts",
+          "title": "320 px, 200% text, dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 30118,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a fresh visit opens the first prepared example; All sources keeps every source and candidate",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4864,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "an example beyond the first source page stays selected; Back, Forward and reload keep each choice",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9569,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a deliberate unprepared link is kept and labelled honestly; a deliberate choice is remembered for this package and run",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4646,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "an explicit pair that is not a candidate is never replaced silently; a pair-only link finds its source",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 5911,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "Browse and back returns to the same pair, tab and each side's hierarchy focus",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 8503,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a late catalogue never overrides a choice made while it loads (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2414,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a catalogue slower than the bounded wait leaves ordinary browsing in place (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 13721,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a linked pair beyond the first candidate pages is found and stays selected (injected paging)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3230,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "declared absence (404) is ordinary browsing: the first source opens and the reason is shown",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2147,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "invalid catalogue (409): the first source opens and the reason is shown",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2660,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "incompatible schema: the first source opens and the reason is shown",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2387,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "denied (403): the first source opens and the reason is shown",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2261,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "network failure: the first source opens and the reason is shown",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2370,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a catalogue for another run offers no examples and says so (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1946,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "a fresh Browse opens the curated default, labelled; every other root stays listed and pageable",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2267,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "an explicit focus is never replaced, and a choice made while the default loads wins (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4688,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "older entry pages without selection, and a missing default, keep the list (injected contract variants)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2240,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "partial ELK keeps the current focus but declares no suggestion",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1536,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-entry.spec.ts",
+          "title": "the compared entity stays the focus in the pair workspace; the suggestion is only labelled in the list",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3492,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "desktop-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 17868,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "desktop-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 17204,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "375-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9877,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "375-200pct-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9817,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "320-200pct-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9594,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "catalogue failure notice (injected 503)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7316,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, desktop-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9824,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 375-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6645,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 375-200pct-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 9397,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 320-200pct-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 7617,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "asserted and ELK children page to their recorded totals; a basis change restarts paging",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2490,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-hierarchy.spec.ts",
+          "title": "discovered entry points page and focus one side",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2034,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "review: an explicit examples view falls back to source browsing when the catalogue is absent (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1824,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "review: a prepared example resolves its target beyond the initial candidate pages (injected paging)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1814,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a empty catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2224,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a unavailable run catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2203,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: an explicit examples URL with a failed catalogue keeps sources and the deliberate pair (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2038,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-A: a source chosen while catalogue recovery is pending wins over its late response (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2628,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: absent target exhausts honestly without automatic substitution (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1995,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: wrong typed identity exhausts honestly without automatic substitution (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2144,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: the page budget pauses and explicit continuation can resolve a later target (injected paging)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3751,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: a failed candidate continuation keeps the reason and resumes only on retry (injected failure)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2738,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: an intervening candidate choice cancels target resolution and defeats its late response (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 2728,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "review-independent-edges.spec.ts",
+          "title": "HR2-B: an intervening another example choice cancels target resolution and defeats its late response (injected delay)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3531,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "static-delivery.spec.ts",
+          "title": "verified public CSS is complete and reused on exploration reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1692,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "static-delivery.spec.ts",
+          "title": "verified public CSS is complete and reused on study reload",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 1590,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "study-review-journey.spec.ts",
+          "title": "review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 107272,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "style-boundary.spec.ts",
+          "title": "the style check rejects a document whose stylesheet transfer failed, and records the failure (injected)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 3880,
+              "retry": 0
+            }
+          ]
+        }
+      ]
+    },
+    "opposite": {
+      "stats": {
+        "startTime": "2026-10-14T12:59:23.547Z",
+        "duration": 91918.954,
+        "expected": 1,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "workers": 1,
+      "retries": [
+        0
+      ],
+      "tests": [
+        {
+          "file": "study-review-journey.spec.ts",
+          "title": "review journey: forms/3, tutorial recovery, both conditions, changing methods, completion and analysis/4 exports",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 89491,
+              "retry": 0
+            }
+          ]
+        }
+      ]
+    },
+    "captures": {
+      "stats": {
+        "startTime": "2026-10-14T13:02:16.729Z",
+        "duration": 65858.69,
+        "expected": 10,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "workers": 1,
+      "retries": [
+        0
+      ],
+      "tests": [
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "desktop-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10883,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "desktop-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 10388,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "375-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6368,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "375-200pct-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6213,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "320-200pct-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 6527,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "catalogue failure notice (injected 503)",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4655,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, desktop-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4239,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 375-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 5546,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 375-200pct-light",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 4021,
+              "retry": 0
+            }
+          ]
+        },
+        {
+          "file": "readiness-visual.spec.ts",
+          "title": "case view after reload, 320-200pct-dark",
+          "status": "expected",
+          "results": [
+            {
+              "status": "passed",
+              "duration_ms": 5259,
+              "retry": 0
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "styles": {
+    "focused": [
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "static-cache-exploration",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 2,
+        "failed_checks": 0,
+        "css_requests": 2,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-focused/static-cache-exploration.json",
+        "sha256": "d74b0943d276b4fbe111ecd95bad177088c2779d7b066827d580f2f29eb52a3e",
+        "stages": [
+          "initial",
+          "reload"
+        ],
+        "first_conditions": []
+      },
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "static-cache-study",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 2,
+        "failed_checks": 0,
+        "css_requests": 2,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-focused/static-cache-study.json",
+        "sha256": "ebfa2b554eac3234b9b10df2df40fadae978a81479e7ab856d5affbbe9c04015",
+        "stages": [
+          "initial",
+          "reload"
+        ],
+        "first_conditions": []
+      }
+    ],
+    "final": [
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "static-cache-exploration",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 2,
+        "failed_checks": 0,
+        "css_requests": 2,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-final/static-cache-exploration.json",
+        "sha256": "c18a122bcc996c8337e2594389a4531729c42acf1c679f428d6d3c7fb68d6646",
+        "stages": [
+          "initial",
+          "reload"
+        ],
+        "first_conditions": []
+      },
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "static-cache-study",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 2,
+        "failed_checks": 0,
+        "css_requests": 2,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-final/static-cache-study.json",
+        "sha256": "1b7a2883114d66017f58040ac11cc9203a2c86e558b9f0af819c3ae72e3baf56",
+        "stages": [
+          "initial",
+          "reload"
+        ],
+        "first_conditions": []
+      },
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "study-review-journey",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 9,
+        "failed_checks": 0,
+        "css_requests": 4,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1,
+          "disk": 2
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-final/study-review-journey.json",
+        "sha256": "1dc9e651de48bb34404a743dc8e7ce09a9f89498bacaedcb2606d13686a3233b",
+        "stages": [
+          "study-entry",
+          "lesson-2-reload",
+          "lesson-6",
+          "assessment-q5-reload",
+          "first-case",
+          "first-baseline-case-1",
+          "consultation-reload",
+          "first-explanation-case-13",
+          "completion"
+        ],
+        "first_conditions": [
+          "ontology_baseline"
+        ]
+      },
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "style-boundary-injected",
+        "identity": {},
+        "checks": 3,
+        "failed_checks": 1,
+        "css_requests": 3,
+        "css_failed": 1,
+        "css_failed_not_canceled": 1,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "unknown": 1,
+          "disk": 1
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-final/style-boundary-injected.json",
+        "sha256": "f5b6e922bada6f3cb924bc4ccda1ae54c6bf318f6f8b5abdc8181ca197d217b9",
+        "stages": [
+          "styled-baseline",
+          "injected",
+          "after-recovery"
+        ],
+        "first_conditions": []
+      }
+    ],
+    "opposite": [
+      {
+        "schema": "exact-style-diagnostics/1",
+        "test": "study-review-journey",
+        "identity": {
+          "backend_commit": "fd47dcacaa09d58ca8dd6f86c52a1a6204ce67b0",
+          "backend_source_sha256": "3cb520b13a4471342a9eea34e67c5e80a420b71277693c6b568f3496d884954c",
+          "frontend_export_sha256": "3289bf6daf9312da0187ec95047827c22587c283492047026f10dff9fcdf8350",
+          "package_sha256": "b89ae882e62ceb9ad810aa063b739429c08027fef26fe0ef0dc75ca0007bc18a",
+          "publication_sha256": "352ed1d79d71cdb13a5eb5e77506c82541ffefd9db958a6da8e188bd52fbd47b",
+          "source_publication_sha256": "3893f7607b229fbbd3957d382ad3d27063293a642e18f15ddce8605eddfe209f",
+          "study_revision": "review-20261014T123129-31902966fc"
+        },
+        "checks": 9,
+        "failed_checks": 0,
+        "css_requests": 4,
+        "css_failed": 0,
+        "css_failed_not_canceled": 0,
+        "css_pending": 0,
+        "css_from": {
+          "network": 1,
+          "memory": 1,
+          "disk": 2
+        },
+        "css_export_mismatch": 0,
+        "css_completed_hash_unknown": 0,
+        "css_export_unknown": 0,
+        "status": "passed",
+        "receipt": "styles-opposite/study-review-journey.json",
+        "sha256": "00de9e356f8187dcb041d4a07db7781b6fefbd13f8aa78990e9fd16deaace504",
+        "stages": [
+          "study-entry",
+          "lesson-2-reload",
+          "lesson-6",
+          "assessment-q5-reload",
+          "first-case",
+          "first-explanation-case-1",
+          "consultation-reload",
+          "first-baseline-case-13",
+          "completion"
+        ],
+        "first_conditions": [
+          "explanation"
+        ]
+      }
+    ]
+  },
+  "commands": [
+    {
+      "name": "owned-isort",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "isort",
+        "exact_inspect/frontend.py",
+        "exact_inspect/public_assets.py",
+        "exact_inspect/read_diagnostics.py",
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "tests/explanation_static_delivery_test.py",
+        "tools/verify_static_delivery.py"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 0
+    },
+    {
+      "name": "owned-black",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "black",
+        "exact_inspect/frontend.py",
+        "exact_inspect/public_assets.py",
+        "exact_inspect/read_diagnostics.py",
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "tests/explanation_static_delivery_test.py",
+        "tools/verify_static_delivery.py"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 0
+    },
+    {
+      "name": "final-black",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "black",
+        "--check",
+        "exact",
+        "exact_inspect",
+        "tests",
+        "tools",
+        "study_visualizer_runtime"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 1
+    },
+    {
+      "name": "final-isort",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "isort",
+        "--check-only",
+        "exact",
+        "exact_inspect",
+        "tests",
+        "tools",
+        "study_visualizer_runtime"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 1
+    },
+    {
+      "name": "baseline-mypy",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "mypy"
+      ],
+      "cwd": "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/hr2-source",
+      "returncode": 1
+    },
+    {
+      "name": "baseline-flake8",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "flake8",
+        "exact",
+        "exact_inspect",
+        "tests",
+        "tools",
+        "study_visualizer_runtime"
+      ],
+      "cwd": "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/hr2-source",
+      "returncode": 1
+    },
+    {
+      "name": "owned-flake8",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "flake8",
+        "exact_inspect/frontend.py",
+        "exact_inspect/public_assets.py",
+        "exact_inspect/read_diagnostics.py",
+        "exact_inspect/service.py",
+        "exact_inspect/study/api.py",
+        "tests/explanation_static_delivery_test.py",
+        "tools/verify_static_delivery.py"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 0
+    },
+    {
+      "name": "backend-regressions",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/explanation_backend_followup_test.py",
+        "tests/explanation_corrective_http_test.py",
+        "tests/explanation_description_metadata_test.py",
+        "tests/explanation_evidence_metadata_test.py",
+        "tests/explanation_evidence_subject_test.py",
+        "tests/explanation_export_policy_test.py",
+        "tests/explanation_filtered_ontology_export_test.py",
+        "tests/explanation_framework_test.py",
+        "tests/explanation_frontend_serving_test.py",
+        "tests/explanation_handoff_test.py",
+        "tests/explanation_independent_review_test.py",
+        "tests/explanation_integration_contract_test.py",
+        "tests/explanation_integration_position_test.py",
+        "tests/explanation_integration_timing_test.py",
+        "tests/explanation_luna_overlay_test.py",
+        "tests/explanation_luna_pipeline_test.py",
+        "tests/explanation_luna_review_test.py",
+        "tests/explanation_model_comparison_test.py",
+        "tests/explanation_ontology_download_reuse_test.py",
+        "tests/explanation_postmigration_corrections_test.py",
+        "tests/explanation_preparation_test.py",
+        "tests/explanation_recovery_test.py",
+        "tests/explanation_review_catalogue_test.py",
+        "tests/explanation_review_descriptions_test.py",
+        "tests/explanation_review_environment_test.py",
+        "tests/explanation_review_http_verifier_test.py",
+        "tests/explanation_review_inventory_verifier_test.py",
+        "tests/explanation_review_pair_verifier_test.py",
+        "tests/explanation_review_publication_test.py",
+        "tests/explanation_review_resume_test.py",
+        "tests/explanation_review_verifier_test.py",
+        "tests/explanation_static_delivery_test.py",
+        "tests/explanation_study_image_contents_test.py",
+        "tests/explanation_study_test.py",
+        "tests/explanation_study_v2_test.py",
+        "tests/explanation_study_workspace_test.py",
+        "tests/explanation_tutorial_entity_contract_test.py",
+        "tests/explanation_workspace_evidence_test.py",
+        "tests/explanation_workspace_pair_metadata_test.py",
+        "--junitxml=/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/backend-regressions.xml"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 1
+    },
+    {
+      "name": "final-contracts",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "tools.freeze_explanation_contracts",
+        "--check"
+      ],
+      "cwd": "/Users/pedrocotovio/Developer/Repos/OM/Exact-OM",
+      "returncode": 0
+    },
+    {
+      "name": "frontend-typecheck-final",
+      "command": [
+        "npm",
+        "run",
+        "typecheck"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "frontend-unit-final",
+      "command": [
+        "npm",
+        "run",
+        "test:unit"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "frontend-build-final",
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "static-transfer",
+      "returncode": 0,
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "tools.verify_static_delivery",
+        "--root",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac",
+        "--output",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-transfer.json"
+      ]
+    },
+    {
+      "name": "focused-browser",
+      "returncode": 0,
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "/private/tmp/exact-readiness-browser.py",
+        "focused",
+        "e2e/review-independent-edges.spec.ts",
+        "e2e/static-delivery.spec.ts"
+      ]
+    },
+    {
+      "name": "final-api",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "tools.verify_backend_followup",
+        "--root",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/backend-integration-20261013",
+        "--environment",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac",
+        "--output",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/final-api"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "normal-read-probe",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/source-fd47dcac/tools/verify_service_reads.mjs",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac",
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/normal-read-probe.json",
+        "normal_operation_after_acceptance"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "static-focused",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "pytest",
+        "-q",
+        "tests/explanation_static_delivery_test.py",
+        "tests/explanation_frontend_serving_test.py",
+        "tests/explanation_backend_followup_test.py",
+        "tests/explanation_study_image_contents_test.py",
+        "--junitxml=/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/static-focused.xml"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "initial-contracts",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "tools.freeze_explanation_contracts",
+        "--check"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "current-full-flake8",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "flake8",
+        "exact",
+        "exact_inspect",
+        "tests",
+        "tools",
+        "study_visualizer_runtime"
+      ],
+      "returncode": 1
+    },
+    {
+      "name": "current-full-mypy",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "mypy"
+      ],
+      "returncode": 1
+    },
+    {
+      "name": "imports",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/quality-tools/bin/lint-imports"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "docstrings",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "-m",
+        "interrogate",
+        "exact/delivery/api",
+        "exact/ontology",
+        "exact/io",
+        "exact/core/contracts",
+        "exact/utils/timing.py",
+        "exact/utils/candidate_generation.py",
+        "exact/utils/graph_search.py"
+      ],
+      "returncode": 0
+    },
+    {
+      "name": "browser-final",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "/private/tmp/exact-readiness-browser.py",
+        "final",
+        "e2e/luna-corrections.spec.ts",
+        "e2e/study-review-journey.spec.ts",
+        "e2e/review-hierarchy.spec.ts",
+        "e2e/assessment-recovery.spec.ts",
+        "e2e/readiness-entry.spec.ts",
+        "e2e/readiness-visual.spec.ts",
+        "e2e/style-boundary.spec.ts",
+        "e2e/review-independent-edges.spec.ts",
+        "e2e/static-delivery.spec.ts"
+      ],
+      "returncode": 0,
+      "workers": 1,
+      "retries": 0,
+      "binding": "binding.json"
+    },
+    {
+      "name": "browser-opposite",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "/private/tmp/exact-readiness-browser.py",
+        "opposite",
+        "e2e/study-review-journey.spec.ts"
+      ],
+      "returncode": 0,
+      "workers": 1,
+      "retries": 0,
+      "binding": "binding.json"
+    },
+    {
+      "name": "browser-captures",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/pyenv/bin/python",
+        "-B",
+        "/private/tmp/exact-readiness-browser.py",
+        "captures",
+        "e2e/readiness-visual.spec.ts"
+      ],
+      "returncode": 0,
+      "workers": 1,
+      "retries": 0,
+      "binding": "binding.json"
+    },
+    {
+      "name": "after-restart-read-probe",
+      "command": [
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/node-v24.21.0-darwin-x64/bin/node",
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/readiness-closure-20261014/source-fd47dcac/tools/verify_service_reads.mjs",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/environment-fd47dcac",
+        "/Users/pedrocotovio/Library/Caches/exact-om-dev/fe",
+        "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/after-restart-read-probe.json",
+        "after_restart"
+      ],
+      "returncode": 0
+    }
+  ],
+  "harness_failures": [
+    {
+      "name": "first-frontend-typecheck",
+      "returncode": 2,
+      "disposition": "TS7022 fixed with explicit query/page types before final build",
+      "retained_log": "/Users/pedrocotovio/Library/Caches/exact-om-review/readiness-closure-20261014/frontend-typecheck.log"
+    },
+    {
+      "name": "post-restart-resume-module-path",
+      "returncode": 1,
+      "product_defect": false,
+      "retained_log": "/private/tmp/exact-readiness-packaging-guard.log"
+    },
+    {
+      "name": "post-restart-resume-required-origin",
+      "returncode": 1,
+      "product_defect": false,
+      "retained_log": "/private/tmp/exact-readiness-packaging-2-guard.log",
+      "correction": "Provided required Origin; explicit missing-Origin negative returned403; supported recovery passed"
+    }
+  ]
+}

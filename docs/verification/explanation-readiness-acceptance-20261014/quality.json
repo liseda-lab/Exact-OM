@@ -1,0 +1,248 @@
+{
+  "black_version": "24.10.0",
+  "isort_version": "5.13.2",
+  "flake8_version": "7.3.0",
+  "mypy_version": "1.20.2",
+  "full_ci_passed": false,
+  "black_residual_paths": [
+    "tests/campaign_request_accounting_test.py",
+    "tests/explanation_ncit_hermit_datatypes_test.py",
+    "tests/e19_precision_recovery_test.py",
+    "tests/experiments_supervisor_email_test.py",
+    "exact/experiments/notifications.py",
+    "tests/explanation_cluster_hermit_test.py",
+    "tests/frozen_inference_test.py",
+    "tools/complete_hermit_declarations.py",
+    "tests/experiments_notifications_test.py",
+    "tests/graph_provenance_storage_test.py",
+    "tools/prepare_ncit_hermit_datatypes.py",
+    "exact/experiments/dispatch.py",
+    "tests/experiments_supervisor_notifications_test.py",
+    "tests/experiments_supervision_test.py",
+    "exact/experiments/supervision.py",
+    "tests/experiments_dispatch_test.py",
+    "tools/cluster_hermit_taxonomy.py",
+    "tests/experiments_supervisor_cli_test.py",
+    "tools/supervise_experiments.py"
+  ],
+  "isort_residual_paths": [
+    "exact/experiments/openea_pools.py",
+    "tests/experiments_supervision_test.py",
+    "tests/experiments_dispatch_test.py",
+    "tests/prepared_batch_control_test.py",
+    "tests/explanation_ncit_hermit_datatypes_test.py",
+    "tests/experiments_supervisor_notifications_test.py",
+    "tests/compact_graph_features_test.py",
+    "tests/openea_preparation_test.py",
+    "tools/prepare_openea_pools.py",
+    "tools/supervise_experiments.py"
+  ],
+  "mypy_errors": 48,
+  "mypy_files": 13,
+  "mypy_normalized_identity_equal_baseline": true,
+  "flake8_findings": 52,
+  "flake8_baseline_findings": 722,
+  "flake8_current_tracked_baseline_equivalents": 45,
+  "flake8_preserved_untracked_findings": 7,
+  "flake8_categories": {
+    "E402": 3,
+    "E741": 5,
+    "E306": 6,
+    "F401": 16,
+    "F811": 17,
+    "E731": 5
+  },
+  "imports": {
+    "kept": 5,
+    "broken": 0
+  },
+  "docstrings_percent": 82.6,
+  "docstrings_threshold": 80,
+  "owned_behavior_flake8": "passed",
+  "mechanical_review": [
+    {
+      "path": "exact_inspect/decisions.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/generation.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/models.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/navigation_prepare.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/partial_elk.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/postmigration_contracts.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/preparation.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/readable_descriptions.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/review_metadata.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/service.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/study/models.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/study/resources.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/study/review_models.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/study/v2_models.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "exact_inspect/study/workspace.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_evidence_metadata_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_evidence_subject_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_independent_review_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_luna_overlay_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_luna_pipeline_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_luna_review_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_model_comparison_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_ontology_download_reuse_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_preparation_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_recovery_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_catalogue_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_descriptions_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_environment_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_http_verifier_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_inventory_verifier_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_pair_verifier_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_publication_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_review_verifier_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_tutorial_entity_contract_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_workspace_evidence_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tests/explanation_workspace_pair_metadata_test.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/freeze_explanation_contracts.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/prepare_review_bundle.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/publish_luna_review.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/review_environment.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/review_generation_batch.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/review_luna_bundle.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/review_model_comparison.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/review_private_run_cache.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/serve_explanation_ui_study.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    },
+    {
+      "path": "tools/verify_backend_followup.py",
+      "non_import_AST_and_import_inventory_unchanged": true
+    }
+  ]
+}
