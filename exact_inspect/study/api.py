@@ -444,7 +444,8 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         if getattr(body.definition, "purpose", None) == "development_review" and urlsplit(
             origin
         ).hostname not in {"localhost", "127.0.0.1", "::1"}:
-            raise StudyError(422, "Development review requires a loopback review service")
+            if os.environ.get("EXACT_STUDY_REVIEW_ORIGIN") != origin or not origin.startswith("https://"):
+                raise StudyError(422, "Development review requires an explicitly enabled review origin")
         return store.publish(body)
 
     @router.get(

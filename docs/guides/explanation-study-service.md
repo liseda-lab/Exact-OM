@@ -20,6 +20,13 @@ describe the implemented setup, tutorial, workspace, consultation and export con
 Existing v1 sessions retain their original semantics and can resume without a database
 rewrite; new live v1 publications are rejected. Historical v1 behavior below is labeled.
 
+## Hosted development review
+
+To register a development-review revision on a hosted test deployment, set
+`EXACT_STUDY_REVIEW_ORIGIN` to the exact configured HTTPS study origin for the
+publishing process. Other hosted origins reject review publications by default.
+Review revisions accept only test invitations and disable correctness metrics.
+
 ## Configuration and publication
 
 Install the `study` extra, or the small dependency list at
