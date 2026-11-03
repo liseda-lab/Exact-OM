@@ -50,6 +50,7 @@ from ..navigation import (
     PreparedEquivalentsPage,
     PreparedHierarchyPage,
 )
+from ..public_assets import file_identity
 from ..sqlite_safety import readonly_connection
 from .models import Identifier, StrictModel
 
@@ -446,20 +447,13 @@ def _open_resources(store, scope, policy):
     index = store._resource_path(scope.index_path)
     if not index.is_file():
         raise ValueError("Frozen workspace index is missing")
-    stat = index.stat()
-    key = (
-        str(index.resolve()),
-        stat.st_dev,
-        stat.st_ino,
-        stat.st_size,
-        stat.st_mtime_ns,
-        stat.st_ctime_ns,
-    )
+    identity = file_identity(index.stat())
+    key = (str(index.resolve()), *identity)
     with _VERIFICATION_LOCK:
         actual = _VERIFIED_INDEXES.get(key)
         if actual is None:
             actual = _digest(index)
-            if index.stat() != stat:
+            if file_identity(index.stat()) != identity:
                 raise ValueError("Workspace index changed during verification")
             _VERIFIED_INDEXES[key] = actual
             while len(_VERIFIED_INDEXES) > 128:
