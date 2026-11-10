@@ -95,3 +95,22 @@ test("admin selects, replaces and revokes an active link", async ({ page }) => {
   expect(paths).toContain("POST /api/v1/admin/invitations/selectable-session/reissue");
   expect(paths).toContain("POST /api/v1/admin/invitations/selectable-session/revoke");
 });
+
+test("a rendering failure has a recovery screen and reload preserves the session", async ({ page }) => {
+  await page.goto(harness!.origin + await newInvitation(page));
+  await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
+  const api = new ParticipantApi(page);
+  const saved = await api.state();
+  await page.route("**/api/v1/study/state", async route => {
+    // Deliberately malformed transport data tests the route error boundary, not a claimed
+    // reproduction of the user's intermittent black screen.
+    await route.fulfill({ json: { ...saved, stage: "background", forms: { ...saved.forms, background: null } } });
+  });
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "The study page could not be displayed" })).toBeVisible();
+  await page.unroute("**/api/v1/study/state");
+  await page.getByRole("button", { name: "Reload study", exact: true }).click();
+  await expect(page.getByRole("button", { name: "I agree to take part", exact: true })).toBeVisible();
+  expect((await api.state()).session_id).toBe(saved.session_id);
+  await revoke(page);
+});
