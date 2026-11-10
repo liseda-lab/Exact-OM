@@ -2,9 +2,10 @@
 
 Implementation is pushed to `study-deploy`. Runtime commits are `2366786` (backend) and
 `6e11742` (frontend). The production export was built on AppVM with Node 24.22.1 / Next
-15.5.26 in `/home/pcotovio/exact-study/releases/6e11742`. Activation requires the VM owner's
-sudo-authenticated service restart. The unchanged live service continues serving during
-preparation. The temporary validation service is loopback-only.
+15.5.26 in `/home/pcotovio/exact-study/releases/6e11742`. The owner activated the release on
+10 November 2026. The live service restarted successfully at checkout `3892862`, with public
+HTTPS readiness returning `ready: true`. The temporary validation service and SSH tunnel
+were stopped. The staged export is now the live export; retain its release directory.
 
 ## Delivered changes
 
@@ -77,7 +78,7 @@ Guide wording was checked against primary documentation:
 [Protégé views](https://protegeproject.github.io/protege/views/), and
 [OWL Functional Syntax](https://www.w3.org/TR/owl2-syntax/).
 
-## Activation
+## Activation completed
 
 The prepared script `/home/pcotovio/exact-study/activate-nov10.sh` authenticates with sudo
 before changing live files, fast-forwards the deployment checkout, retains prior hashed
@@ -88,5 +89,19 @@ assets for already-open tabs, preserves the old export, selects the new export a
 ssh -t AppVM '~/exact-study/activate-nov10.sh'
 ```
 
-After activation, verify public readiness, the authenticated invitation listing and a fresh
-link for `vm-review-20261110-copy`. Existing participant links keep their frozen text.
+Post-activation checks on 10 November passed against the public HTTPS origin with normal
+certificate verification. All five browser tests passed again in 2.5 minutes, including
+baseline and explanation ranking/reload and injected-failure recovery. The admin browser
+interaction test uses mocked responses; a separate real public API check verified authentication,
+revision metadata, create/list/replace/revoke and removal from the active-link list. Diagnostic
+links from these checks were revoked. Public HTML and all 17 linked assets matched the VM
+release bytes. CSP and the valid `private, no-store` cache header were confirmed. An initial
+probe incorrectly required the cache header to equal only `no-store`; correcting that probe
+required no production change.
+
+The live frontend path resolves to the release directory above. The prior frontend remains at
+`/home/pcotovio/exact-study/releases/frontend-before-20261110`. Temporary test credentials,
+staging certificate and tunnel were removed. Local combined storage measured 51.49 GB.
+Existing participant links keep their frozen text; use a fresh invitation for
+`vm-review-20261110-copy` to review the revised copy. The activation command above is a record
+of the completed operation, and does not need to be run again.
