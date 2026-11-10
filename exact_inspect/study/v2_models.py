@@ -7,6 +7,7 @@ from typing import Annotated, Literal
 from pydantic import Field, field_validator, model_validator
 
 from ..review_metadata import ReviewBundleSummary
+from .forms import FORMS3_VERSIONS
 from .models import (
     Asset,
     Candidate,
@@ -395,7 +396,7 @@ class ProtocolVersions(StrictModel):
 
     @model_validator(mode="after")
     def reserve_review_versions(self):
-        if self.forms == "exact-study-forms/3" or self.setup == "setup/3":
+        if self.forms in FORMS3_VERSIONS or self.setup == "setup/3":
             raise ValueError(
                 "New form versions require the complete study-methods/3 publication contract"
             )
@@ -406,7 +407,7 @@ class ProtocolVersionsV3(StrictModel):
     setup: Literal["setup/3"]
     tutorial: Identifier
     assessment: Identifier
-    forms: Literal["exact-study-forms/3"]
+    forms: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
     consultation: Literal["consultation/3"]
     methods: Literal["study-methods/3"]
     information: Identifier
@@ -580,7 +581,7 @@ class SetupReceiptV3(StrictModel):
 
 class ConsultationDraftV3(Mutation):
     presentation_id: Identifier
-    form_version: Literal["exact-study-forms/3"]
+    form_version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
     consultation_version: Literal["consultation/3"]
     consulted_external_ontologies: bool | None = None
     methods: Annotated[list[MethodV3], Field(max_length=3)] = Field(default_factory=list)
@@ -631,7 +632,7 @@ class ConsultationV3(ConsultationDraftV3):
 
 class ConsultationReceiptV3(StrictModel):
     presentation_id: Identifier
-    form_version: Literal["exact-study-forms/3"]
+    form_version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
     consultation_version: Literal["consultation/3"]
     consulted_external_ontologies: bool | None
     methods: list[MethodV3]
@@ -672,7 +673,7 @@ class QuestionDefinitionV3(QuestionDefinitionV2):
 
 
 class FormsV3(StrictModel):
-    version: Literal["exact-study-forms/3"]
+    version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
     background: list[QuestionDefinitionV3]
     consultation: list[QuestionDefinitionV3]
     setup: list[QuestionDefinitionV3]

@@ -1483,3 +1483,39 @@ def test_every_participant_write_checks_session_binding_before_store_work(servic
         parameters = schema["paths"][path][method.lower()]["parameters"]
         header = next(p for p in parameters if p["name"].lower() == "x-study-session")
         assert header["in"] == "header" and header["required"] is False
+
+
+def test_admin_active_invitations_are_scoped_paged_and_secret_free(service):
+    app, store, frozen = service
+    client = TestClient(app, base_url=ORIGIN)
+    revision = frozen.definition.study_revision
+    path = f"/api/v1/admin/studies/{revision}/invitations"
+    headers = {"Authorization": f"Bearer {ADMIN}"}
+    assert client.get(path).status_code == 401
+    assert client.get(path, headers=headers).json()["items"] == []
+    issued = store.issue(revision, count=3)["invitations"]
+    ids = sorted(item["session_id"] for item in issued)
+    page = client.get(path, headers=headers, params={"limit": 2}).json()
+    assert [item["session_id"] for item in page["items"]] == ids[:2]
+    assert set(page["items"][0]) == {"session_id", "generation", "test", "stage"}
+    for item in issued:
+        assert item["invitation"].split("=", 1)[1] not in str(page)
+    last = client.get(path, headers=headers, params={"cursor": page["next_cursor"]}).json()
+    assert [item["session_id"] for item in last["items"]] == ids[2:]
+    assert last["next_cursor"] is None
+    store.reissue(ids[0])
+    store.reissue(ids[1], revoke=True)
+    rows = client.get(path, headers=headers).json()["items"]
+    assert [item["session_id"] for item in rows] == [ids[0], ids[2]]
+    assert rows[0]["generation"] == 2
+    assert client.get(path, headers=headers, params={"limit": 101}).status_code == 422
+    assert client.get(path, headers=headers, params={"cursor": "bad cursor"}).status_code == 422
+    assert (
+        client.get("/api/v1/admin/studies/missing/invitations", headers=headers).status_code == 404
+    )
+    store.close(revision)
+    assert client.get(path, headers=headers).json() == {
+        "items": [],
+        "next_cursor": None,
+        "study_closed": True,
+    }

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
-from .forms import definitions, validate_answers
+from .forms import FORMS3_VERSIONS, definitions, validate_answers
 from .models import Publish
 from .scoring import score_response, summarize
 
@@ -525,10 +525,7 @@ class StudyStore:
                 raise StudyError(401, "Invitation unavailable") from exc
             if state["stage"] == "closed":
                 raise StudyError(401, "Invitation unavailable")
-            if (
-                study.get("form_version") == "exact-study-forms/3"
-                and client_contract != "study-review/1"
-            ):
+            if study.get("form_version") in FORMS3_VERSIONS and client_contract != "study-review/1":
                 raise StudyError(
                     409, "This publication requires a client supporting study-review/1"
                 )

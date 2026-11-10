@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import Field, model_validator
 
 from ..review_metadata import ReviewBundleSummary
+from .forms import FORMS3_VERSIONS
 from .models import Identifier, StrictModel
 from .v2_models import StudyDefinitionV2
 
@@ -26,7 +27,7 @@ class DevelopmentReviewDefinition(StudyDefinitionV2):
 
     @model_validator(mode="after")
     def review_contract(self):
-        if self.form_version != "exact-study-forms/3":
+        if self.form_version not in FORMS3_VERSIONS:
             raise ValueError("Development review requires explicit forms/3 negotiation")
         if self.launch_approvals:
             raise ValueError("Development review is not research launch approval")

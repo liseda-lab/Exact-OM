@@ -546,3 +546,40 @@ def test_actual_consultation_export_opt_in_and_immutable_restart(review):
     saved_route = "/api/v1/admin/exports/" + named["manifest"]["export_id"]
     assert client.get(saved_route).status_code == 401
     assert ok(client.get(saved_route, headers={"Authorization": f"Bearer {ADMIN}"})) == named
+
+
+def test_copy_revision_preserves_old_forms_and_protocol(review):
+    from exact_inspect.study.forms import FORMS3_COPY
+    from tools.revise_study_participant_copy import revise
+
+    client, store, original = review
+    before = original.model_dump(mode="json")
+    revised = Publish.model_validate(revise(before, "copy-review-20261110"))
+    assert revised.definition.form_version == FORMS3_COPY
+    assert revised.definition.protocol_versions.forms == FORMS3_COPY
+    assert revised.definition.assets == original.definition.assets
+    assert revised.definition.cases == original.definition.cases
+    assert revised.case_keys == original.case_keys
+    assert revised.definition.tutorial.hash != original.definition.tutorial.hash
+    assert revised.definition.tutorial.grading == original.definition.tutorial.grading
+    for field in ("purpose", "synthetic", "correctness_metrics", "launch_approvals"):
+        assert revised.definition.model_dump().get(field) == original.definition.model_dump().get(
+            field
+        )
+    store.publish(revised)  # Old and new wordings coexist, no frozen version collision.
+    old = client.get("/api/v1/study/state").json()
+    assert old["forms"]["collection_notice"]
+    assert old["forms"]["version"] == FORMS
+    secret = invite(store, revised)
+    state = ok(
+        client.post(
+            "/api/v1/study/session", json={"secret": secret, "client_contract": "study-review/1"}
+        )
+    )
+    assert state["forms"]["version"] == FORMS3_COPY
+    assert state["forms"]["collection_notice"] == ""
+    assert state["forms"]["experience_note"] == ""
+    assert original.model_dump(mode="json") == before
+    # The stricter v3 branching and exclusive-answer semantics remain active.
+    assert state["forms"]["method_dictionary"] == old["forms"]["method_dictionary"]
+    assert client.post("/api/v1/study/session", json={"secret": secret}).status_code == 409

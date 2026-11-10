@@ -27,7 +27,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from starlette.datastructures import Headers, MutableHeaders
 
-from .administration import RevisionPage, revisions
+from .administration import InvitationPage, RevisionPage, invitations, revisions
 from .exports import csv_archive
 from .models import (
     Consent,
@@ -444,8 +444,12 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         if getattr(body.definition, "purpose", None) == "development_review" and urlsplit(
             origin
         ).hostname not in {"localhost", "127.0.0.1", "::1"}:
-            if os.environ.get("EXACT_STUDY_REVIEW_ORIGIN") != origin or not origin.startswith("https://"):
-                raise StudyError(422, "Development review requires an explicitly enabled review origin")
+            if os.environ.get("EXACT_STUDY_REVIEW_ORIGIN") != origin or not origin.startswith(
+                "https://"
+            ):
+                raise StudyError(
+                    422, "Development review requires an explicitly enabled review origin"
+                )
         return store.publish(body)
 
     @router.get(
@@ -456,6 +460,18 @@ def create_study_router(store, *, signing_secret, researcher_token, origin):
         cursor: str | None = Query(None, max_length=128, pattern=r"^[A-Za-z0-9_.:/-]+$"),
     ):
         return revisions(store, limit=limit, cursor=cursor)
+
+    @router.get(
+        "/admin/studies/{revision:path}/invitations",
+        response_model=InvitationPage,
+        dependencies=[Depends(auth.researcher)],
+    )
+    def list_invitations(
+        revision: str,
+        limit: int = Query(50, ge=1, le=100),
+        cursor: str | None = Query(None, max_length=36, pattern=r"^[a-fA-F0-9-]+$"),
+    ):
+        return invitations(store, revision, limit=limit, cursor=cursor)
 
     @router.post(
         "/admin/studies/{revision:path}/invitations", dependencies=[Depends(auth.researcher)]

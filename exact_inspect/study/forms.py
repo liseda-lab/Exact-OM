@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from copy import deepcopy
 
+FORMS3_COPY = "exact-study-forms/3-copy-20261110"
+FORMS3_VERSIONS = ("exact-study-forms/3", FORMS3_COPY)
+
 YEARS = {
     "none": "None",
     "less_than_1": "Less than 1 year",
@@ -176,8 +179,21 @@ BACKGROUND = [
 
 def definitions(components=None, version="exact-study-forms/1", *, ordered=False):
     """Return a detached, ordered definition; historical versions are frozen in the DB."""
-    if version == "exact-study-forms/3":
-        return definitions3(components)
+    if version in FORMS3_VERSIONS:
+        result = definitions3(components)
+        if version == FORMS3_COPY:
+            result["version"] = version
+            result["collection_notice"] = ""
+            result["experience_note"] = ""
+            for q in result["background"]:
+                q["label"] = (
+                    q["label"]
+                    .replace(
+                        "study or professional experience", "experience through education or work"
+                    )
+                    .replace("in study or professional work", "in your education or work")
+                )
+        return result
     selected = {k: COMPONENTS[k] for k in (components if components is not None else COMPONENTS)}
     final = [
         question(
@@ -333,7 +349,7 @@ def validate_answers(form, answers, *, submitted, version=None):
         raise ValueError("Unknown questionnaire field")
     result = {}
     states = {}
-    corrected = version == "exact-study-forms/3"
+    corrected = version in FORMS3_VERSIONS
     for q in form:
         visible_answers = result if corrected else answers
         key = q["id"]

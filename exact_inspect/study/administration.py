@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 
+from .forms import FORMS3_VERSIONS
 from .models import Identifier, StrictModel
 
 
@@ -31,6 +33,51 @@ class RevisionPage(StrictModel):
     items: list[RevisionSummary]
     next_cursor: str | None
     order: str = "study_revision_ascending"
+
+
+class InvitationSummary(StrictModel):
+    session_id: str
+    generation: int
+    test: bool
+    stage: str
+
+
+class InvitationPage(StrictModel):
+    items: list[InvitationSummary]
+    next_cursor: str | None
+    study_closed: bool
+
+
+def invitations(store, revision, *, limit=50, cursor=None):
+    """List unrevoked links in one study without secrets or participant answers."""
+    with store.transaction() as db:
+        row, study = store._study(db, revision)
+        closed = bool(row["closed"]) or datetime.fromisoformat(study["closes_at"]) <= datetime.now(
+            timezone.utc
+        )
+        if closed:
+            return {"items": [], "next_cursor": None, "study_closed": True}
+        stage = (
+            "CAST(state AS json)->>'stage'" if store.postgres else "json_extract(state, '$.stage')"
+        )
+        rows = db.execute(
+            "SELECT id, generation, test, state FROM sessions "
+            f"WHERE study_revision = ? AND revoked = 0 AND {stage} <> 'closed' AND id > ? ORDER BY id LIMIT ?",
+            (revision, cursor or "", limit + 1),
+        ).fetchall()
+        return {
+            "items": [
+                {
+                    "session_id": r["id"],
+                    "generation": r["generation"],
+                    "test": bool(r["test"]),
+                    "stage": json.loads(r["state"])["stage"],
+                }
+                for r in rows[:limit]
+            ],
+            "next_cursor": rows[limit - 1]["id"] if len(rows) > limit else None,
+            "study_closed": False,
+        }
 
 
 def revisions(store, *, limit=50, cursor=None):
@@ -66,7 +113,7 @@ def revisions(store, *, limit=50, cursor=None):
                     "source_export_version": versions.get("export", "exact-study-analysis/1"),
                     "supported_analysis_schemas": (
                         ["exact-study-analysis/4"]
-                        if definition.get("form_version") == "exact-study-forms/3"
+                        if definition.get("form_version") in FORMS3_VERSIONS
                         else (
                             ["exact-study-analysis/2", "exact-study-analysis/3"]
                             if protocol == "exact-study/2.0"
