@@ -6,7 +6,9 @@
 // Exports name their derived schema explicitly: corrected exact-study/2.0 analyses request
 // exact-study-analysis/3 and the returned manifest is verified before anything is saved.
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+import { ActiveInvitations } from "./ActiveInvitations";
 
 import { Dialog } from "@/components/common/Dialog";
 import { IconCopy, IconDownload, IconWarning } from "@/components/common/Icons";
@@ -123,6 +125,8 @@ export function AdminApp() {
   const [count, setCount] = useState(10);
   const [test, setTest] = useState(true);
   const [sessionId, setSessionId] = useState("");
+  const [invitationRefresh, setInvitationRefresh] = useState(0);
+  useEffect(() => { setSessionId(""); setReissued(null); }, [revision, token]);
   const [reissued, setReissued] = useState<string | null>(null);
   const [format, setFormat] = useState<"json" | "csv">("json");
   const [includeTest, setIncludeTest] = useState(false);
@@ -363,7 +367,7 @@ export function AdminApp() {
                   disabled={!revision.trim() || busy !== null}
                   onClick={async () => {
                     const result = await run("invite", () => adminRequest<{ invitations: { session_id: string; invitation: string }[] }>(token, "POST", `/api/v1/admin/studies/${rev}/invitations`, { count, test }));
-                    if (result) setLinks(result.data.invitations.map((item) => ({ session_id: item.session_id, url: `${window.location.origin}${item.invitation}` })));
+                    if (result) { setLinks(result.data.invitations.map((item) => ({ session_id: item.session_id, url: `${window.location.origin}${item.invitation}` }))); setInvitationRefresh(n => n + 1); }
                   }}
                 >
                   Create links
@@ -403,10 +407,8 @@ export function AdminApp() {
 
             <section className="study-card" aria-labelledby="session-h">
               <h2 id="session-h">Replace or revoke one link</h2>
-              <div className="field">
-                <label htmlFor="session-id">Session ID</label>
-                <input id="session-id" className="input mono" value={sessionId} disabled={busy !== null} onChange={(event) => { setReissued(null); setSessionId(event.target.value); }} placeholder="From the issuance list" />
-              </div>
+              <ActiveInvitations key={revision} token={token} revision={revision.trim()} refresh={invitationRefresh} value={sessionId}
+                onSelect={(id) => { setSessionId(id); setReissued(null); }} disabled={busy !== null} />
               <div className="admin-inline">
                 <button
                   type="button"
@@ -414,7 +416,7 @@ export function AdminApp() {
                   disabled={!sessionId.trim() || busy !== null}
                   onClick={async () => {
                     const result = await run("reissue", () => adminRequest<{ invitation?: string }>(token, "POST", `/api/v1/admin/invitations/${encodeURIComponent(sessionId.trim())}/reissue`));
-                    if (result?.data.invitation) { setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setReissued(`${window.location.origin}${result.data.invitation}`); }
+                    if (result?.data.invitation) { setInvitationRefresh(n => n + 1); setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setReissued(`${window.location.origin}${result.data.invitation}`); }
                   }}
                 >
                   Issue a replacement link
@@ -425,7 +427,7 @@ export function AdminApp() {
                   disabled={!sessionId.trim() || busy !== null}
                   onClick={async () => {
                     const result = await run("revoke", () => adminRequest(token, "POST", `/api/v1/admin/invitations/${encodeURIComponent(sessionId.trim())}/revoke`));
-                    if (result) { setReissued(null); setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setMessage({ tone: "ok", text: "Link revoked. The old link and any browser signed in with it no longer work." }); }
+                    if (result) { setSessionId(""); setInvitationRefresh(n => n + 1); setReissued(null); setLinks((current) => current.filter((link) => link.session_id !== sessionId.trim())); setMessage({ tone: "ok", text: "Link revoked. The old link and any browser signed in with it no longer work." }); }
                   }}
                 >
                   Revoke

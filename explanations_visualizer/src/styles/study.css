@@ -1508,3 +1508,20 @@
 .question-nav .btn { max-width: 100%; white-space: normal; text-align: left; }
 .question-nav .btn.current { border-color: var(--ink); font-weight: 600; }
 #tutorial-heading:focus-visible, .assessment-item h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 4px; }
+
+/* Short optional inspection guides share the study's palette and text scaling. */
+.inspection-guides { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem; margin-block: 1rem; border: 1px solid var(--line); border-radius: 0.5rem; }
+.inspection-guides p { margin: 0.25rem 0 0; }
+.inspection-guide-content { padding: 1rem; }
+.guide-figure { margin: 1rem 0; padding: 1rem; background: var(--paper); border: 1px solid var(--line); border-radius: 0.5rem; }
+.guide-figure svg { display: block; width: 100%; height: auto; max-height: 12rem; }
+.guide-figure svg rect { fill: var(--paper); stroke: currentColor; }
+.guide-figure svg path { fill: none; stroke: currentColor; stroke-width: 2; }
+.guide-figure svg text { fill: currentColor; font-size: 22px; }
+.guide-figure svg text.guide-svg-small { font-size: 17px; }
+.guide-figure figcaption { font-size: 0.875rem; margin-top: 0.75rem; }
+.guide-editor-heading { font-weight: 600; border-bottom: 1px solid var(--line); padding-bottom: 0.5rem; }
+.guide-editor-columns { display: grid; grid-template-columns: 1fr 2fr; gap: 1rem; padding-block: 1rem; }
+.guide-editor-columns p { margin-block: 0.25rem 0.75rem; }
+.guide-code { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.875rem; }
+@media (max-width: 32rem) { .guide-editor-columns { grid-template-columns: 1fr; } }

@@ -6,6 +6,8 @@
 // save-and-return, never a false confirmation or a different study condition. Drafts never
 // advance; only the explicit Continue submits.
 
+import { InspectionGuides } from "./InspectionGuides";
+
 import { useEffect, useRef, useState } from "react";
 
 import { OPEN_HELP, ResourceList, SCOPE_NOTICE } from "@/components/study/Resources";
@@ -26,7 +28,7 @@ export const METHOD_LABELS: [string, string][] = [
 
 /** study-methods/3 (22 B06): Protégé is a recommendation, never a requirement or an assumed use. */
 export const METHOD_FREEDOM_V3 =
-  "Inspecting the supplied ontologies outside this site is optional. If you want a tool, we recommend Protégé, but you do not need to install or use it; a text editor, another method or no outside inspection at all are equally fine. You can combine methods and change them between cases. After each case we ask which methods, if any, you actually used for that case.";
+  "You can inspect the supplied files in Protégé, a text editor or another tool. You can combine methods and change them between cases. After each case, tell us which methods you used, if any.";
 
 /** Legacy (setup/2) wording, kept for historical publications. */
 export const METHOD_FREEDOM =
@@ -121,7 +123,7 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
     <div className="study-page">
       <div className="study-intro">
         <h1>Before you start: the task and the ontology files</h1>
-        <p className="lead">You do not need to install or use any particular program. Please read the task, check that you can get the two files, and confirm that you understand how outside inspection works in this study.</p>
+        <p className="lead">Read the task instructions and download the two ontology files.</p>
       </div>
 
       <section className="study-card" aria-labelledby="setup-task-h">
@@ -141,13 +143,13 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
         <p className="muted">{SCOPE_NOTICE}</p>
         <ResourceList resources={state.ontology_resources} />
         <p className="meta">{OPEN_HELP}</p>
+        <InspectionGuides />
         <fieldset className="question">
           <legend className="question-label">Can you get the two files?</legend>
-          <p className="meta">Downloading now is optional; this only checks that they are available to you if you want them.</p>
           <div className="option-grid option-grid-column">
             {(
               [
-                ["available", "Yes, I can download or open them if I want to"],
+                ["available", "Yes, I can download or open them"],
                 ["needs_help", "I have a problem getting them"],
               ] as [ResourceAccess, string][]
             ).map(([value, label]) => (
@@ -182,9 +184,8 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
 
       <section className="study-card" aria-labelledby="setup-familiar-h">
         <h2 id="setup-familiar-h">
-          4 · Methods you are familiar with <span className="meta">Optional</span>
+          4 · Methods for inspecting ontologies you are familiar with <span className="meta">Optional</span>
         </h2>
-        <p className="muted">This only describes your experience. It does not commit you to using anything, it is not taken as what you used in a case, and leaving it empty is fine.</p>
         <fieldset className="question">
           <legend className="sr-only">{familiarQuestion?.label ?? "Methods you are familiar with"}</legend>
           <div className="option-grid option-grid-column">
@@ -223,7 +224,6 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
             )}
           </div>
         )}
-        {v3 && state.forms.collection_notice && <p className="meta">{state.forms.collection_notice}</p>}
       </section>
 
       <div className="study-actions">

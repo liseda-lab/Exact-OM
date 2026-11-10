@@ -239,7 +239,7 @@ export function ParticipantApp() {
             session={session}
             formId="background"
             title="About your background"
-            intro={formsGeneration(state.forms.version) === 3 ? "Broad answers only. No name, email or institution is asked." : "Broad answers only. “Prefer not to say” is always available and is never read as a lack of experience."}
+            intro=""
             submitLabel={protocol === "v2" ? "Continue to the tutorial" : "Continue to practice"}
           />
         );
@@ -293,7 +293,7 @@ export function ParticipantApp() {
         );
         break;
       default:
-        body = null;
+        body = <MessagePage title="This study step could not be opened"><p>Please reload the page. If the problem continues, contact the study team.</p><button className="btn" onClick={() => window.location.reload()}>Reload study</button></MessagePage>;
     }
   }
 

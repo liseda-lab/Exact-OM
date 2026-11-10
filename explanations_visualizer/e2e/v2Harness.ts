@@ -81,7 +81,7 @@ export class ParticipantApi {
 
 /** The harness publication's form version (null without a harness). */
 export const harnessForms: string | null = harness ? publication().definition.form_version : null;
-const reviewForms = () => harnessForms === REVIEW_FORMS;
+const reviewForms = () => harnessForms === REVIEW_FORMS || harnessForms === "exact-study-forms/3-copy-20261110";
 
 /** Typed requirement evidence for every frozen lesson, built from the practice fixture. */
 function tutorialActions() {

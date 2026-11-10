@@ -243,7 +243,6 @@ export function ConsultationStageV2({ state, session, sourceLabel }: { state: St
         </button>
       </div>
       <p className="meta">You can use different methods, or none, in every case. Your answer here does not change your ranking.</p>
-      {v3 && state.forms.collection_notice && <p className="meta">{state.forms.collection_notice}</p>}
     </div>
   );
 }

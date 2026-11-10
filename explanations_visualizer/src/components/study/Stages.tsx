@@ -38,46 +38,44 @@ export function WelcomeStage({ state, session, protocol }: { state: StudyState; 
       <div className="study-intro">
         <h1>Welcome, and thank you for considering this study</h1>
         <p className="lead">
-          You will judge which concepts from one ontology mean the same as a concept from another, using two different sets of tools. You can pause at any point and come back with your private link.
+          You will compare concepts from two ontologies and decide which ones have the same meaning.
         </p>
       </div>
       <section className="study-card">
         <h2>What you will do</h2>
         {protocol === "v2" ? (
           <ol className="plain-steps">
-            <li>Read the task and check that you can get the two ontology files. You do not need to install or use any particular program.</li>
-            <li>Answer a few questions about your background. No name, email or institution is asked.</li>
-            <li>Learn the tools in a short interactive tutorial with practice examples, then answer five short questions about the task. Practice is not scored, and you can retry.</li>
-            <li>Rank candidates for {state.assigned_case_count || "a number of"} source concepts, in two blocks that use different tools. After each case, say which inspection methods, if any, you used for it.</li>
+            <li>Read the task and download the two ontology files.</li>
+            <li>Answer a few questions about your background.</li>
+            <li>Learn how to use the tool with a practice example, then answer five short questions. You can retry the practice and questions.</li>
+            <li>For each concept, choose and rank the proposed matches. In one part of the study you can use the explanations in this tool. In the other, you inspect the ontology files using your own methods. After each case, tell us which methods you used, if any.</li>
             <li>Tell us what helped and what was hard.</li>
           </ol>
         ) : (
           <ol className="plain-steps">
             <li>Check that Protégé is installed and both ontology files open.</li>
-            <li>Answer a few questions about your background. No name, email or institution is asked.</li>
+            <li>Answer a few questions about your background.</li>
             <li>Practise with the controls. Practice is not scored.</li>
             <li>Rank candidates for {state.assigned_case_count || "a number of"} source concepts, in two blocks that use different tools.</li>
             <li>Tell us what helped and what was hard.</li>
           </ol>
         )}
         <p className="muted">
-          We record your answers, the actions you take in the study pages and how long each step takes. We do not record what you do outside the study pages{protocol === "v1" ? ", including in Protégé" : ""}.
+          Your answers, the actions you take in the study pages and how long each step takes will be recorded.
         </p>
       </section>
       <section className="study-card study-card-info">
         <IconLink className="icon study-card-icon" />
         <div>
-          <h2>Keep your private link</h2>
+          <h2>Keep your private link secure</h2>
           <p>
-            Your link is the only way back to your answers, on this or any other device. Anyone who has it can continue as you, so please do not share it. We cannot look you up by name: if both the link and
-            this browser&apos;s session are lost, the session cannot be recovered.
+            Do not share your link. Anyone with it can access your study session.
           </p>
         </div>
       </section>
       <section className="study-card" aria-labelledby="consent-h">
         <div className="section-head">
           <h2 id="consent-h">Information and consent</h2>
-          <span className="meta">Version {state.information_version}</span>
         </div>
         <div className="consent-text prose" role="region" tabIndex={0} aria-label="Participant information and consent text">
           <Paragraphs text={state.information_text} />
@@ -203,7 +201,6 @@ export function FormStage({
       <div className="study-intro">
         <h1>{title}</h1>
         <p className="lead">{intro}</p>
-        {formId === "background" && state.forms.experience_note && <p className="muted">{state.forms.experience_note}</p>}
       </div>
       <QuestionnaireForm
         questions={questions}

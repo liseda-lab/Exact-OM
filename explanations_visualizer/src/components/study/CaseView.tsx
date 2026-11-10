@@ -324,7 +324,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
       <section className="study-card baseline-tools">
         <h2>Inspect with your own methods</h2>
         <p>
-          This block shows no explanations. Inspect the source and candidates in any way you choose: an ontology editor such as Protégé, a viewer, the files directly, queries, or none of these. Copy an IRI to find an entity in the files or in your tool.
+          Inspect the source concept and the candidates in the supplied ontology files. You can use Protégé, a text editor or another method. Copy an IRI to find the concept in the file.
         </p>
         <ResourceList resources={state.ontology_resources} compact onDownload={(asset) => telemetry.emit("external_resource_link", { component: "downloads", element: asset })} />
         <p className="meta">Time you spend inspecting before you submit counts as part of this case. Switching windows does not pause anything.</p>

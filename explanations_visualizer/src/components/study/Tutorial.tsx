@@ -10,6 +10,8 @@
 // another device restores the server's acknowledged position, and focus follows deliberate
 // navigation only (19 F13).
 
+import { InspectionGuides } from "./InspectionGuides";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Dialog } from "@/components/common/Dialog";
@@ -366,6 +368,7 @@ function Tutorial({ state, session, tutorial, onPause, telemetry }: { state: Stu
           </ol>
         </nav>
       </div>
+      <InspectionGuides />
       {index === 0 && view !== "assessment" && <p className="tutorial-intro">{tutorial.intro}</p>}
       {restoredPending && session.pendingCount() > 0 && (
         <p className="note" role="status">
