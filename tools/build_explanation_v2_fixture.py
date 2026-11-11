@@ -18,9 +18,9 @@ from exact_inspect.study.v2_models import TutorialDefinition
 from exact_inspect.study.workspace import build_workspace_scope
 
 
-def _base_publication():
+def _base_publication(case_count=4):
     cases, keys, schedules = [], [], []
-    for index in range(4):
+    for index in range(case_count):
         candidates = [
             dict(
                 candidate_id=f"candidate-{i}",
@@ -47,8 +47,12 @@ def _base_publication():
         keys.append(
             dict(
                 case_id=f"case-{index}",
-                case_kind="answer_present" if index < 2 else "answer_absent",
-                acceptable_candidate_ids=[f"candidate-{index+1}"] if index < 2 else [],
+                case_kind="answer_present" if case_count != 4 or index < 2 else "answer_absent",
+                acceptable_candidate_ids=(
+                    [f"candidate-{index % 5 + 1}"]
+                    if case_count != 4
+                    else [f"candidate-{index+1}"] if index < 2 else []
+                ),
                 adjudication_version="synthetic-key-v2",
                 criterion="Invented fixture equivalence only",
                 evidence=["Synthetic test oracle; not biomedical adjudication"],
@@ -60,11 +64,11 @@ def _base_publication():
         blocks = [
             dict(
                 condition="explanation",
-                case_ids=["case-0", "case-2"] if form == 0 else ["case-1", "case-3"],
+                case_ids=[f"case-{i}" for i in range(case_count) if i % 2 == form],
             ),
             dict(
                 condition="ontology_baseline",
-                case_ids=["case-1", "case-3"] if form == 0 else ["case-0", "case-2"],
+                case_ids=[f"case-{i}" for i in range(case_count) if i % 2 != form],
             ),
         ]
         schedules.extend(
@@ -99,6 +103,7 @@ def publication_v2(
     paged_facts=0,
     forms_version="exact-study-forms/2",
     visibility_policy=None,
+    case_count=4,
 ):
     import pyowl_core as core
 
@@ -111,14 +116,16 @@ def publication_v2(
         raise ValueError("Forms/3 fixtures require analysis/4")
     root = Path(root)
     root.mkdir(parents=True, exist_ok=True)
-    legacy = _base_publication()
+    if not 4 <= case_count <= 40 or case_count % 2:
+        raise ValueError("Fixture requires an even case count from four to forty")
+    legacy = _base_publication(case_count)
     study = legacy["definition"]
     authored = json.loads(
         (Path(__file__).resolve().parent / "fixtures/study_tutorial_v2.json").read_text()
     )
     tutorial = authored["tutorial"]
     contexts = {}
-    for name, indices in (("source", range(4)), ("target", range(1, 6))):
+    for name, indices in (("source", range(case_count)), ("target", range(1, 6))):
         axioms = [f"Declaration(Class(<urn:{name}:parent>))"]
         for i in indices:
             iri = f"urn:{name}:{i}"

@@ -748,14 +748,15 @@ function Assessment({
   const progress = state.tutorial_progress ?? null;
   const passed = new Set(progress?.passed_items ?? []);
   const [busy, setBusy] = useState(false);
+  const [confirmSkip, setConfirmSkip] = useState(false);
   const outstanding = progress?.outstanding ?? [...outstandingLessons.map((lesson) => lesson.lesson_id), ...tutorial.assessment.filter((item) => !passed.has(item.question_id)).map((item) => item.question_id)];
   // One question at a time (21 F02). The landing position (no question) shows the first one.
   const currentIndex = Math.max(0, tutorial.assessment.findIndex((item) => item.question_id === focusedQuestion));
   const current = tutorial.assessment[currentIndex];
-  const finish = async () => {
+  const finish = async (skipConfirmed = false) => {
     setBusy(true);
     try {
-      await session.mutate({ method: "POST", path: "/api/v1/study/tutorial/complete", body: { tutorial_version: tutorial.version }, transition: true });
+      await session.mutate({ method: "POST", path: "/api/v1/study/tutorial/complete", body: { tutorial_version: tutorial.version, ...(skipConfirmed ? { skip_confirmed: true } : {}) }, transition: true });
     } catch {
       /* the header explains; nothing is allocated unless the server accepts completion */
     } finally {
@@ -794,11 +795,20 @@ function Assessment({
           </button>
         )}
       </div>
+      {confirmSkip && <Dialog title="Skip the rest of the tutorial?" onClose={() => setConfirmSkip(false)}>
+        <div className="inspection-guide-content">
+          <p>You have unfinished practice or questions. You can continue to the study cases now, or return to the tutorial.</p>
+          <div className="study-actions">
+            <button type="button" className="btn" onClick={() => setConfirmSkip(false)}>Return to tutorial</button>
+            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => void finish(true)}>{busy ? "Starting…" : "Skip tutorial and start cases"}</button>
+          </div>
+        </div>
+      </Dialog>}
       <section className="study-card" aria-labelledby="finish-h">
         <h2 id="finish-h">Finish the tutorial</h2>
         {outstanding.length ? (
           <>
-            <p>Before the scored cases, the study server still needs:</p>
+            <p>Practice and questions you have not finished:</p>
             <ul>
               {outstanding.map((id) => (
                 <li key={id}>
@@ -819,7 +829,7 @@ function Assessment({
           <p>Everything is done. Your cases are assigned when you start; every participant receives this same tutorial first.</p>
         )}
         <div className="study-actions">
-          <button type="button" className="btn btn-primary btn-large" disabled={busy || outstanding.length > 0} onClick={finish}>
+          <button type="button" className="btn btn-primary btn-large" disabled={busy || (outstanding.length > 0 && !state.tutorial_skip_allowed)} onClick={() => outstanding.length > 0 ? setConfirmSkip(true) : void finish()}>
             {busy ? "Saving…" : "Finish the tutorial and start the scored cases"}
           </button>
         </div>

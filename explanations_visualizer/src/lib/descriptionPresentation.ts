@@ -41,7 +41,7 @@ export function textOrigin(explanation: GeneratedExplanation): "original" | "der
 function tagFor(explanation: GeneratedExplanation): PresentationView["tag"] {
   switch (explanation.support_status) {
     case "independently_reviewed":
-      return { text: "Generated · reviewed", tone: "generated" };
+      return { text: "Generated", tone: "generated" };
     case "typed_template_support":
       // A typed rendering either reads necessary conditions from axioms or quotes a definition.
       return explanation.preparation_kind === "fact_extract" ? { text: "Original excerpts", tone: "original" } : { text: "From original axioms", tone: "derived" };

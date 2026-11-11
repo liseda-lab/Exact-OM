@@ -189,7 +189,7 @@ class StudyDefinition(StrictModel):
     launch_approvals: Annotated[list[str], Field(min_length=0)] = Field(default_factory=list)
     cases: Annotated[list[FrozenCase], Field(min_length=2)]
     assets: list[Asset] = Field(default_factory=list)
-    schedules: Annotated[list[Schedule], Field(min_length=4, max_length=64)]
+    schedules: Annotated[list[Schedule], Field(max_length=64)]
     components: list[
         Literal[
             "original_context",
@@ -270,6 +270,17 @@ class StudyDefinition(StrictModel):
             raise ValueError("Asset and admission receipt paths must be unique")
         if any(a.policy_hash != self.policy_hash for a in self.assets):
             raise ValueError("All resources must share the frozen information policy")
+        sampling = getattr(self, "sampling", None)
+        if sampling:
+            from .sampling import validate_pool
+
+            validate_pool(self.cases, sampling)
+            if self.schedules:
+                raise ValueError(
+                    "Rank-balanced sampling owns block orders; schedules must be empty"
+                )
+        elif len(self.schedules) < 4:
+            raise ValueError("Fixed allocation requires at least four schedules")
         groups = {c.case_id: c.transfer_group for c in self.cases}
         conditions = {cid: set() for cid in ids}
         signatures = set()
@@ -285,7 +296,9 @@ class StudyDefinition(StrictModel):
             for block in schedule.blocks:
                 for cid in block.case_ids:
                     conditions[cid].add(block.condition)
-        if len(signatures) != len(self.schedules) or any(len(v) != 2 for v in conditions.values()):
+        if not sampling and (
+            len(signatures) != len(self.schedules) or any(len(v) != 2 for v in conditions.values())
+        ):
             raise ValueError("Schedules must cross complementary forms and block orders")
         for signature in signatures:
             if tuple(reversed(signature)) not in signatures:

@@ -107,7 +107,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
   const [inspecting, setInspecting] = useState<string | null>(null);
   const [viewed, setViewed] = useState<Set<string>>(new Set());
   const [submitting, setSubmitting] = useState(false);
-  const [showInstructions, setShowInstructions] = useState(true);
+  const [showInstructions, setShowInstructions] = useState(!state.planned_case_count);
   const [tab, setTab] = useState<string | null>(null);
   const [sourceFocus, setSourceFocus] = useState<Focus | null>(null);
   const [targetFocus, setTargetFocus] = useState<Record<string, Focus | null>>({});
@@ -259,6 +259,8 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
   const focal = new Set([studyCase.source, ...studyCase.candidates.map((candidate) => candidate.entity)].map((entity) => `${entity.ontology_version_id}|${entity.kind}|${entity.iri}`));
   const isFocal = (entity: EntityRef) => focal.has(`${entity.ontology_version_id}|${entity.kind}|${entity.iri}`);
   const inspected = studyCase.candidates.find((candidate) => candidate.candidate_id === inspecting) ?? studyCase.candidates[0];
+  const orderedCandidates = [...studyCase.candidates].sort((a, b) => a.display_position - b.display_position);
+  const inspectedIndex = orderedCandidates.findIndex(candidate => candidate.candidate_id === inspected.candidate_id);
   const inspect = (id: string) => {
     setInspecting(id);
     setViewed((current) => new Set([...current, id]));
@@ -269,6 +271,11 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
   const question = (names: { source: string | null; target: string | null }) => (
     <div className="pair-header">
       <div className="pair-heading">
+        <nav className="candidate-navigation" aria-label="Inspect candidates">
+          <button type="button" className="btn btn-sm" disabled={inspectedIndex <= 0} onClick={() => inspect(orderedCandidates[inspectedIndex - 1].candidate_id)}>Previous candidate</button>
+          <span className="meta" aria-live="polite">Candidate {inspectedIndex + 1} of {orderedCandidates.length}</span>
+          <button type="button" className="btn btn-sm" disabled={inspectedIndex >= orderedCandidates.length - 1} onClick={() => inspect(orderedCandidates[inspectedIndex + 1].candidate_id)}>Next candidate</button>
+        </nav>
         <span className="meta">
           Inspecting initial position {inspected.display_position} of {studyCase.candidates.length} · matching score {inspected.score.toFixed(2)}
         </span>

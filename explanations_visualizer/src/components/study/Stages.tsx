@@ -48,7 +48,7 @@ export function WelcomeStage({ state, session, protocol }: { state: StudyState; 
             <li>Read the task and download the two ontology files.</li>
             <li>Answer a few questions about your background.</li>
             <li>Learn how to use the tool with a practice example, then answer five short questions. You can retry the practice and questions.</li>
-            <li>For each concept, choose and rank the proposed matches. In one part of the study you can use the explanations in this tool. In the other, you inspect the ontology files using your own methods. After each case, tell us which methods you used, if any.</li>
+            <li>For each concept, choose and rank the proposed matches. In one part of the study you can use the explanations in this tool. In the other, you inspect the ontology files using your own methods. {state.consultation_scope === "baseline_cases" ? "After each case without explanations, tell us which inspection methods you used, if any." : state.consultation_scope === "none" ? "" : "After each case, tell us which methods you used, if any."}</li>
             <li>Tell us what helped and what was hard.</li>
           </ol>
         ) : (

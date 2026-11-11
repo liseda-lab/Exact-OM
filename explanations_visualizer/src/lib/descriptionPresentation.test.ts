@@ -30,7 +30,7 @@ test("artifact roles resolve by entity identity, not column position (23 C03)", 
 test("each preparation keeps its own label", () => {
   assert.equal(profileView(artifact("necessary_conditions", "typed_template_support", [DOID], { c: ["source"] }, ["source"])).title, "Necessary conditions");
   assert.deepEqual(profileView(artifact("necessary_conditions", "typed_template_support", [DOID], { c: ["source"] }, ["source"])).tag, { text: "From original axioms", tone: "derived" });
-  assert.equal(profileView(artifact("reviewed_profile", "independently_reviewed", [DOID], { c: ["source"] }, ["source"])).tag.text, "Generated · reviewed");
+  assert.equal(profileView(artifact("reviewed_profile", "independently_reviewed", [DOID], { c: ["source"] }, ["source"])).tag.text, "Generated");
   assert.equal(profileView(artifact("available_facts", "fallback", [DOID], { c: ["source"] }, ["source"])).title, "Available facts");
   assert.equal(comparisonView(artifact("paired_context", "exact_support", [NCIT, DOID], { a: ["source"], b: ["target"] }, ["source", "target"]), ["source", "target"]).title, "Definitions side by side");
   // Typed-readable/3 paired definitions are quoted excerpts (fact_extract), not readings of axioms.
@@ -50,7 +50,7 @@ test("generated reviewed prose is never presented as a quotation; only declared 
   assert.equal(pairedView.title, "Descriptions side by side");
   assert.equal(pairedView.quote, false);
   assert.doesNotMatch(pairedView.intro ?? "", /Quoted/);
-  assert.deepEqual(pairedView.tag, { text: "Generated · reviewed", tone: "generated" });
+  assert.deepEqual(pairedView.tag, { text: "Generated", tone: "generated" });
   // The five reviewed comparisons whose only claim is a meaning summary stay grouped, unquoted.
   const meaningOnly = with_("reviewed_comparison", "independently_reviewed", "grounded_description", { m: ["source", "target"] });
   assert.equal(comparisonView(meaningOnly, ["source", "target"]).quote, false);

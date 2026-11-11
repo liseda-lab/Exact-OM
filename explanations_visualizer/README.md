@@ -167,3 +167,6 @@ and `EXACT_E2E_PAGED_SOURCE` (the fixture's source ontology version).
 Production uses the static `out/` export served by `exact-inspect`; `next start` is not
 compatible with this export mode.
 
+
+The [final-study preparation handoff](../docs/verification/explanation-final-study-preparation-20261111.md)
+describes the ten-case protocol, private 40-source catalogue, generated-text review and publication boundary.

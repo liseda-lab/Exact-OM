@@ -306,6 +306,7 @@ class TutorialAssessment(Mutation):
 
 class TutorialComplete(Mutation):
     tutorial_version: Identifier
+    skip_confirmed: bool = False
 
 
 class AttemptReceipt(StrictModel):
@@ -332,6 +333,7 @@ class TutorialReceipt(StrictModel):
     outstanding: list[Identifier]
     help_opened: int
     completed_at: str | None
+    skipped_at: str | None = None
 
 
 class ConsultationDraftV2(Mutation):
@@ -416,7 +418,24 @@ class ProtocolVersionsV3(StrictModel):
     export: Literal["exact-study-analysis/4"]
 
 
+class RankStratum(StrictModel):
+    reference_rank: Annotated[int, Field(ge=1, le=5)]
+    case_ids: Annotated[list[Identifier], Field(min_length=2, max_length=40)]
+
+
+class RankBalancedSampling(StrictModel):
+    """Private reference-aware design; never projected into participant responses."""
+
+    version: Literal["rank-balanced/1"] = "rank-balanced/1"
+    selection_manifest_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    reference_alignment_sha256: Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
+    strata: Annotated[list[RankStratum], Field(min_length=5, max_length=5)]
+
+
 class StudyDefinitionV2(StudyDefinition):
+    consultation_scope: Literal["each_case", "baseline_cases", "none"] = "each_case"
+    sampling: RankBalancedSampling | None = None
+    tutorial_skip_allowed: bool = False
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
     form_version: Identifier = "exact-study-forms/2"
     tutorial_steps: list[str] = Field(default_factory=list)
@@ -488,6 +507,9 @@ class FormsV2(StrictModel):
 
 
 class StudyStateV2(StudyState):
+    consultation_scope: Literal["each_case", "baseline_cases", "none"] = "each_case"
+    planned_case_count: Annotated[int | None, Field(ge=1)] = None
+    tutorial_skip_allowed: bool = False
     contract_version: Literal["exact-study/2.0"] = "exact-study/2.0"
     # Old immutable mutation receipts may omit this additive runtime capability.
     integration_contract: Literal["study-integration/1"] | None = None

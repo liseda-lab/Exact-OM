@@ -107,6 +107,14 @@ def csv_archive(export):
                 "setup": session["setup"],
                 **(
                     {
+                        "tutorial_status": session["tutorial_status"],
+                        "tutorial_skipped_at": session.get("tutorial_skipped_at"),
+                    }
+                    if "tutorial_status" in session
+                    else {}
+                ),
+                **(
+                    {
                         "tutorial_timing": session["tutorial_timing"],
                         "tutorial_observed_seconds": session["tutorial_observed_seconds"],
                     }

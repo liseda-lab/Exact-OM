@@ -473,8 +473,26 @@ class ExplanationResource(StrictModel):
                             **(
                                 {
                                     "render_revision": claim.packet_render_revision,
+                                    # Reconstruct the packet projection, not the larger
+                                    # public transport model (nulls, qualifiers, aliases).
+                                    # Otherwise a valid 48 KiB packet can fail admission.
                                     "referenced_labels": [
-                                        f.model_dump(mode="json")
+                                        {
+                                            "fact_id": f.fact_id,
+                                            "subject": f.subject.model_dump(mode="json"),
+                                            "predicate_iri": f.predicate_iri,
+                                            "category": f.category,
+                                            "value": f.value.model_dump(
+                                                mode="json", exclude_none=True
+                                            ),
+                                            "axiom_ref": f.axiom_ref,
+                                            "interpretation": f.interpretation,
+                                            "origins": [
+                                                o.model_dump(mode="json") for o in f.origins
+                                            ],
+                                            "premise_ids": f.premises,
+                                            "derivation_id": f.derivation,
+                                        }
                                         for f in self.referenced_labels
                                         if f.fact_id in claim.packet_reference_label_ids
                                     ],

@@ -452,6 +452,7 @@ export interface TutorialProgress {
   outstanding: string[];
   help_opened: number;
   completed_at: string | null;
+  skipped_at?: string | null;
 }
 
 export type ConsultationMethod = "protege" | "other_editor" | "plain_files" | "other_resource" | "queries_scripts" | "reasoner" | "other_method";
@@ -479,6 +480,9 @@ export interface ConsultationReceiptV2 extends ConsultationDraftV2 {
 
 /** Fields a v2 StudyState adds; all optional so a v1 state type-checks unchanged. */
 export interface StudyStateV2Fields {
+  consultation_scope?: "each_case" | "baseline_cases" | "none";
+  planned_case_count?: number | null;
+  tutorial_skip_allowed?: boolean;
   tutorial?: TutorialPublic | null;
   tutorial_progress?: TutorialProgress | null;
   consultation_draft?: ConsultationDraftV2 | null;

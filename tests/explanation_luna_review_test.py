@@ -30,13 +30,11 @@ from tools.review_luna_bundle import source_result, wire
 @pytest.fixture
 def reviewed_labels(tmp_path):
     context = build_context_package(
-        core.load_snapshot(
-            b"""Ontology(
+        core.load_snapshot(b"""Ontology(
       Declaration(Class(<urn:A>)) Declaration(Class(<urn:B>))
       AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:A> "Focal")
       AnnotationAssertion(<http://www.w3.org/2000/01/rdf-schema#label> <urn:B> "Parent")
-      SubClassOf(<urn:A> <urn:B>))"""
-        ),
+      SubClassOf(<urn:A> <urn:B>))"""),
         tmp_path / "context",
     )
     entity = EntityRef(ontology_version_id=context.ontology_version_id, iri="urn:A", kind="class")
@@ -166,3 +164,37 @@ def test_provider_never_becomes_approved_without_receipt(reviewed_labels):
     *_, source, raw, receipt, result = reviewed_labels
     assert source["support_status"] == "fallback"
     assert result["support_status"] == "independently_reviewed"
+
+
+def test_final_admission_requires_exact_separate_decisions(reviewed_labels, tmp_path):
+    from tools.admit_final_study_prose import admit
+
+    _, _, _, source, raw, receipt, _ = reviewed_labels
+    root = tmp_path / "review"
+    jid = source["explanation_id"].removeprefix("sha256:")
+    atomic_json(
+        root / "plan.json", {"jobs": [{"job_id": source["explanation_id"], "old_id": "original"}]}
+    )
+    atomic_json(root / "generation" / jid / "source.json", source)
+    atomic_json(
+        root / "generation" / jid / "response.json",
+        {"response": raw, "sha256": canonical_hash(raw)},
+    )
+    atomic_json(root / "review-requests" / (jid + ".json"), build_review_request(source, raw))
+    decisions = tmp_path / "decisions.json"
+    atomic_json(decisions, [])
+    with pytest.raises(ValueError, match="exactly all reviewable"):
+        admit(
+            root,
+            decisions,
+            "synthetic-reviewer",
+            "Synthetic explicit decisions for this test only.",
+        )
+    assert not (root / "reviewed-results.json").exists()
+    decision = {k: receipt["decisions"][0][k] for k in ("decision", "support_explanation")}
+    atomic_json(decisions, [{"id": jid, "decisions": [decision]}])
+    admit(root, decisions, "synthetic-reviewer", "Synthetic explicit decisions for this test only.")
+    result = json.loads((root / "reviewed-results.json").read_text())
+    assert result["claim_counts"] == {"approved": 1}
+    assert result["results"]["original"]["support_status"] == "independently_reviewed"
+    assert json.loads((root / "generation" / jid / "source.json").read_text()) == source

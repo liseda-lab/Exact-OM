@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 import { IconCheck, IconOffline, IconSpinner, IconWarning } from "@/components/common/Icons";
-import { TextSizeControl } from "@/components/shell/Preferences";
+import { TextSizeControl, ThemeControl } from "@/components/shell/Preferences";
 import type { StudySession } from "@/study/session";
 import type { Stage } from "@/study/types";
 
@@ -57,12 +57,14 @@ export function StudyHeader({
   stage,
   progress,
   condition,
+  caseProgress,
   onPause,
   tutorialLabel = "Practice",
 }: {
   session: StudySession;
   stage: Stage | null;
   progress?: string | null;
+  caseProgress?: { completed: number; total: number } | null;
   condition?: string | null;
   onPause?: () => void;
   tutorialLabel?: string;
@@ -97,7 +99,14 @@ export function StudyHeader({
           </button>
         )}
         <TextSizeControl compact />
+        <ThemeControl />
       </div>
+      {caseProgress && caseProgress.total > 0 && (
+        <div className="study-case-progress">
+          <label htmlFor="case-progress">{caseProgress.completed} of {caseProgress.total} cases completed · {Math.max(0, caseProgress.total - caseProgress.completed)} remaining</label>
+          <progress id="case-progress" max={caseProgress.total} value={caseProgress.completed} />
+        </div>
+      )}
       {index >= 0 && (
         <nav aria-label="Study steps" className="study-steps">
           <ol>
@@ -106,7 +115,7 @@ export function StudyHeader({
                 <span className="study-step-bar" aria-hidden="true" />
                 <span className="study-step-label">
                   {step.label === "Practice" ? tutorialLabel : step.label}
-                  {position < index && <span className="sr-only"> (completed)</span>}
+                  {position < index && <span className="sr-only">{step.label === "Practice" && session.state?.tutorial_progress?.skipped_at ? " (skipped)" : " (completed)"}</span>}
                 </span>
               </li>
             ))}

@@ -57,7 +57,7 @@ def label_facts(packet):
 
 def enrich(packet, contexts, policy):
     """Add only bounded original labels for exact typed references; no new medical facts."""
-    labels, used = [], 0
+    labels = []
     refs = sorted(
         {
             (f["subject"]["ontology_version_id"], iri, kind)
@@ -89,10 +89,10 @@ def enrich(packet, contexts, policy):
             "category",
         }
         fact = {k: v for k, v in fact.items() if k in allowed}
-        size = len(canonical_json(fact))
-        if used + size > 48 * 1024:
+        # The contract bounds the serialized array, including brackets/commas.
+        # Counting only individual records could admit an array a few bytes over.
+        if len(canonical_json(labels + [fact])) > 48 * 1024:
             continue
-        used += size
         labels.append(fact)
     result = packet.model_copy(
         update={

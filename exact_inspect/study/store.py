@@ -144,6 +144,12 @@ class StudyStore:
     def publish(self, publication: Publish):
         """Verify and freeze participant packages; store keys in a separate table."""
         study = publication.definition.model_dump(mode="json")
+        if not study.get("tutorial_skip_allowed"):
+            study.pop("tutorial_skip_allowed", None)
+        if study.get("consultation_scope") == "each_case":
+            study.pop("consultation_scope", None)
+        if study.get("sampling") is None:
+            study.pop("sampling", None)
         # Preserve canonical bytes/idempotent publication for pre-practice definitions.
         if not study["practice_cases"]:
             study.pop("practice_cases")
@@ -238,6 +244,13 @@ class StudyStore:
                 key["original_production_ranks"][c["candidate_id"]] for c in case["candidates"]
             ] != list(range(1, 6)):
                 raise StudyError(422, "Natural candidates must retain the untouched top five")
+        if study.get("sampling"):
+            from .sampling import validate_reference_strata
+
+            try:
+                validate_reference_strata(study, keys)
+            except ValueError as exc:
+                raise StudyError(422, str(exc)) from exc
         admitted_ontologies = {}
         admitted_explanations = {}
         for asset in study["assets"]:
@@ -596,7 +609,7 @@ class StudyStore:
             ),
             "current_case_id": case_id,
             "current_presentation_id": current["presentation_id"] if current else None,
-            "completed_cases": len(state["consultations"]),
+            "completed_cases": state["case_index"],
             "assigned_case_count": (
                 len(state["assignment"]["presentations"]) if state["assignment"] else 0
             ),
@@ -652,6 +665,17 @@ class StudyStore:
             submitted = list(state["consultations"].values())
             result.update(
                 {
+                    **(
+                        {"consultation_scope": study["consultation_scope"]}
+                        if study.get("consultation_scope")
+                        else {}
+                    ),
+                    **({"planned_case_count": 10} if study.get("sampling") else {}),
+                    **(
+                        {"tutorial_skip_allowed": True}
+                        if study.get("tutorial_skip_allowed")
+                        else {}
+                    ),
                     "integration_contract": "study-integration/1",
                     "tutorial": public_tutorial(study["tutorial"]),
                     "tutorial_progress": state["tutorial_progress"],
@@ -676,9 +700,14 @@ class StudyStore:
                 (row["study_revision"], row["test"]),
             ).fetchall()
         )
-        schedule = study["schedules"][sequence % len(study["schedules"])]
         seed = secrets.randbits(63)
         rng = random.Random(seed)
+        if study.get("sampling"):
+            from .sampling import sample_blocks
+
+            schedule = sample_blocks(study["sampling"], sequence, rng)
+        else:
+            schedule = study["schedules"][sequence % len(study["schedules"])]
         presentations = []
         for block_index, block in enumerate(schedule["blocks"]):
             case_ids = list(block["case_ids"])
@@ -708,6 +737,8 @@ class StudyStore:
     def mutate(self, sid, generation, operation, payload, case_id=None):
         """Replay an identical acknowledged mutation before checking stale revisions."""
         data = payload.model_dump(mode="json")
+        if operation == "tutorial_complete" and "skip_confirmed" not in payload.model_fields_set:
+            data.pop("skip_confirmed", None)
         if operation == "tutorial_progress" and "position" not in payload.model_fields_set:
             # Old requests were hashed with all old defaults. Keep that exact
             # canonical shape; omission/null of the legacy alias both preserve position.
@@ -840,11 +871,13 @@ class StudyStore:
                 raise StudyError(409, "Tutorial version changed")
             progress = state["tutorial_progress"]
             if stage != "tutorial" and not (
-                progress["completed_at"]
+                (progress["completed_at"] or progress.get("skipped_at"))
                 and operation == "tutorial_progress"
                 and stage in {"case", "consultation", "final", "paused"}
             ):
-                if operation == "tutorial_complete" and progress["completed_at"]:
+                if operation == "tutorial_complete" and (
+                    progress["completed_at"] or progress.get("skipped_at")
+                ):
                     return
                 raise StudyError(409, "Tutorial is unavailable at this step")
             from .tutorial import apply_progress, attempt, refresh_outstanding
@@ -862,7 +895,10 @@ class StudyStore:
                     attempt(study["tutorial"], progress, data, utcnow())
                 elif operation == "tutorial_complete":
                     refresh_outstanding(study["tutorial"], progress)
-                    if progress["outstanding"]:
+                    skipping = data.get("skip_confirmed", False)
+                    if skipping and not study.get("tutorial_skip_allowed"):
+                        raise StudyError(422, "Skipping is not enabled for this study revision")
+                    if progress["outstanding"] and not skipping:
                         raise StudyError(
                             422, "Required tutorial lessons or assessment items are incomplete"
                         )
@@ -872,7 +908,7 @@ class StudyStore:
                         raise StudyError(
                             409, "Setup and background must be submitted before allocation"
                         )
-                    progress["completed_at"] = utcnow()
+                    progress["skipped_at" if skipping else "completed_at"] = utcnow()
                     self._allocate(db, row, state, study)
                 else:
                     raise StudyError(404, "Unknown tutorial operation")
@@ -1026,7 +1062,13 @@ class StudyStore:
             if operation == "submit":
                 # Saving an answer must survive telemetry loss. Missing case-ready
                 # evidence stays explicit in the timing export instead of blocking it.
-                state["stage"] = "consultation"
+                from .sampling import consultation_requested
+
+                if consultation_requested(study, current["condition"]):
+                    state["stage"] = "consultation"
+                else:
+                    state["case_index"] += 1
+                    state["stage"] = "case" if self._current(state) else "final"
             now = utcnow()
             state["rankings"][case_id] = {
                 "artifact_type": "ranking_response",
@@ -1361,6 +1403,7 @@ class StudyStore:
             method_response_rows,
             observation_summary,
         )
+        from .sampling import consultation_requested
 
         with self.transaction() as db:
             study_row, study = self._study(db, revision)
@@ -1529,6 +1572,19 @@ class StudyStore:
                                 else None
                             ),
                             "consultation": consultations.get(cid),
+                            **(
+                                {
+                                    "consultation_collection_status": (
+                                        "not_requested"
+                                        if not consultation_requested(
+                                            study, presentation["condition"]
+                                        )
+                                        else "submitted" if cid in consultations else "unanswered"
+                                    )
+                                }
+                                if study.get("consultation_scope")
+                                else {}
+                            ),
                             "timing": timing,
                             "missingness_reason": (
                                 None
@@ -1582,6 +1638,24 @@ class StudyStore:
                         **(
                             {
                                 "tutorial_progress": state["tutorial_progress"],
+                                **(
+                                    {
+                                        "tutorial_status": (
+                                            "skipped"
+                                            if state["tutorial_progress"].get("skipped_at")
+                                            else (
+                                                "completed"
+                                                if state["tutorial_progress"].get("completed_at")
+                                                else "incomplete"
+                                            )
+                                        ),
+                                        "tutorial_skipped_at": state["tutorial_progress"].get(
+                                            "skipped_at"
+                                        ),
+                                    }
+                                    if study.get("tutorial_skip_allowed")
+                                    else {}
+                                ),
                                 "tutorial_outcomes": {
                                     q["question_id"]: {
                                         "first": next(
@@ -1692,6 +1766,25 @@ class StudyStore:
                 content.update(purpose="development_review", correctness_metrics="disabled")
                 content["summary"] = {"status": "disabled_development_review"}
                 content["condition_summaries"] = {}
+            if study.get("consultation_scope"):
+                content["consultation_scope"] = study["consultation_scope"]
+                content["data_dictionary"]["consultation_collection_status"] = (
+                    "not_requested is a protocol decision, never a no-use answer; submitted is an "
+                    "explicit receipt; unanswered means a requested response is missing."
+                )
+            if study.get("sampling"):
+                content["sampling_design"] = study["sampling"]
+                content["data_dictionary"]["sampling_design"] = (
+                    "Private reference-rank strata and input hashes. Each frozen assignment has "
+                    "ten distinct cases, one per rank per condition; block orders alternate within "
+                    "test and participant sequences independently. Selection is purposive, not "
+                    "representative of the full matcher run."
+                )
+            if study.get("tutorial_skip_allowed"):
+                content["data_dictionary"].update(
+                    tutorial_status="Completed, explicitly skipped, or incomplete tutorial; skipped never means passed.",
+                    tutorial_skipped_at="Server UTC timestamp of the confirmed skip, otherwise null. Partial attempts remain in tutorial_progress.",
+                )
             if include_keys:
                 content["researcher_case_keys"] = keys
             export_id, now = str(uuid4()), utcnow()

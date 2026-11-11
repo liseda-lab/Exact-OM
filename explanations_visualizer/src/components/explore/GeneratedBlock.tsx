@@ -107,7 +107,7 @@ export function withReferencedLabels(cite: (factId: string) => CitedFact | undef
 }
 
 const SUPPORT_NAMES: Record<string, string> = {
-  independently_reviewed: "Generated text, independently reviewed sentence by sentence",
+  independently_reviewed: "Generated text",
   typed_template_support: "A fixed reading of the original axioms (no language model)",
   exact_support: "Exact quotations of original records",
   fallback: "Original facts only; no description could be prepared",

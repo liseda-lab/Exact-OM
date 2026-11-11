@@ -175,7 +175,7 @@ export function SetupStageV2({ state, session }: { state: StudyState; session: S
 
       <section className="study-card" aria-labelledby="setup-methods-h">
         <h2 id="setup-methods-h">3 · Inspecting the ontologies outside this site is optional</h2>
-        <p>{v3 ? METHOD_FREEDOM_V3 : METHOD_FREEDOM}</p>
+        <p>{state.consultation_scope && state.consultation_scope !== "each_case" ? "You can inspect the supplied files in Protégé, a text editor or another tool. You can combine methods and change them between cases." : v3 ? METHOD_FREEDOM_V3 : METHOD_FREEDOM}</p>
         <label className="check-row">
           <input type="checkbox" checked={draft.external_inspection_optional_understood} onChange={() => update({ external_inspection_optional_understood: !draft.external_inspection_optional_understood })} />
           <span>I understand that outside inspection is optional, that I can combine and change methods between cases, and that I will be asked about my methods after each case.</span>

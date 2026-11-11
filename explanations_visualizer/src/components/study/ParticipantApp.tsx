@@ -160,6 +160,7 @@ export function ParticipantApp() {
           ? `Case ${Math.min(state.completed_cases + 1, state.assigned_case_count)} of ${state.assigned_case_count}`
           : null
       }
+      caseProgress={state && ["case", "consultation"].includes(state.stage) ? { completed: state.completed_cases, total: state.assigned_case_count } : null}
       onPause={state && PAUSABLE.has(state.stage) && !incompatible ? pause : undefined}
     />
   );
@@ -301,6 +302,7 @@ export function ParticipantApp() {
     <div className="study-root">
       {header}
       <main id="main">{body}</main>
+      {state && <footer className="study-session-code">Session code: <code>{state.session_id}</code></footer>}
       {needsGapAnswer && state && (
         <GapDialog
           onAnswer={async (activity) => {
