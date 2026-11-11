@@ -216,3 +216,25 @@ The portable owner page is retained locally at
 `/Users/pedrocotovio/.codex/visualizations/2026/09/25/01a0d99e-ecf4-7430-ad31-3805420dcd7a/final-study-review.html`.
 A local-only preview is at `http://127.0.0.1:19712/` while its review server is running.
 The page contains private reference answers. Review notes remain in that browser until exported.
+
+The full real publication then passed `StudyStore.publish` in an isolated SQLite test database
+on AppVM (131.8 seconds), including original-fact/resource/workspace admission. Two real-data
+service journeys each reached the final questionnaire with ten distinct sources and one rank
+1–5 per condition; source-context reads succeeded for explanation cases, baseline workspaces
+and explanation references remained absent, and methods were collected only after baseline.
+The combined journey check took 50.3 seconds after publication. These were service-level checks,
+not a substitute for the separately completed synthetic browser journeys or real graph visual QA.
+
+The private verification helper initially used obsolete client/setup request versions; the
+service correctly refused them. It was rerun with `study-review/1`, `setup/3` and
+`consultation/3`, matching the current browser. The rejected attempts affected only the separate
+test database. Logs are `verify-real.log` and `verify-journeys-v3.log` under the AppVM preparation
+folder; no test was pointed at the live database.
+
+Final review publication SHA-256:
+`bef48ac4b723fe142f64f3fc39a0c74ea853f15d6150b156602593a8d501ed92`.
+Final combined local usage: **52,064,839,271 bytes (52.06 GB)**, with approximately 89.27 GB
+filesystem free. The synthetic browser server was stopped; the local owner-catalogue server
+remains available for review. All implementation changes are committed on and pushed to
+`codex/final-study-review`; the live `study-deploy` branch/service has not been switched to this
+new protocol or pool.
