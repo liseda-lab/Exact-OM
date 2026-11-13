@@ -1,5 +1,11 @@
 # Final-study case quality correction — 13 November 2026
 
+Follow-up: the owner approved all twelve replacement proposals. The
+[forty-source pool review](explanation-final-pool-review-20261113.md) retains them,
+adds 23 automatically reviewed cases, and presents five decisions with alternatives.
+The earlier catalogue below remains preserved as a predecessor, not the current
+proposed selection.
+
 ## Decision
 
 The first 40-case catalogue is a preparation result, **not an approved study

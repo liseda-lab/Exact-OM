@@ -145,7 +145,8 @@ def test_skip_requires_explicit_publication_and_preserves_incomplete_training(tm
     assert session["tutorial_skipped_at"] == progress["skipped_at"]
 
 
-def test_real_allocator_freezes_ten_balanced_cases_and_baseline_only_reports(tmp_path):
+def test_real_allocator_freezes_ten_balanced_cases_and_baseline_only_reports(tmp_path, monkeypatch):
+    monkeypatch.setattr("exact_inspect.study.store.secrets.randbits", lambda _: 17)
     frozen = publication_v2(tmp_path, case_count=40)
     raw = frozen.model_dump(mode="json")
     sampling = plan()
@@ -213,6 +214,9 @@ def test_real_allocator_freezes_ten_balanced_cases_and_baseline_only_reports(tmp
             assert state["completed_cases"] == n + 1
         assert state["stage"] == "final"
         assert all(sorted(values) == [1, 2, 3, 4, 5] for values in ranks.values())
+        # Check the actual participant presentation order, not the private
+        # stratum-ordered intermediate returned by sample_blocks.
+        assert all(values != [1, 2, 3, 4, 5] for values in ranks.values())
     assert first_conditions == ["explanation", "ontology_baseline"]
     exported = store.export(frozen.definition.study_revision, include_test=True)["data"]
     assert exported["sampling_design"] == sampling

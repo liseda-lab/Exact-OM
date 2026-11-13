@@ -78,7 +78,7 @@ def lexical_screen(case):
     }
 
 
-def detail_catalogue(path, case_ids):
+def detail_catalogue(path, case_ids, context_overrides=None):
     """Read original, policy-filtered facts for a private replacement shortlist."""
     from exact_inspect.context import OntologyContext
     from exact_inspect.contracts import EntityRef, VisibilityPolicy
@@ -91,11 +91,18 @@ def detail_catalogue(path, case_ids):
     selected = [cases[i] for i in requested]
     contexts = {}
     for side, identity in data["input_bindings"]["contexts"].items():
-        manifest = Path(identity["manifest"]["path"])
-        if sha(manifest) != identity["manifest"]["sha256"]:
+        override = (context_overrides or {}).get(side)
+        manifest = (
+            Path(override) / "manifest.json" if override else Path(identity["manifest"]["path"])
+        )
+        if not override and sha(manifest) != identity["manifest"]["sha256"]:
             raise ValueError("Original context manifest changed")
         context = OntologyContext(manifest.parent)
-        if context.manifest["artifacts"]["context.sqlite"] != identity["database_sha256"]:
+        validate_context_identity(context.manifest, identity)
+        if (
+            not override
+            and context.manifest["artifacts"]["context.sqlite"] != identity["database_sha256"]
+        ):
             raise ValueError("Original context database changed")
         contexts[side] = context
     policy = VisibilityPolicy(
@@ -108,11 +115,15 @@ def detail_catalogue(path, case_ids):
         ("target", {t["target"] for c in selected for t in c["candidates"]}),
     ]:
         context = contexts[side]
+        prepared = context.manifest.get("policy_filter")
+        effective_policy = (
+            VisibilityPolicy.model_validate(prepared["policy"]) if prepared else policy
+        )
         for iri in sorted(iris):
             ref = EntityRef(ontology_version_id=context.ontology_version_id, iri=iri, kind="class")
             facts = {}
             for category in ["labels", "definitions", "hierarchy", "restrictions", "synonyms"]:
-                page = context.facts(ref, category=category, limit=20, policy=policy)
+                page = context.facts(ref, category=category, limit=20, policy=effective_policy)
                 facts[category] = {
                     "items": page["items"],
                     "has_more": bool(page.get("next_cursor")),
@@ -134,6 +145,19 @@ def detail_catalogue(path, case_ids):
         "status": "replacement_proposals_not_final_pool",
         "inventory_sha256": sha(path),
         "input_bindings": data["input_bindings"],
+        "contexts_used": {
+            side: {
+                "manifest": {
+                    "path": str(context.path / "manifest.json"),
+                    "sha256": sha(context.path / "manifest.json"),
+                },
+                "database_sha256": context.manifest["artifacts"]["context.sqlite"],
+                "ontology_version_id": context.ontology_version_id,
+                "source_sha256": context.manifest["identity"]["root_sha256"],
+                "policy_filter": context.manifest.get("policy_filter"),
+            }
+            for side, context in contexts.items()
+        },
         "cases": selected,
         "entities": entities,
         "limitations": [
@@ -143,6 +167,15 @@ def detail_catalogue(path, case_ids):
             "Reference identities are private. They must never enter provider packets or participant materials.",
         ],
     }
+
+
+def validate_context_identity(manifest, expected):
+    """A relocated/filtered context must still represent the exact frozen ontology."""
+    if (
+        manifest["ontology_version_id"] != expected["ontology_version_id"]
+        or manifest["identity"]["root_sha256"] != expected["source_sha256"]
+    ):
+        raise ValueError("Replacement context does not match the frozen ontology")
 
 
 def inventory(catalogue):
@@ -207,14 +240,28 @@ def main():
     source.add_argument("--catalogue", type=Path)
     source.add_argument("--inventory", type=Path)
     parser.add_argument("--case-ids", help="Comma-separated private shortlist, with --inventory")
+    parser.add_argument(
+        "--source-context",
+        type=Path,
+        help="Reuse an existing verified context of the same frozen ontology",
+    )
+    parser.add_argument("--target-context", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
     if args.output.exists():
         raise ValueError("Use a new private output, preserving previous reviews")
     if bool(args.inventory) != bool(args.case_ids):
         parser.error("--inventory and --case-ids must be used together")
+    if bool(args.source_context) != bool(args.target_context) or (
+        args.source_context and not args.inventory
+    ):
+        parser.error("Context overrides require both source/target contexts and --inventory")
     data = (
-        detail_catalogue(args.inventory, args.case_ids)
+        detail_catalogue(
+            args.inventory,
+            args.case_ids,
+            {"source": args.source_context, "target": args.target_context},
+        )
         if args.inventory
         else inventory(args.catalogue)
     )

@@ -180,7 +180,7 @@ def prepare_inputs(args):
             safe = filter_evidence_items(raw, contexts, policy, physically_filtered=True)
             events = (
                 [{"stage": "prefilter", "reason_code": "exact_match_protected"}]
-                if row["evidence_status"] == "exact_match"
+                if row.get("protected_exact") or row["evidence_status"] == "exact_match"
                 else []
             )
             pair = pair_evidence_metadata(

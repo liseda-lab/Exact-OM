@@ -1,6 +1,12 @@
 from copy import deepcopy
 
-from tools.audit_final_study_candidates import label_key, lexical_screen
+import pytest
+
+from tools.audit_final_study_candidates import (
+    label_key,
+    lexical_screen,
+    validate_context_identity,
+)
 
 
 def case(source, targets, rank=1):
@@ -65,3 +71,13 @@ def test_same_named_distractor_is_not_mistaken_for_an_easy_reference_answer():
     assert screen["label_twin_candidate_ranks"] == [1]
     assert not screen["obvious_reference_label_twin"]
     assert screen["manual_semantic_review_required"]
+
+
+def test_relocated_context_requires_the_frozen_ontology_identity():
+    expected = {"ontology_version_id": "version-a", "source_sha256": "root-a"}
+    manifest = {"ontology_version_id": "version-a", "identity": {"root_sha256": "root-a"}}
+    validate_context_identity(manifest, expected)
+    for field in ("ontology_version_id", "source_sha256"):
+        wrong = {**expected, field: "different"}
+        with pytest.raises(ValueError, match="frozen ontology"):
+            validate_context_identity(manifest, wrong)
