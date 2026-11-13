@@ -1,5 +1,11 @@
 # Final Exact 2.0 study preparation — 11 November 2026
 
+**Selection update, 13 November:** the owner identified overly obvious cases.
+The [case-quality correction](explanation-final-study-selection-quality-20261113.md)
+records replacement proposals and reference-scope concerns. The preparation and
+admission checks below remain historical evidence; they do not approve the original
+40-case pool for research use.
+
 ## Delivery and publication boundary
 
 This change prepares the final NCIT–DOID study for the owner's review. It does not publish
