@@ -102,11 +102,21 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
     (async () => {
       setReadiness({ attempt: mine, kind: "loading", done: 0, total: 1 });
       let current: StudyCase;
+      // The first access after a service restart verifies the frozen ontology
+      // files. Keep that bounded: a stalled request must offer Retry rather than
+      // leave the participant looking at a skeleton indefinitely.
+      const caseTimeout = window.setTimeout(() => {
+        if (!live()) return;
+        block(failureFrom(new Error("Loading this case took too long. Please retry."), "The case", mine));
+        controller.abort();
+      }, 45_000);
       try {
         current = await scopedRead<StudyCase>("/api/v1/study", "/cases/current", undefined, controller.signal, session);
       } catch (error) {
         if (!isAbort(error) && live()) block(failureFrom(error, "The case", mine));
         return;
+      } finally {
+        window.clearTimeout(caseTimeout);
       }
       if (!live()) return;
       const { reject, block: blocking } = validateCase(stateRef.current, current);

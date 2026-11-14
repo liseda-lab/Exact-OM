@@ -40,7 +40,12 @@ test("real case renders evidence, hierarchy and both colour themes", async ({ pa
     current = await api.currentCase();
   }
   expect(JSON.stringify(current)).not.toMatch(/reference_rank|acceptable_candidate_ids|reference_target/);
+  await page.route("**/api/v1/study/cases/current", async route => {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    await route.continue();
+  });
   await page.reload();
+  await expect(page.getByRole("status").filter({ hasText: "Loading this case's information" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Keep initial order", exact: true })).toBeEnabled({ timeout: 30000 });
   await page.screenshot({ path: "test-results/production-case-light.png", fullPage: true });
   await page.getByRole("tab", { name: "Evidence graph", exact: true }).click();
@@ -55,6 +60,22 @@ test("real case renders evidence, hierarchy and both colour themes", async ({ pa
   await page.reload();
   await expect(page.getByRole("button", { name: "Keep initial order", exact: true })).toBeEnabled();
   expect(errors).toEqual([]);
+  const final = await api.state();
+  await page.request.post(`${harness!.origin}/api/v1/admin/invitations/${final.session_id}/revoke`, { headers: { Authorization: `Bearer ${harness!.researcher_token}` } });
+});
+
+test("a stalled initial case offers a retry and then recovers", async ({ page }) => {
+  test.setTimeout(90000);
+  const api = await seedToTutorial(page);
+  const state = await api.state();
+  await api.write("POST", "/tutorial/complete", { tutorial_version: state.tutorial.version, skip_confirmed: true });
+  await page.route("**/api/v1/study/cases/current", () => new Promise(() => {}));
+  await page.reload();
+  await expect(page.getByRole("status").filter({ hasText: "Loading this case's information" })).toBeVisible();
+  await expect(page.getByText("Loading this case took too long. Please retry.", { exact: false })).toBeVisible({ timeout: 50000 });
+  await page.unrouteAll({ behavior: "ignoreErrors" });
+  await page.getByRole("button", { name: "Retry loading this case", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Keep initial order", exact: true })).toBeEnabled({ timeout: 30000 });
   const final = await api.state();
   await page.request.post(`${harness!.origin}/api/v1/admin/invitations/${final.session_id}/revoke`, { headers: { Authorization: `Bearer ${harness!.researcher_token}` } });
 });

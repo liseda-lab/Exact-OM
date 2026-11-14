@@ -8,6 +8,12 @@ for (const journey of [1, 2]) {
     test.setTimeout(180000);
     const errors: string[] = [];
     page.on("pageerror", e => errors.push(e.message));
+    const started = new Map<object, number>();
+    page.on("request", request => { if (new URL(request.url()).pathname.endsWith("/cases/current")) started.set(request, Date.now()); });
+    page.on("response", response => {
+      const at = started.get(response.request());
+      if (at !== undefined) test.info().annotations.push({ type: "case-read-ms", description: String(Date.now() - at) });
+    });
     // Background is API-seeded; the new skip and ranking interactions are real UI.
     const api = await seedToTutorial(page);
     await page.reload();
@@ -32,7 +38,10 @@ for (const journey of [1, 2]) {
     expect((await api.state()).assignment_id).toBe(assignment);
     const seen = new Set<string>(), conditions: string[] = [];
     for (let n = 0; n < 10; n++) {
-      await expect(page.getByRole("button", { name: "Keep initial order", exact: true })).toBeVisible();
+      // A cold service verifies the full ontology files before its first scoped
+      // read. The UI has a 45-second timeout and a visible retry, so allow that
+      // bounded interval without mistaking the initial hash check for a blank page.
+      await expect(page.getByRole("button", { name: "Keep initial order", exact: true })).toBeVisible({ timeout: 50_000 });
       const current = await api.currentCase();
       expect(seen.has(current.case_id)).toBe(false); seen.add(current.case_id);
       conditions.push(current.condition);

@@ -252,7 +252,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
     },
   });
 
-  if (!studyCase) return readiness.kind === "blocked" ? <ReadinessNote readiness={readiness} onRetry={content.retry} /> : <Skeleton lines={6} />;
+  if (!studyCase) return <><ReadinessNote readiness={readiness} onRetry={content.retry} />{readiness.kind !== "blocked" && <Skeleton lines={6} />}</>;
 
   const explanation = studyCase.condition === "explanation";
   // Generated descriptions exist only for the source and its five candidates; never request others.
