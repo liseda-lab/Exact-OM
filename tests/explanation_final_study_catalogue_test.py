@@ -91,3 +91,45 @@ def test_research_promotion_requires_actual_owner_selection_and_authorization():
     assert not definition["synthetic"]
     assert definition["launch_approvals"] == ["Owner instruction"]
     assert "purpose" not in definition and "review_bundle" not in definition
+
+
+def test_new_build_tutorial_can_coexist_with_frozen_predecessor(tmp_path):
+    from copy import deepcopy
+
+    import pytest
+
+    from exact_inspect.study import StudyError, StudyStore
+    from exact_inspect.study.models import Publish
+    from tests.explanation_study_v2_fixtures import publication_v2
+    from tools.prepare_final_study_resources import bind_tutorial_build
+
+    predecessor = publication_v2(tmp_path)
+    original = predecessor.model_dump(mode="json")
+    store = StudyStore(f"sqlite:///{tmp_path / 'study.sqlite'}", tmp_path, allow_test_sqlite=True)
+    previous_receipt = store.publish(predecessor)
+    changed = deepcopy(original)
+    definition = changed["definition"]
+    definition["study_revision"] += "-new-build"
+    definition["software_version"] = "final-study/1"
+    definition["protocol_versions"]["software"] = definition["software_version"]
+
+    # Reproduce the deployment error: changing only the allowlist and hash reuses
+    # a version already frozen in this database, which must remain forbidden.
+    invalid = deepcopy(changed)
+    invalid["definition"]["tutorial"]["compatible_builds"].append("final-study/1")
+    invalid["definition"]["tutorial"]["hash"] = ""
+    with pytest.raises(StudyError, match="Tutorial version is already frozen"):
+        store.publish(Publish.model_validate(invalid))
+
+    bind_tutorial_build(definition)
+    frozen_binding = deepcopy(definition["tutorial"])
+    bind_tutorial_build(definition)
+    assert definition["tutorial"] == frozen_binding
+    assert definition["tutorial"]["version"] != original["definition"]["tutorial"]["version"]
+    assert definition["protocol_versions"]["tutorial"] == definition["tutorial"]["version"]
+    for key in ("assessment_version", "assessment", "grading", "lessons", "case"):
+        assert definition["tutorial"][key] == original["definition"]["tutorial"][key]
+    new_receipt = store.publish(Publish.model_validate(changed))
+    assert new_receipt["study_revision"] == definition["study_revision"]
+    assert store.publish(predecessor) == previous_receipt
+    assert predecessor.model_dump(mode="json") == original

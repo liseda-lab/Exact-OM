@@ -54,6 +54,20 @@ def freeze(path, value):
         atomic_json(path, value)
 
 
+def bind_tutorial_build(definition):
+    """Version a changed build allowlist without rewriting a frozen tutorial."""
+    tutorial = definition["tutorial"]
+    build = definition["software_version"]
+    if build not in tutorial["compatible_builds"]:
+        tutorial["compatible_builds"].append(build)
+        content = {key: value for key, value in tutorial.items() if key != "hash"}
+        tutorial["version"] = (
+            "tutorial-build-" + canonical_hash(content).removeprefix("sha256:")[:32]
+        )
+        tutorial["hash"] = ""  # TutorialDefinition validates and binds the new content.
+    definition["protocol_versions"]["tutorial"] = tutorial["version"]
+
+
 def open_contexts(assets, predecessor, catalogue):
     selection_policy = VisibilityPolicy.model_validate(catalogue["policy"])
     policy = VisibilityPolicy.model_validate(predecessor["definition"]["visibility_policy"])
@@ -291,11 +305,7 @@ def assemble(args, inputs):
     d["protocol_versions"].update(
         information=d["information_version"], software=d["software_version"]
     )
-    d["tutorial"]["compatible_builds"] = list(
-        dict.fromkeys(d["tutorial"]["compatible_builds"] + [d["software_version"]])
-    )
-    # A changed build allowlist is part of the frozen tutorial identity.
-    d["tutorial"]["hash"] = ""
+    bind_tutorial_build(d)
     d["analysis_plan"] = (
         "Private owner review of the 40-case final-run pool. Ten distinct cases per participant: one reference rank 1–5 in each condition; counterbalanced condition order. Inspection methods collected after no-tool cases only. Correctness metrics disabled until owner/protocol review and a separately approved research publication."
     )
