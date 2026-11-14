@@ -27,15 +27,36 @@ from tools.review_luna_bundle import (
 )
 from tools.review_model_comparison import validate_output
 
+PROFILE_REVISION_GUIDANCE = """Write a useful, concise description rather than only saying that
+X is a type of its parent. Preserve distinguishing information explicitly supported by
+the supplied original facts: site, cell type, mechanism, gene, inheritance, onset, or
+characteristic manifestations. Use two or three short sentences when needed. Do not
+omit these details merely to make one sentence. If the packet only supports a parent
+classification, do not invent a distinguishing definition: return no claims. Never
+borrow details from a candidate, a reference mapping, or external knowledge. Copy
+every cited fact identifier exactly from the input; do not retype or shorten it."""
 
-def prepare(inputs, root, reuse_reviewed=None):
+
+def prepare(inputs, root, reuse_reviewed=None, regenerate_ids=None):
     values = read(inputs)["results"]
+    selected = set(read(regenerate_ids)) if regenerate_ids else None
+    if selected is not None and (
+        not reuse_reviewed
+        or not selected
+        or not selected <= values.keys()
+        or any(values[key]["task"] != "entity_profile" for key in selected)
+    ):
+        raise ValueError("Targeted regeneration requires existing inputs and entity profiles")
     reused = {}
     if reuse_reviewed:
         previous = read(reuse_reviewed)["results"]
         for old_id, original in values.items():
             saved = previous.get(old_id)
-            if saved and saved["support_packet"] == original["support_packet"]:
+            if (
+                saved
+                and (selected is None or old_id not in selected)
+                and saved["support_packet"] == original["support_packet"]
+            ):
                 validate_reviewed_artifact(saved)
                 reused[old_id] = saved
         freeze(
@@ -46,8 +67,12 @@ def prepare(inputs, root, reuse_reviewed=None):
     for old_id, original in sorted(values.items()):
         if old_id in reused:
             continue
+        if selected is not None and old_id not in selected:
+            continue
         packet = FactPacket.model_validate(original["support_packet"])
         body = wire(packet)
+        if selected is not None:
+            body["messages"][0]["content"] += "\n\n" + PROFILE_REVISION_GUIDANCE
         if len(canonical_json(body)) > MAX_BYTES:
             raise ValueError("Provider packet exceeds the existing bound")
         identity = {
@@ -82,6 +107,7 @@ def prepare(inputs, root, reuse_reviewed=None):
         "model": model,
         "retries": 0,
         "review_required": True,
+        "regenerate_ids_sha256": file_hash(regenerate_ids) if regenerate_ids else None,
     }
     freeze(root / "plan.json", plan)
     print(json.dumps({"jobs": len(jobs), "reused": len(reused), "maximum_usd": cost}), flush=True)
@@ -178,9 +204,14 @@ def main():
     parser.add_argument("--key-path", type=Path)
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=4)
     parser.add_argument("--reuse-reviewed", type=Path)
+    parser.add_argument(
+        "--regenerate-ids",
+        type=Path,
+        help="Explicit entity-profile IDs for a targeted quality revision",
+    )
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare(args.inputs, args.root, args.reuse_reviewed)
+        prepare(args.inputs, args.root, args.reuse_reviewed, args.regenerate_ids)
     elif args.command == "generate":
         generate(args.root, args.key_path, args.workers)
     else:

@@ -2,6 +2,7 @@
 // score is only a fallback and the interface says which basis was used.
 
 import type { Candidate, Score } from "@/lib/types";
+export { formatScore } from "@/lib/scorePresentation";
 
 export type OrderBasis = "joint_rank" | "retrieval_rank" | "score" | "pair_id";
 
@@ -35,10 +36,6 @@ export function orderDescription(basis: OrderBasis): string {
 /** The final decision score when present, else the first recorded score. */
 export function primaryScore(item: { scores: Score[] }): Score | undefined {
   return item.scores.find((score) => score.name === "S_final") ?? item.scores[0];
-}
-
-export function formatScore(value: number): string {
-  return Math.abs(value) >= 100 ? value.toFixed(0) : value.toFixed(2);
 }
 
 export function scoreLabel(score: Score): string {

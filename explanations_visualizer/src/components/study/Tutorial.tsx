@@ -28,6 +28,7 @@ import { Paragraphs } from "@/components/study/StudyChrome";
 import { PairWorkspace, type Focus } from "@/components/workspace/PairWorkspace";
 import { ApiError, describeError, getJson } from "@/lib/api";
 import { curie } from "@/lib/iri";
+import { formatScore } from "@/lib/scorePresentation";
 import { indexResources } from "@/lib/workspace/resourceIndex";
 import { createResourceSource } from "@/lib/workspace/resourceSource";
 import type { WorkspaceAction } from "@/lib/workspace/types";
@@ -483,7 +484,7 @@ function LessonWorkspace({
     position: candidate.display_position,
     label: candidate.label,
     identifier: curie(candidate.entity.iri),
-    score: candidate.score.toFixed(2),
+    score: formatScore(candidate.score),
     scoreMeaning: candidate.score_meaning,
   }));
   const controller = useRanking({
@@ -553,7 +554,7 @@ function LessonWorkspace({
     <div className="pair-header">
       <div className="pair-heading">
         <span className="meta">
-          Practice · inspecting initial position {inspected.display_position} of {tutorial.case.candidates.length} · illustrative score {inspected.score.toFixed(2)}
+          Practice · inspecting initial position {inspected.display_position} of {tutorial.case.candidates.length} · illustrative score {formatScore(inspected.score)}
         </span>
         <h2 className="pair-question">
           Does <span className="text-source">{names.source ?? tutorial.case.source_label}</span> mean the same as <span className="text-target">{names.target ?? inspected.label}</span>?

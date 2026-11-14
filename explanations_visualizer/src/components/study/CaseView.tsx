@@ -18,6 +18,7 @@ import { ResourceAccessButton, ResourceList } from "@/components/study/Resources
 import { TutorialHelpButton } from "@/components/study/Tutorial";
 import { ALL_COMPONENTS, PairWorkspace, type Component, type Focus } from "@/components/workspace/PairWorkspace";
 import { curie } from "@/lib/iri";
+import { formatScore } from "@/lib/scorePresentation";
 import type { EntityRef } from "@/lib/types";
 import type { WorkspaceAction } from "@/lib/workspace/types";
 import { WorkspaceProvider } from "@/lib/workspace/WorkspaceContext";
@@ -232,7 +233,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
           position: candidate.display_position,
           label: candidate.label,
           identifier: curie(candidate.entity.iri),
-          score: candidate.score.toFixed(2),
+          score: formatScore(candidate.score),
           scoreMeaning: candidate.score_meaning,
         })),
     [studyCase],
@@ -277,7 +278,7 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
           <button type="button" className="btn btn-sm" disabled={inspectedIndex >= orderedCandidates.length - 1} onClick={() => inspect(orderedCandidates[inspectedIndex + 1].candidate_id)}>Next candidate</button>
         </nav>
         <span className="meta">
-          Inspecting initial position {inspected.display_position} of {studyCase.candidates.length} · matching score {inspected.score.toFixed(2)}
+          Inspecting initial position {inspected.display_position} of {studyCase.candidates.length} · matching score {formatScore(inspected.score)}
         </span>
         <h1 className="pair-question">
           Does <span className="text-source">{names.source ?? studyCase.source_label}</span> mean the same as <span className="text-target">{names.target ?? inspected.label}</span>?
