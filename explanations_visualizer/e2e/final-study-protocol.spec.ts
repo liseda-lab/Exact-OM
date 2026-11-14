@@ -45,6 +45,20 @@ for (const journey of [1, 2]) {
       const current = await api.currentCase();
       expect(seen.has(current.case_id)).toBe(false); seen.add(current.case_id);
       conditions.push(current.condition);
+      // Verify the rendered score against the unrounded API value in both
+      // conditions. Genuine endpoints must remain distinct from rounded ones.
+      const rows = page.locator(".initial-list .initial-row");
+      for (const [index, candidate] of [...current.candidates].sort((a, b) => a.display_position - b.display_position).entries()) {
+        if (candidate.score > 0 && candidate.score < 0.005) {
+          await expect(rows.nth(index)).toContainText("matching score ≈0.00");
+        } else if (candidate.score === 0) {
+          await expect(rows.nth(index)).toContainText("matching score 0.00");
+        } else if (candidate.score >= 0.995 && candidate.score < 1) {
+          await expect(rows.nth(index)).toContainText("matching score ≈1.00");
+        } else if (candidate.score === 1) {
+          await expect(rows.nth(index)).toContainText("matching score 1.00");
+        }
+      }
       await expect(page.getByRole("progressbar")).toHaveAttribute("value", String(n));
       if (n === 0) {
         await expect(page.getByRole("button", { name: "Previous candidate", exact: true })).toBeDisabled();
@@ -58,6 +72,7 @@ for (const journey of [1, 2]) {
       if (current.condition === "ontology_baseline") {
         expect(current.workspace).toBeNull();
         expect(current.explanation_refs).toEqual([]);
+        await expect(page.locator(".generated-block")).toHaveCount(0);
       }
       await page.getByRole("button", { name: "Keep initial order", exact: true }).click();
       await page.getByRole("button", { name: "Submit answer", exact: true }).click();
