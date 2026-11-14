@@ -202,6 +202,10 @@ two ten-case journeys, final welcome/consent at desktop and mobile widths, real
 evidence/hierarchy in both themes, and a deliberately stalled case followed by
 successful retry. Both condition orders complete without browser errors. The
 frontend source and runtime release are `1e8ad4e`, pushed to `study-deploy`.
+The slowest cold `/cases/current` request was 44.008 seconds while the full ontology
+files were verified. Warm requests are much faster, but a future process restart
+can repeat that initial delay. The new loading message and bounded retry cover
+that wait; this change does not claim to optimize the underlying cold hash cost.
 
 AppVM requires interactive sudo authentication for the final systemd restart.
 The activation script, private backup, complete publication and acceptance
