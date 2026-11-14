@@ -72,7 +72,7 @@ for (const journey of [1, 2]) {
       if (current.condition === "ontology_baseline") {
         expect(current.workspace).toBeNull();
         expect(current.explanation_refs).toEqual([]);
-        await expect(page.locator(".generated-block")).toHaveCount(0);
+        await expect(page.locator(".generated, .generated-block")).toHaveCount(0);
       }
       await page.getByRole("button", { name: "Keep initial order", exact: true }).click();
       await page.getByRole("button", { name: "Submit answer", exact: true }).click();

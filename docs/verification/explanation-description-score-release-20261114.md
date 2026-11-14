@@ -2,11 +2,14 @@
 
 ## Release scope
 
-Runtime implementation: `60ada8f` on `study-deploy`. Prepared study revision:
-`exact2-ncit-doid-production-20261114-r2`. The new data and frontend are staged on
-AppVM; activation requires the owner's sudo-authenticated service restart. Do not
-interpret preparation or isolated acceptance as live activation. The activation
-helper writes a publication receipt and a public-browser verification report.
+Runtime implementation: `60ada8f` on `study-deploy`. Live study revision:
+`exact2-ncit-doid-production-20261114-r2`. The owner completed the sudo-authenticated activation. The new data and frontend
+are live on AppVM, the service is active, and public HTTPS readiness passes.
+The publication receipt binds frozen hash
+`d3ad076662848f6104e0c127c2f4ac59dd904b23dff96a163d6714c9d70751a4`.
+The public browser check passed welcome, consent, tutorial-to-ranking, score
+formatting against raw API values, profile boundaries and strict CSP, with no
+browser errors (14 November 2026, 16:53 UTC).
 
 The owner withdrew permission to use external descriptions. No external text,
 URLs or citations were added. The unfinished external-description implementation
@@ -117,3 +120,18 @@ Compute-server generation and admission evidence remains in
 `deployment-reviewed-results.json`. No credential is copied into the repository.
 Local transfers were limited to small review files and checked using the shared
 100 GB storage guard. Shared contexts and original frozen resources were reused.
+
+## Live verification after activation
+
+Confirmed on the public website at 17:10 UTC on 14 November 2026, using a dedicated
+test session on the new revision: all ten scored cases were traversed, **19 approximate
+score displays** matched their raw API values, **five revised generated profiles**
+were visible with their approved text, and **all five no-tool cases** had neither
+workspace/explanation access nor generated-description elements. There were no
+browser errors. The baseline DOM assertion now checks the actual `.generated`
+class as well as `.generated-block` rather than relying on the latter alone.
+
+The private receipt is `public-content-verification.json` alongside the publication
+and earlier public acceptance receipts. The isolated test server and PostgreSQL
+instance were stopped after acceptance; the live service remains healthy. Final
+combined local storage was 52.03 GB against the owner's 100 GB limit.
