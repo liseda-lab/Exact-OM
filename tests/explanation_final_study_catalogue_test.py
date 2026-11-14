@@ -32,6 +32,62 @@ def test_multiple_queries_never_duplicate_a_source_or_merge_candidate_sets():
 
 def test_consent_draft_never_invents_missing_owner_details():
     draft = participant_information()
-    assert len(draft["missing_owner_details"]) == 5
+    assert len(draft["missing_owner_details"]) == 3
     assert not draft["ready_for_participant_publication"]
     assert "to be confirmed" in draft["information_text"]
+
+
+def test_final_information_follows_owner_edits_without_claiming_ethics_approval():
+    from tools.final_study_copy import OWNER_DETAILS
+
+    copy = participant_information(OWNER_DETAILS)
+    text = copy["information_text"]
+    assert "National Cancer Institute Thesaurus (NCIT)" in text
+    assert "Disease Ontology (DOID)" in text
+    assert "one year" in text and "session code" in text
+    assert "pgcotovio@ciencias.ulisboa.pt" in text
+    for removed in (
+        "Study period:",
+        "Time to take part:",
+        "Ethics review:",
+        "clinical decisions",
+        "professional abilities",
+        "to be confirmed",
+    ):
+        assert removed not in text
+    assert copy["ready_for_participant_publication"]
+
+
+def test_research_promotion_requires_actual_owner_selection_and_authorization():
+    from copy import deepcopy
+
+    import pytest
+
+    from tools.prepare_final_study_resources import promote_definition
+
+    catalogue = {
+        "owner_selection": {"ready_for_selection_freeze": True, "case_ids": ["case"]},
+        "options": {"forty_unequal": ["case"]},
+    }
+    definition = {
+        "purpose": "development_review",
+        "correctness_metrics": "disabled",
+        "review_bundle": {},
+        "review_provenance": {},
+    }
+    copy = {"missing_owner_details": []}
+    for approvals in ([], [""]):
+        with pytest.raises(ValueError, match="launch approvals"):
+            promote_definition(deepcopy(definition), catalogue, approvals, copy)
+    pending = deepcopy(catalogue)
+    pending["owner_selection"]["ready_for_selection_freeze"] = False
+    with pytest.raises(ValueError, match="completed owner selection"):
+        promote_definition(deepcopy(definition), pending, ["Owner instruction"], copy)
+    changed = deepcopy(catalogue)
+    changed["options"]["forty_unequal"] = ["different"]
+    with pytest.raises(ValueError, match="differs"):
+        promote_definition(deepcopy(definition), changed, ["Owner instruction"], copy)
+    promote_definition(definition, catalogue, ["Owner instruction"], copy)
+    assert not definition["synthetic"]
+    assert definition["launch_approvals"] == ["Owner instruction"]
+    assert "purpose" not in definition and "review_bundle" not in definition

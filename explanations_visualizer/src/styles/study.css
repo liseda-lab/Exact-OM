@@ -259,8 +259,7 @@
 }
 
 .consent-text {
-  max-height: 16rem;
-  overflow-y: auto;
+  max-width: 75ch;
   padding: 1rem;
   background: var(--surface-2);
   border: 1px solid var(--line-soft);

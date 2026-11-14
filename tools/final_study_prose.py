@@ -11,7 +11,10 @@ from pathlib import Path
 
 from exact.llm.routing import LLMProfile, OpenRouterClient
 from exact_inspect.contracts import canonical_hash, canonical_json, file_hash
-from exact_inspect.description_review import build_review_request
+from exact_inspect.description_review import (
+    build_review_request,
+    validate_reviewed_artifact,
+)
 from exact_inspect.generation import FactPacket
 from tools.review_luna_bundle import (
     MAX_BYTES,
@@ -25,10 +28,24 @@ from tools.review_luna_bundle import (
 from tools.review_model_comparison import validate_output
 
 
-def prepare(inputs, root):
+def prepare(inputs, root, reuse_reviewed=None):
     values = read(inputs)["results"]
+    reused = {}
+    if reuse_reviewed:
+        previous = read(reuse_reviewed)["results"]
+        for old_id, original in values.items():
+            saved = previous.get(old_id)
+            if saved and saved["support_packet"] == original["support_packet"]:
+                validate_reviewed_artifact(saved)
+                reused[old_id] = saved
+        freeze(
+            root / "reused-results.json",
+            {"source_sha256": file_hash(reuse_reviewed), "results": reused},
+        )
     jobs = []
     for old_id, original in sorted(values.items()):
+        if old_id in reused:
+            continue
         packet = FactPacket.model_validate(original["support_packet"])
         body = wire(packet)
         if len(canonical_json(body)) > MAX_BYTES:
@@ -67,7 +84,7 @@ def prepare(inputs, root):
         "review_required": True,
     }
     freeze(root / "plan.json", plan)
-    print(json.dumps({"jobs": len(jobs), "maximum_usd": cost}), flush=True)
+    print(json.dumps({"jobs": len(jobs), "reused": len(reused), "maximum_usd": cost}), flush=True)
 
 
 def generate(root, key_path, workers):
@@ -155,16 +172,33 @@ def generate(root, key_path, workers):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["prepare", "generate"])
+    parser.add_argument("command", choices=["prepare", "generate", "combine"])
     parser.add_argument("--root", required=True, type=Path)
     parser.add_argument("--inputs", type=Path)
     parser.add_argument("--key-path", type=Path)
     parser.add_argument("--workers", type=int, choices=range(1, 5), default=4)
+    parser.add_argument("--reuse-reviewed", type=Path)
     args = parser.parse_args()
     if args.command == "prepare":
-        prepare(args.inputs, args.root)
-    else:
+        prepare(args.inputs, args.root, args.reuse_reviewed)
+    elif args.command == "generate":
         generate(args.root, args.key_path, args.workers)
+    else:
+        combined = {}
+        sources = {}
+        for name in ("reused-results.json", "reviewed-results.json"):
+            path = args.root / name
+            saved = read(path)
+            sources[name] = file_hash(path)
+            for old_id, value in saved["results"].items():
+                if old_id in combined:
+                    raise ValueError("New and reused reviewed outputs overlap")
+                validate_reviewed_artifact(value)
+                combined[old_id] = value
+        freeze(
+            args.root / "combined-reviewed-results.json", {"sources": sources, "results": combined}
+        )
+        print(json.dumps({"combined_reviewed_results": len(combined)}), flush=True)
 
 
 if __name__ == "__main__":

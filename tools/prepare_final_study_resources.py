@@ -112,9 +112,13 @@ def prepare_inputs(args):
     contexts, policy = open_contexts(args.assets, predecessor, catalogue)
     selected = {c["case_id"]: c for c in catalogue["cases"]}
     selected = [selected[cid] for cid in catalogue["options"]["forty_unequal"]]
+    selected_iris = {c["source"] for c in selected} | {
+        row["target"] for c in selected for row in c["candidates"]
+    }
     entities = {
         iri: EntityRef.model_validate(value["entity"])
         for iri, value in catalogue["entities"].items()
+        if iri in selected_iris
     }
     profiles, packets, results = {}, {}, {}
     for iri, entity in entities.items():
@@ -272,8 +276,8 @@ def assemble(args, inputs):
     copy_text = participant_information(OWNER_DETAILS)
     d.update(
         study_revision=args.revision,
-        software_version="final-study-review/1",
-        information_version="final-study-information/20261111",
+        software_version="final-study/1" if args.production else "final-study-review/1",
+        information_version="final-study-information/20261114",
         information_text=copy_text["information_text"],
         consent_text=copy_text["consent_text"],
         instructions=copy_text["instructions"],
@@ -282,7 +286,7 @@ def assemble(args, inputs):
         consultation_scope="baseline_cases",
         schedules=[],
         cases=inputs["cases"],
-        closes_at=(datetime.now(timezone.utc) + timedelta(days=31)).isoformat(),
+        closes_at=args.closes_at or (datetime.now(timezone.utc) + timedelta(days=31)).isoformat(),
     )
     d["protocol_versions"].update(
         information=d["information_version"], software=d["software_version"]
@@ -335,7 +339,11 @@ def assemble(args, inputs):
         source_count=40,
         presented_pairs=200,
         coverage={
-            "original_definition_all_six": sum(c["quality"][0] == 6 for c in catalogue["cases"])
+            "original_definition_all_six": sum(
+                c["quality"][0] == 6
+                for c in catalogue["cases"]
+                if c["case_id"] in catalogue["options"]["forty_unequal"]
+            )
         },
         cases=[
             dict(
@@ -442,7 +450,11 @@ def assemble(args, inputs):
         )
         for c in inputs["cases"]
     ]
-    publication = Publish.model_validate(dict(definition=d, case_keys=review_keys))
+    if args.production:
+        promote_definition(d, catalogue, read(args.launch_approval_file), copy_text)
+    publication = Publish.model_validate(
+        dict(definition=d, case_keys=inputs["case_keys"] if args.production else review_keys)
+    )
     freeze(args.private / (args.revision + ".json"), publication.model_dump(mode="json"))
     freeze(args.private / "reference-keys.json", inputs["case_keys"])
     print(
@@ -461,6 +473,42 @@ def assemble(args, inputs):
     )
 
 
+def promote_definition(definition, catalogue, approvals, copy_text):
+    """Create a new research publication; never relabel existing test sessions."""
+    selected = catalogue.get("owner_selection", {})
+    if not selected.get("ready_for_selection_freeze") or selected.get("errors"):
+        raise ValueError("Production requires the completed owner selection")
+    if selected["case_ids"] != catalogue["options"]["forty_unequal"]:
+        raise ValueError("Production pool differs from the owner's selection")
+    if (
+        not isinstance(approvals, list)
+        or not approvals
+        or not all(isinstance(a, str) and a.strip() for a in approvals)
+    ):
+        raise ValueError("Production requires explicit owner-supplied launch approvals")
+    if copy_text["missing_owner_details"]:
+        raise ValueError("Participant information still has missing owner details")
+    for key in ("purpose", "correctness_metrics", "review_provenance", "review_bundle"):
+        definition.pop(key, None)
+    definition.update(
+        synthetic=False,
+        launch_approvals=approvals,
+        analysis_plan=(
+            "Within-participant comparison of ontology matching with and without explanations. "
+            "Ten distinct sources per participant: one original reference rank 1–5 in each condition; "
+            "random sources and case order, counterbalanced condition order. The owner-selected "
+            "40-source pool is purposive, with unequal rank strata; it does not estimate overall "
+            "matcher accuracy. Compare ranking outcomes and active case time between conditions, "
+            "retaining original ranks, case identity, block order and tutorial completion/skip. "
+            "Analyse inspection methods after baseline cases only; not-requested reports are not "
+            "non-use. Report repeated candidates, sparse original definitions and accepted ontology "
+            "wording limitations. Reference-based correctness uses the retained benchmark keys; "
+            "absence from that reference is not proof that another candidate is false. Test sessions "
+            "are excluded from research exports."
+        ),
+    )
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ["assets", "catalogue", "predecessor", "private"]:
@@ -468,7 +516,12 @@ def main():
     parser.add_argument("--revision", default="final-pool-owner-review-20261111")
     parser.add_argument("--inputs-only", action="store_true")
     parser.add_argument("--reviewed-results", type=Path)
+    parser.add_argument("--production", action="store_true")
+    parser.add_argument("--launch-approval-file", type=Path)
+    parser.add_argument("--closes-at", help="Timezone-aware ISO closing time for the new revision")
     args = parser.parse_args()
+    if args.production and not args.launch_approval_file:
+        parser.error("--production requires --launch-approval-file")
     args.assets, args.private = args.assets.resolve(), args.private.resolve()
     if args.private.is_relative_to(args.assets) or args.catalogue.resolve().is_relative_to(
         args.assets

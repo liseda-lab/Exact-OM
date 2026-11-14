@@ -1,7 +1,7 @@
-"""Participant copy for the final comparative study, pending owner protocol details."""
+"""Owner-approved participant copy for the final comparative study."""
 
 TASK = (
-    "You will see a concept from NCIT and five possible matches from the Disease Ontology (DOID). "
+    "You will see a concept from the National Cancer Institute Thesaurus (NCIT) and five possible matches from the Disease Ontology (DOID). "
     "Your task is to decide which candidates describe the same concept as the source. "
     "For example, two names may refer to the same disease, while a similar name may refer to a "
     "broader group of diseases or a more specific subtype.\n\n"
@@ -22,10 +22,8 @@ SETUP = (
 
 REQUIRED_DETAILS = (
     "researcher_and_contact",
-    "collection_period",
     "data_access_storage_retention",
     "withdrawal_and_deletion",
-    "ethics_status",
 )
 
 # Owner-supplied facts, 11 November 2026. One month describes recruitment/data
@@ -51,7 +49,12 @@ OWNER_DETAILS = {
 
 
 def participant_information(details=None):
-    """Return a reviewable draft; missing institutional facts are explicit, never invented."""
+    """Render the requested information; do not invent missing contact or data policies.
+
+    Readiness here covers this copy only, not institutional approval or data admission.
+    The owner removed collection/duration estimates and the ethics-status paragraph.
+    No claim of approval or exemption is made.
+    """
     details = details or {}
     missing = [key for key in REQUIRED_DETAILS if not str(details.get(key, "")).strip()]
 
@@ -60,38 +63,23 @@ def participant_information(details=None):
 
     information = "\n\n".join(
         [
-            "Assessing explanations for ontology matching",
             "We are studying whether explanations help people assess matches between biomedical "
             "ontologies. An ontology organises concepts, their descriptions and their relationships. "
-            "This study compares NCIT with the Disease Ontology (DOID).",
-            "You will answer a few background questions, practise with the tool, and assess ten "
-            "source concepts, each with five proposed matches. Five cases include the tool's "
-            "explanations; five show basic information for inspection using your own methods. "
-            "At the end, you will answer questions about your experience.",
-            "Study period: " + value("collection_period", "Data-collection period"),
-            "Time to take part: "
-            + value("session_duration", "Estimate to be confirmed in the pilot"),
+            "In this study, you will compare concepts from the National Cancer Institute Thesaurus "
+            "(NCIT) with concepts from the Disease Ontology (DOID).",
+            "You will answer a few background questions, practise with the tool, and then assess "
+            "ten concepts. For each one, choose which of five proposed matches have the same "
+            "meaning and rank the plausible matches, with the best match first. Five cases include "
+            "explanations from the tool. The other five show names, identifiers, scores and the "
+            "system's proposed order; you can inspect the supplied ontology files using your own "
+            "methods. At the end, you will answer a few questions about your experience.",
             "Your answers, the actions you take in the study pages and how long each step takes "
-            "will be recorded. This includes your rankings, questionnaire responses and interactions "
-            "with the tutorial and explanations. Your session is associated with a private link.",
-            "Taking part is voluntary. You can choose not to participate or stop taking part. "
-            "The task involves reading and comparing biomedical concepts. It does not involve "
-            "clinical decisions or treatment. The findings will be used to evaluate and improve "
-            "the tool; the study is not an assessment of your professional abilities.",
-            "Data access, storage and retention: "
-            + value(
-                "data_access_storage_retention",
-                "Who can access the data, storage location, retention and reporting policy",
-            ),
-            "Withdrawal and removal of data: "
-            + value(
-                "withdrawal_and_deletion",
-                "How to request withdrawal or deletion, including any deadline",
-            ),
-            "Researcher and contact: "
-            + value("researcher_and_contact", "Research team, institution and contact"),
-            "Ethics review: "
-            + value("ethics_status", "Approval or exemption status and reference"),
+            "will be recorded. "
+            + value("data_access_storage_retention", "Data access, storage and retention policy"),
+            "Taking part is voluntary. "
+            + value("withdrawal_and_deletion", "How to request withdrawal or removal of your data"),
+            "If you have any questions about the study, contact "
+            + value("researcher_and_contact", "Researcher and contact details"),
         ]
     )
     consent = (
@@ -99,10 +87,6 @@ def participant_information(details=None):
         "understand what the study involves and how my data will be used, and agree to participate."
     )
     pending = list(missing)
-    if not details.get("ethics_confirmed"):
-        pending.append("confirmation of institutional review requirements")
-    if not details.get("session_duration"):
-        pending.append("session-duration estimate from the pilot")
     return {
         "information_text": information,
         "consent_text": consent,
