@@ -2,15 +2,16 @@
 
 ## Status
 
-The owner's exported decisions have been applied to a new ordinary, non-synthetic
-study publication, `exact2-ncit-doid-production-20261114`. The publication and
-versioned frontend are prepared on AppVM. Live activation and public verification
-are recorded in the completion addendum below; preparation alone is not deployment.
+The owner's exported decisions have been applied to the ordinary, non-synthetic
+study publication, `exact2-ncit-doid-production-20261114`, now **published and
+verified on the live AppVM service** at `https://exact-explain.lasige.di.fc.ul.pt`.
+The activation conflict and its correction are recorded in the completion addendum.
 
 The active source checkout is `/private/tmp/exact-study-nov10`, branch
 `codex/final-study-review`. Unrelated work in the canonical Developer checkout was
 not changed. Runtime release commit: `1e8ad4e`; frontend is built on AppVM using
-Node 24. The deployment branch is `study-deploy`, pushed through `1e8ad4e`.
+Node 24. The deployment branch is `study-deploy`; it also contains the preparation
+correction `bb13e0a` described below.
 
 ## Selection and protocol
 
@@ -44,8 +45,10 @@ Identities:
   `d5b5b54e19ca04de29f5843e376bceb921fd4d9f5bd1e9e277b307c0e6581459`.
 - Selected catalogue SHA-256:
   `7d1a8b260bcc43c860a944306464fae296e40822a9ab4dc1d236bf39335099e2`.
-- Private production publication file SHA-256:
+- Initial prepared publication SHA-256 (retained as failed-attempt evidence):
   `53dbf31c0567794bccb461e1fbcc7520dcd435c04c8598b331f2566b82714d50`.
+- Corrected production publication SHA-256:
+  `70020fc22feb542238be5091a91881427139b393ae00533e60163d357065b8fa`.
 
 The closing time is 14 December 2026, 23:59:59 UTC, consistent with the previously
 requested collection month. The month is no longer displayed as participant copy.
@@ -208,10 +211,57 @@ can repeat that initial delay. The new loading message and bounded retry cover
 that wait; this change does not claim to optimize the underlying cold hash cost.
 
 AppVM requires interactive sudo authentication for the final systemd restart.
-The activation script, private backup, complete publication and acceptance
-receipts are prepared. Pending: authenticated live activation, publication receipt
-and public verification. Until those results are observed, the release is staged,
-not yet confirmed live.
+The owner completed that restart. The code and frontend became active and readiness
+passed, but the first publication request returned 409. The preparation had added
+`final-study/1` to the tutorial's build allowlist and recalculated its hash while
+reusing `tutorial/2.0-native-2-copy-20261110`, which was already frozen in the live
+`vm-review-20261110-copy` study. The server correctly refused the conflict. The
+earlier isolated acceptance database did not contain that predecessor, so it did
+not catch this deployment-specific collision.
+
+Commit `bb13e0a` fixes preparation: a changed build allowlist gets a deterministic
+new tutorial version and matching protocol binding. A regression test reproduces
+the 409, publishes the corrected tutorial beside its predecessor and confirms
+that the old publication remains byte-identical and idempotent. All six focused
+catalogue tests passed; Black, isort and whitespace checks passed.
+
+The original failed-attempt file is preserved. The separately written
+`exact2-ncit-doid-production-20261114-publication-v2.json` changes exactly three
+fields: tutorial version, tutorial hash and protocol tutorial binding. Cases, keys,
+assets, evidence, descriptions, consent, assessment/grading and the build allowlist
+are unchanged. Its new tutorial version is
+`tutorial-build-908485e87f38a550e5025e98a88129cb`. A read-only comparison against both
+live frozen studies found no tutorial, assessment or form-version conflict. No
+existing study was edited, and no additional restart is needed for this
+preparation-only correction.
+
+The corrected publication passed the live admin API's full admission and was
+published successfully. Live frozen hash:
+`8df446e48e6bd7f09453a7f8d6da709b3f9b9d45423877c1b0802a62aeeeb2bf`.
+The live database confirms 40 cases, 200 pairs, `synthetic=false`, both previous
+study hashes unchanged, two new test sessions and zero research sessions at
+verification time. No participant invitations were sent.
+
+Public HTTPS verification passed from both the local computer (readiness) and a
+real browser on AppVM (the public hostname, normal certificate validation): new
+welcome/consent copy, consent transition, setup/background, the newly versioned
+tutorial's confirmed skip into a fully loaded ranking case, fragment removal,
+profile route boundaries and strict CSP. A separate resumed-session check waited
+for enabled ranking controls, saved the initial-order test draft and rendered the
+evidence graph. The fully loaded case and graph screenshots were visually inspected;
+both show the actual production definitions, generated descriptions and original
+fact-linked graph. No browser errors were recorded. The verification session is
+explicitly a test and excluded from analysis; a second fresh owner test link
+remains private on AppVM. The remaining acceptance scenarios are covered by the
+earlier five-test PostgreSQL run over byte-identical study content.
+
+`live-publication-receipt.json`, `live-data-verification.json`,
+`public-verification.json`, `tutorial-version-repair.json` and public-page
+screenshots are retained in the private preparation directory. The live checkout
+was advanced to `bb13e0a` for the preparation fix; running application/frontend
+bytes remain the tested `1e8ad4e` runtime release. No second restart was needed.
+Create fresh invitations for `exact2-ncit-doid-production-20261114` in Admin;
+existing invitation links correctly retain their older frozen study content.
 
 Screen-reader testing, a human usability pilot and institutional review decisions
 are not asserted by these automated checks. No new full PostgreSQL concurrency
