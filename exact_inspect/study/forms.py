@@ -5,7 +5,8 @@ from __future__ import annotations
 from copy import deepcopy
 
 FORMS3_COPY = "exact-study-forms/3-copy-20261110"
-FORMS3_VERSIONS = ("exact-study-forms/3", FORMS3_COPY)
+FORMS3_TRACES = "exact-study-forms/3-copy-20261117-traces"
+FORMS3_VERSIONS = ("exact-study-forms/3", FORMS3_COPY, FORMS3_TRACES)
 
 YEARS = {
     "none": "None",
@@ -38,6 +39,8 @@ COMPONENTS = {
     "evidence_table": "Comparison and evidence table",
     "evidence_graph": "Evidence graph",
     "pair_comparison": "Generated pair comparison",
+    "decision_trace": "Decision trace",
+    "scores": "Detailed matcher scores",
 }
 HELPFUL = {
     "not_helpful": "Not helpful",
@@ -181,7 +184,7 @@ def definitions(components=None, version="exact-study-forms/1", *, ordered=False
     """Return a detached, ordered definition; historical versions are frozen in the DB."""
     if version in FORMS3_VERSIONS:
         result = definitions3(components)
-        if version == FORMS3_COPY:
+        if version in (FORMS3_COPY, FORMS3_TRACES):
             result["version"] = version
             result["collection_notice"] = ""
             result["experience_note"] = ""
@@ -194,7 +197,14 @@ def definitions(components=None, version="exact-study-forms/1", *, ordered=False
                     .replace("in study or professional work", "in your education or work")
                 )
         return result
-    selected = {k: COMPONENTS[k] for k in (components if components is not None else COMPONENTS)}
+    selected = {
+        k: COMPONENTS[k]
+        for k in (
+            components
+            if components is not None
+            else [k for k in COMPONENTS if k not in {"decision_trace", "scores"}]
+        )
+    }
     final = [
         question(
             "component_usefulness",

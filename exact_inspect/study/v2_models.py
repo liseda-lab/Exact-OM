@@ -409,7 +409,11 @@ class ProtocolVersionsV3(StrictModel):
     setup: Literal["setup/3"]
     tutorial: Identifier
     assessment: Identifier
-    forms: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
+    forms: Literal[
+        "exact-study-forms/3",
+        "exact-study-forms/3-copy-20261110",
+        "exact-study-forms/3-copy-20261117-traces",
+    ]
     consultation: Literal["consultation/3"]
     methods: Literal["study-methods/3"]
     information: Identifier
@@ -603,7 +607,11 @@ class SetupReceiptV3(StrictModel):
 
 class ConsultationDraftV3(Mutation):
     presentation_id: Identifier
-    form_version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
+    form_version: Literal[
+        "exact-study-forms/3",
+        "exact-study-forms/3-copy-20261110",
+        "exact-study-forms/3-copy-20261117-traces",
+    ]
     consultation_version: Literal["consultation/3"]
     consulted_external_ontologies: bool | None = None
     methods: Annotated[list[MethodV3], Field(max_length=3)] = Field(default_factory=list)
@@ -654,7 +662,11 @@ class ConsultationV3(ConsultationDraftV3):
 
 class ConsultationReceiptV3(StrictModel):
     presentation_id: Identifier
-    form_version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
+    form_version: Literal[
+        "exact-study-forms/3",
+        "exact-study-forms/3-copy-20261110",
+        "exact-study-forms/3-copy-20261117-traces",
+    ]
     consultation_version: Literal["consultation/3"]
     consulted_external_ontologies: bool | None
     methods: list[MethodV3]
@@ -695,7 +707,11 @@ class QuestionDefinitionV3(QuestionDefinitionV2):
 
 
 class FormsV3(StrictModel):
-    version: Literal["exact-study-forms/3", "exact-study-forms/3-copy-20261110"]
+    version: Literal[
+        "exact-study-forms/3",
+        "exact-study-forms/3-copy-20261110",
+        "exact-study-forms/3-copy-20261117-traces",
+    ]
     background: list[QuestionDefinitionV3]
     consultation: list[QuestionDefinitionV3]
     setup: list[QuestionDefinitionV3]

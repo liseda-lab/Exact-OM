@@ -33,7 +33,7 @@ const EvidenceGraph = dynamic(() => import("@/components/explore/EvidenceGraph")
 });
 
 /** Components a study publication can admit individually (final-form matrix codes). */
-export type Component = "original_context" | "entity_description" | "hierarchy" | "evidence_table" | "evidence_graph" | "pair_comparison";
+export type Component = "original_context" | "entity_description" | "hierarchy" | "evidence_table" | "evidence_graph" | "pair_comparison" | "decision_trace" | "scores";
 export const ALL_COMPONENTS: Component[] = ["original_context", "entity_description", "hierarchy", "evidence_table", "evidence_graph", "pair_comparison"];
 
 export interface Focus {

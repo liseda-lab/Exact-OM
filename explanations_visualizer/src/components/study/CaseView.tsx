@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Skeleton } from "@/components/common/ErrorNote";
+import { DecisionTrace, ScoresPanel } from "@/components/explore/DecisionTrace";
 import { CaseLayout, answerSummaryOf } from "@/components/study/CaseLayout";
 import { RenderProbe, useCaseContent, WorkspaceBoundary, type CaseReadiness } from "@/components/study/caseContent";
 import { IdentityCard } from "@/components/study/IdentityCard";
@@ -301,6 +302,11 @@ export function CaseView({ state, session, telemetry, timingEnabled = true }: { 
             components={components}
             tab={tab}
             onTab={setTab}
+            order={["hierarchy", "evidence", "trace", "graph", "scores"]}
+            extraTabs={[
+              ...(components.has("decision_trace") && content.decisions[inspected.candidate_id] ? [{ key: "trace", label: "Decision trace", render: () => <DecisionTrace trace={content.decisions[inspected.candidate_id].decision_trace} /> }] : []),
+              ...(components.has("scores") && content.decisions[inspected.candidate_id] ? [{ key: "scores", label: "Scores", render: () => <ScoresPanel candidate={content.decisions[inspected.candidate_id].score_details} ranking={content.decisions[inspected.candidate_id].decision_trace.ranking} /> }] : []),
+            ]}
             navigation={{
               source: sourceFocus,
               target: targetFocus[inspected.candidate_id] ?? null,

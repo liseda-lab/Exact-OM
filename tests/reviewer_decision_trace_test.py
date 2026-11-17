@@ -124,3 +124,60 @@ def test_ranked_output_contract_rejects_impossible_rank_and_alignment_claim():
         PairResponse.model_validate({**trace, "saved_alignment_member": True})
     with pytest.raises(ValueError, match="Rank exceeds"):
         PairResponse.model_validate({**trace, "ranking": {**trace["ranking"], "rank": 101}})
+
+
+def test_study_admits_only_matching_complete_decision_records():
+    from copy import deepcopy
+
+    from exact_inspect.models import Candidate
+    from exact_inspect.study.workspace import _admit_pair_metadata
+
+    recovery, case, candidate = records()
+    metadata = dict(
+        status="none_selected",
+        bridge_status="not_recorded",
+        counts=dict.fromkeys(
+            [
+                "selected",
+                "resolved",
+                "unresolved",
+                "not_exported",
+                "withheld",
+                "graph_supported",
+                "graph_unsupported",
+                "graph_not_recorded",
+            ],
+            0,
+        ),
+    )
+    scores, trace = recovered_pair(recovery, case, candidate, "run", metadata)
+    details = Candidate.model_validate(
+        dict(
+            pair_id="pair",
+            source=case["source"],
+            target=candidate["entity"],
+            scores=scores,
+            retrieval_channels=[],
+            ordinal_ranks={},
+            evidence_counts=[],
+            nil={},
+            saved_alignment_member=None,
+            membership_provenance={"status": "unavailable", "artifact_hash": None},
+            status="available",
+            decision_status="available",
+        )
+    ).model_dump(mode="json")
+    original = dict(source=case["source"], target=candidate["entity"], evidence_metadata=metadata)
+    assert "decision_trace" not in _admit_pair_metadata(original, candidate, case, [])
+    value = dict(**original, decision_trace=trace, score_details=details)
+    assert _admit_pair_metadata(value, candidate, case, [])["decision_trace"]["pair_id"] == "pair"
+    for kind in ("missing", "wrong_pair", "wrong_score"):
+        bad = deepcopy(value)
+        if kind == "missing":
+            del bad["score_details"]
+        elif kind == "wrong_pair":
+            bad["decision_trace"]["pair_id"] = "other"
+        else:
+            bad["score_details"]["scores"][0]["value"] = 0.5
+        with pytest.raises(ValueError):
+            _admit_pair_metadata(bad, candidate, case, [])

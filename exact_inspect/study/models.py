@@ -198,6 +198,8 @@ class StudyDefinition(StrictModel):
             "evidence_table",
             "evidence_graph",
             "pair_comparison",
+            "decision_trace",
+            "scores",
         ]
     ] = Field(
         default=[

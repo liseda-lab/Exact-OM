@@ -19,9 +19,9 @@ import { createResourceSource } from "@/lib/workspace/resourceSource";
 import { shareReads, type SharedSource } from "@/lib/workspace/sharedReads";
 import type { WorkspaceSource } from "@/lib/workspace/types";
 import { useEntityContext, useExplanation } from "@/lib/workspace/WorkspaceContext";
-import type { EntityRef } from "@/lib/types";
+import type { Candidate, EntityRef, PairTrace } from "@/lib/types";
 import { createAccessGuard, type AccessGuard } from "@/study/accessGuard";
-import { contextProblem, explanationProblem, inBatches, renderExpectations, requiredContent, validateCapabilities, validateCase, workspaceCapabilities, type CaseComponent, type ScopeCapabilities } from "@/study/caseReadiness";
+import { contextProblem, explanationProblem, identity, inBatches, renderExpectations, requiredContent, validateCapabilities, validateCase, workspaceCapabilities, type CaseComponent, type ScopeCapabilities } from "@/study/caseReadiness";
 import type { ExplanationResource, StudyCase, StudyState } from "@/study/types";
 
 export interface ContentFailure {
@@ -57,6 +57,7 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
   const binding = `${state.session_id}|${state.study_revision}|${state.current_case_id}|${state.current_presentation_id}`;
   const [studyCase, setStudyCase] = useState<StudyCase | null>(null);
   const [source, setSource] = useState<WorkspaceSource | null>(null);
+  const [decisions, setDecisions] = useState<Record<string, { decision_trace: PairTrace; score_details: Candidate }>>({});
   const [readiness, setReadiness] = useState<CaseReadiness>({ attempt: 0, kind: "loading", done: 0, total: 1 });
   const [attempt, setAttempt] = useState(0);
   const attemptRef = useRef(0);
@@ -77,6 +78,7 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
   useEffect(() => {
     setStudyCase(null);
     setSource(null);
+    setDecisions({});
     setReadiness({ attempt: attemptRef.current, kind: "loading", done: 0, total: 1 });
     return () => {
       shared.current?.guard.cancel();
@@ -200,15 +202,27 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
       }
       const reads = shared.current.source;
       const required = requiredContent(current, componentsRef.current, caps);
+      const loadedDecisions: typeof decisions = {};
       let done = 0;
       advance({ attempt: mine, kind: "loading", done, total: required.length });
       const results = await inBatches(required, CONCURRENCY, async (item) => {
-        if (item.kind === "context") await reads.entityContext(item.entities[0], controller.signal);
+        if (item.kind === "decision") {
+          const record = await scopedRead<{ candidate_id: string; decision_trace: PairTrace; score_details: Candidate }>(base, "/evidence-metadata", { candidate_id: item.candidateId! }, controller.signal, session);
+          const candidate = current.candidates.find((c) => c.candidate_id === item.candidateId)!;
+          if (record.candidate_id !== candidate.candidate_id || !record.decision_trace || !record.score_details) throw new Error("The matcher record is missing.");
+          for (const value of [record.decision_trace, record.score_details]) {
+            if (value.pair_id !== candidate.candidate_id || identity(value.source) !== identity(current.source) || identity(value.target) !== identity(candidate.entity)) throw new Error("The matcher record belongs to another pair.");
+          }
+          if (record.decision_trace.ranking?.rank !== candidate.display_position || record.score_details.scores.find((s) => s.name === "S_final")?.value !== candidate.score) throw new Error("The matcher record disagrees with the case.");
+          loadedDecisions[candidate.candidate_id] = record;
+        }
+        else if (item.kind === "context") await reads.entityContext(item.entities[0], controller.signal);
         else await reads.explanation(item.kind === "profile" ? "entity_profile" : "pair_comparison", item.entities, controller.signal);
         done += 1;
         if (live()) advance({ attempt: mine, kind: "loading", done, total: required.length });
       });
       if (!live() || results.some((result) => result.status === "rejected" && isAbort(result.reason))) return;
+      setDecisions(loadedDecisions);
       setSource(reads);
       const failures = results.flatMap((result, index): ContentFailure[] => (result.status === "rejected" ? [{ label: required[index].label, detail: detailOf(result.reason) }] : []));
       if (failures.length) {
@@ -234,7 +248,7 @@ export function useCaseContent({ state, components, ontologyName, caseLabels }: 
     (error: unknown) => block({ attempt: attemptRef.current, kind: "blocked", cause: "render", title: "This case's information could not be displayed.", failures: [{ label: "The case display", detail: error instanceof Error ? error.message : "The display did not finish." }] }),
     [block],
   );
-  return { studyCase, source, readiness, retry, rendered, renderFailed, attempt };
+  return { studyCase, source, decisions, readiness, retry, rendered, renderFailed, attempt };
 }
 
 /** Catches a render failure in the case workspace so it blocks readiness instead of passing. */

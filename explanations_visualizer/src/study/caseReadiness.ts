@@ -10,7 +10,7 @@ import { navigationFromScope } from "../lib/workspace/navigation.ts";
 import type { PublicAsset, StudyCase, StudyState } from "./types";
 
 /** Components a frozen study condition can display (final-form matrix codes). */
-export type CaseComponent = "original_context" | "entity_description" | "hierarchy" | "evidence_table" | "evidence_graph" | "pair_comparison";
+export type CaseComponent = "original_context" | "entity_description" | "hierarchy" | "evidence_table" | "evidence_graph" | "pair_comparison" | "decision_trace" | "scores";
 
 /** The workspace capability component that authorizes each displayed component. */
 export const CAPABILITY_FOR: Record<CaseComponent, string> = {
@@ -20,6 +20,8 @@ export const CAPABILITY_FOR: Record<CaseComponent, string> = {
   evidence_table: "evidence",
   evidence_graph: "evidence",
   pair_comparison: "comparison",
+  decision_trace: "decisions",
+  scores: "decisions",
 };
 
 /** The scoped capabilities response (18 B11), as serialized by the study service. */
@@ -142,12 +144,13 @@ export function workspaceCapabilities(caps: ScopeCapabilities, ontologyName: (id
   };
 }
 
-export type RequiredKind = "context" | "profile" | "comparison";
+export type RequiredKind = "context" | "profile" | "comparison" | "decision";
 
 export interface RequiredItem {
   key: string;
   kind: RequiredKind;
   entities: EntityRef[];
+  candidateId?: string;
   /** Plain description used when this item fails. */
   label: string;
 }
@@ -161,6 +164,8 @@ export function requiredContent(current: StudyCase, components: Set<CaseComponen
     items.push(...focal.map(({ entity, name }): RequiredItem => ({ key: `profile|${identity(entity)}`, kind: "profile", entities: [entity], label: `Generated description of ${name}` })));
   if (components.has("pair_comparison") && caps.components.includes("comparison"))
     items.push(...sorted.map((item): RequiredItem => ({ key: `comparison|${identity(current.source)}|${identity(item.entity)}`, kind: "comparison", entities: [current.source, item.entity], label: `Comparison with candidate ${item.display_position}` })));
+  if (components.has("decision_trace") || components.has("scores"))
+    items.push(...sorted.map((item): RequiredItem => ({ key: `decision|${item.candidate_id}`, kind: "decision", candidateId: item.candidate_id, entities: [current.source, item.entity], label: `Matcher record for candidate ${item.display_position}` })));
   return items;
 }
 

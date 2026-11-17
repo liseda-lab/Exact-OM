@@ -36,12 +36,14 @@ from ..evidence_metadata import PairEvidenceMetadata
 from ..generation import Claim
 from ..models import (
     AxiomResponse,
+    Candidate,
     EntityContextResponse,
     ExplanationSummary,
     Fact,
     GeneratedExplanationResponse,
     GenerationManifest,
     LabelsResponse,
+    PairResponse,
     SelectedEvidence,
 )
 from ..navigation import (
@@ -62,7 +64,7 @@ def _error(status, message):
 
 
 Digest = Annotated[str, Field(pattern=r"^[a-f0-9]{64}$")]
-Component = Literal["context", "hierarchy", "profiles", "comparison", "evidence"]
+Component = Literal["context", "hierarchy", "profiles", "comparison", "evidence", "decisions"]
 _VERIFIED_INDEXES = OrderedDict()
 _VERIFICATION_LOCK = Lock()
 _TABLES = {
@@ -158,6 +160,8 @@ class WorkspacePairMetadata(StrictModel):
     source: EntityRef
     target: EntityRef
     evidence_metadata: PairEvidenceMetadata
+    decision_trace: PairResponse | None = None
+    score_details: Candidate | None = None
 
 
 class WorkspaceEvidenceMetadataResponse(WorkspacePairMetadata):
@@ -265,6 +269,26 @@ def _admit_pair_metadata(value, candidate, case, rows):
     from ..evidence_metadata import filter_pair_metadata, recorded_bridges
 
     value = WorkspacePairMetadata.model_validate(value).model_dump(mode="json")
+    trace = value.pop("decision_trace")
+    scores = value.pop("score_details")
+    if (trace is None) != (scores is None):
+        raise ValueError("Decision trace and scores must be supplied together")
+    if trace is not None:
+        for record in (trace, scores):
+            if (
+                record["pair_id"] != candidate["candidate_id"]
+                or record["source"] != case["source"]
+                or record["target"] != candidate["entity"]
+            ):
+                raise ValueError("Decision record differs from its active typed pair")
+        final = [s["value"] for s in scores["scores"] if s["name"] == "S_final"]
+        if (
+            final != [candidate["score"]]
+            or not trace["ranking"]
+            or trace["ranking"]["rank"] != candidate["display_position"]
+        ):
+            raise ValueError("Decision scores or rank differ from the frozen candidate")
+        value.update(decision_trace=trace, score_details=scores)
     if value["source"] != case["source"] or value["target"] != candidate["entity"]:
         raise ValueError("Evidence comparison differs from its active typed pair")
     metadata = value["evidence_metadata"]
@@ -283,6 +307,8 @@ def _admit_pair_metadata(value, candidate, case, rows):
         (),
     )
     value["evidence_metadata"] = metadata
+    if trace is not None:
+        trace["evidence_metadata"] = metadata
     return value
 
 
@@ -555,6 +581,8 @@ def validate_publication_workspaces(store, study, admitted_explanations):
                 "evidence_table": "evidence",
                 "evidence_graph": "evidence",
                 "pair_comparison": "comparison",
+                "decision_trace": "decisions",
+                "scores": "decisions",
             }
             if any(
                 names[c] not in scope.components for c in study.get("components", []) if c in names
@@ -627,6 +655,7 @@ def validate_publication_workspaces(store, study, admitted_explanations):
                 store._check_safe_json(value)
                 counts["evidence"] += 1
             if scope.index_version is not None:
+                decision_candidates = set()
                 for cid, payload in db.execute("SELECT candidate_id,payload FROM pair_metadata"):
                     if cid not in candidates:
                         raise ValueError("Workspace comparison belongs to another case")
@@ -637,7 +666,13 @@ def validate_publication_workspaces(store, study, admitted_explanations):
                         )
                     ]
                     value = _admit_pair_metadata(json.loads(payload), candidates[cid], case, rows)
+                    if value.get("decision_trace"):
+                        decision_candidates.add(cid)
                     store._check_safe_json(value)
+                if "decisions" in scope.components and decision_candidates != set(candidates):
+                    raise ValueError("Decisions must cover every candidate")
+            elif "decisions" in scope.components:
+                raise ValueError("Decision metadata index is required")
         for component, task in (
             ("profiles", "entity_profile"),
             ("comparison", "pair_comparison"),
@@ -1232,10 +1267,14 @@ def install_workspace_routes(router, store, participant_dependency):
                         (candidate_id,),
                     )
                 ]
-            return {
+            result = {
                 "candidate_id": candidate_id,
                 **_admit_pair_metadata(json.loads(row[0]), candidate, w.case, rows),
             }
+            if "decisions" not in w.scope.components:
+                result.pop("decision_trace", None)
+                result.pop("score_details", None)
+            return result
 
         return read(scope_id, identity, result)
 

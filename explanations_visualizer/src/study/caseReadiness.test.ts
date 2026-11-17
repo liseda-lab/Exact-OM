@@ -178,3 +178,15 @@ test("render expectations follow the admitted components exactly (R09)", () => {
   assert.deepEqual([...new Set(kinds(new Set(["hierarchy"])))], ["context"]);
 });
 
+
+test("decision panels require an admitted capability and all five matcher records", () => {
+  const components = new Set([...ALL, "decision_trace", "scores"] as const);
+  const expected = { scopeId: capabilities.scope_id, studyRevision: capabilities.study_revision, current: explanationCase, components };
+  assert.match(validateCapabilities(capabilities, expected).join(" "), /does not authorize decision trace/);
+  const admitted = { ...capabilities, components: [...capabilities.components, "decisions"] };
+  assert.deepEqual(validateCapabilities(admitted, expected), []);
+  const records = requiredContent(explanationCase, components, admitted).filter((item) => item.kind === "decision");
+  assert.equal(records.length, 5);
+  assert.deepEqual(records.map((item) => item.candidateId), [...explanationCase.candidates].sort((a, b) => a.display_position - b.display_position).map((item) => item.candidate_id));
+  assert.equal(requiredContent(explanationCase, ALL, capabilities).filter((item) => item.kind === "decision").length, 0);
+});
