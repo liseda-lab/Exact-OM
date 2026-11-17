@@ -2,11 +2,12 @@
 
 ## Status
 
-The corrected release is staged on AppVM at
-`~/exact-demo/releases/reviewer-traces-20261117`. Public activation is pending
-renewal of the owner's scoped deployment permission. The previous grant was
-revoked after the initial deployment. Neither the active study nor its publication
-has been modified by this recovery.
+The corrected release is live at <https://exact-explain.lasige.di.fc.ul.pt/> from
+`~/exact-demo/releases/reviewer-traces-20261117`, code revision `5daff82`. Public
+verification completed on 17 November 2026 at 12:38 UTC. The owner renewed the
+scoped deployment permission; it was revoked again after verification, and
+passwordless activation was independently confirmed unavailable. Neither the
+active study nor its publication has been modified by this recovery.
 
 ## Defect and correction
 
@@ -101,15 +102,25 @@ that every available feature has complete data in this run.
   including technical hashes, original citations, graph view persistence, themes,
   comparison and browse. Study/admin HTML and referenced assets remained identical
   to the active study upstream, with unchanged authentication responses.
+- The same five browser checks passed on public HTTPS after activation (20.0
+  seconds), and all 50 traces plus 110 description reads passed against the live
+  demo process. Public package identity matched the tested package. Study PID
+  230372 and publication SHA-256
+  `25340d36fab81b7415d5c210c74320a892ce343807b9c2176c4b4b05906487da`
+  remained unchanged; both services were active with zero automatic restarts.
+  Temporary loopback test services were stopped before activation.
 
 Private preparation and acceptance receipts are under
-`~/exact-demo/private/traces-20261117`. Public activation results will be
-recorded here after the owner bootstrap. Docker runtime,
+`~/exact-demo/private/traces-20261117`, including `activation-verification.json`,
+`live-api-verification.json`, `public-browser-verification.json` and
+`public-routing-verification.json`. The trace screenshot was visually inspected.
+Docker runtime,
 screen-reader use and a concurrent-load benchmark are not claimed by these checks.
 
 ## Maintenance
 
-The owner can renew only demo activation/rollback/revocation after the five browser
+No deployment grant remains active. For later maintenance the owner can renew only
+demo activation/rollback/revocation after the five browser
 checks and routing/API receipts are present:
 
 ```sh
