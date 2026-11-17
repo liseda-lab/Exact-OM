@@ -1,0 +1,80 @@
+descriptor_version: 1
+name: bioml_zenodo
+aliases: [bioml_legacy]
+provider: http
+provider_version: "1"
+description: Legacy Bio-ML task bundles from Zenodo record 13119437.
+upstream:
+  revision: "13119437"
+  urls:
+    - url: https://zenodo.org/api/records/13119437/files/ncit-doid.zip/content
+      filename: ncit-doid.zip
+      sha256: 701602faf7fd0427a029ef718ada000d15aaa13b5e810ff3797538307d7aa0a6
+      extract: true
+      destination: datasets
+      tasks: [ncit-doid]
+    - url: https://zenodo.org/api/records/13119437/files/omim-ordo.zip/content
+      filename: omim-ordo.zip
+      sha256: bddfa4d80a6a3b5cb694ed5e56b3d98a406b8a64a726e15745e9e4d002fe4b5f
+      extract: true
+      destination: datasets
+      tasks: [omim-ordo]
+    - url: https://zenodo.org/api/records/13119437/files/snomed-fma.body.zip/content
+      filename: snomed-fma.body.zip
+      sha256: 5f9e5fd337233bcd4472a881a13a7f6eb7fe5d38a33104762de6b54843364919
+      extract: true
+      destination: datasets
+      tasks: [snomed-fma.body]
+    - url: https://zenodo.org/api/records/13119437/files/snomed-ncit.neoplas.zip/content
+      filename: snomed-ncit.neoplas.zip
+      sha256: 10ab501e95fc3cb2c16c12783693c61d6804329f4fe1aa2d37810feed87c4c27
+      extract: true
+      destination: datasets
+      tasks: [snomed-ncit.neoplas]
+    - url: https://zenodo.org/api/records/13119437/files/snomed-ncit.pharm.zip/content
+      filename: snomed-ncit.pharm.zip
+      sha256: 6724f72894cb26ff679dd58646bf6c796fd17a01a061df5e220a126aa530634d
+      extract: true
+      destination: datasets
+      tasks: [snomed-ncit.pharm]
+tasks:
+  ncit-doid:
+    source: datasets/ncit-doid/ncit.owl
+    target: datasets/ncit-doid/doid.owl
+    refs:
+      train: datasets/ncit-doid/refs_equiv/train.tsv
+      test: datasets/ncit-doid/refs_equiv/test.tsv
+      full: datasets/ncit-doid/refs_equiv/full.tsv
+    candidates: datasets/ncit-doid/refs_equiv/test.cands.tsv
+  omim-ordo:
+    source: datasets/omim-ordo/omim.owl
+    target: datasets/omim-ordo/ordo.owl
+    refs:
+      train: datasets/omim-ordo/refs_equiv/train.tsv
+      test: datasets/omim-ordo/refs_equiv/test.tsv
+      full: datasets/omim-ordo/refs_equiv/full.tsv
+    candidates: datasets/omim-ordo/refs_equiv/test.cands.tsv
+  snomed-fma.body:
+    source: datasets/snomed-fma.body/snomed.body.owl
+    target: datasets/snomed-fma.body/fma.body.owl
+    refs:
+      train: datasets/snomed-fma.body/refs_equiv/train.tsv
+      test: datasets/snomed-fma.body/refs_equiv/test.tsv
+      full: datasets/snomed-fma.body/refs_equiv/full.tsv
+    candidates: datasets/snomed-fma.body/refs_equiv/test.cands.tsv
+  snomed-ncit.neoplas:
+    source: datasets/snomed-ncit.neoplas/snomed.neoplas.owl
+    target: datasets/snomed-ncit.neoplas/ncit.neoplas.owl
+    refs:
+      train: datasets/snomed-ncit.neoplas/refs_equiv/train.tsv
+      test: datasets/snomed-ncit.neoplas/refs_equiv/test.tsv
+      full: datasets/snomed-ncit.neoplas/refs_equiv/full.tsv
+    candidates: datasets/snomed-ncit.neoplas/refs_equiv/test.cands.tsv
+  snomed-ncit.pharm:
+    source: datasets/snomed-ncit.pharm/snomed.pharm.owl
+    target: datasets/snomed-ncit.pharm/ncit.pharm.owl
+    refs:
+      train: datasets/snomed-ncit.pharm/refs_equiv/train.tsv
+      test: datasets/snomed-ncit.pharm/refs_equiv/test.tsv
+      full: datasets/snomed-ncit.pharm/refs_equiv/full.tsv
+    candidates: datasets/snomed-ncit.pharm/refs_equiv/test.cands.tsv

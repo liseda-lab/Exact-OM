@@ -1,0 +1,3 @@
+SrcEntity	TgtEntity	Relation	Score
+http://example.org/kg/atrium	http://example.org/kg/atrium	equivalent	1.0
+http://example.org/kg/heart	http://example.org/kg/heart	equivalent	1.0

@@ -1,0 +1,60 @@
+<?xml version="1.0"?>
+<rdf:RDF xmlns="http://example.org/mini/tgt#"
+     xml:base="http://example.org/mini/tgt"
+     xmlns:align="http://oaei.ontologymatching.org/bio-ml/ann/"
+     xmlns:ex="http://example.org/mini/tgt#"
+     xmlns:iao="http://purl.obolibrary.org/obo/"
+     xmlns:oboInOwl="http://www.geneontology.org/formats/oboInOwl#"
+     xmlns:owl="http://www.w3.org/2002/07/owl#"
+     xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+     xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+     xmlns:xsd="http://www.w3.org/2001/XMLSchema#">
+
+  <owl:Ontology rdf:about="http://example.org/mini/tgt"/>
+  <owl:AnnotationProperty rdf:about="http://www.geneontology.org/formats/oboInOwl#hasExactSynonym"/>
+  <owl:AnnotationProperty rdf:about="http://purl.obolibrary.org/obo/IAO_0000115"/>
+  <owl:AnnotationProperty rdf:about="http://oaei.ontologymatching.org/bio-ml/ann/use_in_alignment"/>
+
+  <owl:ObjectProperty rdf:about="http://purl.obolibrary.org/obo/BFO_0000050"><rdfs:label>part of</rdfs:label><rdfs:domain rdf:resource="#Anatomy"/><rdfs:range rdf:resource="#Anatomy"/><owl:inverseOf rdf:resource="#containsPart"/></owl:ObjectProperty>
+  <owl:ObjectProperty rdf:about="#containsPart"><rdfs:label>contains part</rdfs:label><rdfs:domain rdf:resource="#Anatomy"/><rdfs:range rdf:resource="#Anatomy"/></owl:ObjectProperty>
+  <owl:ObjectProperty rdf:about="#associatedWith"><rdf:type rdf:resource="http://www.w3.org/2002/07/owl#SymmetricProperty"/><rdfs:label>associated with</rdfs:label></owl:ObjectProperty>
+  <owl:ObjectProperty rdf:about="#enrolledIn"><rdfs:label>enrolled in</rdfs:label><rdfs:subPropertyOf rdf:resource="#associatedWith"/><rdfs:domain rdf:resource="#Human"/><rdfs:range rdf:resource="#ResearchStudy"/></owl:ObjectProperty>
+  <owl:DatatypeProperty rdf:about="#identifier"><rdfs:label>identifier</rdfs:label><rdfs:domain rdf:resource="#TargetEntity"/><rdfs:range rdf:resource="http://www.w3.org/2001/XMLSchema#string"/></owl:DatatypeProperty>
+
+  <owl:Class rdf:about="#TargetEntity"><rdfs:label>entity</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#LivingThing"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>organism</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Anatomy"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>anatomical entity</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#BodyStructure"><rdfs:subClassOf rdf:resource="#Anatomy"/><rdfs:label>structure</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#BiologicalCell"><rdfs:subClassOf rdf:resource="#Anatomy"/><rdfs:label>cell</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#BodyTissue"><rdfs:subClassOf rdf:resource="#BodyStructure"/><rdfs:label>tissue</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#BodyOrgan"><rdfs:subClassOf rdf:resource="#BodyStructure"/><rdfs:label>organ</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#CardiacOrgan"><rdfs:subClassOf rdf:resource="#BodyOrgan"/><rdfs:subClassOf rdf:resource="#HeartStructure"/><rdfs:label xml:lang="en">heart</rdfs:label><rdfs:label xml:lang="fr">cœur</rdfs:label><oboInOwl:hasExactSynonym>cardiac organ</oboInOwl:hasExactSynonym><iao:IAO_0000115>An organ that circulates blood.</iao:IAO_0000115></owl:Class>
+  <owl:Class rdf:about="#PulmonaryOrgan"><rdfs:subClassOf rdf:resource="#BodyOrgan"/><rdfs:label>lung</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#RenalOrgan"><rdfs:subClassOf rdf:resource="#BodyOrgan"/><rdfs:label>kidney</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#VascularStructure"><rdfs:subClassOf rdf:resource="#BodyStructure"/><rdfs:label>blood vessel</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#ArterialVessel"><rdfs:subClassOf rdf:resource="#VascularStructure"/><rdfs:label>artery</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#VenousVessel"><rdfs:subClassOf rdf:resource="#VascularStructure"/><rdfs:label>vein</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Disorder"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>disease</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#HeartDisorder"><rdfs:subClassOf rdf:resource="#Disorder"/><rdfs:label>cardiac disease</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#PulmonaryDisorder"><rdfs:subClassOf rdf:resource="#Disorder"/><rdfs:label>lung disease</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#RenalDisorder"><rdfs:subClassOf rdf:resource="#Disorder"/><rdfs:label>kidney disease</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#ClinicalFinding"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>symptom</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#PainFinding"><rdfs:subClassOf rdf:resource="#ClinicalFinding"/><rdfs:label>pain</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#ThoracicPain"><rdfs:subClassOf rdf:resource="#PainFinding"/><rdfs:subClassOf><owl:Restriction><owl:onProperty rdf:resource="http://purl.obolibrary.org/obo/BFO_0000050"/><owl:someValuesFrom rdf:resource="#CardiacOrgan"/></owl:Restriction></rdfs:subClassOf><rdfs:label>chest pain</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Therapy"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>treatment</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Medication"><rdfs:subClassOf rdf:resource="#Therapy"/><rdfs:label>drug</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Intervention"><rdfs:subClassOf rdf:resource="#Therapy"/><rdfs:label>procedure</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#Human"><rdfs:subClassOf rdf:resource="#LivingThing"/><rdfs:label>person</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#CareRecipient"><rdfs:subClassOf rdf:resource="#Human"/><rdfs:label>patient</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#MedicalPractitioner"><rdfs:subClassOf rdf:resource="#Human"/><owl:equivalentClass rdf:resource="#HealthWorker"/><rdfs:label>clinician</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#HealthWorker"><owl:equivalentClass rdf:resource="#MedicalPractitioner"/><rdfs:label>healthcare professional</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#ResearchStudy"><rdfs:subClassOf rdf:resource="#TargetEntity"/><rdfs:label>study</rdfs:label></owl:Class>
+  <owl:Class rdf:about="#HeartStructure"><rdfs:label>cardiac structure</rdfs:label><owl:equivalentClass><owl:Class><owl:intersectionOf rdf:parseType="Collection"><rdf:Description rdf:about="#BodyStructure"/><owl:Restriction><owl:onProperty rdf:resource="http://purl.obolibrary.org/obo/BFO_0000050"/><owl:someValuesFrom rdf:resource="#CardiacOrgan"/></owl:Restriction></owl:intersectionOf></owl:Class></owl:equivalentClass></owl:Class>
+  <owl:Class rdf:about="#ObsoleteTarget"><rdfs:label>deprecated concept</rdfs:label><owl:deprecated rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">true</owl:deprecated></owl:Class>
+  <owl:Class rdf:about="#ExcludedTarget"><rdfs:label>ignored concept</rdfs:label><align:use_in_alignment rdf:datatype="http://www.w3.org/2001/XMLSchema#boolean">false</align:use_in_alignment></owl:Class>
+  <owl:Class rdf:about="#NamelessTarget"><rdfs:subClassOf rdf:resource="#TargetEntity"/></owl:Class>
+
+  <owl:NamedIndividual rdf:about="#bob"><rdf:type rdf:resource="#CareRecipient"/><ex:enrolledIn rdf:resource="#studyA"/><ex:identifier rdf:datatype="http://www.w3.org/2001/XMLSchema#string">P-002</ex:identifier></owl:NamedIndividual>
+  <owl:NamedIndividual rdf:about="#ibuprofen"><rdf:type rdf:resource="#Medication"/><ex:associatedWith rdf:resource="#bob"/><ex:identifier>RX-2</ex:identifier></owl:NamedIndividual>
+  <owl:NamedIndividual rdf:about="#studyA"><rdf:type rdf:resource="#ResearchStudy"/><rdfs:label>study alpha</rdfs:label></owl:NamedIndividual>
+</rdf:RDF>

@@ -1,2 +1,4 @@
+from .base import LoggingClass, SelfRegisteringComponent
+from .knowledge import KnowledgeSource
 
-from .base import SelfRegisteringComponent, LoggingClass
+__all__ = ["KnowledgeSource", "LoggingClass", "SelfRegisteringComponent"]

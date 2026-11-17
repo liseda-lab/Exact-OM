@@ -1,0 +1,8 @@
+{
+  "ontologies": {
+    "source": {
+      "filename": "source.owl",
+      "sha256": "3e3d1d0f32ad127387c94be537117fe47f496e1f467bdbf6debddd7551e41156"
+    }
+  }
+}

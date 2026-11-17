@@ -1,0 +1,9 @@
+include README.md LICENSE CHANGELOG.md CONTRIBUTING.md MIGRATION.md
+recursive-include docs *.md
+recursive-include exact *.yaml *.json *.owl *.tsv *.txt
+recursive-include tests *.py *.json *.jsonl *.yaml *.yml *.owl *.tsv *.csv *.nt *.ttl *.trig
+recursive-include scripts *.py *.yml
+exclude BioML-data-and-evaluation.zip
+prune data
+prune exports
+prune .worktrees

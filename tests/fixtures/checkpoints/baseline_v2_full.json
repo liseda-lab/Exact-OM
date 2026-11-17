@@ -1,0 +1,42 @@
+{
+  "checkpoint_schema_version": 2,
+  "kind": "inference",
+  "dataset_signature": "wp-d-fixture",
+  "dataset_fingerprint": "wp-d-candidates-v1",
+  "checkpoint_fingerprint": "1c724b9f7799b2339cba21a99078fca677d0db57",
+  "checkpoint_fingerprint_payload": {
+    "dataset_signature": "wp-d-fixture",
+    "dataset_fingerprint": "wp-d-candidates-v1",
+    "models": [
+      {
+        "class": "FixtureModel",
+        "fingerprint": "1f3e6e26358c2da20f85147e6dfc56f04f13450b",
+        "payload": {
+          "model": "fixture-v1"
+        }
+      }
+    ]
+  },
+  "total_examples": 2,
+  "processed_examples": 2,
+  "timing": {
+    "inference_seconds_cumulative": 12.5,
+    "examples_per_second_ema": 0.16
+  },
+  "checkpoint_payload": "full",
+  "mappings_count": 2,
+  "results_json_count": 0,
+  "mappings": [
+    {
+      "src": "https://example.org/source/A",
+      "tgt": "https://example.org/target/A",
+      "score": 0.91
+    },
+    {
+      "src": "https://example.org/source/B",
+      "tgt": "https://example.org/target/B",
+      "score": 0.73
+    }
+  ],
+  "results_json": []
+}

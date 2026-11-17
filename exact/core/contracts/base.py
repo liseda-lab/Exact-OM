@@ -1,22 +1,38 @@
+"""Shared registration and logging bases for runtime components."""
 
-from abc import ABC
-from typing import Optional, TYPE_CHECKING
-
+import inspect
 import logging
+import sys
+from abc import ABC
+from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from exact.core.entities.registry import ComponentType
 
-#TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
+# TODO on debug check if all modules are being curretly registered, non imported implementations might not be registered.
 
 
 class SelfRegisteringComponent(ABC):
-    
     """Base class for self-registering components."""
-    component_type: 'ComponentType'  # To be defined in subclasses
+
+    component_type: "ComponentType"  # To be defined in subclasses
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
+
+        # Interface classes such as IDataset and IMetric declare abstract
+        # methods and are not runnable registry components.  Register only
+        # concrete subclasses; otherwise callers must rely on registration
+        # order to skip the interface entry.
+        if inspect.isabstract(cls):
+            return
+
+        # Files executed under a temporary ``module_from_spec`` name may not
+        # be installed in ``sys.modules``. Registering those classes would
+        # leave an unimportable component path and conflict with the canonical
+        # package import. Normal package and plugin imports are present here.
+        if cls.__module__ not in sys.modules:
+            return
 
         # Ensure the subclass defines the component_type
         if not hasattr(cls, "component_type") or not cls.component_type:
@@ -28,20 +44,25 @@ class SelfRegisteringComponent(ABC):
         # Determine the fully qualified import path of the subclass
         module_name = cls.__module__
         class_name = cls.__name__
+        registry_name = getattr(cls, "registry_name", class_name)
         import_path = f"{module_name}.{class_name}"
 
         # Register the class using the ComponentRegistry
-        
+
         from exact.core.entities.registry import ComponentRegistry
-        ComponentRegistry.register(cls.component_type, class_name, import_path)
+
+        ComponentRegistry.register(cls.component_type, registry_name, import_path)
 
 
 class LoggingClass:
     """Base class for logging classes."""
+
     def __init__(self, logger: Optional[logging.Logger] = None):
         self.logger = logger
 
     def log(self, msg: str, level: str = "info", traceback: bool = False):
+        """Emit a message through the bound logger or standard output."""
+
         if self.logger is not None:
             log_method = getattr(self.logger, level, None)
             if callable(log_method):

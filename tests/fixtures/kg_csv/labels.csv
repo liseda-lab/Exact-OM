@@ -1,0 +1,6 @@
+entity,label
+http://example.org/kg/atrium,Atrium
+http://example.org/kg/blood,Blood
+http://example.org/kg/heart,Heart
+http://example.org/kg/heart,Cardiac organ
+http://example.org/kg/organ,Organ

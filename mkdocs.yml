@@ -1,0 +1,26 @@
+site_name: Exact-OM
+site_description: Explainable ontology matching
+site_url: https://liseda-lab.github.io/Exact-OM/
+repo_url: https://github.com/liseda-lab/Exact-OM
+theme:
+  name: material
+plugins:
+  - search
+nav:
+  - Overview: index.md
+  - Installation: installation.md
+  - Workflow: pipeline.md
+  - Configuration: configuration.md
+  - Decisions: decisions.md
+  - Global acceptance: acceptance.md
+  - Local ranking: ranking.md
+  - Evaluation: evaluation.md
+  - Artifacts and resume: runs.md
+  - Python API: api.md
+markdown_extensions:
+  - tables
+  - fenced_code
+validation:
+  links:
+    not_found: warn
+    unrecognized_links: warn

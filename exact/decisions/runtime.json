@@ -1,0 +1,54 @@
+{
+  "dependency_versions": {
+    "fla-core": "0.5.2",
+    "flash-linear-attention": "0.5.2",
+    "safetensors": "0.8.0",
+    "tokenizers": "0.23.3",
+    "torch": "2.8.0+cu128",
+    "transformers": "5.19.0"
+  },
+  "model": "baselabs/elephant-1",
+  "model_files": {
+    "README.md": "0c1f7c170191d0906218c3b34ad7a11ae4bc49a04d210eb12e5bb7a5461648f7",
+    "chat_template.jinja": "a4aee8afcf2e0711942cf848899be66016f8d14a889ff9ede07bca099c28f715",
+    "config.json": "f26324589d15932e2742dbb13dbc7c561865ce4f80990af3b7dff05efe4dadab",
+    "constraints.txt": "7afb5334b5d57ef09e3d8ac2fc670f07182c50ffb51035d5b6eb7898f863edfb",
+    "engine.py": "72373353379c53b7cabfb5d05b6fef3c898d48c87cc386e03fc3de9c07e67ca7",
+    "generation_config.json": "290866a6d7d4a4442fe83ba2434a31517446f40a01de500ff97b4354e7e5d082",
+    "model.safetensors": "682f02348dfe4617dd21bba2915c12e805de8cf16327a61e895a831ea681d0ba",
+    "processor_config.json": "bfbc24af59a3e73a9cd0653b8d4ae758dfaec4e3e6c15dfb1c6c8ee8d5683c85",
+    "readout.json": "96ea8a5c6ecfc30c20cdd369762db5997c5f4fb9821ce0a0318941343eb5e8ba",
+    "serve.patch": "f234c125f1d38d82104b9e1f24e75bde51e4401928acfba2fbf5c59ef2fb46b8",
+    "setup.sh": "6bf9514c6b80f585a94f9a40c03f87c27cce9e2de8d2ba4cf4b41434babca62a",
+    "tokenizer.json": "a5cd9732badce41de57e6efce8302930ded1c1188c5f81feb2bd6c24c4a1941f",
+    "tokenizer_config.json": "2984c03425a28d242744e234a5003786fd289b3713db79fe0958c65eb59d85b2"
+  },
+  "revision": "b3f8a93462fb1051a9de031e94a7ff380e254072",
+  "runtime_files": {
+    "__init__.py": "6446cd0006940630b28180d275efe39972b871c2fb2ae502c848607c940e8376",
+    "answers.py": "09b06dba258c80a6a9afdaa5aacfd0f7523f9d2a087a7b6402ca03553ea6fba6",
+    "calibrate.py": "3fa6013a81c7e79a702afcdcc0ebd089bee7047590c18cc44708850f5aeda1ee",
+    "cli.py": "826ccbe6ec72327229d2d66c19becb1c041ee98f78280700563a4dbb5bdb0fdb",
+    "client.py": "560ca00f7ecffee72e6490afdd69a34cf4f55a6e1765a0493d4beebf8b6b4278",
+    "engine.py": "dc3eb95e0118cb056357bd3e68c0ed9f18b4656492b02087e9ca53773af8d3f0",
+    "fp8.py": "e666635147127479dbb81f45c469a13b090789ff39e60a72877f2b6d0e278de9",
+    "llamacpp.py": "e3f86829a2f7d28857d6bc184eb7b79e5ee2c2444ccbff2fce2894e772b2463b",
+    "media.py": "1f6ec71b03a42f7f48461260580d8aacc1fa6ff64a3c684cb23bb1d5d13aa8c0",
+    "mm_engine.py": "2b03b290ee9328caa5e23bea8d92b6dbd8fff61152305bbe0e445ad4d1e7a132",
+    "prompt.py": "f0763b5f747039c2919bc2a6d51e4ed88308fe3497e53498e6f298286b6169b2",
+    "readout.py": "e084edead750ddeb39384b9f659182df52720d96294d9a95c9259a8001e3c20d",
+    "schema.py": "bce4b7d353ac115a9e50aef284975ddeed9a3bb452e3fd928a556668705bc2f3",
+    "server.py": "51ddaafebc677286aebff370ee0740baef9f902778b32bb8da1b061ffa964dd2"
+  },
+  "serve_patch_sha256": "f234c125f1d38d82104b9e1f24e75bde51e4401928acfba2fbf5c59ef2fb46b8",
+  "settings": {
+    "attention": "noncausal",
+    "dtype": "bfloat16",
+    "fork_mode": "sequential",
+    "head_dtype": "float32",
+    "max_branch_tokens": 16384,
+    "max_request_tokens": 16384,
+    "readout": "slot_lm"
+  },
+  "vendor_commit": "81ce62f1597c91e46767d4d02d6ac2e18534fe94"
+}

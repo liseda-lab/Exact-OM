@@ -1,4 +1,3 @@
-
 import shutil
 import tarfile
 import zipfile
@@ -6,12 +5,13 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-from tqdm import tqdm
 import yaml
+from tqdm import tqdm
 
-## read data tables
+# Read data tables
 
 na_vals = pd.io.parsers.readers.STR_NA_VALUES.difference({"NULL", "null", "n/a"})
+
 
 def read_table(file_path: Path) -> pd.DataFrame:
     """Read tsv file as pandas dataframe without treating "null" as empty string."""
@@ -22,19 +22,24 @@ def read_table(file_path: Path) -> pd.DataFrame:
     return pd.read_csv(file_path, sep=sep, na_values=na_vals, keep_default_na=False)
 
 
-## save dict to csv
+# Save dictionaries to CSV
+
 
 def save_dict_to_csv(data: dict, file_path: Path, sep: str = ",", columns: list = ["key", "value"]):
     """Save a dictionary to a csv file."""
     pd.DataFrame(data.items(), columns=columns).to_csv(str(file_path), index=False, sep=sep)
 
-## read yaml
+
+# Read YAML
+
 
 def read_yaml(file_path: Path):
     with open(str(file_path), "r") as file:
         return yaml.safe_load(file)
 
-## get data from urls
+
+# Download data from URLs
+
 
 class DataDownloader:
     def __init__(self, dest_folder):
@@ -122,7 +127,7 @@ class DataDownloader:
     @staticmethod
     def has_subdirs(directory):
         return any(item.is_dir() for item in Path(directory).iterdir())
-    
+
     @staticmethod
     def delete_file(file_path):
         Path(file_path).unlink()

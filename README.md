@@ -1,283 +1,90 @@
-# EXACT-OM
+# Exact-OM 2.0
 
-EXACT-OM is a tool for explainable, context-aware ontology matching.
-It combines lexical similarity, ontology structure, and optional language-model
-reasoning to predict mappings between entities while keeping the decision process
-inspectable.
+Exact matches ontology entities using lexical and structural evidence, optional
+gated language-model decisions, and fitted ranking or acceptance models. It
+exports alignments, complete local rankings, and inspectable evidence.
 
-The repository currently defaults to a pair-adaptive scorer: lexical matching is
-still the main signal, structural evidence is split into separate channels, and
-the LLM sees a compact pair brief built from pair-specific evidence. The earlier
-single-context scorer is still available as a legacy mode.
-
-## Documentation
-
-The practical documentation site is available at
-[liseda-lab.github.io/Exact-OM](https://liseda-lab.github.io/Exact-OM/).
-
-## Citation
-
-If you use this repository in academic work, please cite:
-
-Cotovio, P. G., Nunes, S., Jiménez-Ruiz, E., & Pesquita, C. (2026).
-*Interpretable Context-Aware Models Improve Expert Validation in Ontology
-Matching*. In *The Semantic Web: 23rd European Semantic Web Conference*.
-Springer.
-
-## How EXACT-OM Works
-
-At a high level, EXACT-OM follows four steps:
-
-1. **Lexical matching**
-   Label variants are embedded with SapBERT, and the strongest pairwise
-   similarity is used as the lexical signal.
-2. **Pair-adaptive structural evidence**
-   For each candidate pair, the model gathers multiple structural views instead
-   of relying on a single pooled context. The current scorer separates:
-   hierarchy-based evidence, non-hierarchical similarity triples, distinctive
-   difference triples, and auxiliary literal or annotation attributes.
-3. **Confidence-weighted fusion**
-   Structural channels are first combined into one structural score. That score
-   is then fused with lexical similarity using a confidence-aware function so
-   that stronger evidence has more influence on the final prediction.
-4. **Optional LLM arbitration**
-   When a pair remains ambiguous, the system can build a short pair brief and
-   ask an LLM for a binary decision. This can be done with local Hugging Face
-   models or hosted OpenRouter models, depending on configuration.
-
-One of the main goals of the project is interpretability. For each evaluated
-mapping, EXACT-OM can export:
-
-- the lexical, structural, and LLM contributions to the final score
-- the per-channel structural breakdown
-- natural-language rationales aligned with the final outcome
-- structured JSON outputs for downstream inspection and analysis
+Python 3.10–3.12 is supported. Native OWL processing does not require Java.
+GPU encoders and Elephant-1 are optional; the bundled demonstration runs offline
+on CPU.
 
 ## Installation
 
-The project is managed with Poetry.
+From a checkout of this release:
 
-### Requirements
-
-- Python 3.10
-- Java available on the system path for JVM-based preprocessing
-- Poetry
-- CUDA-capable GPU if you want GPU execution; CPU-only runs are also supported
-
-### Setup
-
-```bash
-poetry install
-poetry run exact --help
+```console
+python -m pip install .
+exact --help
 ```
 
-The package exposes these main entry points:
+For a built distribution, use `pip install exact_om-2.0.0-py3-none-any.whl`.
+The package is prepared for PyPI publication; creating this branch does not
+publish it. Optional integrations are `.[bioml-eval]` and `.[reasoning]`.
+Elephant uses a separate, pinned serving environment described in
+[the decision guide](docs/decisions.md).
 
-- `exact` for ontology matching runs
-- `bioml-eval` for standalone evaluation
-- `exact-user-study` for post-run user-study analysis
-- `exact-study-viz` for the FastAPI-hosted embedded study visualizer
+## Offline demonstration
 
-## Running EXACT-OM
-
-The matching CLI lives in `exact/delivery/cli/align.py`.
-
-The core inputs are:
-
-- `-s` / `--source_ontology_file`: source ontology in OWL format
-- `-t` / `--target_ontology_file`: target ontology in OWL format
-- `-o` / `--output_dir`: directory for outputs, logs, and artifacts
-- `-y` / `--config_file`: YAML configuration file
-
-Useful optional inputs:
-
-- `-r` / `--training_reference_file`: training mappings for supervised settings
-- `-f` / `--full_reference_file`: reference mappings for evaluation and some
-  context-building steps
-- `-c` / `--candidates_file`: candidate restriction file, useful for validation
-  slices
-- `-e` / `--run_eval`: run evaluation after inference
-- `-d` / `--device`: CUDA device id; omit for CPU
-- `-m` / `--jvm_heap_size`: heap size passed to the JVM, for example `32G`
-- `-l` / `--save_logs`: write `exact.log` inside the output directory
-
-Example:
-
-```bash
-poetry run exact \
-  -s data/ncit-doid/ncit.owl \
-  -t data/ncit-doid/doid.owl \
-  -o exp/runs/ncit_doid/manual \
-  -y exp/debug_new_approach/full_ncit2doid_local_small/config.yaml \
-  -f data/ncit-doid/test.tsv \
-  -c data/ncit-doid/test.cands.val.tsv \
-  -l -e -m 60G -d 0
+```console
+exact config example --output demo
+exact align -s demo/mini_src.owl -t demo/mini_tgt.owl \
+  -c demo/mini_test.cands.tsv -y demo/config.yaml -o runs/demo
+exact run info runs/demo
+exact run export runs/demo --format jsonl --output evidence.jsonl
 ```
 
-A typical workflow is:
+The demonstration uses string evidence to exercise the complete input/output
+path without downloading models. Its accuracy is not representative of the
+encoder-based research configuration.
 
-1. Prepare the ontologies, reference mappings, and optional candidate file.
-2. Copy and edit a YAML config, for example
-   `exp/debug_new_approach/full_ncit2doid_local_small/config.yaml`.
-3. Run `exact` and inspect the output directory for alignments, logs, plots, and
-   explanations.
+## Production workflow
 
-## Configuration Notes
+The final architecture has explicit stages so expensive pair evidence can be
+reused when fitting or changing a selection policy.
 
-### Threshold semantics
+| Command | Purpose |
+|---|---|
+| `exact score` | Generate source-sharded native pair scores and selected evidence |
+| `exact decisions` | Freeze the source gate, run/reuse Elephant, and mix pair probabilities |
+| `exact acceptance` | Fit a global edge classifier and export full or partial-policy alignments |
+| `exact rank` | Fit and apply the local query ranker without changing candidate membership |
+| `exact eval` / `exact-eval` | Evaluate saved submissions |
+| `exact config` | Copy profiles/examples, print defaults, or migrate configuration |
+| `exact data` | Retrieve and verify dataset tracks |
+| `exact run` | Inspect, export, and clean standard alignment runs |
+| `exact align` | Run the existing configurable matching pipeline and API-compatible workflow |
 
-`alignment_params.threshold` is the shared final decision threshold.
+Start with [the staged workflow](docs/pipeline.md). It distinguishes generated
+global candidates from supplied local query pools and explains TRAIN-only
+fitting, separate full/partial policies, checkpoints, and output formats.
+`exact align` retains the configurable native workflow; it does not implicitly
+load the final study's fitted acceptance models or apply an Elephant gate.
 
-- In global mode, it filters saved alignments and also determines positive vs.
-  negative rationale polarity together with `cardinality`.
-- In local mode, all candidates remain in the ranking output, but the same
-  threshold is still used to label rationales as positive or negative.
+Production profiles preserve the selected encoders and numerical settings.
+Task-specific models and thresholds must be fitted from designated training
+data, qualified on validation data, and frozen before test evaluation.
+The BioML full and partial results use different operating policies. NCIT–DOID
+also retains a historical full-policy head; these details are explicit in the
+[acceptance](docs/acceptance.md), [decisions](docs/decisions.md), and
+[local ranking](docs/ranking.md) guides.
 
-### LLM routing
+## Documentation and development
 
-LLM behavior is split into two configuration blocks:
+- [Installation and optional integrations](docs/installation.md)
+- [Configuration and inputs](docs/configuration.md)
+- [Evaluation](docs/evaluation.md)
+- [Artifacts, storage, and resume](docs/runs.md)
+- [Python API](docs/api.md)
+- [Migration from Exact v1](MIGRATION.md)
+- [Contributing and release checks](CONTRIBUTING.md)
 
-- `llm_profiles` defines named local or hosted backends
-- `llm_routing` selects which profile is used for each task:
-  `verbaliser`, `summary`, `decision`, and `rationale`
+Ontology repair and the interactive visualization product are not included in
+this release. Their source and historical experiments remain on the research
+branches. Explanation export remains part of the matcher.
 
-Hosted profiles use OpenRouter. The API key is resolved in this order:
+## Citation and license
 
-1. `OPENROUTER_API_KEY`
-2. the profile-specific `api_key_path`
-3. `~/.config/openrouter/api_key`
-4. an interactive prompt for a key-file path
-5. local fallback with a warning
-
-For decision scoring, the hosted path is stricter than the others. EXACT-OM uses
-a constrained binary decision head and relies on usable chat logprobs for both
-labels. If the selected hosted route does not support that path, the runtime
-falls back to the configured local decision model.
-
-## Outputs
-
-Depending on the run mode, a typical output directory includes:
-
-- alignment TSV files
-- logs and runtime artifacts
-- evaluation summaries
-- `full_explanations.json` with detailed per-pair explanations
-
-User-study analysis expects a run directory containing
-`src2tgt.maps_local.tsv` and `full_explanations.json`.
-
-## Evaluation And Analysis
-
-### Standalone evaluation
-
-`bioml-eval` mirrors the evaluation API and can be used on an existing alignment
-file.
-
-```bash
-poetry run bioml-eval \
-  --alignment_file exp/runs/ncit_doid/manual/model/alignment.tsv \
-  --output_dir exp/runs/ncit_doid/manual \
-  --full_reference_file data/ncit-doid/test.tsv \
-  --source_ontology_file data/ncit-doid/ncit.owl \
-  --target_ontology_file data/ncit-doid/doid.owl \
-  --save_logs -m 32G
-```
-
-### Python API
-
-For programmatic use, `exact.delivery.api` exposes:
-
-- `AlignmentRunner`, which mirrors the main matching CLI
-- `EvalutionRunner`, which wraps the standalone evaluation flow
-
-### User-study analysis
-
-`exact-user-study` is the post-run analysis CLI used to build balanced study
-selections, export mappings, generate failure taxonomies, and produce the
-notebook used for expert validation analysis.
-
-The helper `tools/run_user_study_job.py` wraps this flow from a YAML run config.
-
-### Embedded study visualizer
-
-The repository also includes a Render-friendly study visualizer that serves one
-fixed user-study run through FastAPI and a static React/Cytoscape frontend.
-
-The visualizer is read-only and is meant to be embedded into LimeSurvey via an
-iframe:
-
-```text
-/?source=<exact_source_iri>
-```
-
-At runtime it loads:
-
-- `analysis/user_study/study_mapping.json`
-- `analysis/user_study/study_selected_records_with_rationales.json`
-  or `study_selected_records.json`
-- `analysis/user_study/ontology_cache.json` when precomputed one-hop ontology
-  expansion is enabled
-
-Required environment variable:
-
-- `EXACT_STUDY_RUN_DIR`
-
-Optional environment variables:
-
-- `EXACT_STUDY_ANALYSIS_DIR`
-- `EXACT_STUDY_ENABLE_ONTOLOGY_INFO`
-- `EXACT_STUDY_PORT`
-- `EXACT_STUDY_HOST`
-- `EXACT_STUDY_LOG_LEVEL`
-
-Typical local workflow:
-
-```bash
-cd explanations_visualizer
-npm install
-npm run build
-
-cd ..
-poetry install
-poetry run python -m study_visualizer_runtime.cli \
-  --run-dir exp/test/Full_local_bioml_with_exp/omim-ordo \
-  --analysis-dir exp/test/Full_local_bioml_with_exp/omim-ordo/analysis/user_study \
-  --port 8000
-```
-
-The frontend is exported as static files under `explanations_visualizer/out`,
-and FastAPI serves those files together with the `/api/study/*` endpoints.
-
-## YAML Runners And Slurm Helpers
-
-For repeatable runs, the repository includes small wrappers around the main CLI:
-
-- `tools/run_exact_job.py` builds and runs an `exact` command from a YAML file
-- `tools/run_user_study_job.py` does the same for `exact-user-study`
-
-These can be executed locally with `--dry-run` to inspect the resolved command,
-or submitted through Slurm by passing the corresponding wrapper script:
-
-- `deploy/sbatch/exact_tune_run.sh`
-- `deploy/sbatch/exact_user_study_run.sh`
-- `deploy/sbatch/exact_single_run.sh`
-
-## Hyperparameter Tuning
-
-`tools/hparam_tuner.py` generates per-trial experiment folders, trial configs,
-and `sbatch` commands from a tuner YAML file such as
-`exp/tuning/ncit_doid_val/tuner.yaml`.
-
-Two common modes are supported:
-
-- grid search over explicit parameter values
-- a lightweight smart sampler for low-discrepancy exploration with local
-  exploitation
-
-Example:
-
-```bash
-poetry run python tools/hparam_tuner.py \
-  --tuner-config exp/tuning/ncit_doid_val/tuner.yaml \
-  --strategy grid --dry-run
-```
+If you use Exact, cite the accompanying Exact ontology-matching paper and record
+the package version, configuration, model revisions and evaluation protocol.
+Licensed under the [MIT license](LICENSE). Dataset and model licenses apply
+separately.

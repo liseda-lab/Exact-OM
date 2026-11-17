@@ -1,0 +1,3 @@
+SrcEntity	TgtEntity	TgtCandidates
+http://example.org/kg/atrium	http://example.org/kg/atrium	('http://example.org/kg/atrium', 'http://example.org/kg/heart')
+http://example.org/kg/heart	http://example.org/kg/heart	('http://example.org/kg/heart', 'http://example.org/kg/organ')

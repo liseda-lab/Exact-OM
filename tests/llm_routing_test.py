@@ -5,8 +5,8 @@ import httpx
 from exact.utils.llm_routing import (
     DEFAULT_OPENROUTER_KEY_PATH,
     LLMProfile,
-    OpenRouterClient,
     LLMRouter,
+    OpenRouterClient,
     extract_completion_span_logprobs,
     extract_completion_suffix_logprob,
     extract_first_token_top_logprobs,
@@ -23,7 +23,10 @@ def test_parse_structured_json_extracts_embedded_object():
 
 def test_parse_structured_json_extracts_value_from_fenced_partial_json():
     text = '```json\n{"rationale":"First sentence. Second sentence without closing brace"\n'
-    assert parse_structured_json(text, "rationale") == "First sentence. Second sentence without closing brace"
+    assert (
+        parse_structured_json(text, "rationale")
+        == "First sentence. Second sentence without closing brace"
+    )
 
 
 def test_extract_first_token_top_logprobs_reads_openai_shape():
@@ -118,7 +121,9 @@ def test_openrouter_chat_completion_includes_seed_when_supported(monkeypatch):
     client = OpenRouterClient()
     profile = LLMProfile(name="hosted", backend="openrouter", model="openai/gpt-4o-mini")
     monkeypatch.setattr(client, "resolve_api_key", lambda profile: "test-key")
-    monkeypatch.setattr(client, "supports_parameter", lambda profile, parameter: parameter == "seed")
+    monkeypatch.setattr(
+        client, "supports_parameter", lambda profile, parameter: parameter == "seed"
+    )
 
     def fake_http_json(url, method="GET", headers=None, payload=None, timeout_secs=60.0):
         captured["payload"] = payload
@@ -189,7 +194,9 @@ def test_openrouter_retries_transient_http_status(monkeypatch):
     monkeypatch.setattr(client, "_sleep_before_retry", lambda attempt: None)
     request = httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions")
     transient = httpx.Response(status_code=503, request=request, content=b'{"error":"busy"}')
-    success = httpx.Response(status_code=200, request=request, content=json.dumps({"choices": []}).encode("utf-8"))
+    success = httpx.Response(
+        status_code=200, request=request, content=json.dumps({"choices": []}).encode("utf-8")
+    )
     calls = {"count": 0}
 
     def fake_request(**kwargs):
@@ -200,7 +207,9 @@ def test_openrouter_retries_transient_http_status(monkeypatch):
 
     monkeypatch.setattr(client._client, "request", fake_request)
     profile = LLMProfile(name="hosted", backend="openrouter", model="openai/gpt-4o-mini")
-    payload = client.chat_completion(profile=profile, messages=[{"role": "user", "content": "hi"}], max_tokens=1)
+    payload = client.chat_completion(
+        profile=profile, messages=[{"role": "user", "content": "hi"}], max_tokens=1
+    )
     assert payload == {"choices": []}
     assert calls["count"] == 2
 
@@ -314,6 +323,5 @@ def test_router_warns_when_primary_profile_is_missing():
     assert resolved.fallback_triggered is True
     assert resolved.fallback_reason == "missing_primary_profile"
     assert any(
-        level == "warning" and "missing_hosted_profile" in message
-        for level, message in messages
+        level == "warning" and "missing_hosted_profile" in message for level, message in messages
     )

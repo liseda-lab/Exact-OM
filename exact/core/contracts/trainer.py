@@ -1,25 +1,30 @@
-import random
-from abc import abstractmethod
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Tuple, TYPE_CHECKING, Union
+"""Trainer orchestration contract and shared artifact helpers."""
 
+import json
 import logging
+from abc import abstractmethod
+from collections.abc import Mapping
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import seaborn as sns
 import torch as th
 from torch import device as tdevice
-import json
 
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-from exact.core.contracts import SelfRegisteringComponent, LoggingClass
-from exact.core.entities.registry import ComponentType
-from exact.core.entities.mappings import EntityMapping
-from exact.utils.mappings import fill_anchored_scores
-from exact.utils.data import read_table
+from exact.core.contracts import LoggingClass, SelfRegisteringComponent
+from exact.core.contracts.alignment_io import (
+    type_alignment_relations,
+    write_alignment_format,
+)
 from exact.core.entities.configs.dataset import DatasetMask
+from exact.core.entities.mappings import EntityMapping
+from exact.core.entities.registry import ComponentType
+from exact.runs.layout import RunLayout
+from exact.utils.data import read_table
+from exact.utils.mappings import candidate_table_views, fill_anchored_scores
 
 if TYPE_CHECKING:
     from exact.core.contracts.dataset import IDataset
@@ -27,28 +32,30 @@ if TYPE_CHECKING:
 
 
 class ITrainer(SelfRegisteringComponent, LoggingClass):
+    """Base trainer that binds datasets, models, and run artifacts."""
 
     component_type = ComponentType.TRAINER
 
     def __init__(
         self,
-        dataset: 'IDataset',
-        model: Optional[Type['IModel']] = None,
+        dataset: "IDataset",
+        model: Optional[Type["IModel"]] = None,
         model_params: Optional[Dict[str, Any]] = None,
-        models: Optional[List[Tuple[Type['IModel'], Dict[str, Any]]]] = None,
+        models: Optional[List[Tuple[Type["IModel"], Dict[str, Any]]]] = None,
         device: tdevice = tdevice("cuda" if th.cuda.is_available() else "cpu"),
         output_dir: Optional[Path] = None,
         logger: Optional[logging.Logger] = None,
         **kwargs,
     ):
-        
+        """Instantiate model components and prepare a versioned run layout."""
+
         LoggingClass.__init__(self, logger=logger)
 
         # Load Args
 
         self._dataset = dataset
         self._device = device
-        model_specs: List[Tuple[Type['IModel'], Dict[str, Any]]] = []
+        model_specs: List[Tuple[Type["IModel"], Dict[str, Any]]] = []
         if models:
             model_specs = [(m, params or {}) for m, params in models]
         elif model is not None:
@@ -67,7 +74,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
             obj.log = _log
 
-        self._models: List['IModel'] = []
+        self._models: List["IModel"] = []
         for model_cls, params in model_specs:
             instance = model_cls(device=device, **params)
             _bind_logger(instance)
@@ -75,14 +82,20 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 try:
                     instance.attach_dataset(dataset)
                 except Exception as exc:
-                    self.log(f"Failed to attach dataset to model {model_cls.__name__}: {exc}", level="warning")
+                    self.log(
+                        f"Failed to attach dataset to model {model_cls.__name__}: {exc}",
+                        level="warning",
+                    )
             self._models.append(instance.to(self.device))
         self._model = self._models[0]
 
         self._results_json: List[Dict[str, Any]] = []
         self._results_df: Optional[pd.DataFrame] = None
-        
-        self._output_dir = output_dir
+
+        if output_dir is None:
+            raise ValueError("Trainer output_dir is required")
+        self._run_layout = RunLayout.create(output_dir)
+        self._output_dir = self._run_layout.root
 
         # Create output directories
         self.alignment_dir.mkdir(parents=True, exist_ok=True)
@@ -93,32 +106,40 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         return th.device(self._device if th.cuda.is_available() else "cpu")
 
     @property
-    def dataset(self) -> 'IDataset':
+    def dataset(self) -> "IDataset":
         return self._dataset
 
     @property
-    def model(self) -> 'IModel':
+    def model(self) -> "IModel":
         return self._model
 
     @property
-    def models(self) -> List['IModel']:
+    def models(self) -> List["IModel"]:
         return self._models
 
     @property
     def output_dir(self) -> Path:
         return self._output_dir
-    
+
+    @property
+    def run_layout(self) -> RunLayout:
+        layout = getattr(self, "_run_layout", None)
+        if layout is None:
+            layout = RunLayout.create(self._output_dir)
+            self._run_layout = layout
+        return layout
+
     @property
     def plot_dir(self) -> Path:
-        return (self._output_dir / "plots").resolve()
+        return self.run_layout.plots_dir
 
     @property
     def alignment_dir(self) -> Path:
-        return (self._output_dir / "alignment").resolve()
+        return self.run_layout.alignment_dir
 
     @property
     def checkpoint_dir(self) -> Path:
-        path = (self._output_dir / "checkpoints").resolve()
+        path = self.run_layout.checkpoints_dir
         path.mkdir(parents=True, exist_ok=True)
         return path
 
@@ -135,34 +156,45 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         self._results_df = value
 
     @abstractmethod
-    def predict(self, kind: DatasetMask = DatasetMask.inference, 
-                threshold: Optional[float] = 0.7,
-                **kwargs
+    def predict(
+        self,
+        kind: DatasetMask = DatasetMask.inference,
+        threshold: Optional[float] = 0.7,
+        **kwargs,
     ) -> Tuple[List[EntityMapping], float]:
-        
+        """Run inference and return retained mappings plus average pair latency."""
+
         pass
 
-    def apply_prefilter(self,
-                        alignment: List[EntityMapping],
-                        threshold: Optional[float] = None,
-                        cardinality: Optional[int] = None,
-                        target_cardinality: Optional[int] = None,
-                        **kwargs
+    def apply_prefilter(
+        self,
+        alignment: List[EntityMapping],
+        threshold: Optional[float] = None,
+        cardinality: Optional[int] = None,
+        target_cardinality: Optional[int] = None,
+        **kwargs,
     ) -> List[EntityMapping]:
         """
         Apply prefiltering to the dataset based on the features.
         """
+        if getattr(self, "_extraction_includes_prefilter", False):
+            # Global extraction already resolved exact anchors and the declared
+            # cardinalities (including unrestricted threshold output).
+            return alignment
+
         selector_target_conflict_enabled = getattr(self, "_selector_target_conflict_enabled", None)
         if selector_target_conflict_enabled is False:
             target_cardinality = None
-        
+
         df = self.dataset.dataframe.copy()
-        df = df[df[DatasetMask.prefiltered] == True]
+        df = df[df[DatasetMask.prefiltered]]
 
         if df.empty:
             self.log("No data to prefilter", level="warning")
             if target_cardinality is not None:
-                filtered = EntityMapping.filter_top_n_target_entity_mappings(alignment, target_cardinality)
+                filtered = EntityMapping.filter_top_n_target_entity_mappings(
+                    alignment, target_cardinality
+                )
                 self.log(
                     (
                         "Target conflict resolver: "
@@ -170,6 +202,14 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                         f"removed_mappings={len(alignment) - len(filtered)}"
                     ),
                     level="info",
+                )
+                from exact.runs.decisions import observe_cardinality
+
+                observe_cardinality(
+                    getattr(self, "_final_candidate_frame", None),
+                    alignment,
+                    filtered,
+                    target_cardinality=target_cardinality,
                 )
                 return filtered
             return alignment
@@ -181,19 +221,19 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 break
 
         if score_column is None:
-            self.log("Prefiltered dataframe missing score column; skipping prefilter step.", level="warning")
+            self.log(
+                "Prefiltered dataframe missing score column; skipping prefilter step.",
+                level="warning",
+            )
             return alignment
 
         prefilter_df = df[["Src", "Tgt", score_column]].copy()
         prefilter_df.columns = ["Src", "Tgt", "Score"]
 
         prefiltered_mappings = EntityMapping.read_table_mappings(prefilter_df, threshold=threshold)
-        protected_pairs = {
-            (mapping.head, mapping.tail)
-            for mapping in prefiltered_mappings
-        }
+        protected_pairs = {(mapping.head, mapping.tail) for mapping in prefiltered_mappings}
         final_alignment = prefiltered_mappings + alignment
-        
+
         if cardinality is not None:
             final_alignment = EntityMapping.filter_top_n_entity_mappings(
                 final_alignment,
@@ -216,7 +256,17 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 ),
                 level="info",
             )
-        
+
+        from exact.runs.decisions import observe_cardinality
+
+        observe_cardinality(
+            getattr(self, "_final_candidate_frame", None),
+            prefiltered_mappings + alignment,
+            final_alignment,
+            source_cardinality=cardinality,
+            target_cardinality=target_cardinality,
+            protected_pairs=protected_pairs,
+        )
         return final_alignment
 
     def save_results(
@@ -230,7 +280,18 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         append_stats_to_summary_csv: bool = False,
         review_low: Optional[float] = None,
         review_high: Optional[float] = None,
-        **kwargs
+        output_formats: Optional[List[str]] = None,
+        relation_prediction: str = "none",
+        relation_anchors: Any = None,
+        relation_semantic_backend: str = "graph_closure",
+        relation_equivalence_anchor_threshold: float = 0.95,
+        relation_equivalence_anchor_margin: float = 0.10,
+        relation_confidence_threshold: float = 0.5,
+        relation_reasoning_timeout_seconds: float = 60.0,
+        source_uri: Optional[str] = None,
+        target_uri: Optional[str] = None,
+        paper_audit: bool = False,
+        **kwargs,
     ) -> Dict[str, Path]:
         """
         Saves TSVs (alignment), JSON (explanations), CSV (summary), and run-level stats.
@@ -238,16 +299,26 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         """
         output_paths = {}
 
-        # ---- Alignments (existing behavior)
-        align_path = self.save_alignment(
+        # ---- Alignments
+        alignment_paths = self._save_alignment_formats(
             preds=preds,
             candidates_one2many_path=candidates_one2many_path,
-            sub_dir=sub_dir,
+            output_formats=output_formats,
+            relation_prediction=relation_prediction,
+            relation_anchors=relation_anchors,
+            relation_semantic_backend=relation_semantic_backend,
+            relation_equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            relation_equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            relation_reasoning_timeout_seconds=relation_reasoning_timeout_seconds,
+            source_uri=source_uri,
+            target_uri=target_uri,
+            paper_audit=paper_audit,
         )
-        output_paths["alignment_tsv"] = Path(align_path)
+        output_paths.update(alignment_paths)
 
-        out_dir = (self.alignment_dir / (sub_dir or "default")).resolve()
-        out_dir.mkdir(parents=True, exist_ok=True)
+        stats_dir = self._run_layout.stats_dir
+        stats_dir.mkdir(parents=True, exist_ok=True)
 
         # ---- Explanations JSON
         writer = getattr(self, "write_full_explanations_json", None)
@@ -257,29 +328,52 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             or (callable(has_streamed_explanations) and bool(has_streamed_explanations()))
         )
         if save_json and (self.results_json or can_stream_explanations):
-            json_path = out_dir / "full_explanations.json"
+            json_path = self._run_layout.full_explanations_path
             if callable(writer):
                 writer(json_path)
             else:
                 with open(json_path, "w", encoding="utf-8") as f:
-                    json.dump(self.results_json, f, ensure_ascii=False, separators=(",", ":"), default=str)
+                    json.dump(
+                        self.results_json,
+                        f,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        default=str,
+                    )
             self.log(f"Saved full explanations JSON → {json_path}", level="info")
             output_paths["explanations_json"] = json_path
 
         # ---- Summary CSV
         results_df = self.results_df
         if save_csv and results_df is not None and not results_df.empty:
-            csv_path = out_dir / "summary_metrics.csv"
+            csv_path = self._run_layout.summary_metrics_path
             results_df.to_csv(csv_path, sep="\t", index=False)
             self.log(f"Saved numeric summary CSV → {csv_path}", level="info")
             output_paths["summary_csv"] = csv_path
 
             # ---- Run-level stats
-            stats = self._compute_run_stats(results_df, review_low=review_low, review_high=review_high)
+            stats = self._compute_run_stats(
+                results_df, review_low=review_low, review_high=review_high
+            )
             summary_stats = getattr(self, "_llm_summary_stats", None)
             if summary_stats is not None:
                 stats["llm_summary_stats"] = summary_stats
-            stats_json_path = out_dir / "run_stats.json"
+            selector_calibration = []
+            for model in self.models:
+                metadata = dict(getattr(model, "_calibration_meta", {}) or {})
+                provenance = getattr(model, "training_reference_provenance", None)
+                if metadata or provenance:
+                    if provenance and "training_reference" not in metadata:
+                        metadata["training_reference"] = provenance
+                        metadata["training_reference_sha256"] = provenance.get("sha256")
+                    metadata["model"] = model.__class__.__name__
+                    selector_calibration.append(metadata)
+            if selector_calibration:
+                stats["selector_calibration"] = selector_calibration
+            extraction = dict(getattr(self, "_extraction_diagnostics", {}) or {})
+            if extraction:
+                stats["extraction"] = extraction
+            stats_json_path = self._run_layout.run_stats_path
             with open(stats_json_path, "w", encoding="utf-8") as f:
                 json.dump(stats, f, indent=2, ensure_ascii=False)
             self.log(f"Saved run-level stats JSON → {stats_json_path}", level="info")
@@ -307,7 +401,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                     flat["llm_summary_empty"] = summary_stats.get("empty")
                     flat["llm_summary_empty_fraction"] = summary_stats.get("empty_fraction")
 
-                stats_csv_path = out_dir / "run_stats.csv"
+                stats_csv_path = stats_dir / "run_stats.csv"
                 pd.DataFrame([flat]).to_csv(stats_csv_path, index=False)
                 self.log(f"Saved run-level stats CSV → {stats_csv_path}", level="info")
                 output_paths["run_stats_csv"] = stats_csv_path
@@ -321,7 +415,7 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         calib_report = getattr(self, "_llm_calibration_report", None)
         if calib_report and (calib_report.get("messages") or calib_report.get("learned")):
-            calib_path = out_dir / "llm_calibration.json"
+            calib_path = stats_dir / "llm_calibration.json"
             with open(calib_path, "w", encoding="utf-8") as f:
                 json.dump(calib_report, f, indent=2, ensure_ascii=False)
             self.log(f"Saved LLM calibration metadata → {calib_path}", level="info")
@@ -329,22 +423,447 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return output_paths
 
-    def save_alignment(self, 
-                       preds: List[EntityMapping], 
-                       candidates_one2many_path: Optional[Path] = None,
-                       sub_dir: Optional[str] = None
-                       ) -> None:
-        
-        if sub_dir is not None:
-            alignment_dir = self.alignment_dir / sub_dir
-            alignment_dir.mkdir(parents=True, exist_ok=True)
+    @staticmethod
+    def _entity_kind_value(value: Any) -> str:
+        """Return a stable string for an ``EntityKind``-like value."""
 
-        else:
-            alignment_dir = self.alignment_dir
+        return str(getattr(value, "value", value))
+
+    def _scored_alignment_frame(
+        self,
+        preds: List[EntityMapping],
+        *,
+        relation_prediction: str,
+        relation_anchors: Any,
+        relation_semantic_backend: str,
+        relation_equivalence_anchor_threshold: float,
+        relation_equivalence_anchor_margin: float,
+        relation_confidence_threshold: float,
+        relation_reasoning_timeout_seconds: float,
+    ) -> pd.DataFrame:
+        """Build the canonical scored frame and apply optional relation typing."""
+
+        frame = pd.DataFrame(
+            [
+                {
+                    "SrcEntity": mapping.head,
+                    "TgtEntity": mapping.tail,
+                    "Score": mapping.score,
+                    "Relation": mapping.relation,
+                    "Kind": self._entity_kind_value(mapping.kind),
+                    "SrcKind": self._entity_kind_value(mapping.src_kind),
+                    "TgtKind": self._entity_kind_value(mapping.tgt_kind),
+                }
+                for mapping in preds
+            ],
+            columns=[
+                "SrcEntity",
+                "TgtEntity",
+                "Score",
+                "Relation",
+                "Kind",
+                "SrcKind",
+                "TgtKind",
+            ],
+        )
+        typed = type_alignment_relations(
+            frame,
+            getattr(self.dataset, "source", None),
+            getattr(self.dataset, "target", None),
+            mode=relation_prediction,
+            anchors=relation_anchors,
+            semantic_backend=relation_semantic_backend,
+            equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            timeout_seconds=relation_reasoning_timeout_seconds,
+            **(
+                {"artifact": self.relation_artifact}
+                if getattr(self, "relation_artifact", None) is not None
+                else {}
+            ),
+        )
+        self.relation_audit = {
+            key: typed.attrs[key]
+            for key in ("coherence_audit", "relation_fit_identity", "relation_anchor_count")
+            if key in typed.attrs
+        }
+        if self.relation_audit:
+            audit_dir = self.output_dir / "audit"
+            audit_dir.mkdir(parents=True, exist_ok=True)
+            (audit_dir / "relations.json").write_text(
+                json.dumps(self.relation_audit, indent=2) + "\n"
+            )
+        # ``none`` is the compatibility mode: relations remain equality and
+        # historical explanation payloads must stay byte-identical.  Only an
+        # enabled typer contributes new relation metadata and overlays.
+        if str(relation_prediction).strip().lower() != "none":
+            self._apply_relation_metadata(
+                preds,
+                typed,
+                relation_prediction=relation_prediction,
+                relation_semantic_backend=relation_semantic_backend,
+            )
+        return typed
+
+    def _apply_relation_metadata(
+        self,
+        preds: List[EntityMapping],
+        frame: pd.DataFrame,
+        *,
+        relation_prediction: str,
+        relation_semantic_backend: str,
+    ) -> None:
+        """Synchronize relation acceptances and abstentions across every output surface."""
+
+        def plain(value: Any) -> Any:
+            if isinstance(value, np.generic):
+                return value.item()
+            if isinstance(value, Mapping):
+                return {
+                    str(key): plain(item)
+                    for key, item in sorted(value.items(), key=lambda pair: str(pair[0]))
+                }
+            if isinstance(value, (list, tuple)):
+                return [plain(item) for item in value]
+            return value
+
+        def optional(row: Mapping[str, Any], name: str) -> Any:
+            if name not in row:
+                return None
+            value = plain(row[name])
+            if value is None:
+                return None
+            try:
+                missing = pd.isna(value)
+                if isinstance(missing, (bool, np.bool_)) and bool(missing):
+                    return None
+            except (TypeError, ValueError):
+                pass
+            return value
+
+        original_keys = {(str(mapping.head), str(mapping.tail)) for mapping in preds}
+        semantic_mode = str(relation_prediction).strip().lower() in {
+            "semantic_entailment",
+            "semantic_then_learned",
+        }
+        configured_backend = str(relation_semantic_backend) if semantic_mode else None
+        metadata: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for row in frame.to_dict(orient="records"):
+            key = (str(row.get("SrcEntity")), str(row.get("TgtEntity")))
+            relation = optional(row, "Relation")
+            confidence = optional(row, "relation_confidence")
+            if relation is None or confidence is None:
+                raise ValueError(f"Relation typer returned incomplete metadata for pair {key!r}")
+            item: Dict[str, Any] = {
+                "relation": str(relation),
+                "relation_confidence": float(confidence),
+            }
+            backend = optional(row, "relation_semantic_backend") or configured_backend
+            evidence = optional(row, "relation_evidence")
+            if backend is not None:
+                item["relation_semantic_backend"] = str(backend)
+            if evidence is not None:
+                item["relation_evidence"] = evidence
+            metadata[key] = item
+
+        unknown_typed = sorted(set(metadata).difference(original_keys))
+        if unknown_typed:
+            raise ValueError(
+                f"Relation typer returned pairs absent from the accepted input: {unknown_typed}"
+            )
+
+        abstentions: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        raw_abstentions = frame.attrs.get("relation_abstentions") or []
+        if not isinstance(raw_abstentions, (list, tuple)):
+            raise ValueError("relation_abstentions must be a sequence of pair records")
+        normalized_abstentions = [
+            plain(entry) for entry in raw_abstentions if isinstance(entry, Mapping)
+        ]
+        normalized_abstentions.sort(
+            key=lambda entry: (
+                str(entry.get("source", "")),
+                str(entry.get("target", "")),
+                json.dumps(entry, sort_keys=True, separators=(",", ":"), default=str),
+            )
+        )
+        for entry in normalized_abstentions:
+            source = entry.get("source")
+            target = entry.get("target")
+            if source is None or target is None:
+                continue
+            key = (str(source), str(target))
+            if key in abstentions:
+                raise ValueError(
+                    f"Relation typer returned duplicate abstention metadata for {key!r}"
+                )
+            abstentions[key] = {
+                str(name): value
+                for name, value in entry.items()
+                if name not in {"source", "target"}
+            }
+
+        conflicting = sorted(set(metadata).intersection(abstentions))
+        if conflicting:
+            raise ValueError(f"Relation typer both accepted and abstained pairs: {conflicting}")
+
+        updates: Dict[Tuple[str, str], Dict[str, Any]] = {}
+        for key in sorted(original_keys):
+            accepted = metadata.get(key)
+            if accepted is not None:
+                prediction = {
+                    "relation": accepted["relation"],
+                    "relation_abstained": False,
+                    "saved_alignment_member": True,
+                }
+                updates[key] = {
+                    **accepted,
+                    "relation_abstained": False,
+                    "confidences": {"relation_confidence": accepted["relation_confidence"]},
+                    "prediction": prediction,
+                }
+                continue
+
+            payload = dict(abstentions.get(key) or {})
+            reason = str(payload.get("reason") or "relation_typer_abstained")
+            payload["reason"] = reason
+            backend = (
+                payload.get("relation_semantic_backend")
+                or payload.get("backend")
+                or configured_backend
+            )
+            evidence = payload.get("relation_evidence", payload.get("evidence"))
+            update: Dict[str, Any] = {
+                "relation": None,
+                "relation_confidence": None,
+                "relation_abstained": True,
+                "relation_abstention": payload,
+                "relation_abstention_reason": reason,
+                "confidences": {"relation_confidence": None},
+                "prediction": {
+                    "relation": None,
+                    "relation_abstained": True,
+                    "saved_alignment_member": False,
+                    "rationale_positive": False,
+                    "rationale_decision_label": "No match",
+                },
+            }
+            if backend is not None:
+                update["relation_semantic_backend"] = str(backend)
+            if evidence is not None:
+                update["relation_evidence"] = evidence
+            updates[key] = update
+
+        kept: List[EntityMapping] = []
+        for mapping in preds:
+            key = (str(mapping.head), str(mapping.tail))
+            accepted = metadata.get(key)
+            if accepted is None:
+                continue
+            mapping.relation = str(accepted["relation"])
+            kept.append(mapping)
+        preds[:] = kept
+
+        for record in self.results_json:
+            key = (str(record.get("src_iri")), str(record.get("tgt_iri")))
+            update = updates.get(key)
+            if update is None:
+                continue
+            for name, value in update.items():
+                if name in {"confidences", "prediction"}:
+                    section = dict(record.get(name) or {})
+                    section.update(value)
+                    record[name] = section
+                else:
+                    record[name] = value
+
+        results_df = self.results_df
+        if results_df is not None and not results_df.empty:
+            source_column = "src_iri" if "src_iri" in results_df.columns else "Src"
+            target_column = "tgt_iri" if "tgt_iri" in results_df.columns else "Tgt"
+            if source_column in results_df.columns and target_column in results_df.columns:
+                if "saved_alignment_member" not in results_df.columns:
+                    results_df["saved_alignment_member"] = False
+                if "relation_abstained" not in results_df.columns:
+                    results_df["relation_abstained"] = False
+                for index, row in results_df.iterrows():
+                    key = (str(row[source_column]), str(row[target_column]))
+                    update = updates.get(key)
+                    if update is None:
+                        continue
+                    prediction = update["prediction"]
+                    flat = {
+                        "Relation": update.get("relation"),
+                        "relation_confidence": update.get("relation_confidence"),
+                        "relation_semantic_backend": update.get("relation_semantic_backend"),
+                        "relation_evidence": update.get("relation_evidence"),
+                        "relation_abstained": update["relation_abstained"],
+                        "relation_abstention_reason": update.get("relation_abstention_reason"),
+                        "relation_abstention": (
+                            json.dumps(
+                                update["relation_abstention"],
+                                sort_keys=True,
+                                separators=(",", ":"),
+                                default=str,
+                            )
+                            if "relation_abstention" in update
+                            else None
+                        ),
+                        "saved_alignment_member": prediction["saved_alignment_member"],
+                    }
+                    if "rationale_positive" in prediction:
+                        flat["rationale_positive"] = prediction["rationale_positive"]
+                        flat["rationale_decision_label"] = prediction["rationale_decision_label"]
+                    for name, value in flat.items():
+                        results_df.at[index, name] = value
+
+        store = getattr(self, "_explanation_store", None)
+        if store is not None and updates:
+            store.append_overlay(
+                {
+                    "Src": source,
+                    "Tgt": target,
+                    **update,
+                }
+                for (source, target), update in sorted(updates.items())
+            )
+
+    def _save_alignment_formats(
+        self,
+        preds: List[EntityMapping],
+        *,
+        candidates_one2many_path: Optional[Path],
+        output_formats: Optional[List[str]],
+        relation_prediction: str,
+        relation_anchors: Any,
+        relation_semantic_backend: str,
+        relation_equivalence_anchor_threshold: float,
+        relation_equivalence_anchor_margin: float,
+        relation_confidence_threshold: float,
+        relation_reasoning_timeout_seconds: float,
+        source_uri: Optional[str],
+        target_uri: Optional[str],
+        paper_audit: bool,
+    ) -> Dict[str, Path]:
+        """Write the configured alignment formats and select the primary artifact."""
+
+        formats = ["tsv-global", "tsv-local"] if output_formats is None else list(output_formats)
+        if not formats:
+            raise ValueError("At least one alignment output format must be configured")
+        self._decision_policy = {
+            **getattr(self, "_decision_policy", {}),
+            "relation_prediction": relation_prediction,
+            "relation_semantic_backend": relation_semantic_backend,
+        }
+        decision_inputs = list(preds)
+        scored = self._scored_alignment_frame(
+            preds,
+            relation_prediction=relation_prediction,
+            relation_anchors=relation_anchors,
+            relation_semantic_backend=relation_semantic_backend,
+            relation_equivalence_anchor_threshold=relation_equivalence_anchor_threshold,
+            relation_equivalence_anchor_margin=relation_equivalence_anchor_margin,
+            relation_confidence_threshold=relation_confidence_threshold,
+            relation_reasoning_timeout_seconds=relation_reasoning_timeout_seconds,
+        )
+        local_frame: Optional[pd.DataFrame] = None
+        is_local = candidates_one2many_path is not None
+        if candidates_one2many_path is not None:
+            _, candidates_one2many = candidate_table_views(read_table(candidates_one2many_path))
+            local_frame = pd.DataFrame(
+                fill_anchored_scores(candidates_one2many.values, preds),
+                columns=["SrcEntity", "TgtEntity", "TgtCandidates"],
+            )
+
+        # Preserve a lossless, selected-pair audit artifact even when the
+        # compatibility output is a local ranking table. Global evaluation
+        # must never treat ``TgtCandidates`` as model decisions.
+        paths: Dict[str, Path] = {}
+        if paper_audit:
+            global_audit_path = self.alignment_dir / "paper.maps_global.tsv"
+            scored[
+                [
+                    "SrcEntity",
+                    "TgtEntity",
+                    "Score",
+                    "Relation",
+                    "SrcKind",
+                    "TgtKind",
+                ]
+            ].to_csv(global_audit_path, sep="\t", index=False)
+            paths["alignment_global_audit"] = global_audit_path
+            relation_auditor = getattr(self, "_write_relation_diagnostics", None)
+            if callable(relation_auditor):
+                relation_auditor(
+                    scored,
+                    save_scores="typed-tsv" in formats,
+                    options={
+                        "mode": relation_prediction,
+                        "anchors": relation_anchors,
+                        "semantic_backend": relation_semantic_backend,
+                        "equivalence_anchor_threshold": relation_equivalence_anchor_threshold,
+                        "equivalence_anchor_margin": relation_equivalence_anchor_margin,
+                        "relation_confidence_threshold": relation_confidence_threshold,
+                        "timeout_seconds": relation_reasoning_timeout_seconds,
+                        "artifact": getattr(self, "relation_artifact", None),
+                    },
+                )
+        primary: Optional[Path] = None
+        for format_name in formats:
+            normalized = str(format_name).strip().lower()
+            if normalized == "tsv-global" and is_local:
+                continue
+            if normalized == "tsv-local" and not is_local:
+                continue
+            mappings: Any = local_frame if normalized == "tsv-local" else scored
+            options: Optional[Dict[str, Any]] = None
+            filename: Optional[str] = None
+            if normalized == "tsv-global":
+                filename = self.run_layout.mapping_path("global").name
+            elif normalized == "tsv-local":
+                filename = self.run_layout.mapping_path("local").name
+            elif normalized == "oaei-rdf":
+                options = {
+                    key: value
+                    for key, value in {
+                        "source_uri": source_uri,
+                        "target_uri": target_uri,
+                    }.items()
+                    if value is not None
+                }
+            path = write_alignment_format(
+                normalized,
+                mappings,
+                self.alignment_dir,
+                options=options,
+                filename=filename,
+            )
+            key = f"alignment_{normalized.replace('-', '_')}"
+            paths[key] = Path(path)
+            if primary is None or normalized in {"tsv-global", "tsv-local"}:
+                primary = Path(path)
+        if primary is None:
+            raise ValueError(
+                "Configured output formats did not produce an artifact for this alignment mode"
+            )
+        paths["alignment_tsv"] = primary
+        source_writer = getattr(self, "_write_source_decisions", None)
+        if callable(source_writer):
+            paths["source_decisions_json"] = source_writer(decision_inputs, scored)
+        return paths
+
+    def save_alignment(
+        self,
+        preds: List[EntityMapping],
+        candidates_one2many_path: Optional[Path] = None,
+        sub_dir: Optional[str] = None,
+    ) -> Path:
+        """Write the legacy global or local TSV alignment artifact."""
+
+        alignment_dir = self.alignment_dir
 
         if candidates_one2many_path is not None:
-            candidates_one2many = read_table(candidates_one2many_path)
-            candidates_one2many.columns = ["Src", "Tgt", "Candidates"]
+            _, candidates_one2many = candidate_table_views(read_table(candidates_one2many_path))
             return self._save_local_alignment(preds, candidates_one2many, alignment_dir)
 
         else:
@@ -358,7 +877,12 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         # Save the global alignment
 
-        global_dir = str(save_dir) + f"/{'src2tgt.maps'}_global.tsv"
+        resolved_save_dir = Path(save_dir or self.alignment_dir).resolve()
+        global_dir = (
+            self._run_layout.mapping_path("global")
+            if resolved_save_dir == self.alignment_dir
+            else resolved_save_dir / "maps_global.tsv"
+        )
 
         pd.DataFrame(global_alignment, columns=["SrcEntity", "TgtEntity", "Score"]).to_csv(
             global_dir, sep="\t", index=False
@@ -366,20 +890,30 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         return global_dir
 
-    def _save_local_alignment(self, preds: List[EntityMapping], candidates_one2many: pd.DataFrame, save_dir: Optional[Path] = None):
+    def _save_local_alignment(
+        self,
+        preds: List[EntityMapping],
+        candidates_one2many: pd.DataFrame,
+        save_dir: Optional[Path] = None,
+    ):
 
         # candidates is now a 1-1 format for this the original candidates are required
 
         ranking_results = fill_anchored_scores(candidates_one2many.values, preds)
 
-        local_dir = str(save_dir) + f"/{'src2tgt.maps'}_local.tsv"
+        resolved_save_dir = Path(save_dir or self.alignment_dir).resolve()
+        local_dir = (
+            self._run_layout.mapping_path("local")
+            if resolved_save_dir == self.alignment_dir
+            else resolved_save_dir / "maps_local.tsv"
+        )
 
         pd.DataFrame(ranking_results, columns=["SrcEntity", "TgtEntity", "TgtCandidates"]).to_csv(
             local_dir, sep="\t", index=False
         )
 
         return local_dir
-    
+
     def _make_summary_dataframe(self, records: List[Dict[str, Any]]) -> pd.DataFrame:
         """
         Extracts numeric metrics and weights into a flat DataFrame for plotting.
@@ -390,10 +924,20 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
                 "src_iri": rec.get("src_iri"),
                 "tgt_iri": rec.get("tgt_iri"),
             }
+            src_kind = rec.get("src_kind", rec.get("kind"))
+            tgt_kind = rec.get("tgt_kind", src_kind)
+            if src_kind is not None:
+                base["src_kind"] = self._entity_kind_value(src_kind)
+            if tgt_kind is not None:
+                base["tgt_kind"] = self._entity_kind_value(tgt_kind)
             pred = rec.get("prediction") or {}
             if "ground_truth" in pred:
                 base["ground_truth"] = pred.get("ground_truth")
-            for key in ("threshold_positive", "saved_alignment_member", "rationale_positive"):
+            for key in (
+                "threshold_positive",
+                "saved_alignment_member",
+                "rationale_positive",
+            ):
                 if key in pred:
                     base[key] = pred.get(key)
             for key, value in pred.items():
@@ -413,7 +957,6 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
             rows.append(base)
         return pd.DataFrame(rows)
 
-    
     def plot_distributions(
         self,
         which: List[str] = ["S_final", "I_label", "I_ctx", "I_llm", "w_c", "w_i"],
@@ -472,11 +1015,16 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
         dpi: int = 300,
         jitter: float = 0.2,
     ) -> None:
+        """Plot configured scores against binary ground-truth labels."""
+
         if self.results_df is None or self.results_df.empty:
             self.log("No numeric results to plot.", level="warning")
             return
         if "ground_truth" not in self.results_df.columns:
-            self.log("Summary DF lacks ground_truth column; skipping score-vs-label plots.", level="warning")
+            self.log(
+                "Summary DF lacks ground_truth column; skipping score-vs-label plots.",
+                level="warning",
+            )
             return
         metrics = which or []
         if not metrics:
@@ -485,12 +1033,18 @@ class ITrainer(SelfRegisteringComponent, LoggingClass):
 
         for col in metrics:
             if col not in self.results_df.columns:
-                self.log(f"Column {col} missing in summary DF; skipping label plot.", level="warning")
+                self.log(
+                    f"Column {col} missing in summary DF; skipping label plot.",
+                    level="warning",
+                )
                 continue
 
             plot_df = self.results_df[["ground_truth", col]].dropna()
             if plot_df.empty:
-                self.log(f"No data to plot for column {col} vs ground_truth.", level="warning")
+                self.log(
+                    f"No data to plot for column {col} vs ground_truth.",
+                    level="warning",
+                )
                 continue
 
             try:

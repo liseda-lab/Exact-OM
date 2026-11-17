@@ -1,0 +1,18 @@
+descriptor_version: 1
+description: Mini BioKG-shaped graph for hermetic I/O tests.
+triples_files:
+  - path: triples.csv
+    src_col: subject
+    rel_col: predicate
+    dst_col: object
+labels_file:
+  path: labels.csv
+  entity_col: entity
+  label_col: label
+hierarchy_relations:
+  - subclass_of
+class_relation: subclass_of
+attribute_relations:
+  - description
+datalog_files:
+  - facts.dl
