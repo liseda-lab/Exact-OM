@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 // @ts-expect-error Node's direct TypeScript runner requires the explicit extension.
-import { retainCurrentTiming, splitTiming } from "./timing.ts";
+import { retainCurrentTiming, sameTimingContext, splitTiming } from "./timing.ts";
 const open = { stage: "case", caseId: "c", presentationId: "p", start: 1000 };
 test("submit freezes timing and a later acknowledgement cannot extend the case", () => {
   const result = splitTiming(open, 2500, true);
@@ -34,4 +34,12 @@ test("a parent stage effect preserves the same case's already usable interval", 
   assert.equal(retainCurrentTiming(open, "case", "next-presentation"), null);
   assert.equal(retainCurrentTiming(open, "paused", "p"), null);
   assert.equal(retainCurrentTiming(null, "case", "p"), null);
+});
+
+test("finishing one case cannot restart its timer while the next case is mounting", () => {
+  const first = { stage: "case", current_presentation_id: "p1" };
+  assert.equal(sameTimingContext(first, { stage: "case", current_presentation_id: "p2" }), false);
+  assert.equal(sameTimingContext(first, first), true);
+  assert.equal(sameTimingContext(first, { stage: "consultation", current_presentation_id: "p1" }), false);
+  assert.equal(sameTimingContext({ stage: "setup" }, { stage: "setup" }), true);
 });

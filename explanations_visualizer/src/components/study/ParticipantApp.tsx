@@ -20,6 +20,7 @@ import { getJson } from "@/lib/api";
 import type { Mutation } from "@/study/mutationQueue";
 import { useStudySession } from "@/study/session";
 import { useTelemetry } from "@/study/telemetry";
+import { sameTimingContext } from "@/study/timing";
 import { formsGeneration, INTEGRATION_CONTRACT, unsupportedProtocol, type StudyCase, type StudyState } from "@/study/types";
 
 const PAUSABLE = new Set(["setup", "background", "practice", "tutorial", "case", "consultation", "final"]);
@@ -65,7 +66,7 @@ export function ParticipantApp() {
         try {
           if (transition) await telemetry.flushTiming();
           const next = await rawSession.mutate(mutation);
-          if (transition && next.stage === rawSession.state?.stage) telemetry.resumeTiming();
+          if (transition && sameTimingContext(rawSession.state, next)) telemetry.resumeTiming();
           return next;
         } catch (error) {
           if (transition) telemetry.resumeTiming();
@@ -301,6 +302,14 @@ export function ParticipantApp() {
   return (
     <div className="study-root">
       {header}
+      {state && (telemetry.delivery.delayed || telemetry.delivery.rejected > 0 || telemetry.delivery.lost > 0 || telemetry.delivery.storageUnavailable) && (
+        <aside className="study-page" role="status" aria-label="Activity recording status">
+          <div className="error-note">
+            <p>Some activity records have not been saved. Your answers are saved separately. Keep this page open and tell the researcher if this message stays.</p>
+            <button type="button" className="btn btn-sm" onClick={telemetry.retryDelivery}>Retry activity upload</button>
+          </div>
+        </aside>
+      )}
       <main id="main">{body}</main>
       {state && <footer className="study-session-code">Session code: <code>{state.session_id}</code></footer>}
       {needsGapAnswer && state && (

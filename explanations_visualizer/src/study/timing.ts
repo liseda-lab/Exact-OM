@@ -16,3 +16,8 @@ export function retainCurrentTiming(open: OpenSegment | null, stage: string | un
   if ((stage === "case" || stage === "consultation") && open.presentationId !== presentationId) return null;
   return open;
 }
+
+/** A case-to-case transition changes timers even though both steps are named "case". */
+export function sameTimingContext(before: { stage: string; current_presentation_id?: string | null } | null | undefined, after: { stage: string; current_presentation_id?: string | null }): boolean {
+  return Boolean(before && before.stage === after.stage && (before.current_presentation_id ?? null) === (after.current_presentation_id ?? null));
+}

@@ -7,6 +7,7 @@ relative to a server transition. We deliberately do not manufacture that relatio
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Annotated, Literal, get_args
 
@@ -372,7 +373,18 @@ def save_events(store, sid, generation, batch):
                     raise StudyError(409, "Event ID reused for different content")
                 acknowledged.append(event["event_id"])
                 continue
-            _scope(store, state, study, event)
+            try:
+                _scope(store, state, study, event)
+            except StudyError as exc:
+                # Operational diagnostics contain no answer text, URLs or invitation secrets.
+                logging.getLogger(__name__).warning(
+                    "Study event rejected session=%s event=%s type=%s status=%s",
+                    sid,
+                    event["event_id"],
+                    event["type"],
+                    exc.status,
+                )
+                raise
             if db.execute(
                 "SELECT event_id FROM events WHERE session_id = ? AND page_id = ? AND sequence = ?",
                 (sid, event["page_instance_id"], event["sequence"]),
