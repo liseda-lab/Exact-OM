@@ -132,6 +132,23 @@ class StageEvent(ResourceModel):
     ]
 
 
+class RankedOutput(WireModel):
+    """Saved query output is ordering evidence, not accepted alignment membership."""
+
+    mode: Literal["local_ranking"]
+    query_id: int = Field(ge=0)
+    candidate_count: int = Field(ge=1)
+    rank: int = Field(ge=1)
+    saved_output_member: Literal[True]
+    artifact_ref: str = Field(pattern=r"^sha256:[a-f0-9]{64}$")
+
+    @model_validator(mode="after")
+    def validate_rank(self):
+        if self.rank > self.candidate_count:
+            raise ValueError("Rank exceeds the original query population")
+        return self
+
+
 class PairResponse(ResourceModel):
     """Immutable pair binding, original decisions and actual persisted membership."""
 
@@ -153,6 +170,13 @@ class PairResponse(ResourceModel):
     assumption_refs: list[str]
     evidence_metadata: PairEvidenceMetadata | None = None
     fixture_provenance: str
+    ranking: RankedOutput | None = None
+
+    @model_validator(mode="after")
+    def ranking_is_not_alignment(self):
+        if self.ranking and (self.saved_alignment_member is not None or self.relation is not None):
+            raise ValueError("A local candidate ranking is not an accepted or typed alignment")
+        return self
 
 
 class HierarchyPage(Page[dict[str, Any]]):

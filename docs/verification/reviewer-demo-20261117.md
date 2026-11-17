@@ -1,5 +1,9 @@
 # Reviewer demo — 17 November 2026
 
+Follow-up: [decision-trace recovery and full-tool audit](reviewer-demo-trace-recovery-20261117.md).
+The record below describes the initial deployment; its missing-trace limitation is
+addressed in that separately verified release.
+
 ## Scope and current state
 
 Deployed at <https://exact-explain.lasige.di.fc.ul.pt/> on 17 November 2026.

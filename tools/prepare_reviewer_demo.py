@@ -40,6 +40,9 @@ SELECTION = frozenset(
         "ncit-doid-q1426",
     }
 )
+RUN_ID = (
+    "reviewer-demo-20261117"  # Keep existing reviewer bookmarks valid across package revisions.
+)
 
 
 def prepare(assets, publication, catalogue, name, report, decisions):
@@ -143,7 +146,7 @@ def prepare(assets, publication, catalogue, name, report, decisions):
                         ).fetchone()[0]
                     )
                     scores, trace = recovered_pair(
-                        recovery, case, c, name, metadata["evidence_metadata"]
+                        recovery, case, c, RUN_ID, metadata["evidence_metadata"]
                     )
                     candidate = Candidate.model_validate(
                         dict(
@@ -201,7 +204,7 @@ def prepare(assets, publication, catalogue, name, report, decisions):
         contract_version="exact-explain/1.0",
         artifact_type="run_decision_package",
         implementation="study-demo-adapter/2",
-        run_id=name,
+        run_id=RUN_ID,
         revision=canonical_hash(dependencies),
         source_ontology_version_id=source["ontology_version_id"],
         target_ontology_version_id=c["entity"]["ontology_version_id"],
@@ -222,7 +225,7 @@ def prepare(assets, publication, catalogue, name, report, decisions):
         policy=d["visibility_policy"],
         artifacts=list(artifacts.values()),
         ontologies=contexts,
-        runs={name: run.relative_to(assets).as_posix()},
+        runs={RUN_ID: run.relative_to(assets).as_posix()},
         explanations=explanation_paths,
         capabilities={"matching": "not_requested", "generation": "prepared", "imports": "disabled"},
         provenance={

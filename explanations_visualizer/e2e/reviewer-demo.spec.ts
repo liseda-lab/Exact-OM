@@ -2,7 +2,7 @@ import {test, expect} from '@playwright/test';
 
 test.skip(process.env.EXACT_REVIEWER_DEMO !== '1', 'Requires the fixed ten-source reviewer demo');
 test("recovered decisions show original ranking and scoring without accepted-alignment claims", async ({ page }) => {
-  await page.goto("/");
+  await page.goto("/?run=reviewer-demo-20261117&source=http%3A%2F%2Fncicb.nci.nih.gov%2Fxml%2Fowl%2FEVS%2FThesaurus.owl%23C118847");
   await expect(page.getByRole("heading", { level: 1, name: /^Does / })).toBeVisible();
   await expect(page.locator(".matcher-bar")).toContainText("Ranked 1 of 100 in the original run");
   await expect(page.locator(".matcher-bar")).not.toContainText("saved alignment unknown");
@@ -15,6 +15,11 @@ test("recovered decisions show original ranking and scoring without accepted-ali
   await page.getByRole("tab", { name: "Scores", exact: true }).click();
   await expect(page.locator(".scores-panel")).toContainText("Base pair score");
   await expect(page.locator(".scores-panel")).toContainText("Ranking utility");
+  await expect(page.locator(".scores-panel")).not.toContainText("Membership in the saved alignment");
+  await page.setViewportSize({ width: 375, height: 900 });
+  await page.getByRole("tab", { name: "Decision trace", exact: true }).click();
+  await page.locator(".trace").getByRole("button", { name: "Technical details", exact: true }).first().click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
 });
 test('fixed demo pool, full comparison tabs, theme and responsive browse', async ({page}) => {
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));

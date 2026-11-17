@@ -4,6 +4,7 @@ import hashlib
 
 import pytest
 
+from exact_inspect.models import PairResponse
 from tools.recover_reviewer_decisions import Reader
 from tools.reviewer_decision_trace import recovered_pair
 
@@ -114,3 +115,12 @@ def test_original_artifact_hashes_are_checked(tmp_path):
     path.write_text('{"mode":"global_alignment"}')
     with pytest.raises(ValueError, match="Changed original artifact"):
         Reader().json(path, expected)
+
+
+def test_ranked_output_contract_rejects_impossible_rank_and_alignment_claim():
+    recovery, case, candidate = records()
+    _, trace = recovered_pair(recovery, case, candidate, "run", None)
+    with pytest.raises(ValueError, match="not an accepted"):
+        PairResponse.model_validate({**trace, "saved_alignment_member": True})
+    with pytest.raises(ValueError, match="Rank exceeds"):
+        PairResponse.model_validate({**trace, "ranking": {**trace["ranking"], "rank": 101}})

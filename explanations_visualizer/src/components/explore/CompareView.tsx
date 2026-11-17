@@ -439,7 +439,7 @@ export function CompareView() {
                   label: "Decision trace",
                   render: () => (trace.data ? <DecisionTrace trace={trace.data} /> : trace.error ? <ErrorNote error={trace.error} onRetry={trace.reload} what="Decision trace" /> : <Skeleton lines={4} title={false} />),
                 },
-                { key: "scores", label: "Scores", render: () => <ScoresPanel candidate={candidate} /> },
+                { key: "scores", label: "Scores", render: () => <ScoresPanel candidate={candidate} ranking={trace.data?.ranking} /> },
               ]}
               navigation={navigation}
               reveal={reveal}

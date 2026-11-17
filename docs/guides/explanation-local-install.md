@@ -3,8 +3,10 @@
 The [public demo](https://exact-explain.lasige.di.fc.ul.pt/) offers ten prepared
 sources, candidate comparison, ontology browsing, evidence graphs, generated
 descriptions and recorded matcher information. It does not accept bundle uploads.
-Some pipeline events were not retained in the study export; the demo marks those
-as unrecorded rather than reconstructing them.
+Its decision traces are recovered from the original run's verified outputs. This
+run produced candidate rankings, so the trace distinguishes ranking from accepted
+alignment membership. See the [recovery audit](../verification/reviewer-demo-trace-recovery-20261117.md)
+for data coverage and remaining limits.
 
 The local application additionally provides the Library: import prepared bundle
 ZIPs, switch between bundles and remove local library entries. Serving prepared

@@ -166,7 +166,7 @@ function scoreName(name: string): string {
   return labels[name] ?? name;
 }
 
-export function ScoresPanel({ candidate }: { candidate: Candidate }) {
+export function ScoresPanel({ candidate, ranking }: { candidate: Candidate; ranking?: PairTrace["ranking"] }) {
   const ranks = candidate.ordinal_ranks;
   const nil = Object.entries(candidate.nil);
   return (
@@ -190,19 +190,19 @@ export function ScoresPanel({ candidate }: { candidate: Candidate }) {
       <dl className="kv">
         <div>
           <dt>Candidate order</dt>
-          <dd>{ranks.candidate_joint_rank ?? "Not recorded"}{ranks.joint_ordering ? <span className="meta"> · {ranks.joint_ordering}</span> : null}</dd>
+          <dd>{ranks.candidate_joint_rank ?? "Not recorded"}{ranking ? ` of ${ranking.candidate_count}` : null}{ranks.joint_ordering ? <span className="meta"> · {ranks.joint_ordering}</span> : null}</dd>
         </div>
         <div>
           <dt>Retrieval order</dt>
           <dd>
-            {ranks.retrieval_rank ?? "Not recorded"}
+            {ranks.retrieval_rank ?? (ranking ? "Provided candidate set; no retrieval rank" : "Not recorded")}
             {ranks.retrieval_ordering ? <span className="meta"> · {ranks.retrieval_ordering.replace(/_/g, " ")}</span> : null}
             {ranks.retrieval_tie_rule ? <span className="meta"> · ties: {ranks.retrieval_tie_rule.replace(/_/g, " ")}</span> : null}
           </dd>
         </div>
         <div>
           <dt>No-match rank</dt>
-          <dd>{ranks.nil_rank ?? "Not recorded"}</dd>
+          <dd>{ranks.nil_rank ?? (ranking ? "Not used in this ranking run" : "Not recorded")}</dd>
         </div>
       </dl>
       {nil.length > 0 && (
@@ -219,7 +219,7 @@ export function ScoresPanel({ candidate }: { candidate: Candidate }) {
           </ul>
         </>
       )}
-      <p className="meta">Membership in the saved alignment: {candidate.membership_provenance.status === "derived_from_saved_artifacts" ? "read from the saved alignment file" : "unavailable"}.</p>
+      {ranking ? <p className="meta">Saved output: a ranking of {ranking.candidate_count} candidates.</p> : <p className="meta">Membership in the saved alignment: {candidate.membership_provenance.status === "derived_from_saved_artifacts" ? "read from the saved alignment file" : "unavailable"}.</p>}
     </div>
   );
 }

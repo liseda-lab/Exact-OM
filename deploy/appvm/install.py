@@ -36,6 +36,7 @@ def main():
         or api.get("restored_trace_pairs") != 50
         or not routing["study_pages_and_assets_identical"]
         or browser["failed"]
+        or browser.get("passed", 0) < 5
     ):
         raise SystemExit("Demo acceptance has not passed")
     src = Path(__file__).resolve().parent
