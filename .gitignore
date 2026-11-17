@@ -14,3 +14,11 @@ __pycache__/
 /.worktrees/
 /.env
 /api_key
+/exact_inspect/static/
+/explanations_visualizer/node_modules/
+/explanations_visualizer/.next/
+/explanations_visualizer/out/
+/explanations_visualizer/next-env.d.ts
+/explanations_visualizer/*.tsbuildinfo
+/explanations_visualizer/test-results/
+/explanations_visualizer/playwright-report/

@@ -21,6 +21,7 @@ No JVM is required. Optional integrations:
 ```console
 python -m pip install '.[bioml-eval]'
 python -m pip install '.[reasoning]'
+python -m pip install '.[viz]'
 python -m pip install '.[dev,docs]'
 ```
 
@@ -38,3 +39,7 @@ not loaded by ordinary package imports.
 For restricted/offline environments, pre-download the pinned encoders and
 configure their local directories. `exact config example --output demo`
 provides an entirely offline string-evidence example.
+
+For the browser app, use Python 3.11–3.12 and follow [the local explorer guide](local-tool.md). Release
+wheels include its built pages; source checkouts require a Node.js build once.
+Node.js is not needed to run an installed wheel.

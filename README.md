@@ -4,7 +4,7 @@ Exact matches ontology entities using lexical and structural evidence, optional
 gated language-model decisions, and fitted ranking or acceptance models. It
 exports alignments, complete local rankings, and inspectable evidence.
 
-Python 3.10–3.12 is supported. Native OWL processing does not require Java.
+The matcher supports Python 3.10–3.12; Exact Explain requires Python 3.11–3.12. Native OWL processing does not require Java.
 GPU encoders and Elephant-1 are optional; the bundled demonstration runs offline
 on CPU.
 
@@ -19,7 +19,7 @@ exact --help
 
 For a built distribution, use `pip install exact_om-2.0.0-py3-none-any.whl`.
 The package is prepared for PyPI publication; creating this branch does not
-publish it. Optional integrations are `.[bioml-eval]` and `.[reasoning]`.
+publish it. Optional integrations are `.[bioml-eval]`, `.[reasoning]` and `.[viz]`.
 Elephant uses a separate, pinned serving environment described in
 [the decision guide](docs/decisions.md).
 
@@ -53,6 +53,7 @@ reused when fitting or changing a selection policy.
 | `exact data` | Retrieve and verify dataset tracks |
 | `exact run` | Inspect, export, and clean standard alignment runs |
 | `exact align` | Run the existing configurable matching pipeline and API-compatible workflow |
+| `exact-inspect` | Prepare, open and share bundles in the local Exact Explain app |
 
 Start with [the staged workflow](docs/pipeline.md). It distinguishes generated
 global candidates from supplied local query pools and explains TRAIN-only
@@ -74,13 +75,21 @@ also retains a historical full-policy head; these details are explicit in the
 - [Configuration and inputs](docs/configuration.md)
 - [Evaluation](docs/evaluation.md)
 - [Artifacts, storage, and resume](docs/runs.md)
+- [Install and use Exact Explain locally](docs/local-tool.md)
 - [Python API](docs/api.md)
 - [Migration from Exact v1](MIGRATION.md)
 - [Contributing and release checks](CONTRIBUTING.md)
 
-Ontology repair and the interactive visualization product are not included in
-this release. Their source and historical experiments remain on the research
-branches. Explanation export remains part of the matcher.
+Exact Explain provides candidate comparison, ontology browsing, evidence graphs,
+decision traces, scores and a local bundle library. A release wheel includes the
+built app; install it with the `viz` extra and run `exact-inspect serve`.
+For a source checkout, build the frontend first as described in the
+[local installation guide](docs/local-tool.md). The app accepts prepared bundles
+and standard `exact align` runs; standalone staged scoring/ranking directories
+need an adapter and are not accepted as inspection bundles.
+
+Ontology repair, participant/admin study services, private deployment scripts,
+and historical experiments remain outside this production release.
 
 ## Citation and license
 

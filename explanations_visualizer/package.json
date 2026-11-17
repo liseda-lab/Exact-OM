@@ -1,0 +1,36 @@
+{
+  "name": "explanations_visualizer",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "node --test src/lib/*.test.ts",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "cytoscape": "^3.33.0",
+    "next": "^15.5.28",
+    "react": "19.1.0",
+    "react-dom": "19.1.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "1.63.0",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.28"
+    },
+    "sharp": "0.35.5",
+    "source-map-js": "1.2.2"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}

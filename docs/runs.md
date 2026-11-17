@@ -2,7 +2,7 @@
 
 A standard `exact align` run contains alignment files, a run manifest,
 statistics, checkpoints and a compressed explanation store. Inspect and export
-without the unfinished visualization product:
+from the command line:
 
 ```console
 exact run info runs/demo

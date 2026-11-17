@@ -15,5 +15,7 @@ rather than mapping endpoints in the scoped global adapter.
 Use [evaluation](evaluation.md) to score submissions, [artifacts and resume](runs.md)
 to manage storage, and the [Python API](api.md) for application integration.
 
-Ontology repair and the interactive viewer are excluded from this release.
-Historical experiment evidence is maintained separately from the public package.
+[Exact Explain](local-tool.md) is the local app for comparing candidates, browsing
+ontologies, checking evidence and decision traces, and managing prepared bundles.
+The participant study, administrative services, ontology repair and historical
+experiments are maintained separately from this public package.

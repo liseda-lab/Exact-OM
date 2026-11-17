@@ -1,0 +1,34 @@
+"use client";
+
+import { useSyncExternalStore } from "react";
+
+function subscribe(listener: () => void) {
+  window.addEventListener("resize", listener);
+  // The text-size control changes the root font size through an inline custom property.
+  const observer = new MutationObserver(listener);
+  observer.observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
+  // Some environments resize the viewport without a resize event; the root box still changes.
+  const sizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(listener);
+  sizes?.observe(document.documentElement);
+  return () => {
+    window.removeEventListener("resize", listener);
+    observer.disconnect();
+    sizes?.disconnect();
+  };
+}
+
+/**
+ * True when the viewport is at most `rem` root-em wide. Like the CSS container queries it
+ * follows the app's text-size control, so enlarged text gets the narrow layout. False
+ * during static prerender so markup stays stable.
+ */
+export function useNarrow(rem = 56.25): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => {
+      const root = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+      return document.documentElement.clientWidth / root <= rem;
+    },
+    () => false,
+  );
+}

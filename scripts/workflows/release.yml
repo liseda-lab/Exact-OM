@@ -23,6 +23,11 @@ jobs:
           version = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
           assert os.environ["GITHUB_REF_NAME"] == "v" + version
           PY
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: "24"
+      - run: python scripts/build_frontend.py
+      - run: npm --prefix explanations_visualizer run test:unit
       - run: python -m build
       - run: python -m twine check dist/*
       - run: python scripts/check_distribution.py dist

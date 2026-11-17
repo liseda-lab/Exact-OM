@@ -1,0 +1,256 @@
+// Workspace over the prepared exact-explain/1.0 API.
+
+import { ApiError, buildUrl, request } from "../api";
+import type { Axiom, EntityContext, EntityRef, EntryPointPage, ExplanationSummary, Fact, GeneratedExplanation, HierarchyPage, Page, PairEvidenceMetadata, PairTrace, SearchItem, SelectedEvidence } from "../types";
+import type { Basis, EvidenceBundle, ExplanationResult, FactRef, OntologyNavigation, PairScope, ResolvedFact, WorkspaceCapabilities, WorkspaceSource } from "./types";
+
+const axiomCache = new Map<string, Promise<Axiom>>();
+
+export function scopedRead<T>(base: string, suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal): Promise<T> {
+  return request<T>(buildUrl(`${base}${suffix}`, params), { signal, headers: { Accept: "application/json" } });
+}
+
+export function loadAxiom(base: string, ontology: string, factId: string, signal?: AbortSignal, scope?: { key: string }): Promise<Axiom> {
+  const key = `${scope?.key ?? base}|${base}|${ontology}|${factId}`;
+  if (!axiomCache.has(key)) {
+    const promise = scopedRead<Axiom>(base, `/axioms/${encodeURIComponent(factId)}`, { ontology_version_id: ontology }, signal);
+    promise.catch(() => axiomCache.delete(key));
+    axiomCache.set(key, promise);
+  }
+  return axiomCache.get(key)!;
+}
+
+function notFound(error: unknown): boolean {
+  return error instanceof ApiError && (error.status === 404 || error.code === "not_found");
+}
+
+const iriValue = (node: unknown): string | null => {
+  const record = node as { type?: string; value?: unknown; iri?: unknown } | null;
+  if (!record || typeof record !== "object") return null;
+  if (record.type === "IRI" && typeof record.value === "string") return record.value;
+  return iriValue(record.iri);
+};
+
+/** The entity a stored axiom is about, read from its own structure (never guessed from text). */
+function axiomSubject(ast: Record<string, unknown>, ontology: string): FactRef["subject"] {
+  const named = (node: unknown, kind: "class" | "individual" | "object_property" | "data_property") => {
+    const iri = iriValue(node);
+    return iri ? { ontology_version_id: ontology, iri, kind } : null;
+  };
+  switch (ast.type) {
+    case "AnnotationAssertion":
+      return named(ast.subject, "class");
+    case "SubClassOf":
+      return (ast.sub_class as { type?: string })?.type === "Class" ? named(ast.sub_class, "class") : null;
+    case "ClassAssertion":
+      return named(ast.individual, "individual");
+    default:
+      return null;
+  }
+}
+
+const byIdentity = (a: EntityRef, b: EntityRef) => `${a.ontology_version_id}|${a.iri}|${a.kind}`.localeCompare(`${b.ontology_version_id}|${b.iri}|${b.kind}`);
+const sameEntity = (a: EntityRef, b: EntityRef) => a.ontology_version_id === b.ontology_version_id && a.iri === b.iri && a.kind === b.kind;
+
+/** Describe a stored axiom as a resolved original record without reinterpreting it. */
+export function resolvedFromAxiom(ref: FactRef, axiom: Axiom): ResolvedFact {
+  const ast = axiom.ast as Record<string, unknown>;
+  // The original record decides what it can be about: a typed entity is consistent only in the
+  // record's ontology and, when the axiom names one subject, with that IRI (kinds then tell punned
+  // entities apart). A consistent supplied subject is the one it is about; other admitted
+  // subjects are listed with it; several admitted subjects without one stay ambiguous; a
+  // different entity is never shown (R2, R2-F1).
+  const own = axiomSubject(ast, axiom.ontology_version_id);
+  const consistent = (entity: EntityRef) => entity.ontology_version_id === axiom.ontology_version_id && (!own || entity.iri === own.iri);
+  const supplied = ref.subject && consistent(ref.subject) ? ref.subject : null;
+  const admitted = (ref.candidates ?? []).filter(consistent).filter((entity) => !supplied || !sameEntity(entity, supplied));
+  const ambiguous = !supplied && admitted.length > 1;
+  // An open choice is listed in a fixed order, so nothing about it depends on packet order.
+  const subjects: EntityRef[] = supplied ? [supplied, ...admitted] : ambiguous ? [...admitted].sort(byIdentity) : admitted.length ? admitted : own ? [own] : [];
+  const value = ast.type === "AnnotationAssertion" ? (ast.value as Record<string, unknown> | undefined) : undefined;
+  const property = ast.type === "AnnotationAssertion" ? (ast.property as { iri?: { value?: string } } | undefined)?.iri?.value ?? null : null;
+  return {
+    ref,
+    status: axiom.availability === "available" ? "available" : axiom.availability,
+    reason: null,
+    ontology: axiom.ontology_version_id,
+    category: axiom.category,
+    interpretation: axiom.interpretation?.kind ?? null,
+    predicateIri: property,
+    subjects: subjects.map((entity) => ({ entity, side: null })),
+    ambiguous,
+    literal: value?.type === "Literal"
+      ? { text: String(value.lexical_form ?? ""), language: (value.language as string | null) ?? null, datatype: null }
+      : null,
+    axiom,
+    reconstructed: false,
+    origins: (axiom.origins ?? []).map((origin) => ({
+      document: origin.source_sha256,
+      span: origin.span && typeof origin.span === "object" && "start" in origin.span ? `${String(origin.span.start)}–${String(origin.span.end)}` : null,
+      status: "recorded",
+    })),
+    qualifiers: Array.isArray(ast.annotations) ? (ast.annotations as unknown[]) : [],
+    derivation: null,
+  };
+}
+
+export function unresolvedFact(ref: FactRef, status: ResolvedFact["status"], reason: string): ResolvedFact {
+  return {
+    ref, status, reason, ontology: null, category: null, interpretation: null, predicateIri: null,
+    subjects: ref.subject ? [{ entity: ref.subject, side: null }] : [], literal: null, axiom: null,
+    reconstructed: false, origins: [], qualifiers: [], derivation: null,
+  };
+}
+
+function entityParams(entity: EntityRef, prefix = "") {
+  return {
+    [`${prefix}ontology_version_id`]: entity.ontology_version_id,
+    [`${prefix}iri`]: entity.iri,
+    [`${prefix}kind`]: entity.kind,
+  };
+}
+
+export function createApiSource(options: {
+  key: string;
+  base?: string;
+  ontologyName: (id: string) => string | null;
+  reasonerStatus?: (id: string) => string;
+  kind?: WorkspaceSource["kind"];
+  capabilities?: WorkspaceCapabilities;
+  /** Exploration: per-ontology navigation from `/api/v1/ontologies` (a scope supplies its own). */
+  navigation?: Record<string, OntologyNavigation>;
+}): WorkspaceSource {
+  const base = options.base ?? "/api/v1";
+  const read = <T,>(suffix: string, params?: Parameters<typeof buildUrl>[1], signal?: AbortSignal) => scopedRead<T>(base, suffix, params, signal);
+  const metadataCache = new Map<string, Promise<PairEvidenceMetadata | null>>();
+  const capabilities: WorkspaceCapabilities = options.capabilities ?? {
+    search: "available",
+    navigation: "available",
+    bases: ["literal_asserted", "structural_navigation", "reasoner_inferred", "elk_inferred_partial"],
+    reasoner: "per_ontology",
+    navigationByOntology: options.navigation,
+    graphExpansion: true,
+    profiles: "available",
+    comparison: "available",
+    evidence: "available",
+    evidenceMetadata: true,
+    scopeNote: null,
+    limitations: [],
+    synthetic: false,
+  };
+
+  const explanation = async (task: "entity_profile" | "pair_comparison", entities: EntityRef[], signal?: AbortSignal): Promise<ExplanationResult> => {
+    const [subject, counterpart] = entities;
+    const params: Record<string, string> = { ...entityParams(subject), task };
+    if (task === "pair_comparison" && counterpart) Object.assign(params, entityParams(counterpart, "counterpart_"));
+    const page = await read<Page<ExplanationSummary>>("/explanations", { ...params, limit: 100 }, signal);
+    // An empty page is a terminal, recorded absence; keep the service's own status and reason.
+    if (!page.items.length) return page.status === "not_exported" ? { status: "not_exported", reason: page.reason ?? "No resource was prepared for this selection." } : { status: "not_requested", reason: page.reason ?? undefined };
+    const chosen = page.items.find((item) => item.grounding_status === "validated") ?? page.items[0];
+    if (chosen.grounding_status !== "validated") return { status: "unverified" };
+    try {
+      const item = await read<GeneratedExplanation>(`/explanations/${encodeURIComponent(chosen.explanation_id)}`, undefined, signal);
+      return {
+        status: "available",
+        explanation: item,
+        factOntologies: Array.from(new Set(entities.map((entity) => entity.ontology_version_id))),
+        provenance: {
+          kind: "manifest",
+          requestedModel: item.manifest.requested_model,
+          returnedModel: item.manifest.returned_model,
+          provider: item.manifest.provider,
+          language: item.manifest.language,
+          grounding: item.grounding_status,
+          preparationKind: item.preparation_kind ?? null,
+          supportStatus: item.support_status ?? null,
+          supportReasons: item.support_reasons ?? [],
+          reviewerKind: item.independent_review?.reviewer_kind ?? null,
+          renderRevision: item.presentation?.render_revision ?? null,
+        },
+      };
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "explanation_unverified") return { status: "unverified" };
+      throw error;
+    }
+  };
+
+  const fact = async (ref: FactRef, signal?: AbortSignal): Promise<ResolvedFact> => {
+    for (const ontology of ref.ontologies) {
+      try {
+        return resolvedFromAxiom(ref, await loadAxiom(base, ontology, ref.factId, signal, options));
+      } catch (error) {
+        if (notFound(error)) continue;
+        if (error instanceof ApiError && error.code === "axiom_detail_too_large") {
+          return { ...unresolvedFact(ref, "partial", "This record is too large to show inline; it remains in the ontology file."), ontology };
+        }
+        throw error;
+      }
+    }
+    return unresolvedFact(ref, "not_exported", "This record is not available in the open bundle. It may be withheld by the bundle's information policy.");
+  };
+
+  const evidence = async (pair: PairScope, signal?: AbortSignal): Promise<EvidenceBundle> => {
+    if (!pair.runId || !pair.pairId) return { items: [], total: 0, status: "not_exported", reason: "This pair has no saved matcher record.", axioms: {} };
+    const items: SelectedEvidence[] = [];
+    let cursor: string | null = null;
+    let first: Page<SelectedEvidence> | null = null;
+    for (let guard = 0; guard < 10; guard += 1) {
+      const page: Page<SelectedEvidence> = await read<Page<SelectedEvidence>>(`/runs/${encodeURIComponent(pair.runId!)}/pair-evidence`, { pair_id: pair.pairId, limit: 100, cursor }, signal);
+      first = first ?? page;
+      items.push(...page.items);
+      if (!page.next_cursor) break;
+      cursor = page.next_cursor;
+    }
+    // Reading order: source side first, then by channel; identities stay stable.
+    items.sort((a, b) => (a.side === b.side ? a.channel.localeCompare(b.channel) || a.evidence_id.localeCompare(b.evidence_id) : a.side === "source" ? -1 : 1));
+    const axioms: Record<string, Axiom | null> = {};
+    await Promise.all(
+      items.flatMap((item) =>
+        item.fact_ids.map(async (factId) => {
+          try {
+            axioms[factId] = await loadAxiom(base, item.entity.ontology_version_id, factId, signal, options);
+          } catch {
+            axioms[factId] = null;
+          }
+        }),
+      ),
+    );
+    const truncated = Boolean(first?.next_cursor) && items.length < (first?.total_count ?? items.length);
+    return { items, total: first?.total_count ?? items.length, status: truncated ? "partial" : first?.status ?? "not_exported", reason: first?.reason ?? null, axioms };
+  };
+
+  return {
+    key: options.key,
+    kind: "exploration",
+    capabilities,
+    ontologyName: options.ontologyName,
+    entityContext: (entity, signal) => read<EntityContext>("/entity-context", entityParams(entity), signal),
+    fact,
+    explanation,
+    hierarchy: (entity, direction, basis: Basis, cursor, signal) =>
+      read<HierarchyPage>("/hierarchy", { ...entityParams(entity), direction, basis, limit: 50, cursor }, signal),
+    search: (ontology, term, cursor, signal) => read<Page<SearchItem>>("/entities", { ontology_version_id: ontology, term, limit: 20, cursor }, signal),
+    entryPoints: (ontology, kind, basis, cursor, signal) =>
+      read<EntryPointPage>(`/ontologies/${encodeURIComponent(ontology)}/entry-points`, { kind, basis, limit: 20, cursor }, signal),
+    equivalents: (entity, basis, cursor, signal) =>
+      read<Page<EntityRef>>(`/ontologies/${encodeURIComponent(entity.ontology_version_id)}/equivalents`, { iri: entity.iri, kind: entity.kind, basis, limit: 20, cursor }, signal),
+    // Recorded comparisons are immutable per pair: one shared read per pair, not cancelled when
+    // a tab closes, so reopening the graph reuses it instead of aborting and refetching.
+    evidenceMetadata: (pair) => {
+        if (!pair.runId || !pair.pairId) return Promise.resolve(null);
+      const key = `p|${pair.runId}|${pair.pairId}`;
+      let promise = metadataCache.get(key);
+      if (!promise) {
+        promise = read<PairTrace>(`/runs/${encodeURIComponent(pair.runId!)}/pair`, { pair_id: pair.pairId! }).then((body) => body.evidence_metadata ?? null);
+        promise.catch(() => metadataCache.delete(key));
+        metadataCache.set(key, promise);
+        if (metadataCache.size > 200) metadataCache.delete(metadataCache.keys().next().value!);
+      }
+      return promise;
+    },
+    facts: (entity, category, cursor, signal) => read<Page<Fact>>("/entity-facts", { ...entityParams(entity), category, limit: 50, cursor }, signal),
+    evidence,
+    labels: null,
+    remoteLabels: { key: options.key, base },
+  };
+}

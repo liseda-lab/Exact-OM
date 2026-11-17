@@ -16,6 +16,7 @@ nav:
   - Local ranking: ranking.md
   - Evaluation: evaluation.md
   - Artifacts and resume: runs.md
+  - Local explorer: local-tool.md
   - Python API: api.md
 markdown_extensions:
   - tables
