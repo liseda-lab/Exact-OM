@@ -1,0 +1,32 @@
+config_version: 2
+run:
+  use_file_cache: false
+dataset:
+  filter_exact_matches: false
+  verbalization_mode: deterministic
+  which: []
+  legacy:
+    only_taxonomy: true
+pipeline:
+- name: PairAdaptiveSemanticScorer
+  params:
+    use_lexical: false
+    use_context: false
+    use_llm: false
+    llm_model_name: null
+    fp16_inference: false
+    return_explanations: true
+matching:
+  channels:
+    strsim:
+      enabled: true
+inference:
+  batch_size: 4
+  mixed_precision: false
+  which: []
+  enable_checkpoints: true
+output:
+  sanity_checks:
+    enabled: false
+  plots:
+    dpi: 72

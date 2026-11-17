@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "backend": {
+    "name": "mowl-borg",
+    "version": "1.0.1",
+    "legacy_exact_revision": "330044c942d8876a40205e336ca3ee0aeb70bd55",
+    "python": "3.10.11",
+    "java": "15.0.2",
+    "jpype": "1.5.0",
+    "class_resolver": "0.5.4",
+    "numpy": "1.26.4"
+  },
+  "fixtures": {
+    "mini_src": {
+      "source_sha256": "3df05eca2b7d8e7c1cd11f79769ff04562a25903b59b293d4d26209ea5271f10",
+      "snapshot_sha256": "48952e50504618de1f3c53d9a9bbae3e29b5a460ee78c9382cc87be4c688e85a",
+      "allowed_elk_inferences": {
+        "http://example.org/mini/src#ChestPain": [
+          "http://example.org/mini/src#AnatomicalEntity"
+        ]
+      }
+    },
+    "mini_tgt": {
+      "source_sha256": "2801e80fa3478317756568353b1122dd867c3b208a5ec833c881bd076c968c29",
+      "snapshot_sha256": "064986ca74152e08ddf06f62d3cc6fe58612122b075d685bc9fb1c52193b5d03",
+      "allowed_elk_inferences": {
+        "http://example.org/mini/tgt#ThoracicPain": [
+          "http://example.org/mini/tgt#Anatomy"
+        ]
+      }
+    }
+  }
+}

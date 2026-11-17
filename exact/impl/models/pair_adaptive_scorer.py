@@ -1,15 +1,29 @@
 from __future__ import annotations
 
-import hashlib
-import json
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+import os
 
-import torch
+import hashlib  # noqa: F401
+import json  # noqa: F401
+import math
+from typing import Any, Dict, List, Optional, Sequence, Tuple  # noqa: F401
 
-from .semantic_scorer import SemanticScorer
+import torch  # noqa: F401
+
+from exact.runtime.numerical_cache import cached_numerical
+from exact.impl.models.pair_adaptive_channels import PairAdaptiveChannelsMixin
+from exact.impl.models.pair_adaptive_evidence import PairAdaptiveEvidenceMixin
+from exact.impl.models.pair_adaptive_experiments import (
+    JsonExperimentArtifact,
+    config_dict,
+)
+from exact.impl.models.selector.llm_gate import analytical_oracle_ceiling
+from exact.impl.models.semantic_scorer import SemanticScorer
+from exact.utils.formatting import clip01, safe_mean  # noqa: F401
 
 
-class PairAdaptiveSemanticScorer(SemanticScorer):
+class PairAdaptiveSemanticScorer(
+    PairAdaptiveEvidenceMixin, PairAdaptiveChannelsMixin, SemanticScorer
+):
     """
     Default pair-adaptive scorer.
 
@@ -17,6 +31,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
     projection-backed, attributes are auxiliary/support-only, and the LLM
     consumes one pair brief instead of separate source/target summaries.
     """
+
+    _clip01 = staticmethod(clip01)
+    _safe_mean = staticmethod(safe_mean)
 
     def __init__(
         self,
@@ -30,33 +47,239 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         max_attr_items: int = 12,
         hierarchical_relation_families: Optional[Dict[str, Dict[str, Any]]] = None,
         attribute_property_weights: Optional[Dict[str, float]] = None,
-        ablate_channels: Optional[Sequence[str]] = None,
-        uniform_weights: bool = False,
+        hierarchy_embedding_weight: float = 0.5,
+        hierarchy_support_weight: float = 0.5,
+        similarity_embedding_weight: float = 0.5,
+        similarity_support_weight: float = 0.5,
+        similarity_per_relation_cap: int = 2,
+        difference_per_relation_cap: int = 3,
+        stability_factor: float = 2.0,
+        attribute_information_word_cap: int = 20,
+        attribute_score_floor: float = 0.5,
+        uncertainty_indecision_scale: float = 2.0,
+        uncertainty_disagreement_quality_power: float = 0.5,
+        strsim: Optional[Dict[str, Any]] = None,
+        attr: Optional[Dict[str, Any]] = None,
+        hier: Optional[Dict[str, Any]] = None,
+        diff: Optional[Dict[str, Any]] = None,
+        lex: Optional[Dict[str, Any]] = None,
+        property: Optional[Dict[str, Any]] = None,
+        instance: Optional[Dict[str, Any]] = None,
+        graph: Optional[Dict[str, Any]] = None,
+        fusion_config: Optional[Dict[str, Any]] = None,
+        llm_experiment_config: Optional[Dict[str, Any]] = None,
         **kwargs: Any,
     ) -> None:
-        if isinstance(ablate_channels, str):
-            requested_ablations = [ablate_channels]
-        else:
-            requested_ablations = list(ablate_channels or [])
-        normalized_ablations = {
-            str(channel).strip().lower()
-            for channel in requested_ablations
-            if str(channel).strip()
-        }
-        supported_ablations = {"hier", "sim", "diff", "attr"}
-        unsupported_ablations = normalized_ablations - supported_ablations
-        if unsupported_ablations:
-            unsupported = ", ".join(sorted(unsupported_ablations))
-            raise ValueError(
-                f"Unsupported ablate_channels value(s): {unsupported}. "
-                "Expected any of: hier, sim, diff, attr."
-            )
-        self.ablate_channels = tuple(
-            channel
-            for channel in ("hier", "sim", "diff", "attr")
-            if channel in normalized_ablations
+        self.strsim_config = self._experiment_config(
+            strsim,
+            enabled=False,
+            placement="channel",
+            abbreviation="off",
+            isub_weight=1.0,
+            jaro_winkler_weight=1.0,
+            token_set_weight=1.0,
         )
-        self.uniform_weights = bool(uniform_weights)
+        self.attr_config = self._experiment_config(
+            attr,
+            enabled=False,
+            polarity="support_only",
+            bank="full",
+            signed_property_allowlist=[],
+        )
+        self.hier_config = self._experiment_config(
+            hier,
+            enabled=False,
+            mode="labels",
+            siblings=False,
+            depth=2,
+            overlap_weight=0.5,
+        )
+        self.diff_config = self._experiment_config(
+            diff,
+            enabled=False,
+            formulation="normalised",
+            dump_components=False,
+            controlled_perturbations=False,
+            incompatibilities=[],
+            relation_interpretation=None,
+        )
+        self.lex_config = self._experiment_config(
+            lex,
+            enabled=False,
+            quality="margin",
+            entropy_top_m=5,
+            entropy_temperature=1.0,
+            deduplicate_labels=False,
+        )
+        self.property_config = self._experiment_config(property, enabled=False)
+        self.instance_config = self._experiment_config(instance, enabled=False)
+        self.graph_config = self._experiment_config(
+            graph,
+            mode="off",
+            artifact=None,
+            dump_profile=False,
+            shuffled=False,
+            hierarchy_removal=0.0,
+            negative_label_policy=None,
+        )
+        self.fusion_config = self._experiment_config(
+            fusion_config,
+            enabled=False,
+            mode="analytic_shipped",
+            scope="global",
+            sigma_mode="full",
+            tau=0.5,
+            llm_pivot=0.5,
+            gamma=2.0,
+            beta=0.8,
+            artifact=None,
+        )
+        raw_llm_config = self._experiment_config(
+            llm_experiment_config,
+            enabled=False,
+            decision={},
+            gate={},
+            fusion_weight="beta_u",
+            constant_weight=0.5,
+            fusion_artifact=None,
+            exemplars="off",
+            exemplar_count=3,
+            exemplar_artifact=None,
+            student_training="gold_teacher",
+            teacher_source_cap=200,
+            outcome_policy="unknown",
+            distill="off",
+            distill_artifact=None,
+        )
+        raw_llm_config["decision"] = self._experiment_config(
+            raw_llm_config.get("decision"),
+            mode="binary",
+            probability="raw_joint",
+            listwise_max_candidates=5,
+            evidence="generated_brief",
+            permutations=1,
+            output="categorical",
+            brief_max_tokens=64,
+            samples_per_permutation=3,
+        )
+        raw_llm_config["gate"] = self._experiment_config(
+            raw_llm_config.get("gate"),
+            mode="analytic",
+            threshold=0.5,
+            quantile_fraction=0.05,
+            forced_sample_size=0,
+            artifact=None,
+        )
+        configured_gate_mode = str(raw_llm_config["gate"]["mode"]).strip().lower()
+        self._gate_mode_alias: Optional[str] = None
+        if configured_gate_mode == "router":
+            self._gate_mode_alias = "router"
+            raw_llm_config["gate"]["mode"] = "learned"
+        self.llm_experiment_config = raw_llm_config
+
+        self.strsim_enabled = bool(self.strsim_config["enabled"])
+        self.attr_enabled = bool(self.attr_config["enabled"])
+        self.hier_enabled = bool(self.hier_config["enabled"])
+        self.diff_enabled = bool(self.diff_config["enabled"])
+        self.lex_enabled = bool(self.lex_config["enabled"])
+        self.fusion_enabled = bool(self.fusion_config["enabled"])
+        self.llm_experiment_enabled = bool(self.llm_experiment_config["enabled"])
+        self._fusion_artifact: Optional[JsonExperimentArtifact] = None
+        self._gate_artifact: Optional[JsonExperimentArtifact] = None
+        self._graph_artifact: Optional[JsonExperimentArtifact] = None
+        self._validate_experiment_configs()
+
+        if self.graph_config["mode"] in {"inductive", "graph_only"}:
+            self._graph_artifact = JsonExperimentArtifact.load(
+                self.graph_config.get("artifact"), expected_mode="inductive", kind="graph head"
+            )
+        if self.graph_config["mode"] == "graph_only":
+            kwargs.update(use_lexical=False, use_context=False, use_llm=False)
+            self.strsim_enabled = False
+
+        if self.fusion_enabled:
+            kwargs["tau"] = float(self.fusion_config["tau"])
+            kwargs["tau_LLM"] = float(self.fusion_config["llm_pivot"])
+            kwargs["gamma"] = float(self.fusion_config["gamma"])
+            kwargs["beta"] = float(self.fusion_config["beta"])
+            fusion_mode = str(self.fusion_config["mode"])
+            if fusion_mode != "analytic_shipped":
+                if fusion_mode == "learned_adaptive":
+                    raise NotImplementedError(
+                        "learned_adaptive fusion requires a fitted gating-network runtime"
+                    )
+                if self.fusion_config["scope"] != "global":
+                    raise NotImplementedError(
+                        "artifact-backed analytic_fitted/learned_global currently supports "
+                        "only fusion scope='global'"
+                    )
+                self._fusion_artifact = JsonExperimentArtifact.load(
+                    self.fusion_config.get("artifact"),
+                    expected_mode=fusion_mode,
+                    kind="fusion",
+                )
+                self._validate_fusion_artifact_contract(fusion_mode)
+                if fusion_mode == "analytic_fitted":
+                    parameters = self._fusion_artifact.scoped_payload(
+                        "parameters", scope_key="global"
+                    )
+                    for name in ("tau", "gamma"):
+                        if name in parameters:
+                            kwargs[name] = float(parameters[name])
+
+        gate_mode = str(self.llm_experiment_config["gate"]["mode"])
+        gate_artifact = self.llm_experiment_config["gate"].get("artifact")
+        if self.llm_experiment_enabled and gate_mode in {
+            "quantile",
+            "transferred_threshold",
+            "source_top_fraction",
+            "pair_top_fraction",
+            "forced_sample",
+            "oracle_perfect",
+            "oracle_replay",
+            "learned",
+        }:
+            if not gate_artifact:
+                raise ValueError(
+                    f"LLM gate mode {gate_mode!r} requires an immutable selection artifact"
+                )
+        if self.llm_experiment_enabled and gate_artifact:
+            self._gate_artifact = JsonExperimentArtifact.load(
+                gate_artifact,
+                expected_mode=self._gate_mode_alias or gate_mode,
+                kind="LLM gate",
+            )
+            if gate_mode in {
+                "quantile",
+                "transferred_threshold",
+                "source_top_fraction",
+                "pair_top_fraction",
+                "forced_sample",
+                "oracle_perfect",
+                "oracle_replay",
+            }:
+                self._validate_gate_artifact_contract(gate_mode)
+
+        self.attribute_property_weights = dict(
+            attribute_property_weights
+            or {
+                "definition": 1.0,
+                "identifier": 0.8,
+                "comment": 0.6,
+                "other": 0.5,
+            }
+        )
+        self.hierarchy_embedding_weight = float(hierarchy_embedding_weight)
+        self.hierarchy_support_weight = float(hierarchy_support_weight)
+        self.similarity_embedding_weight = float(similarity_embedding_weight)
+        self.similarity_support_weight = float(similarity_support_weight)
+        self.similarity_per_relation_cap = int(similarity_per_relation_cap)
+        self.difference_per_relation_cap = int(difference_per_relation_cap)
+        self.stability_factor = float(stability_factor)
+        self.attribute_information_word_cap = int(attribute_information_word_cap)
+        self.attribute_score_floor = float(attribute_score_floor)
+        self.uncertainty_indecision_scale = float(uncertainty_indecision_scale)
+        self.uncertainty_disagreement_quality_power = float(uncertainty_disagreement_quality_power)
         requested_context_cap = int(kwargs.get("max_input_tokens_context", 256))
         kwargs["max_input_tokens_context"] = max(
             requested_context_cap,
@@ -75,1284 +298,788 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         self.max_diff_triples = int(max_diff_triples)
         self.max_attr_items = int(max_attr_items)
         self.hierarchical_relation_families = dict(hierarchical_relation_families or {})
-        self.attribute_property_weights = dict(attribute_property_weights or {})
         self._attached_dataset = None
+        self._exact_anchor_src_to_tgt: Dict[str, set[str]] = {}
+        self._exact_anchor_tgt_to_src: Dict[str, set[str]] = {}
+        self._hierarchy_ic_cache: Dict[Tuple[str, str], float] = {}
+
+    @staticmethod
+    def _experiment_config(value: Any, **defaults: Any) -> Dict[str, Any]:
+        merged = dict(defaults)
+        merged.update(config_dict(value))
+        return merged
+
+    def _validate_experiment_configs(self) -> None:
+        if self.strsim_config["placement"] not in {"channel", "folded_into_lexical"}:
+            raise ValueError(f"unsupported strsim placement: {self.strsim_config['placement']!r}")
+        if self.strsim_config["abbreviation"] not in {"off", "initialism"}:
+            raise ValueError(
+                f"unsupported strsim abbreviation mode: {self.strsim_config['abbreviation']!r}"
+            )
+        for key in ("isub_weight", "jaro_winkler_weight", "token_set_weight"):
+            if float(self.strsim_config[key]) < 0.0:
+                raise ValueError(f"strsim {key} must be non-negative")
+        if self.attr_config["polarity"] not in {"support_only", "signed"}:
+            raise ValueError(f"unsupported attr polarity: {self.attr_config['polarity']!r}")
+        if self.attr_config["bank"] not in {"full", "attrs_labels", "attrs_only"}:
+            raise ValueError(f"unsupported attr bank: {self.attr_config['bank']!r}")
+        if self.attr_config["polarity"] == "signed" and not self.attr_config.get(
+            "signed_property_allowlist"
+        ):
+            raise ValueError("signed attribute polarity requires a descriptor property allowlist")
+        if self.hier_config["mode"] not in {"labels", "labels_overlap", "off"}:
+            raise ValueError(f"unsupported hierarchy mode: {self.hier_config['mode']!r}")
+        if self.diff_config["formulation"] not in {
+            "normalised",
+            "missingness_aware",
+            "absolute",
+            "asymmetric",
+            "off",
+        }:
+            raise ValueError(
+                f"unsupported difference formulation: {self.diff_config['formulation']!r}"
+            )
+        if self.diff_config.get("controlled_perturbations") and not self.diff_config.get(
+            "dump_components"
+        ):
+            raise ValueError(
+                "controlled difference perturbations require persisted component diagnostics"
+            )
+        if self.lex_config["quality"] not in {
+            "candidate_margin",
+            "margin",
+            "entropy",
+            "encoder_agreement",
+            "constant",
+        }:
+            raise ValueError(f"unsupported lexical quality: {self.lex_config['quality']!r}")
+        if self.fusion_config["sigma_mode"] not in {
+            "full",
+            "constant_q",
+            "no_sharpening",
+            "suppression_only",
+            "uniform",
+        }:
+            raise ValueError(f"unsupported fusion sigma mode: {self.fusion_config['sigma_mode']!r}")
+        graph_mode = self.graph_config["mode"]
+        if graph_mode not in {"off", "features", "inductive", "transductive", "graph_only"}:
+            raise ValueError(f"unsupported graph channel mode: {graph_mode!r}")
+        if graph_mode == "transductive":
+            raise NotImplementedError(
+                "E23 graph scoring needs a normalized graph-feature/artifact contract; "
+                "refusing to execute this arm as the graph-off baseline"
+            )
+        if self.instance_config.get("enabled") and self.instance_config.get("anchors"):
+            raise ValueError("instance anchors require a separately bound training-link artifact")
+        if self.llm_experiment_enabled:
+            decision_mode = str(self.llm_experiment_config["decision"]["mode"])
+            if decision_mode not in {"binary", "listwise", "listwise_sc"}:
+                raise ValueError(f"unsupported LLM decision mode: {decision_mode!r}")
+            if decision_mode == "binary" and (
+                self.llm_experiment_config["fusion_weight"] == "source_first"
+                or self.llm_experiment_config["decision"].get("max_evidence_packets", 0)
+            ):
+                raise ValueError(
+                    "Source-first integration and bounded evidence acquisition require comparative judgments"
+                )
+            from exact.impl.models.selector.llm_learning import read_learning_artifact
+
+            self._exemplar_artifact = None
+            self._student_artifact = None
+            if self.llm_experiment_config.get("exemplars") == "knn":
+                self._exemplar_artifact = read_learning_artifact(
+                    self.llm_experiment_config.get("exemplar_artifact"), "llm_exemplars"
+                )
+            if self.llm_experiment_config.get("distill") == "student":
+                self._student_artifact = read_learning_artifact(
+                    self.llm_experiment_config.get("distill_artifact"), "llm_student"
+                )
+            gate_mode = str(self.llm_experiment_config["gate"]["mode"])
+            if gate_mode not in {
+                "off",
+                "analytic",
+                "quantile",
+                "transferred_threshold",
+                "source_top_fraction",
+                "pair_top_fraction",
+                "forced_sample",
+                "oracle",
+                "oracle_perfect",
+                "oracle_replay",
+                "learned",
+            }:
+                raise ValueError(f"unsupported LLM gate mode: {gate_mode!r}")
+            if gate_mode == "learned" and self._gate_mode_alias == "router":
+                raise NotImplementedError(
+                    "E21 learned gating requires a counterfactual-training artifact bound to "
+                    "the complete pinned LLM fingerprint; the legacy 'router' linear head is "
+                    "not a scientifically valid substitute"
+                )
+        if self.llm_experiment_enabled and self.llm_experiment_config["fusion_weight"] not in {
+            "beta_u",
+            "constant",
+            "source_first",
+        }:
+            raise NotImplementedError(
+                "learned LLM mixing requires an immutable fitted fusion artifact runtime"
+            )
+
+    def _experiment_entity_features(self, iri: str, side: str) -> Dict[str, Any]:
+        dataset = self._attached_dataset
+        base = dataset.get_entity_features(iri, side)
+        kind = dataset.entity_kind_for(iri, side, warn_unknown=False).value
+        config = (
+            self.property_config
+            if kind in {"object_property", "data_property"}
+            else (self.instance_config if kind == "individual" else {})
+        )
+        if not config.get("enabled"):
+            return base
+        selected = dict(base)
+        if not config.get("labels", True):
+            selected["labels"] = []
+        property_kind = kind in {"object_property", "data_property"}
+        if not config.get("hierarchy" if property_kind else "types", True):
+            selected["hierarchy"] = {}
+        if not config.get("annotations" if property_kind else "literals", True):
+            selected["attributes"] = []
+        if property_kind:
+            selected["object_triples"] = [
+                item
+                for item in base.get("object_triples", [])
+                if item.get("property_schema") and config.get("signature", True)
+            ]
+            if any(config.get(field, True) for field in ("signature", "characteristics", "usage")):
+                extras = dataset._property_experiment_extras(side).get(iri, {})
+                selected["object_triples"] += [
+                    item
+                    for item in extras.get("signature", [])
+                    if config.get(item["evidence_group"], True)
+                ]
+                if config.get("usage", True):
+                    selected["object_triples"] += list(extras.get("usage", []))
+        elif not config.get("relations", True):
+            selected["object_triples"] = []
+        elif config.get("relations_shuffled"):
+            selected["object_triples"] = dataset.shuffled_object_bundle(
+                iri, side, self.request_seed
+            )
+        selected["experiment_evidence"] = {
+            "kind": kind,
+            "labels": len(selected.get("labels", [])),
+            "attributes": len(selected.get("attributes", [])),
+            "hierarchy": sum(len(items) for items in selected.get("hierarchy", {}).values()),
+            "relations": len(selected.get("object_triples", [])),
+            "relations_shuffled": bool(config.get("relations_shuffled", False)),
+        }
+        return selected
+
+    def attach_dataset(self, dataset: Any) -> None:
+        self._graph_input_dataset = dataset
+        if self.graph_config.get("hierarchy_removal", 0.0):
+            from exact.impl.graph_controls import hierarchy_control_view
+            from exact.impl.models.graph_head import HIERARCHY_PREDICATES
+
+            if self.request_seed is None:
+                raise ValueError("hierarchy removal requires an explicit request_seed")
+            dataset = hierarchy_control_view(
+                dataset,
+                fraction=self.graph_config["hierarchy_removal"],
+                seed=self.request_seed,
+                hierarchy_predicates=HIERARCHY_PREDICATES,
+            )
+        super().attach_dataset(dataset)
+        self._hierarchy_ic_cache = {}
+        self._exact_anchor_src_to_tgt = {}
+        self._exact_anchor_tgt_to_src = {}
+        exact_matches = getattr(dataset, "exact_matches", None)
+        if exact_matches is not None and hasattr(exact_matches, "columns"):
+            if {"Src", "Tgt"}.issubset(exact_matches.columns):
+                rows = exact_matches[["Src", "Tgt"]].dropna().itertuples(index=False, name=None)
+                for src_iri, tgt_iri in rows:
+                    src_key = str(src_iri)
+                    tgt_key = str(tgt_iri)
+                    self._exact_anchor_src_to_tgt.setdefault(src_key, set()).add(tgt_key)
+                    self._exact_anchor_tgt_to_src.setdefault(tgt_key, set()).add(src_key)
+        dataset_signature = getattr(dataset, "dataset_signature", None)
+        if self._graph_artifact is not None:
+            self._graph_artifact.validate_dataset(dataset_signature, required=True)
+        if self._fusion_artifact is not None:
+            from exact.utils.artifact_transfer import validate_transferred_artifact
+
+            families = set(self.hierarchical_relation_families) | {"is_a"}
+            features = sorted(
+                ["label", "strsim", "sim_obj", "diff", "attr_aux"]
+                + [f"hier__{family}" for family in families]
+                + (
+                    ["graph"]
+                    if self.graph_config.get("mode") in {"inductive", "graph_only"}
+                    else []
+                )
+            ) + ["lex", "struct"]
+            if not validate_transferred_artifact(
+                dataset, self._fusion_artifact.path, kind="fusion", features=features
+            ):
+                self._fusion_artifact.validate_dataset(dataset_signature, required=True)
+        if self._gate_artifact is not None:
+            self._gate_artifact.validate_dataset(
+                dataset_signature,
+                required=self.llm_experiment_config["gate"]["mode"]
+                not in {"oracle_perfect", "oracle_replay"},
+            )
+
+    def _validate_fusion_artifact_contract(self, mode: str) -> None:
+        artifact = self._fusion_artifact
+        if artifact is None:
+            raise RuntimeError("fusion artifact validation requires a loaded artifact")
+        artifact.require_fields(
+            "dataset_signature",
+            "dataset_lock_sha256",
+            "seed",
+            "feature_schema",
+            "negative_label_policy",
+            kind="fusion",
+        )
+        pool_fingerprint = artifact.payload.get(
+            "candidate_pool_fingerprint",
+            artifact.payload.get("pool_fingerprint"),
+        )
+        if not isinstance(pool_fingerprint, str) or not pool_fingerprint.strip():
+            raise ValueError("fusion artifact is missing candidate_pool_fingerprint")
+        feature_schema = artifact.payload["feature_schema"]
+        if (
+            not isinstance(feature_schema, list)
+            or not feature_schema
+            or not all(isinstance(value, str) and value for value in feature_schema)
+        ):
+            raise ValueError("fusion artifact feature_schema must be a non-empty string array")
+        try:
+            int(artifact.payload["seed"])
+        except (TypeError, ValueError) as exc:
+            raise ValueError("fusion artifact seed must be an integer") from exc
+        if mode == "analytic_fitted":
+            parameters = artifact.scoped_payload("parameters", scope_key="global")
+            tau = float(parameters.get("tau", self.fusion_config["tau"]))
+            gamma = float(parameters.get("gamma", self.fusion_config["gamma"]))
+            if not 0.0 <= tau <= 1.0 or not math.isfinite(gamma) or gamma < 0.0:
+                raise ValueError("analytic_fitted fusion artifact has invalid tau or gamma")
+            if (
+                "beta" in parameters
+                and abs(float(parameters["beta"]) - float(self.fusion_config["beta"])) > 1.0e-12
+            ):
+                raise ValueError(
+                    "analytic_fitted fusion artifact may not refit beta; beta is pinned by E10"
+                )
+            multipliers = parameters.get("multipliers")
+            if not isinstance(multipliers, dict) or not multipliers:
+                raise ValueError("analytic_fitted fusion artifact needs channel multipliers")
+            fitted_values = [
+                float(value) for name, value in multipliers.items() if name != "default"
+            ]
+            if not fitted_values or any(
+                not math.isfinite(value) or value < 0.0 for value in fitted_values
+            ):
+                raise ValueError("analytic_fitted channel multipliers must be non-negative")
+            if abs(sum(fitted_values) / len(fitted_values) - 1.0) > 1.0e-6:
+                raise ValueError("analytic_fitted channel multipliers must have arithmetic mean 1")
+        elif mode == "learned_global":
+            weights = artifact.scoped_payload("weights", scope_key="global")
+            values = [float(value) for value in weights.values()]
+            if not values or any(value < 0.0 for value in values) or max(values) <= 0.0:
+                raise ValueError("learned_global fusion weights must be non-negative and non-zero")
+
+    def _validate_gate_artifact_contract(self, mode: str) -> None:
+        artifact = self._gate_artifact
+        if artifact is None:
+            raise RuntimeError("gate artifact validation requires a loaded artifact")
+        payload = artifact.payload
+        if mode in {"oracle_perfect", "oracle_replay"}:
+            artifact.require_fields(
+                "population_rows",
+                "fixed_fusion",
+                "negative_label_policy",
+                kind="oracle replay",
+            )
+            # Zero beneficial interventions (and the paired off control) are
+            # valid replays. Require the collections, not nonempty selections.
+            if not isinstance(payload.get("selected_sources"), list) or not isinstance(
+                payload.get("decision_probs"), dict
+            ):
+                raise ValueError("Oracle replay requires selected_sources and decision_probs")
+            if (
+                payload.get("kind") != "llm_oracle_replay"
+                or not payload.get("no_llm_invocations")
+                or payload.get("deployable") is not False
+            ):
+                raise ValueError(
+                    "Oracle replay artifact must explicitly prohibit live calls and deployment"
+                )
+            selected = set(payload["selected_sources"])
+            if (
+                len(selected) != len(payload["selected_sources"])
+                or len(selected) > 200
+                or set(payload["decision_probs"]) != selected
+            ):
+                raise ValueError("Oracle replay intervention source inventory is invalid")
+            label_independent_trust = (
+                mode == "oracle_replay"
+                and payload.get("protocol") == "forced_cached_trust"
+                and payload.get("label_independent_selection") is True
+            )
+            benchmark_reference = payload.get("outcome_semantics") == "benchmark_reference"
+            if benchmark_reference:
+                expected_protocol = {
+                    "oracle_replay": "benchmark_reference_observed_cached",
+                    "oracle_perfect": "benchmark_reference_perfect_fixed_sources",
+                }[mode]
+                teacher = payload.get("teacher_binding")
+                if (
+                    payload.get("mode") != mode
+                    or payload.get("protocol") != expected_protocol
+                    or payload.get("no_training_use") is not True
+                    or payload.get("training_use_permitted") is not False
+                    or payload.get("global_f1_optimality_claim") is not False
+                    or payload.get("ignored_reference_pairs") != []
+                    or payload.get("ignored_pair_policy") != "reject_nonempty"
+                    or not isinstance(teacher, dict)
+                    or teacher.get("reference_role")
+                    not in {
+                        "development",
+                        "dev",
+                        "validation",
+                        "valid",
+                        "diagnostic",
+                        "oracle",
+                        "research_development",
+                    }
+                ):
+                    raise ValueError(
+                        "Benchmark oracle requires explicit development-only diagnostic provenance"
+                    )
+            if (
+                not label_independent_trust
+                and not benchmark_reference
+                and payload["negative_label_policy"]
+                not in {
+                    "complete_reference",
+                    "confirmed_negatives",
+                }
+            ):
+                raise ValueError("Oracle replay requires safe development outcome labels")
+            return
+
+        if mode in {"source_top_fraction", "pair_top_fraction"}:
+            artifact.require_fields(
+                "dataset_signature",
+                "fraction",
+                "population_fingerprint",
+                "population_pairs",
+                "eligible_count",
+                "selected_count",
+                "pairs",
+                "selected_sources",
+                "tie_rule",
+                kind="LLM inference gate",
+            )
+            fraction = float(payload["fraction"])
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            selected = {tuple(pair) for pair in payload["pairs"]}
+            if not selected.issubset(population):
+                raise ValueError("inference gate selects pairs outside its population")
+            count = (
+                len(set(payload["selected_sources"]))
+                if mode == "source_top_fraction"
+                else len(selected)
+            )
+            if (
+                not 0.0 <= fraction <= 1.0
+                or count != int(payload["selected_count"])
+                or count != math.ceil(fraction * int(payload["eligible_count"]))
+            ):
+                raise ValueError("inference gate violates its exact population budget")
+            if (
+                abs(fraction - float(self.llm_experiment_config["gate"]["quantile_fraction"]))
+                > 1e-12
+            ):
+                raise ValueError("inference gate fraction differs from its declared policy")
+            if payload["tie_rule"] != "(-statistic, source_iri, target_iri)":
+                raise ValueError("inference gate has an unsupported tie rule")
+            return
+        artifact.require_fields(
+            "dataset_signature",
+            "task_id",
+            "entity_kind",
+            "pairs",
+            kind="LLM gate",
+        )
+        raw_pairs = payload["pairs"]
+        if not isinstance(raw_pairs, list) or any(
+            not isinstance(pair, list) or len(pair) != 2 for pair in raw_pairs
+        ):
+            raise ValueError("LLM gate artifact pairs must be a two-column array")
+        selected = [(str(pair[0]), str(pair[1])) for pair in raw_pairs]
+        if len(selected) != len(set(selected)):
+            raise ValueError("LLM gate artifact pairs must be unique")
+        if mode == "forced_sample":
+            artifact.require_fields(
+                "sample_size",
+                "sample_unit",
+                "source_count",
+                "selected_sources",
+                "population_pairs",
+                "seed",
+                "selection_rule",
+                kind="LLM gate",
+            )
+            sample_size = int(payload["sample_size"])
+            sources = set(map(str, payload["selected_sources"]))
+            if (
+                payload["sample_unit"] != "source"
+                or sample_size != len(sources)
+                or not 1 <= sample_size <= 200
+            ):
+                raise ValueError("forced_sample must contain at most 200 whole source groups")
+            population = {tuple(map(str, pair)) for pair in payload["population_pairs"]}
+            if set(selected) != {pair for pair in population if pair[0] in sources}:
+                raise ValueError(
+                    "forced_sample must retain every candidate of each selected source"
+                )
+            if payload["selection_rule"] != "stratified_round_robin_sha256(seed, source_iri)":
+                raise ValueError("forced_sample artifact has an unsupported selection rule")
+            configured_size = int(self.llm_experiment_config["gate"].get("forced_sample_size", 0))
+            if (
+                configured_size
+                and min(configured_size, int(payload["source_count"])) != sample_size
+            ):
+                raise ValueError(
+                    "forced_sample source count differs from the configured source budget"
+                )
+            return
+
+        artifact.require_fields(
+            "fraction",
+            "row_count",
+            "selected_count",
+            "threshold",
+            "boundary_ids",
+            "tie_rule",
+            kind="LLM gate",
+        )
+        fraction = float(payload["fraction"])
+        row_count = int(payload["row_count"])
+        selected_count = int(payload["selected_count"])
+        threshold = float(payload["threshold"])
+        if (
+            not 0.0 < fraction <= 1.0
+            or row_count < 1
+            or not math.isfinite(threshold)
+            or not 0.0 <= threshold <= 1.0
+            or selected_count != math.ceil(fraction * row_count)
+            or selected_count != len(selected)
+        ):
+            raise ValueError("quantile gate artifact has inconsistent fitted counts or cutoff")
+        configured_fraction = float(self.llm_experiment_config["gate"]["quantile_fraction"])
+        if abs(configured_fraction - fraction) > 1.0e-12:
+            raise ValueError("quantile gate artifact fraction does not match configuration")
+        if payload["tie_rule"] != "(-U, source_iri, target_iri)":
+            raise ValueError("quantile gate artifact has an unsupported tie rule")
+        boundary = payload["boundary_ids"]
+        if not isinstance(boundary, dict) or boundary.get("selected_last") != raw_pairs[-1]:
+            raise ValueError("quantile gate artifact boundary IDs are inconsistent")
+
+    def _fusion_multiplier(self, channel: str) -> float:
+        if self._fusion_artifact is None:
+            return 1.0
+        mode = str(self.fusion_config["mode"])
+        field = "parameters" if mode == "analytic_fitted" else "weights"
+        payload = self._fusion_artifact.scoped_payload(field, scope_key="global")
+        values = payload.get("multipliers", payload) if field == "parameters" else payload
+        if not isinstance(values, dict):
+            raise ValueError(
+                f"fusion artifact {self._fusion_artifact.path} has invalid {field!r} payload"
+            )
+        fallback = 1.0 if mode == "analytic_fitted" else 0.0
+        if mode == "analytic_fitted" and channel == "lex" and not self.strsim_enabled:
+            channel = "label"
+        value = float(values.get(channel, values.get("default", fallback)))
+        if not math.isfinite(value) or value < 0.0:
+            raise ValueError(f"fusion weight for {channel!r} must be non-negative")
+        return value
+
+    def _sigma_authority(
+        self,
+        score: torch.Tensor,
+        quality: torch.Tensor,
+        active: torch.Tensor,
+        *,
+        channel: str,
+    ) -> torch.Tensor:
+        """Return channel authority for E19/E26 while preserving the shipped default."""
+
+        active_float = active.to(dtype=score.dtype)
+        fusion_mode = str(self.fusion_config["mode"]) if self.fusion_enabled else "analytic_shipped"
+        if fusion_mode == "learned_global":
+            return active_float * quality * self._fusion_multiplier(channel)
+
+        sigma_mode = str(self.fusion_config["sigma_mode"]) if self.fusion_enabled else "full"
+        margin = (score - self.tau).abs()
+        if sigma_mode == "full":
+            authority = active_float * quality * margin.pow(self.gamma)
+        elif sigma_mode == "constant_q":
+            authority = active_float * margin.pow(self.gamma)
+        elif sigma_mode == "no_sharpening":
+            authority = active_float * quality
+        elif sigma_mode == "suppression_only":
+            authority = active_float
+        elif sigma_mode == "uniform":
+            authority = torch.ones_like(score)
+        else:  # guarded in _validate_experiment_configs
+            raise ValueError(f"unsupported fusion sigma mode: {sigma_mode!r}")
+        return authority * self._fusion_multiplier(channel)
+
+    def _llm_gate_mask(
+        self,
+        *,
+        U_ind: torch.Tensor,
+        U_dis: torch.Tensor,
+        U: torch.Tensor,
+        S_base: torch.Tensor,
+        q_label: torch.Tensor,
+        Q_struct: torch.Tensor,
+        src_iris: Sequence[str],
+        tgt_iris: Sequence[str],
+        label: Optional[Sequence[float]],
+    ) -> Tuple[torch.Tensor, List[Dict[str, Any]]]:
+        """Compute a frozen, per-pair gate and an auditable diagnostic row."""
+
+        if not self.llm_experiment_enabled and self.llm_experiment_config["gate"]["mode"] != "off":
+            mask = U >= self.tau_LLM
+            return mask, []
+
+        gate = self.llm_experiment_config["gate"]
+        mode = str(gate["mode"])
+        statistic_name = "U"
+        statistic = U
+        threshold = float(gate["threshold"])
+        extra: Dict[str, Any] = {}
+        if mode == "off":
+            statistic_name = "disabled"
+            statistic = torch.zeros_like(U)
+            threshold = 1.0
+            extra["llm_disabled"] = True
+        elif mode == "analytic":
+            pass
+        elif mode in {"quantile", "transferred_threshold"}:
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            statistic_name = "U"
+            threshold = float(payload["threshold"])
+            extra["target_fraction"] = float(payload["fraction"])
+            extra["threshold_source"] = "development_numeric_cutoff"
+            extra["fitted_cutoff"] = float(payload["threshold"])
+            extra["development_selected_count"] = int(payload["selected_count"])
+        elif mode in {"source_top_fraction", "pair_top_fraction"}:
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            current = [(str(source), str(target)) for source, target in zip(src_iris, tgt_iris)]
+            if not set(current).issubset(population):
+                raise ValueError("inference gate population differs from scored candidate pool")
+            selected = {tuple(pair) for pair in payload["pairs"]}
+            statistic_name = "inference_population_membership"
+            statistic = torch.tensor(
+                [float(pair in selected) for pair in current], device=self.device
+            )
+            threshold = 0.5
+            extra.update(
+                {
+                    "threshold_source": "frozen_inference_selection",
+                    "population_fingerprint": payload["population_fingerprint"],
+                    "target_fraction": payload["fraction"],
+                    "selected_count": payload["selected_count"],
+                }
+            )
+        elif mode == "forced_sample":
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {tuple(pair) for pair in payload["population_pairs"]}
+            if not set(zip(map(str, src_iris), map(str, tgt_iris))) <= population:
+                raise ValueError("Forced judgment candidates differ from the frozen population")
+            pairs = self._gate_artifact.payload.get("pairs")
+            if not isinstance(pairs, list):
+                raise ValueError("forced_sample artifact must contain a 'pairs' array")
+            selected = {
+                (str(pair[0]), str(pair[1]))
+                for pair in pairs
+                if isinstance(pair, list) and len(pair) == 2
+            }
+            expected_size = int(gate["forced_sample_size"])
+            source_count = len({source for source, _ in selected})
+            if expected_size and source_count != min(expected_size, int(payload["source_count"])):
+                raise ValueError(
+                    "forced_sample artifact source count does not match configured sample size"
+                )
+            statistic_name = "frozen_sample_membership"
+            statistic = torch.tensor(
+                [float((str(src), str(tgt)) in selected) for src, tgt in zip(src_iris, tgt_iris)],
+                dtype=torch.float32,
+                device=self.device,
+            )
+            threshold = 0.5
+            extra["sample_size"] = source_count
+            extra["sample_unit"] = "source"
+        elif mode in {"oracle_perfect", "oracle_replay"}:
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            population = {
+                (str(row["Src"]), str(row["Tgt"])): row for row in payload["population_rows"]
+            }
+            for index, pair in enumerate(zip(map(str, src_iris), map(str, tgt_iris))):
+                frozen = population.get(pair)
+                if (
+                    frozen is None
+                    or abs(float(frozen["S_base"]) - float(S_base[index])) > 1e-6
+                    or abs(float(frozen["U"]) - float(U[index])) > 1e-6
+                ):
+                    raise ValueError(
+                        "Oracle replay base scores/population differ from the frozen response artifact"
+                    )
+            fixed = payload["fixed_fusion"]
+            if (
+                fixed["fusion_weight"] != self.llm_experiment_config["fusion_weight"]
+                or abs(float(fixed["beta"]) - self.beta) > 1e-6
+                or abs(
+                    float(fixed["constant_weight"])
+                    - float(self.llm_experiment_config["constant_weight"])
+                )
+                > 1e-6
+            ):
+                raise ValueError(
+                    "Oracle replay integration differs from the frozen counterfactual rule"
+                )
+            statistic_name = "frozen_oracle_source_intervention"
+            statistic = torch.tensor(
+                [float(str(source) in payload["selected_sources"]) for source in src_iris],
+                device=self.device,
+            )
+            threshold = 0.5
+            extra["oracle_diagnostic"] = True
+            extra["protocol"] = payload["protocol"]
+        elif mode == "oracle":
+            if label is None or len(label) != len(src_iris):
+                raise ValueError("oracle LLM gate requires one reference label per scored pair")
+            truth = torch.tensor(label, dtype=torch.float32, device=self.device) >= 0.5
+            predicted = S_base >= self.threshold
+            statistic_name = "baseline_error"
+            statistic = (truth != predicted).to(torch.float32)
+            threshold = 0.5
+            extra["oracle_diagnostic"] = True
+        elif mode == "learned":
+            from exact.impl.models.selector.llm_learning import (
+                SOURCE_FEATURES,
+                predict_head,
+                source_features,
+                validate_learning_binding,
+            )
+
+            assert self._gate_artifact is not None
+            payload = self._gate_artifact.payload
+            validate_learning_binding(payload, self, src_iris)
+            if (
+                payload.get("feature_schema") != SOURCE_FEATURES
+                or payload.get("target") != "correction_minus_harm_per_1000_tokens"
+            ):
+                raise ValueError("Benefit router feature/target schema mismatch")
+            groups = {}
+            for index, source in enumerate(src_iris):
+                groups.setdefault(str(source), []).append(index)
+            statistic = torch.zeros_like(U)
+            for indices in groups.values():
+                features = source_features([float(S_base[index]) for index in indices])
+                value = predict_head([features], payload["model"])[0]
+                statistic[indices] = value
+            statistic_name = "predicted_net_benefit_per_1000_tokens"
+            threshold = float(payload["threshold"])
+            extra["artifact"] = dict(self._gate_artifact.provenance)
+        else:
+            raise ValueError(f"unsupported LLM gate mode: {mode!r}")
+
+        mask = statistic >= threshold
+        rows = []
+        for idx in range(len(src_iris)):
+            rows.append(
+                {
+                    "mode": mode,
+                    "statistic_name": statistic_name,
+                    "statistic": float(statistic[idx]),
+                    "threshold": threshold,
+                    "U_ind": float(U_ind[idx]),
+                    "U_dis": float(U_dis[idx]),
+                    "U": float(U[idx]),
+                    "would_route": bool(mask[idx]),
+                    **extra,
+                }
+            )
+        return mask, rows
 
     def _runtime_fingerprint_payload(
         self,
         generate_llm_rationales_override: Optional[bool] = None,
     ) -> Dict[str, Any]:
+        from exact.impl.models.pair_adaptive_batch import scientific_execution_payload
+
         payload = super()._runtime_fingerprint_payload(
             generate_llm_rationales_override=generate_llm_rationales_override
         )
-        # Preserve legacy default-off fingerprints while ensuring an ablation
-        # arm cannot silently resume a baseline checkpoint.
-        if self.ablate_channels:
-            payload["ablate_channels"] = list(self.ablate_channels)
-        if self.uniform_weights:
-            payload["uniform_weights"] = True
-        return payload
+        execution = scientific_execution_payload()
+        if execution is not None:
+            payload["pair_context_execution"] = execution
+        from exact.impl.models.component_replay import replay_identity
 
-    def attach_dataset(self, dataset: Any) -> None:
-        self._attached_dataset = dataset
-        if not self.hierarchical_relation_families and hasattr(dataset, "hierarchical_relation_families"):
-            self.hierarchical_relation_families = dict(dataset.hierarchical_relation_families or {})
-        if hasattr(dataset, "max_hierarchy_triples_per_family"):
-            self.max_hierarchy_triples_per_family = int(dataset.max_hierarchy_triples_per_family)
-        if hasattr(dataset, "max_object_triples"):
-            self.max_object_triples = int(dataset.max_object_triples)
-        if hasattr(dataset, "max_diff_triples"):
-            self.max_diff_triples = int(dataset.max_diff_triples)
-        if hasattr(dataset, "max_attr_items"):
-            self.max_attr_items = int(dataset.max_attr_items)
-
-    @staticmethod
-    def _sim01(value: torch.Tensor) -> torch.Tensor:
-        return ((value + 1.0) / 2.0).clamp(0.0, 1.0)
-
-    @staticmethod
-    def _clip01(value: float) -> float:
-        return max(0.0, min(1.0, float(value)))
-
-    @staticmethod
-    def _safe_mean(values: Sequence[float]) -> float:
-        if not values:
-            return 0.0
-        return float(sum(float(v) for v in values) / max(1, len(values)))
-
-    @staticmethod
-    def _safe_std(values: Sequence[float]) -> float:
-        if len(values) < 2:
-            return 0.0
-        tensor = torch.tensor(list(values), dtype=torch.float32)
-        return float(torch.std(tensor, unbiased=False).item())
-
-    def _batch_pool_stats(
-        self,
-        feature_map: Dict[str, Dict[str, Any]],
-        family_names: Sequence[str],
-    ) -> Dict[str, int]:
-        hier_nonempty = 0
-        obj_nonempty = 0
-        attr_nonempty = 0
-        for feats in feature_map.values():
-            hierarchy = feats.get("hierarchy", {}) or {}
-            if any(hierarchy.get(family, []) for family in family_names):
-                hier_nonempty += 1
-            if feats.get("object_triples"):
-                obj_nonempty += 1
-            if feats.get("attributes"):
-                attr_nonempty += 1
-        return {
-            "entities": int(len(feature_map)),
-            "hier_nonempty": int(hier_nonempty),
-            "obj_nonempty": int(obj_nonempty),
-            "attr_nonempty": int(attr_nonempty),
-        }
-
-    def _batch_selected_evidence_stats(
-        self,
-        pair_payloads: Sequence[Dict[str, Any]],
-        family_names: Sequence[str],
-    ) -> Dict[str, int]:
-        hier_selected = 0
-        sim_selected = 0
-        diff_selected = 0
-        attr_selected = 0
-        for payload in pair_payloads:
-            hierarchy = payload.get("hierarchy", {}) or {}
-            if any(
-                hierarchy.get(family, {}).get("src_selected") or hierarchy.get(family, {}).get("tgt_selected")
-                for family in family_names
-            ):
-                hier_selected += 1
-            sim_payload = payload.get("sim", {}) or {}
-            if sim_payload.get("src_selected") or sim_payload.get("tgt_selected"):
-                sim_selected += 1
-            diff_payload = payload.get("diff", {}) or {}
-            if diff_payload.get("src_selected") or diff_payload.get("tgt_selected"):
-                diff_selected += 1
-            attr_payload = payload.get("attr", {}) or {}
-            if attr_payload.get("src_selected") or attr_payload.get("tgt_selected"):
-                attr_selected += 1
-        return {
-            "pairs": int(len(pair_payloads)),
-            "hier_selected": int(hier_selected),
-            "sim_selected": int(sim_selected),
-            "diff_selected": int(diff_selected),
-            "attr_selected": int(attr_selected),
-        }
-
-    @staticmethod
-    def _top_two_scores(mat: torch.Tensor) -> Tuple[float, float]:
-        if mat.numel() == 0:
-            return 0.0, 0.0
-        flat = mat.flatten()
-        if flat.numel() == 1:
-            val = float(flat[0].item())
-            return val, val
-        vals, _ = torch.topk(flat, k=2)
-        return float(vals[0].item()), float(vals[1].item())
-
-    @staticmethod
-    def _normalize_text(text: Any) -> str:
-        return str(text or "").strip()
-
-    def _brief_key(self, src_label: str, tgt_label: str, packet: str) -> str:
-        payload = "\u241F".join([src_label or "", tgt_label or "", packet or ""])
-        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
-
-    def _stable_item_id(
-        self,
-        channel: str,
-        side: str,
-        item: Dict[str, Any],
-        family: Optional[str] = None,
-    ) -> str:
-        triple = [self._normalize_text(value) for value in list(item.get("triple") or [])[:3]]
-        payload = {
-            "channel": self._normalize_text(channel),
-            "side": self._normalize_text(side),
-            "family": self._normalize_text(family),
-            "triple": triple,
-            "property": self._normalize_text(item.get("property", item.get("prop"))),
-            "value": self._normalize_text(item.get("value")),
-            "text": self._normalize_text(item.get("text")),
-        }
-        digest = hashlib.sha1(
-            json.dumps(payload, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        ).hexdigest()[:16]
-        return f"{payload['channel']}-{payload['side']}-{digest}"
-
-    def _with_item_id(
-        self,
-        channel: str,
-        side: str,
-        item: Dict[str, Any],
-        family: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        row = dict(item or {})
-        row["item_id"] = self._stable_item_id(channel, side, row, family=family)
-        if family and "family" not in row:
-            row["family"] = family
-        return row
-
-    def _hier_item_triple(self, item: Any) -> Tuple[str, str, str]:
-        if isinstance(item, dict):
-            triple = list(item.get("triple") or ["", "", ""])
-            triple = (triple + ["", "", ""])[:3]
-            return (
-                self._normalize_text(triple[0]),
-                self._normalize_text(triple[1]),
-                self._normalize_text(triple[2]),
-            )
-        triple = list(item[:3]) if item is not None else ["", "", ""]
-        triple = (triple + ["", "", ""])[:3]
-        return (
-            self._normalize_text(triple[0]),
-            self._normalize_text(triple[1]),
-            self._normalize_text(triple[2]),
-        )
-
-    def _hier_item_specificity(self, item: Any) -> float:
-        if isinstance(item, dict):
-            return float(item.get("specificity", 0.0))
-        try:
-            return float(item[3])
-        except Exception:
-            return 0.0
-
-    def _hier_item_subject_iri(self, item: Any) -> str:
-        if isinstance(item, dict):
-            return self._normalize_text(item.get("subject_iri"))
-        try:
-            return self._normalize_text(item[4])
-        except Exception:
-            return ""
-
-    def _hier_item_object_iri(self, item: Any) -> str:
-        if isinstance(item, dict):
-            return self._normalize_text(item.get("object_iri"))
-        try:
-            return self._normalize_text(item[5])
-        except Exception:
-            return ""
-
-    def _matrix_provenance_links(
-        self,
-        src_items: Sequence[Dict[str, Any]],
-        tgt_items: Sequence[Dict[str, Any]],
-        support_matrix: Optional[torch.Tensor],
-    ) -> List[Dict[str, Any]]:
-        if not src_items or not tgt_items or support_matrix is None:
-            return []
-        if support_matrix.ndim != 2:
-            return []
-        if support_matrix.shape[0] != len(src_items) or support_matrix.shape[1] != len(tgt_items):
-            return []
-
-        links: Dict[Tuple[str, str], Dict[str, Any]] = {}
-
-        def _upsert(src_idx: int, tgt_idx: int) -> None:
-            score = float(support_matrix[src_idx, tgt_idx].item())
-            if score <= 0.0:
-                return
-            source_item_id = self._normalize_text(src_items[src_idx].get("item_id"))
-            target_item_id = self._normalize_text(tgt_items[tgt_idx].get("item_id"))
-            if not source_item_id or not target_item_id:
-                return
-            key = (source_item_id, target_item_id)
-            payload = {
-                "source_item_id": source_item_id,
-                "target_item_id": target_item_id,
-                "score": score,
-            }
-            prev = links.get(key)
-            if prev is None or score > float(prev.get("score", 0.0)):
-                links[key] = payload
-
-        for src_idx in range(support_matrix.shape[0]):
-            tgt_idx = int(torch.argmax(support_matrix[src_idx]).item())
-            _upsert(src_idx, tgt_idx)
-        for tgt_idx in range(support_matrix.shape[1]):
-            src_idx = int(torch.argmax(support_matrix[:, tgt_idx]).item())
-            _upsert(src_idx, tgt_idx)
-
-        return sorted(
-            links.values(),
-            key=lambda row: (
-                -float(row.get("score", 0.0)),
-                self._normalize_text(row.get("source_item_id")),
-                self._normalize_text(row.get("target_item_id")),
-            ),
-        )
-
-    def _build_cross_side_provenance(
-        self,
-        s_label_value: float,
-        hierarchy_payloads: Dict[str, Dict[str, Any]],
-        sim_payload: Dict[str, Any],
-        diff_payload: Dict[str, Any],
-        attr_payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        return {
-            "lexical": [
-                {
-                    "source_ref": "__source__",
-                    "target_ref": "__target__",
-                    "score": float(s_label_value),
-                }
-            ],
-            "hierarchy": {
-                family: list(payload.get("links", []))
-                for family, payload in hierarchy_payloads.items()
-                if payload.get("links")
-            },
-            "similarity": list(sim_payload.get("links", [])),
-            "attributes": {
-                "source": list(attr_payload.get("source_links", [])),
-                "target": list(attr_payload.get("target_links", [])),
-            },
-            "difference": {
-                "source": list(diff_payload.get("source_links", [])),
-                "target": list(diff_payload.get("target_links", [])),
+        if replay_identity() is not None and getattr(self, "_numerical_scoring_role", None) != "train":
+            payload["component_judgments"] = replay_identity()
+        payload["pair_adaptive_channels"] = {
+            "hierarchy_embedding_weight": self.hierarchy_embedding_weight,
+            "hierarchy_support_weight": self.hierarchy_support_weight,
+            "similarity_embedding_weight": self.similarity_embedding_weight,
+            "similarity_support_weight": self.similarity_support_weight,
+            "similarity_per_relation_cap": self.similarity_per_relation_cap,
+            "difference_per_relation_cap": self.difference_per_relation_cap,
+            "stability_factor": self.stability_factor,
+            "attribute_property_weights": self.attribute_property_weights,
+            "attribute_information_word_cap": self.attribute_information_word_cap,
+            "attribute_score_floor": self.attribute_score_floor,
+            "uncertainty_indecision_scale": self.uncertainty_indecision_scale,
+            "uncertainty_disagreement_quality_power": (self.uncertainty_disagreement_quality_power),
+            "experiments": {
+                "strsim": self.strsim_config,
+                "attr": self.attr_config,
+                "hier": self.hier_config,
+                "diff": self.diff_config,
+                "lex": self.lex_config,
+                "property": self.property_config,
+                "instance": self.instance_config,
+                "graph": self.graph_config,
+                "anchor_inventory": getattr(self, "_anchor_manifest", None),
+                "fusion": self.fusion_config,
+                "fusion_effective": {
+                    "tau": self.tau,
+                    "gamma": self.gamma,
+                    "beta": self.beta,
+                },
+                "llm": self.llm_experiment_config,
+                "fusion_artifact": (
+                    dict(self._fusion_artifact.provenance)
+                    if self._fusion_artifact is not None
+                    else None
+                ),
+                "gate_artifact": (
+                    dict(self._gate_artifact.provenance)
+                    if self._gate_artifact is not None
+                    else None
+                ),
             },
         }
-
-    def _hydrate_record_item_ids(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        hydrated = dict(record or {})
-        triple_attributions = dict(hydrated.get("triple_attributions") or {})
-        hierarchy = dict(triple_attributions.get("hierarchy") or {})
-        for family, family_payload in hierarchy.items():
-            family_payload = dict(family_payload or {})
-            family_payload["source"] = [
-                self._with_item_id("hierarchy", "source", item, family=family)
-                for item in list(family_payload.get("source") or [])
-            ]
-            family_payload["target"] = [
-                self._with_item_id("hierarchy", "target", item, family=family)
-                for item in list(family_payload.get("target") or [])
-            ]
-            hierarchy[family] = family_payload
-        triple_attributions["hierarchy"] = hierarchy
-        for channel in ["similarity", "difference"]:
-            payload = dict(triple_attributions.get(channel) or {})
-            payload["source"] = [
-                self._with_item_id(channel, "source", item)
-                for item in list(payload.get("source") or [])
-            ]
-            payload["target"] = [
-                self._with_item_id(channel, "target", item)
-                for item in list(payload.get("target") or [])
-            ]
-            triple_attributions[channel] = payload
-        hydrated["triple_attributions"] = triple_attributions
-        attributes = dict(hydrated.get("attributes") or {})
-        attributes["source"] = [
-            self._with_item_id("attribute", "source", item)
-            for item in list(attributes.get("source") or [])
-        ]
-        attributes["target"] = [
-            self._with_item_id("attribute", "target", item)
-            for item in list(attributes.get("target") or [])
-        ]
-        hydrated["attributes"] = attributes
-        hydrated["explanation_schema_version"] = max(
-            3,
-            int(hydrated.get("explanation_schema_version", 0) or 0),
-        )
-        return hydrated
-
-    def _explanation_family_names_from_record(self, record: Dict[str, Any]) -> List[str]:
-        family_names = list(self.hierarchical_relation_families.keys() or [])
-        if "is_a" not in family_names:
-            family_names = ["is_a"] + family_names
-        hierarchy_payload = (record.get("triple_attributions") or {}).get("hierarchy") or {}
-        for family in hierarchy_payload.keys():
-            if family not in family_names:
-                family_names.append(family)
-        return family_names
-
-    def _saved_record_hierarchy_items(
-        self,
-        record: Dict[str, Any],
-        family: str,
-        side: str,
-    ) -> List[Dict[str, Any]]:
-        hierarchy = (record.get("triple_attributions") or {}).get("hierarchy") or {}
-        payload = dict(hierarchy.get(family) or {})
-        out: List[Dict[str, Any]] = []
-        for item in list(payload.get(side) or []):
-            triple = list(item.get("triple") or [])
-            if len(triple) < 3:
-                continue
-            out.append(
-                {
-                    "triple": (
-                        self._normalize_text(triple[0]),
-                        self._normalize_text(triple[1]),
-                        self._normalize_text(triple[2]),
-                    ),
-                    "specificity": float(item.get("specificity", 0.0)),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                }
-            )
-        return out
-
-    def _saved_record_object_items(
-        self,
-        record: Dict[str, Any],
-        channel: str,
-        side: str,
-    ) -> List[Dict[str, Any]]:
-        payload = (record.get("triple_attributions") or {}).get(channel) or {}
-        out: List[Dict[str, Any]] = []
-        for item in list(payload.get(side) or []):
-            triple = list(item.get("triple") or [])
-            if len(triple) < 3:
-                continue
-            out.append(
-                {
-                    "triple": (
-                        self._normalize_text(triple[0]),
-                        self._normalize_text(triple[1]),
-                        self._normalize_text(triple[2]),
-                    ),
-                    "score": float(item.get("edge_ic", item.get("unsupported_mass", 0.0))),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                    "rel_iri": self._normalize_text(item.get("rel_iri")),
-                }
-            )
-        return out
-
-    def _saved_record_attribute_items(
-        self,
-        record: Dict[str, Any],
-        side: str,
-    ) -> List[Dict[str, Any]]:
-        attributes = (record.get("attributes") or {}).get(side) or []
-        out: List[Dict[str, Any]] = []
-        for item in list(attributes):
-            out.append(
-                {
-                    "prop": self._normalize_text(item.get("property", item.get("prop"))),
-                    "value": self._normalize_text(item.get("value")),
-                    "text": self._normalize_text(item.get("text")),
-                    "weight": float(item.get("weight", 0.0)),
-                    "entity_iri": self._normalize_text(item.get("entity_iri")),
-                }
-            )
-        return out
-
-    def reconstruct_explanation_fields_from_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
-        hydrated = self._hydrate_record_item_ids(record)
-        labels = dict(hydrated.get("selected_labels") or {})
-        src_label = self._normalize_text(labels.get("source", hydrated.get("src_iri")))
-        tgt_label = self._normalize_text(labels.get("target", hydrated.get("tgt_iri")))
-        family_names = self._explanation_family_names_from_record(hydrated)
-        hierarchy_payloads: Dict[str, Dict[str, Any]] = {}
-        for family in family_names:
-            hierarchy_payloads[family] = self._score_hierarchy_family(
-                family,
-                self._saved_record_hierarchy_items(hydrated, family, "source"),
-                self._saved_record_hierarchy_items(hydrated, family, "target"),
-            )
-        sim_payload = self._score_similarity_channel(
-            self._saved_record_object_items(hydrated, "similarity", "source"),
-            self._saved_record_object_items(hydrated, "similarity", "target"),
-        )
-        diff_payload = self._score_difference_channel(
-            self._saved_record_object_items(hydrated, "difference", "source"),
-            self._saved_record_object_items(hydrated, "difference", "target"),
-            support_mat=sim_payload.get("support_matrix"),
-        )
-        attr_payload = self._score_attribute_channel(
-            self._saved_record_attribute_items(hydrated, "source"),
-            self._saved_record_attribute_items(hydrated, "target"),
-            [src_label] if src_label else [],
-            [tgt_label] if tgt_label else [],
-            hierarchy_payloads,
-            sim_payload,
-        )
-        s_label_value = float(
-            (hydrated.get("confidences") or {}).get("s_label", self.tau)
-        )
-        hydrated["cross_side_provenance"] = self._build_cross_side_provenance(
-            s_label_value,
-            hierarchy_payloads,
-            sim_payload,
-            diff_payload,
-            attr_payload,
-        )
-        return hydrated
-
-    def reconstruct_explanation_fields_for_pair(
-        self,
-        src_iri: str,
-        tgt_iri: str,
-        src_labels: Optional[List[str]] = None,
-        tgt_labels: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        dataset = self._attached_dataset
-        if dataset is None:
-            raise RuntimeError("PairAdaptiveSemanticScorer requires an attached dataset.")
-        src_feats = dataset.get_entity_features(src_iri, "src")
-        tgt_feats = dataset.get_entity_features(tgt_iri, "tgt")
-        src_label_list = list(src_labels or src_feats.get("labels") or [src_iri])
-        tgt_label_list = list(tgt_labels or tgt_feats.get("labels") or [tgt_iri])
-        out = self.forward(
-            src_iris=[src_iri],
-            tgt_iris=[tgt_iri],
-            src_label_lists=[src_label_list],
-            tgt_label_lists=[tgt_label_list],
-            label=None,
-        )
-        explanations = list(out.get("explanations") or [])
-        if not explanations:
-            raise RuntimeError(f"Failed to rehydrate explanation for pair ({src_iri}, {tgt_iri}).")
-        return dict(explanations[0])
-
-    def _family_display_name(self, family: str) -> str:
-        return family.replace("_", " ").strip()
-
-    def _hierarchy_template(self, family: str) -> str:
-        templates = {
-            "is_a": "$SRC is a kind of $TGT.",
-            "part_of": "$SRC is part of $TGT.",
-            "has_part": "$SRC has part $TGT.",
-        }
-        return templates.get(family, f"$SRC {self._family_display_name(family)} $TGT.")
-
-    def _trim_items_to_budget(self, items: Sequence[str], budget_tokens: int) -> List[str]:
-        if budget_tokens <= 0:
-            return [self._normalize_text(item) for item in items if self._normalize_text(item)]
-        kept: List[str] = []
-        used = 0
-        for item in items:
-            text = self._normalize_text(item)
-            if not text:
-                continue
-            approx = max(1, len(text.split()))
-            if kept and used + approx > budget_tokens:
-                break
-            kept.append(text)
-            used += approx
-        return kept
-
-    def _join_channel_sentences(self, sentences: Sequence[str], budget_tokens: int) -> str:
-        trimmed = self._trim_items_to_budget(sentences, budget_tokens)
-        return self._join_context(list(trimmed))
-
-    def _encode_label_matrix(self, left: Sequence[str], right: Sequence[str]) -> torch.Tensor:
-        if not left or not right:
-            return torch.zeros((len(left), len(right)), device=self.device)
-        e_left = torch.nn.functional.normalize(self.encode_labels_batch(list(left)), dim=-1)
-        e_right = torch.nn.functional.normalize(self.encode_labels_batch(list(right)), dim=-1)
-        return self._sim01(e_left @ e_right.T)
-
-    def _encode_context_matrix(self, left: Sequence[str], right: Sequence[str]) -> torch.Tensor:
-        if not left or not right or not self.use_context:
-            return torch.zeros((len(left), len(right)), device=self.device)
-        e_left = torch.nn.functional.normalize(self.encode_contexts_batch(list(left)), dim=-1)
-        e_right = torch.nn.functional.normalize(self.encode_contexts_batch(list(right)), dim=-1)
-        return self._sim01(e_left @ e_right.T)
-
-    def _context_similarity_from_sentences(
-        self,
-        src_sentences: Sequence[str],
-        tgt_sentences: Sequence[str],
-        budget_tokens: int,
-    ) -> float:
-        if not self.use_context or not src_sentences or not tgt_sentences:
-            return self.tau
-        src_text = self._join_channel_sentences(src_sentences, budget_tokens)
-        tgt_text = self._join_channel_sentences(tgt_sentences, budget_tokens)
-        if not src_text or not tgt_text:
-            return self.tau
-        enc = torch.nn.functional.normalize(self.encode_contexts_batch([src_text, tgt_text]), dim=-1)
-        return float(self._sim01(torch.sum(enc[0] * enc[1], dim=-1)).item())
-
-    def _select_diverse_indices(
-        self,
-        items: Sequence[Any],
-        scores: Sequence[float],
-        limit: int,
-        per_relation_cap: Optional[int],
-        relation_getter,
-        tie_breaker=None,
-    ) -> List[int]:
-        if not items or limit <= 0:
-            return []
-        order = list(range(len(items)))
-        order.sort(
-            key=lambda idx: (
-                float(scores[idx]),
-                float(tie_breaker(items[idx]) if tie_breaker is not None else 0.0),
-            ),
-            reverse=True,
-        )
-        selected: List[int] = []
-        rel_counts: Dict[str, int] = {}
-        for idx in order:
-            rel_key = str(relation_getter(items[idx]) or "")
-            if per_relation_cap is not None and rel_counts.get(rel_key, 0) >= per_relation_cap:
-                continue
-            selected.append(idx)
-            rel_counts[rel_key] = rel_counts.get(rel_key, 0) + 1
-            if len(selected) >= limit:
-                break
-        return selected
-
-    def _family_relation_aliases(self, family: str) -> List[str]:
-        cfg = self.hierarchical_relation_families.get(family, {}) or {}
-        aliases = list(cfg.get("label_seeds") or [])
-        if not aliases:
-            aliases = [self._family_display_name(family)]
-        return aliases
-
-    def _verbalize_hierarchy_items(
-        self,
-        family: str,
-        items: Sequence[Any],
-    ) -> List[str]:
-        template = self._hierarchy_template(family)
-        out: List[str] = []
-        for item in items:
-            head, _, tail = self._hier_item_triple(item)
-            out.append(template.replace("$SRC", str(head)).replace("$TGT", str(tail)))
-        return out
-
-    def _verbalize_object_items(self, items: Sequence[Dict[str, Any]]) -> List[str]:
-        triples = [tuple(item.get("triple", ("", "", ""))) for item in items]
-        dataset = self._attached_dataset
-        if dataset is not None and hasattr(dataset, "_verbalize_triples"):
-            try:
-                return list(dataset._verbalize_triples(triples))
-            except Exception:
-                pass
-        out: List[str] = []
-        for head, rel, tail in triples:
-            out.append(f"{head} {rel} {tail}.")
-        return out
-
-    def _score_label_channel(
-        self,
-        src_label_lists: List[List[str]],
-        tgt_label_lists: List[List[str]],
-    ) -> Tuple[torch.Tensor, torch.Tensor, List[Tuple[str, str]]]:
-        n_pairs = len(src_label_lists)
-        if not self.use_lexical:
-            best_pairs = [
-                (
-                    (src_labels[0] if src_labels else ""),
-                    (tgt_labels[0] if tgt_labels else ""),
-                )
-                for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists)
-            ]
-            neutral = torch.full((n_pairs,), self.tau, device=self.device)
-            q_label = torch.zeros(n_pairs, device=self.device)
-            return neutral, q_label, best_pairs
-
-        flat_src = [label for labels in src_label_lists for label in labels]
-        flat_tgt = [label for labels in tgt_label_lists for label in labels]
-        if not flat_src or not flat_tgt:
-            neutral = torch.full((n_pairs,), self.tau, device=self.device)
-            q_label = torch.zeros(n_pairs, device=self.device)
-            best_pairs = [
-                (
-                    (src_labels[0] if src_labels else ""),
-                    (tgt_labels[0] if tgt_labels else ""),
-                )
-                for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists)
-            ]
-            return neutral, q_label, best_pairs
-
-        e_src = torch.nn.functional.normalize(self.encode_labels_batch(flat_src), dim=-1)
-        e_tgt = torch.nn.functional.normalize(self.encode_labels_batch(flat_tgt), dim=-1)
-
-        src_slices = []
-        start = 0
-        for labels in src_label_lists:
-            end = start + len(labels)
-            src_slices.append(e_src[start:end] if labels else e_src[0:0])
-            start = end
-        tgt_slices = []
-        start = 0
-        for labels in tgt_label_lists:
-            end = start + len(labels)
-            tgt_slices.append(e_tgt[start:end] if labels else e_tgt[0:0])
-            start = end
-
-        s_vals: List[torch.Tensor] = []
-        q_vals: List[float] = []
-        best_pairs: List[Tuple[str, str]] = []
-        for src_labels, tgt_labels, src_embs, tgt_embs in zip(
-            src_label_lists, tgt_label_lists, src_slices, tgt_slices
-        ):
-            if src_embs.shape[0] == 0 or tgt_embs.shape[0] == 0:
-                s_vals.append(torch.tensor(float(self.tau), device=self.device))
-                q_vals.append(0.0)
-                best_pairs.append(
-                    (
-                        (src_labels[0] if src_labels else ""),
-                        (tgt_labels[0] if tgt_labels else ""),
-                    )
-                )
-                continue
-            mat = self._sim01(src_embs @ tgt_embs.T)
-            score, pair = self._select_label_pair(mat, src_labels, tgt_labels)
-            z1, z2 = self._top_two_scores(mat)
-            q_label = 1.0 if mat.numel() <= 1 else self._clip01((z1 - z2) / max(1e-8, (1.0 - z2)))
-            s_vals.append(score)
-            q_vals.append(q_label)
-            best_pairs.append(pair)
-        return torch.stack(s_vals), torch.tensor(q_vals, dtype=torch.float32, device=self.device), best_pairs
-
-    def _score_hierarchy_family(
-        self,
-        family: str,
-        src_items: Sequence[Any],
-        tgt_items: Sequence[Any],
-    ) -> Dict[str, Any]:
-        payload = {
-            "score": self.tau,
-            "quality": 0.0,
-            "strength": 0.0,
-            "coverage": 0.0,
-            "specificity": 0.0,
-            "embedding": self.tau,
-            "src_selected": [],
-            "tgt_selected": [],
-            "src_sentences": [],
-            "tgt_sentences": [],
-            "links": [],
-        }
-        if not self.use_context or not src_items or not tgt_items:
-            return payload
-
-        src_tails = [self._hier_item_triple(item)[2] for item in src_items]
-        tgt_tails = [self._hier_item_triple(item)[2] for item in tgt_items]
-        support_mat = self._encode_label_matrix(src_tails, tgt_tails)
-        row_best = support_mat.max(dim=1).values if support_mat.numel() else torch.zeros(len(src_items), device=self.device)
-        col_best = support_mat.max(dim=0).values if support_mat.numel() else torch.zeros(len(tgt_items), device=self.device)
-
-        src_idx = self._select_diverse_indices(
-            src_items,
-            row_best.detach().cpu().tolist(),
-            self.max_hierarchy_triples_per_family,
-            per_relation_cap=None,
-            relation_getter=lambda _: family,
-            tie_breaker=lambda item: self._hier_item_specificity(item),
-        )
-        tgt_idx = self._select_diverse_indices(
-            tgt_items,
-            col_best.detach().cpu().tolist(),
-            self.max_hierarchy_triples_per_family,
-            per_relation_cap=None,
-            relation_getter=lambda _: family,
-            tie_breaker=lambda item: self._hier_item_specificity(item),
-        )
-
-        if not src_idx or not tgt_idx:
-            return payload
-
-        src_selected = [src_items[i] for i in src_idx]
-        tgt_selected = [tgt_items[i] for i in tgt_idx]
-        src_sentences = self._verbalize_hierarchy_items(family, src_selected)
-        tgt_sentences = self._verbalize_hierarchy_items(family, tgt_selected)
-        reduced = support_mat[src_idx][:, tgt_idx]
-        src_support = reduced.max(dim=1).values.detach().cpu().tolist()
-        tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
-        str_f = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
-        emb_f = self._context_similarity_from_sentences(src_sentences, tgt_sentences, self.max_input_tokens_hier)
-        spec_vals = [self._hier_item_specificity(item) for item in src_selected] + [
-            self._hier_item_specificity(item) for item in tgt_selected
-        ]
-        inf_f = self._safe_mean(spec_vals)
-        cov_f = self._clip01((len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_hierarchy_triples_per_family))
-        q_f = self._clip01((cov_f + str_f + inf_f) / 3.0)
-        s_f = self._clip01(0.5 * emb_f + 0.5 * str_f)
-
-        src_imp = [float(value) for value in src_support]
-        tgt_imp = [float(value) for value in tgt_support]
-        total_imp = sum(src_imp) + sum(tgt_imp) or 1.0
-        src_selected_rows = [
-            self._with_item_id(
-                "hierarchy",
-                "source",
-                {
-                    "triple": list(self._hier_item_triple(item)),
-                    "specificity": self._hier_item_specificity(item),
-                    "subject_iri": self._hier_item_subject_iri(item),
-                    "object_iri": self._hier_item_object_iri(item),
-                    "support": float(src_support[pos]),
-                    "importance": float(src_imp[pos] / total_imp),
-                },
-                family=family,
-            )
-            for pos, item in enumerate(src_selected)
-        ]
-        tgt_selected_rows = [
-            self._with_item_id(
-                "hierarchy",
-                "target",
-                {
-                    "triple": list(self._hier_item_triple(item)),
-                    "specificity": self._hier_item_specificity(item),
-                    "subject_iri": self._hier_item_subject_iri(item),
-                    "object_iri": self._hier_item_object_iri(item),
-                    "support": float(tgt_support[pos]),
-                    "importance": float(tgt_imp[pos] / total_imp),
-                },
-                family=family,
-            )
-            for pos, item in enumerate(tgt_selected)
-        ]
-        payload.update(
-            {
-                "score": s_f,
-                "quality": q_f,
-                "strength": str_f,
-                "coverage": cov_f,
-                "specificity": inf_f,
-                "embedding": emb_f,
-                "src_selected": src_selected_rows,
-                "tgt_selected": tgt_selected_rows,
-                "src_sentences": src_sentences,
-                "tgt_sentences": tgt_sentences,
-                "links": self._matrix_provenance_links(src_selected_rows, tgt_selected_rows, reduced),
-            }
-        )
-        return payload
-
-    def _object_support_matrix(
-        self,
-        src_items: Sequence[Dict[str, Any]],
-        tgt_items: Sequence[Dict[str, Any]],
-    ) -> torch.Tensor:
-        if not src_items or not tgt_items:
-            return torch.zeros((len(src_items), len(tgt_items)), device=self.device)
-        src_rels = [str(item["triple"][1]) for item in src_items]
-        tgt_rels = [str(item["triple"][1]) for item in tgt_items]
-        src_neighbors = [str(item["triple"][2]) for item in src_items]
-        tgt_neighbors = [str(item["triple"][2]) for item in tgt_items]
-        rel_mat = self._encode_label_matrix(src_rels, tgt_rels)
-        nbr_mat = self._encode_label_matrix(src_neighbors, tgt_neighbors)
-        return (0.5 * rel_mat + 0.5 * nbr_mat).clamp(0.0, 1.0)
-
-    def _score_similarity_channel(
-        self,
-        src_items: Sequence[Dict[str, Any]],
-        tgt_items: Sequence[Dict[str, Any]],
-    ) -> Dict[str, Any]:
-        payload = {
-            "score": self.tau,
-            "quality": 0.0,
-            "strength": 0.0,
-            "coverage": 0.0,
-            "stability": 0.0,
-            "embedding": self.tau,
-            "src_selected": [],
-            "tgt_selected": [],
-            "src_sentences": [],
-            "tgt_sentences": [],
-            "support_matrix": None,
-            "links": [],
-        }
-        if not self.use_context or not src_items or not tgt_items:
-            return payload
-
-        support_mat = self._object_support_matrix(src_items, tgt_items)
-        row_best = support_mat.max(dim=1).values if support_mat.numel() else torch.zeros(len(src_items), device=self.device)
-        col_best = support_mat.max(dim=0).values if support_mat.numel() else torch.zeros(len(tgt_items), device=self.device)
-        src_idx = self._select_diverse_indices(
-            src_items,
-            row_best.detach().cpu().tolist(),
-            min(self.max_object_triples, len(src_items)),
-            per_relation_cap=2,
-            relation_getter=lambda item: item["triple"][1],
-            tie_breaker=lambda item: item.get("score", 0.0),
-        )
-        tgt_idx = self._select_diverse_indices(
-            tgt_items,
-            col_best.detach().cpu().tolist(),
-            min(self.max_object_triples, len(tgt_items)),
-            per_relation_cap=2,
-            relation_getter=lambda item: item["triple"][1],
-            tie_breaker=lambda item: item.get("score", 0.0),
-        )
-        if not src_idx or not tgt_idx:
-            return payload
-
-        src_selected = [src_items[i] for i in src_idx]
-        tgt_selected = [tgt_items[i] for i in tgt_idx]
-        reduced = support_mat[src_idx][:, tgt_idx]
-        src_support = reduced.max(dim=1).values.detach().cpu().tolist()
-        tgt_support = reduced.max(dim=0).values.detach().cpu().tolist()
-        str_sim = 0.5 * (self._safe_mean(src_support) + self._safe_mean(tgt_support))
-        src_sentences = self._verbalize_object_items(src_selected)
-        tgt_sentences = self._verbalize_object_items(tgt_selected)
-        emb_sim = self._context_similarity_from_sentences(src_sentences, tgt_sentences, self.max_input_tokens_sim)
-        cov_sim = self._clip01((len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_object_triples))
-        stability_vals = list(src_support) + list(tgt_support)
-        stab_sim = self._clip01(1.0 - min(1.0, 2.0 * self._safe_std(stability_vals)))
-        q_sim = self._clip01((cov_sim + str_sim + stab_sim) / 3.0)
-        s_sim = self._clip01(0.5 * emb_sim + 0.5 * str_sim)
-        src_imp = [float(value) for value in src_support]
-        tgt_imp = [float(value) for value in tgt_support]
-        total_imp = sum(src_imp) + sum(tgt_imp) or 1.0
-        src_selected_rows = [
-            self._with_item_id(
-                "similarity",
-                "source",
-                {
-                    "triple": list(item["triple"]),
-                    "support": float(src_support[pos]),
-                    "edge_ic": float(item.get("score", 0.0)),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                    "rel_iri": self._normalize_text(item.get("rel_iri")),
-                    "importance": float(src_imp[pos] / total_imp),
-                },
-            )
-            for pos, item in enumerate(src_selected)
-        ]
-        tgt_selected_rows = [
-            self._with_item_id(
-                "similarity",
-                "target",
-                {
-                    "triple": list(item["triple"]),
-                    "support": float(tgt_support[pos]),
-                    "edge_ic": float(item.get("score", 0.0)),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                    "rel_iri": self._normalize_text(item.get("rel_iri")),
-                    "importance": float(tgt_imp[pos] / total_imp),
-                },
-            )
-            for pos, item in enumerate(tgt_selected)
-        ]
-        payload.update(
-            {
-                "score": s_sim,
-                "quality": q_sim,
-                "strength": str_sim,
-                "coverage": cov_sim,
-                "stability": stab_sim,
-                "embedding": emb_sim,
-                "src_selected": src_selected_rows,
-                "tgt_selected": tgt_selected_rows,
-                "src_sentences": src_sentences,
-                "tgt_sentences": tgt_sentences,
-                "support_matrix": support_mat,
-                "row_best": row_best.detach().cpu().tolist(),
-                "col_best": col_best.detach().cpu().tolist(),
-                "links": self._matrix_provenance_links(src_selected_rows, tgt_selected_rows, reduced),
-            }
-        )
-        return payload
-
-    def _score_difference_channel(
-        self,
-        src_items: Sequence[Dict[str, Any]],
-        tgt_items: Sequence[Dict[str, Any]],
-        support_mat: Optional[torch.Tensor] = None,
-    ) -> Dict[str, Any]:
-        payload = {
-            "score": self.tau,
-            "quality": 0.0,
-            "conflict": 0.0,
-            "coverage": 0.0,
-            "strength": 0.0,
-            "stability": 0.0,
-            "src_selected": [],
-            "tgt_selected": [],
-            "src_sentences": [],
-            "tgt_sentences": [],
-            "source_links": [],
-            "target_links": [],
-        }
-        if not self.use_context:
-            return payload
-
-        if support_mat is None:
-            support_mat = self._object_support_matrix(src_items, tgt_items)
-        row_best = support_mat.max(dim=1).values if src_items and tgt_items else torch.zeros(len(src_items), device=self.device)
-        col_best = support_mat.max(dim=0).values if src_items and tgt_items else torch.zeros(len(tgt_items), device=self.device)
-
-        src_unsupported = [
-            float(item.get("score", 0.0)) * (1.0 - float(row_best[idx].item() if idx < row_best.numel() else 0.0))
-            for idx, item in enumerate(src_items)
-        ]
-        tgt_unsupported = [
-            float(item.get("score", 0.0)) * (1.0 - float(col_best[idx].item() if idx < col_best.numel() else 0.0))
-            for idx, item in enumerate(tgt_items)
-        ]
-
-        src_idx = self._select_diverse_indices(
-            src_items,
-            src_unsupported,
-            min(self.max_diff_triples, len(src_items)),
-            per_relation_cap=3,
-            relation_getter=lambda item: item["triple"][1],
-            tie_breaker=lambda item: item.get("score", 0.0),
-        )
-        tgt_idx = self._select_diverse_indices(
-            tgt_items,
-            tgt_unsupported,
-            min(self.max_diff_triples, len(tgt_items)),
-            per_relation_cap=3,
-            relation_getter=lambda item: item["triple"][1],
-            tie_breaker=lambda item: item.get("score", 0.0),
-        )
-
-        src_selected = [src_items[i] for i in src_idx]
-        tgt_selected = [tgt_items[i] for i in tgt_idx]
-        if not src_selected and not tgt_selected:
-            return payload
-
-        def _conflict(selected_items: Sequence[Dict[str, Any]], values: Sequence[float]) -> float:
-            if not selected_items:
-                return 0.0
-            weights = [float(item.get("score", 0.0)) for item in selected_items]
-            weighted = [float(values[idx]) for idx in range(len(selected_items))]
-            return sum(weighted) / max(1e-8, sum(weights))
-
-        src_vals = [src_unsupported[i] for i in src_idx]
-        tgt_vals = [tgt_unsupported[i] for i in tgt_idx]
-        c_x = _conflict(src_selected, src_vals)
-        c_y = _conflict(tgt_selected, tgt_vals)
-        c_diff = self._clip01(0.5 * (c_x + c_y))
-        s_diff = self._clip01(1.0 - c_diff)
-        cov_diff = self._clip01((len(src_selected) + len(tgt_selected)) / max(1.0, 2.0 * self.max_diff_triples))
-        str_diff = 0.5 * (
-            self._safe_mean([float(item.get("score", 0.0)) for item in src_selected]) +
-            self._safe_mean([float(item.get("score", 0.0)) for item in tgt_selected])
-        )
-        stab_vals = list(src_vals) + list(tgt_vals)
-        stab_diff = self._clip01(1.0 - min(1.0, 2.0 * self._safe_std(stab_vals)))
-        q_diff = self._clip01((cov_diff + str_diff + stab_diff) / 3.0)
-        src_sentences = self._verbalize_object_items(src_selected)
-        tgt_sentences = self._verbalize_object_items(tgt_selected)
-        total_imp = sum(src_vals) + sum(tgt_vals) or 1.0
-        src_selected_rows = [
-            self._with_item_id(
-                "difference",
-                "source",
-                {
-                    "triple": list(item["triple"]),
-                    "edge_ic": float(item.get("score", 0.0)),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                    "rel_iri": self._normalize_text(item.get("rel_iri")),
-                    "unsupported_mass": float(src_vals[pos]),
-                    "importance": float(src_vals[pos] / total_imp),
-                },
-            )
-            for pos, item in enumerate(src_selected)
-        ]
-        tgt_selected_rows = [
-            self._with_item_id(
-                "difference",
-                "target",
-                {
-                    "triple": list(item["triple"]),
-                    "edge_ic": float(item.get("score", 0.0)),
-                    "subject_iri": self._normalize_text(item.get("subject_iri")),
-                    "object_iri": self._normalize_text(item.get("object_iri")),
-                    "rel_iri": self._normalize_text(item.get("rel_iri")),
-                    "unsupported_mass": float(tgt_vals[pos]),
-                    "importance": float(tgt_vals[pos] / total_imp),
-                },
-            )
-            for pos, item in enumerate(tgt_selected)
-        ]
-        payload.update(
-            {
-                "score": s_diff,
-                "quality": q_diff,
-                "conflict": c_diff,
-                "coverage": cov_diff,
-                "strength": str_diff,
-                "stability": stab_diff,
-                "src_selected": src_selected_rows,
-                "tgt_selected": tgt_selected_rows,
-                "src_sentences": src_sentences,
-                "tgt_sentences": tgt_sentences,
-                "source_links": [
-                    {
-                        "item_id": self._normalize_text(item.get("item_id")),
-                        "anchor_kind": "endpoint",
-                        "anchor_ref": "__target__",
-                        "score": float(item.get("unsupported_mass", 0.0)),
-                    }
-                    for item in src_selected_rows
-                    if self._normalize_text(item.get("item_id"))
-                ],
-                "target_links": [
-                    {
-                        "item_id": self._normalize_text(item.get("item_id")),
-                        "anchor_kind": "endpoint",
-                        "anchor_ref": "__source__",
-                        "score": float(item.get("unsupported_mass", 0.0)),
-                    }
-                    for item in tgt_selected_rows
-                    if self._normalize_text(item.get("item_id"))
-                ],
-            }
-        )
-        return payload
-
-    def _attribute_property_weight(self, prop_name: str) -> float:
-        normalized = prop_name.lower()
-        for key, weight in self.attribute_property_weights.items():
-            if key.lower() in normalized:
-                return float(weight)
-        if any(token in normalized for token in ["definition", "def", "synopsis", "xref"]):
-            return 1.0
-        if any(token in normalized for token in ["identifier", "id", "code", "dbxref"]):
-            return 0.8
-        if any(token in normalized for token in ["comment", "note", "remark"]):
-            return 0.6
-        return 0.5
-
-    def _attribute_weight(self, item: Dict[str, Any]) -> float:
-        prop = self._normalize_text(item.get("prop"))
-        value = self._normalize_text(item.get("value"))
-        words = max(1, len(value.split()))
-        info = min(1.0, float(torch.log1p(torch.tensor(float(words))).item() / torch.log1p(torch.tensor(20.0)).item()))
-        return self._clip01(self._attribute_property_weight(prop) * info)
-
-    def _score_attribute_channel(
-        self,
-        src_attrs: Sequence[Dict[str, Any]],
-        tgt_attrs: Sequence[Dict[str, Any]],
-        src_labels: Sequence[str],
-        tgt_labels: Sequence[str],
-        hierarchy_payloads: Dict[str, Dict[str, Any]],
-        sim_payload: Dict[str, Any],
-    ) -> Dict[str, Any]:
-        payload = {
-            "score": self.tau,
-            "quality": 0.0,
-            "coverage": 0.0,
-            "informativeness": 0.0,
-            "stability": 0.0,
-            "src_selected": [],
-            "tgt_selected": [],
-            "source_links": [],
-            "target_links": [],
-        }
-        if not self.use_context:
-            return payload
-
-        src_items = [
-            self._with_item_id("attribute", "source", item)
-            for item in list(src_attrs[: self.max_attr_items])
-        ]
-        tgt_items = [
-            self._with_item_id("attribute", "target", item)
-            for item in list(tgt_attrs[: self.max_attr_items])
-        ]
-        if not src_items and not tgt_items:
-            return payload
-
-        tgt_bank = [
-            {"kind": "label", "anchor_ref": "__target__", "text": self._normalize_text(label)}
-            for label in tgt_labels
-            if self._normalize_text(label)
-        ]
-        src_bank = [
-            {"kind": "label", "anchor_ref": "__source__", "text": self._normalize_text(label)}
-            for label in src_labels
-            if self._normalize_text(label)
-        ]
-        for family_payload in hierarchy_payloads.values():
-            tgt_bank.extend(
-                {
-                    "kind": "hierarchy",
-                    "anchor_ref": self._normalize_text(item.get("item_id")),
-                    "text": self._normalize_text(sentence),
-                }
-                for item, sentence in zip(
-                    list(family_payload.get("tgt_selected", [])),
-                    list(family_payload.get("tgt_sentences", [])),
-                )
-                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-            )
-            src_bank.extend(
-                {
-                    "kind": "hierarchy",
-                    "anchor_ref": self._normalize_text(item.get("item_id")),
-                    "text": self._normalize_text(sentence),
-                }
-                for item, sentence in zip(
-                    list(family_payload.get("src_selected", [])),
-                    list(family_payload.get("src_sentences", [])),
-                )
-                if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-            )
-        tgt_bank.extend(
-            {
-                "kind": "similarity",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(sentence),
-            }
-            for item, sentence in zip(
-                list(sim_payload.get("tgt_selected", [])),
-                list(sim_payload.get("tgt_sentences", [])),
-            )
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-        )
-        src_bank.extend(
-            {
-                "kind": "similarity",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(sentence),
-            }
-            for item, sentence in zip(
-                list(sim_payload.get("src_selected", [])),
-                list(sim_payload.get("src_sentences", [])),
-            )
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(sentence)
-        )
-        tgt_bank.extend(
-            {
-                "kind": "attribute",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(item.get("text")),
-            }
-            for item in tgt_items
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
-        )
-        src_bank.extend(
-            {
-                "kind": "attribute",
-                "anchor_ref": self._normalize_text(item.get("item_id")),
-                "text": self._normalize_text(item.get("text")),
-            }
-            for item in src_items
-            if self._normalize_text(item.get("item_id")) and self._normalize_text(item.get("text"))
-        )
-
-        def _side_support(
-            side_items: Sequence[Dict[str, Any]],
-            bank: Sequence[Dict[str, Any]],
-        ) -> Tuple[float, List[Dict[str, Any]], List[float], List[float], List[Dict[str, Any]]]:
-            if not side_items or not bank:
-                return 0.0, [], [], [], []
-            texts = [self._normalize_text(item.get("text")) for item in side_items]
-            weights = [self._attribute_weight(item) for item in side_items]
-            bank_texts = [self._normalize_text(item.get("text")) for item in bank]
-            mat = self._encode_context_matrix(texts, bank_texts)
-            best = mat.max(dim=1).values.detach().cpu().tolist() if mat.numel() else [0.0 for _ in texts]
-            best_idx = mat.argmax(dim=1).detach().cpu().tolist() if mat.numel() else [0 for _ in texts]
-            denom = sum(weights) or 1.0
-            score = sum(w * s for w, s in zip(weights, best)) / denom
-            weighted_support = [w * s for w, s in zip(weights, best)]
-            selected = []
-            links = []
-            for item, weight, support, weighted, anchor_idx in zip(side_items, weights, best, weighted_support, best_idx):
-                anchor = dict(bank[anchor_idx]) if bank and 0 <= int(anchor_idx) < len(bank) else {}
-                selected.append(
-                    {
-                        "item_id": self._normalize_text(item.get("item_id")),
-                        "property": self._normalize_text(item.get("prop")),
-                        "value": self._normalize_text(item.get("value")),
-                        "text": self._normalize_text(item.get("text")),
-                        "entity_iri": self._normalize_text(item.get("entity_iri")),
-                        "support": float(support),
-                        "weight": float(weight),
-                        "importance": float(weighted),
-                    }
-                )
-                item_id = self._normalize_text(item.get("item_id"))
-                anchor_kind = self._normalize_text(anchor.get("kind"))
-                anchor_ref = self._normalize_text(anchor.get("anchor_ref"))
-                if item_id and anchor_kind and anchor_ref:
-                    links.append(
-                        {
-                            "item_id": item_id,
-                            "anchor_kind": anchor_kind,
-                            "anchor_ref": anchor_ref,
-                            "score": float(support),
-                        }
-                    )
-            return float(score), selected, weights, best, links
-
-        src_score, src_selected, src_weights, src_supports, src_links = _side_support(src_items, tgt_bank)
-        tgt_score, tgt_selected, tgt_weights, tgt_supports, tgt_links = _side_support(tgt_items, src_bank)
-        side_scores = [score for score, items in [(src_score, src_selected), (tgt_score, tgt_selected)] if items]
-        if not side_scores:
-            return payload
-
-        r_attr = self._safe_mean(side_scores)
-        s_attr = max(self.tau, r_attr)
-        cov_attr = self._clip01((len(src_items) + len(tgt_items)) / max(1.0, 2.0 * self.max_attr_items))
-        inf_attr = 0.5 * (self._safe_mean(src_weights) + self._safe_mean(tgt_weights))
-        stab_attr = self._clip01(1.0 - min(1.0, 2.0 * self._safe_std(list(src_supports) + list(tgt_supports))))
-        q_attr = self._clip01((cov_attr + inf_attr + stab_attr) / 3.0)
-        total_imp = sum(item["importance"] for item in src_selected + tgt_selected) or 1.0
-        for item in src_selected:
-            item["importance"] = float(item["importance"] / total_imp)
-        for item in tgt_selected:
-            item["importance"] = float(item["importance"] / total_imp)
-        payload.update(
-            {
-                "score": float(s_attr),
-                "quality": q_attr,
-                "coverage": cov_attr,
-                "informativeness": inf_attr,
-                "stability": stab_attr,
-                "src_selected": src_selected,
-                "tgt_selected": tgt_selected,
-                "source_links": src_links,
-                "target_links": tgt_links,
-            }
-        )
         return payload
 
     def _brief_prompt(self, src_label: str, tgt_label: str, packet: str) -> Dict[str, str]:
@@ -1360,7 +1087,7 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "system": "You are an ontology alignment analyst that returns strict JSON.",
             "user": (
                 "Condense the pair evidence below into one compact ontology-alignment brief. "
-                "Return exactly one JSON object with one key: \"summary\".\n"
+                'Return exactly one JSON object with one key: "summary".\n'
                 "The brief must keep these section titles in plain text:\n"
                 "Label evidence\nHierarchy evidence\nRelational similarity evidence\n"
                 "Distinctive conflicting evidence\nAuxiliary attribute evidence\n\n"
@@ -1385,7 +1112,11 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             return self._run_hosted_chat_prompts(
                 prompts=prompts,
                 profile=profile,
-                max_tokens=self.max_new_tokens_llm,
+                max_tokens=(
+                    self.llm_experiment_config["decision"]["brief_max_tokens"]
+                    if self.llm_experiment_enabled
+                    else self.max_new_tokens_llm
+                ),
                 temperature=self.llm_temperature,
                 top_p=self.llm_top_p,
                 concurrency=self.llm_summary_batch_size,
@@ -1419,7 +1150,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 outputs[start + offset] = text
         return outputs
 
-    def _decision_prompt(self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str) -> Dict[str, str]:
+    def _decision_prompt(
+        self, src_label: str, tgt_label: str, src_summary: str, tgt_summary: str
+    ) -> Dict[str, str]:
         pair_brief = src_summary
         return {
             "system": "You are an ontology alignment expert.",
@@ -1432,6 +1165,12 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "Answer:"
             ),
         }
+
+    @staticmethod
+    def _hosted_decisions_evidence(src_label: str, tgt_label: str, pair_brief: str) -> str:
+        from exact.llm.decisions import pair_evidence
+
+        return pair_evidence(src_label, tgt_label, pair_brief)
 
     def _hosted_decision_prompt(
         self,
@@ -1466,17 +1205,14 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         pair_brief = src_summary
         context_block = ""
         if decision_context:
-            context_block = (
-                "\nFinal alignment context:\n"
-                f"{decision_context}\n\n"
-            )
+            context_block = f"\nFinal alignment context:\n{decision_context}\n\n"
         return {
             "system": "You are an ontology alignment expert.",
             "user": (
                 "Write a concise but specific rationale explaining the final alignment decision. "
                 "Use only the pair brief and final alignment context below. Mention supporting and conflicting evidence when available. "
                 "When final alignment context is present, explain whether the pair was kept or rejected after candidate-set selection and cardinality filtering. "
-                "Return exactly one JSON object with one key: \"rationale\".\n\n"
+                'Return exactly one JSON object with one key: "rationale".\n\n'
                 f"Source entity: {src_label}\n"
                 f"Target entity: {tgt_label}\n"
                 f"Final decision: {decision}\n\n"
@@ -1503,12 +1239,14 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         pending: Dict[str, Dict[str, Any]] = {}
 
         short_threshold = int(self.max_total_tokens_llm_summary * 0.75)
-        for idx, (src_label, tgt_label, packet) in enumerate(zip(src_labels, tgt_labels, evidence_packets)):
+        for idx, (src_label, tgt_label, packet) in enumerate(
+            zip(src_labels, tgt_labels, evidence_packets)
+        ):
             packet = self._normalize_text(packet)
             if not packet:
                 outputs[idx] = ""
                 continue
-            if len(packet.split()) <= short_threshold:
+            if not self.llm_experiment_enabled and len(packet.split()) <= short_threshold:
                 outputs[idx] = packet
                 continue
             key = self._brief_key(src_label, tgt_label, packet)
@@ -1518,7 +1256,12 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 continue
             entry = pending.setdefault(
                 key,
-                {"src_label": src_label, "tgt_label": tgt_label, "packet": packet, "indices": []},
+                {
+                    "src_label": src_label,
+                    "tgt_label": tgt_label,
+                    "packet": packet,
+                    "indices": [],
+                },
             )
             entry["indices"].append(idx)
 
@@ -1548,7 +1291,12 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         progress_callback=None,
         completion_callback=None,
     ) -> List[str]:
-        if not (self.use_llm and self.generate_llm_rationales):
+        if (
+            not (self.use_llm and self.generate_llm_rationales)
+            or self.llm_experiment_config["gate"]["mode"]
+            in {"off", "oracle", "oracle_perfect", "oracle_replay"}
+            or self.llm_experiment_config.get("distill") == "student"
+        ):
             return ["" for _ in records]
         src_labels: List[str] = []
         tgt_labels: List[str] = []
@@ -1583,6 +1331,61 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         diff_payload: Dict[str, Any],
         attr_payload: Dict[str, Any],
     ) -> str:
+        if (
+            self.llm_experiment_enabled
+            and self.llm_experiment_config["decision"]["evidence"] == "structured_packet"
+        ):
+            facts = []
+            groups = [(f"hierarchy:{name}", value) for name, value in hierarchy_payloads.items()]
+            groups += [
+                ("similarity", sim_payload),
+                ("difference", diff_payload),
+                ("attribute", attr_payload),
+            ]
+            seen = set()
+            for group, payload in groups:
+                for side, field in (("source", "src_selected"), ("target", "tgt_selected")):
+                    for item in payload.get(field, []):
+                        # Keep facts and their provenance; never include channel scores or
+                        # classify an unmatched triple as a logical contradiction.
+                        fact = {
+                            key: item[key]
+                            for key in (
+                                "item_id",
+                                "triple",
+                                "text",
+                                "subject_iri",
+                                "object_iri",
+                                "rel_iri",
+                                "property_iri",
+                                "state",
+                                "contradiction_semantics",
+                                "axiom_id",
+                                "datatype",
+                                "language",
+                            )
+                            if key in item
+                        }
+                        identity = (
+                            side,
+                            json.dumps(
+                                {key: value for key, value in fact.items() if key != "item_id"},
+                                sort_keys=True,
+                            ),
+                        )
+                        if identity not in seen:
+                            facts.append({"side": side, "group": group, **fact})
+                            seen.add(identity)
+            return json.dumps(
+                {
+                    "source_label": src_label,
+                    "target_label": tgt_label,
+                    "facts": facts,
+                    "unknowns": "An absent counterpart is unobserved, not a contradiction.",
+                },
+                ensure_ascii=False,
+                sort_keys=True,
+            )
         lines = [
             "Label evidence",
             f"Source label: {src_label}",
@@ -1597,7 +1400,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             if not src_sentences and not tgt_sentences:
                 continue
             active_hier = True
-            lines.append(f"{self._family_display_name(family)} support (score={payload.get('score', self.tau):.3f})")
+            lines.append(
+                f"{self._family_display_name(family)} support (score={payload.get('score', self.tau):.3f})"
+            )
             for sentence in src_sentences[:3]:
                 lines.append(f"Source: {sentence}")
             for sentence in tgt_sentences[:3]:
@@ -1617,7 +1422,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
 
         lines.extend(["", "Distinctive conflicting evidence"])
         if diff_payload.get("src_sentences") or diff_payload.get("tgt_sentences"):
-            lines.append(f"Difference compatibility score={diff_payload.get('score', self.tau):.3f}")
+            lines.append(
+                f"Difference compatibility score={diff_payload.get('score', self.tau):.3f}"
+            )
             for sentence in list(diff_payload.get("src_sentences", []))[:4]:
                 lines.append(f"Source-only signal: {sentence}")
             for sentence in list(diff_payload.get("tgt_sentences", []))[:4]:
@@ -1636,7 +1443,131 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             lines.append("No attribute evidence selected.")
         return "\n".join(line for line in lines if line is not None).strip()
 
+    def _uncertainty_components(
+        self,
+        S_base: torch.Tensor,
+        s_label: torch.Tensor,
+        S_struct: torch.Tensor,
+        q_label: torch.Tensor,
+        Q_struct: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Compute configurable indecision and cross-channel disagreement."""
+
+        indecision = (
+            self.uncertainty_indecision_scale * (self.tau - (S_base - self.tau).abs())
+        ).clamp(0.0, 1.0)
+        disagreement = (
+            (q_label * Q_struct).clamp_min(0.0).pow(self.uncertainty_disagreement_quality_power)
+            * (s_label - S_struct).abs()
+        ).clamp(0.0, 1.0)
+        return indecision, disagreement
+
+    def _experiment_diagnostics_for_pair(
+        self,
+        payload: Dict[str, Any],
+        *,
+        gate_diagnostic: Optional[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        diagnostics: Dict[str, Any] = {}
+        if self.strsim_enabled:
+            diagnostics["string_similarity"] = dict(payload["strsim"])
+        if self.attr_enabled:
+            diagnostics["attribute"] = {
+                key: payload["attr"].get(key)
+                for key in (
+                    "bank",
+                    "polarity",
+                    "identifier_disagreement",
+                    "identifier_comparable_groups",
+                    "identifier_groups",
+                    "identifier_support",
+                )
+            }
+        if self.hier_enabled:
+            diagnostics["hierarchy"] = {
+                family: {
+                    key: family_payload.get(key)
+                    for key in (
+                        "label_score",
+                        "ancestor_overlap",
+                        "anchor_coverage",
+                        "sibling_conflict",
+                        "sibling_coverage",
+                    )
+                }
+                for family, family_payload in payload["hierarchy"].items()
+            }
+        if self.diff_enabled and bool(self.diff_config.get("dump_components")):
+            diagnostics["difference"] = {
+                key: payload["diff"].get(key)
+                for key in (
+                    "formulation",
+                    "n_triples_src",
+                    "n_triples_tgt",
+                    "unsupported_mass_src",
+                    "unsupported_mass_tgt",
+                    "unsupported_mean_src",
+                    "unsupported_mean_tgt",
+                    "diff_absolute",
+                    "c_x",
+                    "c_y",
+                    "diff_pivot_reason",
+                    "evidence_states",
+                    "controlled_perturbations",
+                )
+            }
+        if self.lex_enabled or self.fusion_enabled:
+            diagnostics["quality_components"] = {
+                "label": dict(payload["label_quality"]),
+                "hierarchy": {
+                    family: {
+                        key: family_payload.get(key)
+                        for key in (
+                            "coverage",
+                            "strength",
+                            "specificity",
+                            "embedding",
+                            "anchor_coverage",
+                        )
+                    }
+                    for family, family_payload in payload["hierarchy"].items()
+                },
+                "similarity": {
+                    key: payload["sim"].get(key)
+                    for key in ("coverage", "strength", "stability", "embedding")
+                },
+                "difference": {
+                    key: payload["diff"].get(key)
+                    for key in ("coverage", "strength", "stability", "conflict")
+                },
+                "attribute": {
+                    key: payload["attr"].get(key)
+                    for key in ("coverage", "informativeness", "stability")
+                },
+                "sigma_mode": (self.fusion_config["sigma_mode"] if self.fusion_enabled else "full"),
+            }
+        if gate_diagnostic is not None:
+            diagnostics["llm_gate"] = dict(gate_diagnostic)
+        if self.fusion_enabled:
+            diagnostics["fusion"] = {
+                "mode": self.fusion_config["mode"],
+                "scope": self.fusion_config["scope"],
+                "sigma_mode": self.fusion_config["sigma_mode"],
+                "effective_parameters": {
+                    "tau": self.tau,
+                    "gamma": self.gamma,
+                    "beta": self.beta,
+                },
+                "artifact": (
+                    dict(self._fusion_artifact.provenance)
+                    if self._fusion_artifact is not None
+                    else None
+                ),
+            }
+        return diagnostics
+
     @torch.inference_mode()
+    @cached_numerical()
     def forward(
         self,
         src_iris: List[str],
@@ -1671,20 +1602,16 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         tgt_unique_iris = list(dict.fromkeys(tgt_iris))
         cache_probe = getattr(dataset, "has_entity_features_cached", None)
         src_cache_hits = sum(
-            1 for iri in src_unique_iris
-            if callable(cache_probe) and bool(cache_probe(iri, "src"))
+            1 for iri in src_unique_iris if callable(cache_probe) and bool(cache_probe(iri, "src"))
         )
         tgt_cache_hits = sum(
-            1 for iri in tgt_unique_iris
-            if callable(cache_probe) and bool(cache_probe(iri, "tgt"))
+            1 for iri in tgt_unique_iris if callable(cache_probe) and bool(cache_probe(iri, "tgt"))
         )
         src_feature_map = {
-            iri: dataset.get_entity_features(iri, "src")
-            for iri in src_unique_iris
+            iri: self._experiment_entity_features(iri, "src") for iri in src_unique_iris
         }
         tgt_feature_map = {
-            iri: dataset.get_entity_features(iri, "tgt")
-            for iri in tgt_unique_iris
+            iri: self._experiment_entity_features(iri, "tgt") for iri in tgt_unique_iris
         }
         self._computed_llm_calibration = None
         self._calibration_messages = []
@@ -1692,8 +1619,115 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         self._last_decision_backend_meta = {}
         self._last_rationale_backend_meta = {}
 
-        s_label, q_label, best_pairs = self._score_label_channel(src_label_lists, tgt_label_lists)
-        s_label_star = s_label
+        src_label_lists = [
+            (
+                []
+                if src_feature_map[iri].get("experiment_evidence", {}).get("labels") == 0
+                else labels
+            )
+            for iri, labels in zip(src_iris, src_label_lists)
+        ]
+        tgt_label_lists = [
+            (
+                []
+                if tgt_feature_map[iri].get("experiment_evidence", {}).get("labels") == 0
+                else labels
+            )
+            for iri, labels in zip(tgt_iris, tgt_label_lists)
+        ]
+
+        self._prefetch_evidence_embeddings(
+            list(src_feature_map.values()) + list(tgt_feature_map.values()),
+            src_label_lists + tgt_label_lists,
+        )
+        s_label, q_label, best_pairs, label_quality_payloads = self._score_label_channel(
+            src_label_lists, tgt_label_lists
+        )
+        if self.lex_enabled and self.lex_config["quality"] in {
+            "candidate_margin",
+            "encoder_agreement",
+        }:
+            q_label = self._candidate_quality(
+                src_iris,
+                tgt_iris,
+                src_label_lists,
+                tgt_label_lists,
+                s_label,
+                label_quality_payloads,
+            )
+        label_active = torch.tensor(
+            [
+                bool(self.use_lexical and src_labels and tgt_labels)
+                for src_labels, tgt_labels in zip(src_label_lists, tgt_label_lists)
+            ],
+            dtype=torch.bool,
+            device=self.device,
+        )
+        s_strsim = torch.full((n_pairs,), float(self.tau), device=self.device)
+        q_strsim = torch.zeros(n_pairs, device=self.device)
+        strsim_payloads = [
+            {"active": False, "winner": None, "components": {}} for _ in range(n_pairs)
+        ]
+        strsim_active = torch.zeros(n_pairs, dtype=torch.bool, device=self.device)
+        if self.strsim_enabled:
+            s_strsim, q_strsim, strsim_payloads = self._score_string_channel(
+                src_label_lists, tgt_label_lists
+            )
+            strsim_active = torch.tensor(
+                [bool(payload.get("active")) for payload in strsim_payloads],
+                dtype=torch.bool,
+                device=self.device,
+            )
+
+        needs_inner_lexical_fusion = self.strsim_enabled or (
+            self.fusion_enabled
+            and self.fusion_config["mode"] in {"analytic_fitted", "learned_global"}
+        )
+        sig_label_inner = (
+            self._sigma_authority(s_label, q_label, label_active, channel="label")
+            if needs_inner_lexical_fusion
+            else torch.zeros(n_pairs, device=self.device)
+        )
+        sig_strsim_inner = torch.zeros(n_pairs, device=self.device)
+        lex_label_weight = torch.ones(n_pairs, device=self.device)
+        lex_strsim_weight = torch.zeros(n_pairs, device=self.device)
+        S_lex = s_label
+        Q_lex = q_label
+        lex_active = label_active
+        if self.strsim_enabled and self.strsim_config["placement"] == "folded_into_lexical":
+            strsim_wins = strsim_active & (~label_active | (s_strsim > s_label))
+            S_lex = torch.where(strsim_wins, s_strsim, s_label)
+            Q_lex = torch.where(strsim_wins, q_strsim, q_label)
+            lex_active = label_active | strsim_active
+            lex_label_weight = (~strsim_wins).to(torch.float32)
+            lex_strsim_weight = strsim_wins.to(torch.float32)
+        elif self.strsim_enabled:
+            sig_strsim_inner = self._sigma_authority(
+                s_strsim, q_strsim, strsim_active, channel="strsim"
+            )
+            lex_sigma_sum = sig_label_inner + sig_strsim_inner
+            lex_label_weight = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                sig_label_inner / lex_sigma_sum.clamp_min(1.0e-8),
+                (~(~label_active & strsim_active)).to(torch.float32),
+            )
+            lex_strsim_weight = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                sig_strsim_inner / lex_sigma_sum.clamp_min(1.0e-8),
+                (~label_active & strsim_active).to(torch.float32),
+            )
+            S_lex = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                lex_label_weight * s_label + lex_strsim_weight * s_strsim,
+                torch.full_like(s_label, float(self.tau)),
+            )
+            Q_lex = torch.where(
+                lex_sigma_sum > 1.0e-8,
+                lex_label_weight * q_label + lex_strsim_weight * q_strsim,
+                torch.zeros_like(q_label),
+            )
+            lex_active = label_active | strsim_active
+        s_label_star = S_lex
 
         family_names = list(self.hierarchical_relation_families.keys() or [])
         if "is_a" not in family_names:
@@ -1702,16 +1736,36 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
         pair_payloads: List[Dict[str, Any]] = []
         struct_channel_scores: Dict[str, List[float]] = {}
         struct_channel_qualities: Dict[str, List[float]] = {}
+        struct_channel_active: Dict[str, List[bool]] = {}
         for family in family_names:
             struct_channel_scores[f"hier__{family}"] = []
             struct_channel_qualities[f"hier__{family}"] = []
+            struct_channel_active[f"hier__{family}"] = []
         for key in ["sim_obj", "diff", "attr_aux"]:
             struct_channel_scores[key] = []
             struct_channel_qualities[key] = []
+            struct_channel_active[key] = []
 
+        from exact.impl.models.pair_adaptive_batch import (
+            call_prepared, execution_options, prepare_structural_block,
+        )
+
+        context_batching = (
+            os.getenv("EXACT_PAIR_CONTEXT_BATCHING", "0") == "1"
+            and execution_options()["schedule"] == "staged"
+        )
+        context_block = max(1, int(os.getenv("EXACT_PAIR_CONTEXT_BLOCK_PAIRS", "32")))
+        prepared_rows = []
         for idx, (src_iri, tgt_iri) in enumerate(zip(src_iris, tgt_iris)):
             src_feats = src_feature_map[src_iri]
             tgt_feats = tgt_feature_map[tgt_iri]
+            if context_batching and idx % context_block == 0:
+                stop = min(n_pairs, idx + context_block)
+                prepared_rows = prepare_structural_block(self, [
+                    (src_iris[pos], tgt_iris[pos], src_feature_map[src_iris[pos]],
+                     tgt_feature_map[tgt_iris[pos]]) for pos in range(idx, stop)
+                ], family_names)
+            prepared = prepared_rows[idx % context_block] if context_batching else None
             src_best_label, tgt_best_label = best_pairs[idx]
             if not src_best_label:
                 src_best_label = src_feats["labels"][0] if src_feats.get("labels") else ""
@@ -1720,31 +1774,48 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
 
             hierarchy_payloads: Dict[str, Dict[str, Any]] = {}
             for family in family_names:
-                family_payload = self._score_hierarchy_family(
+                family_payload = call_prepared(
+                    self, "hierarchy", self._score_hierarchy_family,
+                    prepared["hierarchy"][family] if prepared is not None else None,
                     family,
                     src_feats.get("hierarchy", {}).get(family, []),
                     tgt_feats.get("hierarchy", {}).get(family, []),
+                    src_iri=src_iri,
+                    tgt_iri=tgt_iri,
+                    cache_hit=prepared is not None and ("hierarchy", family) in prepared["cache_hits"],
                 )
                 hierarchy_payloads[family] = family_payload
                 struct_channel_scores[f"hier__{family}"].append(float(family_payload["score"]))
                 struct_channel_qualities[f"hier__{family}"].append(float(family_payload["quality"]))
+                struct_channel_active[f"hier__{family}"].append(
+                    bool(family_payload.get("active", True))
+                    and bool(
+                        family_payload.get("src_selected") or family_payload.get("tgt_selected")
+                    )
+                )
 
-            sim_payload = self._score_similarity_channel(
+            sim_payload = call_prepared(
+                self, "similarity", self._score_similarity_channel,
+                prepared["similarity"] if prepared is not None else None,
                 src_feats.get("object_triples", []),
                 tgt_feats.get("object_triples", []),
+                cache_hit=prepared is not None and ("similarity", None) in prepared["cache_hits"],
             )
             diff_payload = self._score_difference_channel(
                 src_feats.get("object_triples", []),
                 tgt_feats.get("object_triples", []),
                 support_mat=sim_payload.get("support_matrix"),
             )
-            attr_payload = self._score_attribute_channel(
+            attr_payload = call_prepared(
+                self, "attributes", self._score_attribute_channel,
+                prepared["attributes"] if prepared is not None else None,
                 src_feats.get("attributes", []),
                 tgt_feats.get("attributes", []),
                 src_feats.get("labels", []),
                 tgt_feats.get("labels", []),
                 hierarchy_payloads,
                 sim_payload,
+                cache_hit=prepared is not None and ("attributes", None) in prepared["cache_hits"],
             )
             struct_channel_scores["sim_obj"].append(float(sim_payload["score"]))
             struct_channel_qualities["sim_obj"].append(float(sim_payload["quality"]))
@@ -1752,6 +1823,15 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             struct_channel_qualities["diff"].append(float(diff_payload["quality"]))
             struct_channel_scores["attr_aux"].append(float(attr_payload["score"]))
             struct_channel_qualities["attr_aux"].append(float(attr_payload["quality"]))
+            struct_channel_active["sim_obj"].append(
+                bool(sim_payload.get("src_selected") or sim_payload.get("tgt_selected"))
+            )
+            struct_channel_active["diff"].append(
+                bool(diff_payload.get("src_selected") or diff_payload.get("tgt_selected"))
+            )
+            struct_channel_active["attr_aux"].append(
+                bool(attr_payload.get("src_selected") or attr_payload.get("tgt_selected"))
+            )
 
             packet = self._build_evidence_packet(
                 src_best_label,
@@ -1765,10 +1845,20 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 {
                     "src_label": src_best_label,
                     "tgt_label": tgt_best_label,
+                    "evidence_counts": self._evidence_collection_counts(
+                        src_feats,
+                        tgt_feats,
+                        hierarchy_payloads,
+                        sim_payload,
+                        diff_payload,
+                        attr_payload,
+                    ),
                     "hierarchy": hierarchy_payloads,
                     "sim": sim_payload,
                     "diff": diff_payload,
                     "attr": attr_payload,
+                    "label_quality": label_quality_payloads[idx],
+                    "strsim": strsim_payloads[idx],
                     "packet": packet,
                 }
             )
@@ -1785,35 +1875,58 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             key: torch.tensor(values, dtype=torch.float32, device=self.device)
             for key, values in struct_channel_qualities.items()
         }
+        channel_active_tensors = {
+            key: torch.tensor(values, dtype=torch.bool, device=self.device)
+            for key, values in struct_channel_active.items()
+        }
+
+        graph_features = []
+        graph_diagnostics = []
+        if self.graph_config["mode"] != "off":
+            from exact.impl.models.graph_head import (
+                graph_pair_features,
+                graph_predictions,
+            )
+
+            graph_features = graph_pair_features(
+                self._graph_input_dataset, src_iris, tgt_iris, self.graph_config, self.request_seed
+            )
+            active = torch.tensor([row["active"] for row in graph_features], device=self.device)
+            graph_scores = torch.full((n_pairs,), self.tau, device=self.device)
+            if self._graph_artifact is not None:
+                graph_probs, graph_contributions, graph_logits = graph_predictions(
+                    graph_features, self._graph_artifact.payload
+                )
+                graph_scores = torch.tensor(graph_probs, dtype=torch.float32, device=self.device)
+                graph_diagnostics = [
+                    {
+                        "features": row["values"],
+                        "active": row["active"],
+                        "feature_schema": self._graph_artifact.payload["feature_schema"],
+                        "logit": float(graph_logits[index]),
+                        "bias": self._graph_artifact.payload["bias"],
+                        "feature_contributions": graph_contributions[index].tolist(),
+                        "graph_fingerprints": row["graph_fingerprints"],
+                        "artifact": dict(self._graph_artifact.provenance),
+                    }
+                    for index, row in enumerate(graph_features)
+                ]
+            channel_score_tensors["graph"] = graph_scores
+            channel_quality_tensors["graph"] = (
+                active.to(torch.float32)
+                if self._graph_artifact is not None
+                else torch.zeros_like(graph_scores)
+            )
+            channel_active_tensors["graph"] = active
 
         sigma_tensors: Dict[str, torch.Tensor] = {}
         for key, score_tensor in channel_score_tensors.items():
             quality_tensor = channel_quality_tensors[key]
-            sigma_tensors[key] = quality_tensor * (score_tensor - self.tau).abs().pow(self.gamma)
-
-        # Preserve raw hierarchy evidence for the reported s_hier score;
-        # ablation mutes only the channel's contribution to the mixture.
-        raw_sigma_tensors = dict(sigma_tensors)
-        muted_keys = set()
-        for key in sigma_tensors:
-            channel = (
-                "hier"
-                if key.startswith("hier__")
-                else {"sim_obj": "sim", "diff": "diff", "attr_aux": "attr"}.get(key)
-            )
-            if channel in self.ablate_channels:
-                muted_keys.add(key)
-                sigma_tensors[key] = torch.zeros_like(sigma_tensors[key])
-
-        if self.ablate_channels and self.uniform_weights:
-            self._log_once(
-                "combined_structural_ablation_uniform_weights",
-                (
-                    "Both ablate_channels and uniform_weights are enabled; "
-                    "muted channels remain at zero and uniform weights are "
-                    "assigned over the surviving structural keys."
-                ),
-                "warning",
+            sigma_tensors[key] = self._sigma_authority(
+                score_tensor,
+                quality_tensor,
+                channel_active_tensors[key],
+                channel=key,
             )
 
         sigma_sum = torch.zeros(n_pairs, device=self.device)
@@ -1828,44 +1941,34 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 torch.zeros_like(tensor),
             )
 
-        if self.uniform_weights and struct_weights:
-            surviving_keys = [key for key in struct_weights if key not in muted_keys]
-            uniform_weight = 1.0 / len(surviving_keys) if surviving_keys else 0.0
-            for key, tensor in struct_weights.items():
-                struct_weights[key] = (
-                    torch.full_like(tensor, uniform_weight)
-                    if key in surviving_keys
-                    else torch.zeros_like(tensor)
-                )
-
         S_struct = torch.full((n_pairs,), float(self.tau), device=self.device)
         if struct_weights:
-            structural_terms = [struct_weights[key] * channel_score_tensors[key] for key in struct_weights]
+            structural_terms = [
+                struct_weights[key] * channel_score_tensors[key] for key in struct_weights
+            ]
             structural_sum = torch.stack(structural_terms, dim=0).sum(dim=0)
-            if self.uniform_weights and any(key not in muted_keys for key in struct_weights):
-                S_struct = structural_sum
-            else:
-                S_struct = torch.where(sigma_sum > 1e-8, structural_sum, S_struct)
+            S_struct = torch.where(sigma_sum > 1e-8, structural_sum, S_struct)
 
         Q_struct = torch.zeros(n_pairs, device=self.device)
         if struct_weights:
-            quality_terms = [struct_weights[key] * channel_quality_tensors[key] for key in struct_weights]
-            quality_sum = torch.stack(quality_terms, dim=0).sum(dim=0)
-            if self.uniform_weights and any(key not in muted_keys for key in struct_weights):
-                Q_struct = quality_sum
-            else:
-                Q_struct = torch.where(
-                    sigma_sum > 1e-8,
-                    quality_sum,
-                    torch.zeros_like(sigma_sum),
-                )
+            quality_terms = [
+                struct_weights[key] * channel_quality_tensors[key] for key in struct_weights
+            ]
+            Q_struct = torch.where(
+                sigma_sum > 1e-8,
+                torch.stack(quality_terms, dim=0).sum(dim=0),
+                torch.zeros_like(sigma_sum),
+            )
 
         hier_keys = [f"hier__{family}" for family in family_names]
-        hier_sigma = sum((raw_sigma_tensors[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device))
+        hier_sigma = sum(
+            (sigma_tensors[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
+        )
         s_hier = torch.full((n_pairs,), float(self.tau), device=self.device)
         if hier_keys:
             hier_weighted = sum(
-                (raw_sigma_tensors[key] * channel_score_tensors[key] for key in hier_keys),
+                (sigma_tensors[key] * channel_score_tensors[key] for key in hier_keys),
                 torch.zeros(n_pairs, device=self.device),
             )
             active_hier = hier_sigma > 1e-8
@@ -1891,51 +1994,109 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 torch.zeros_like(family_quality_sum),
             )
 
-        sig_lex = q_label * (s_label - self.tau).abs().pow(self.gamma)
-        sig_struct = Q_struct * (S_struct - self.tau).abs().pow(self.gamma)
-        active_lex = sig_lex > 1e-8
-        active_struct = sig_struct > 1e-8
-        both_active = active_lex & active_struct
-        only_lex = active_lex & ~active_struct
-        only_struct = active_struct & ~active_lex
+        fusion_mode = str(self.fusion_config["mode"]) if self.fusion_enabled else "analytic_shipped"
+        if fusion_mode == "learned_global":
+            if self.strsim_enabled and self.strsim_config["placement"] == "channel":
+                sig_lex = sig_label_inner + sig_strsim_inner
+            else:
+                sig_lex = self._sigma_authority(S_lex, Q_lex, lex_active, channel="label")
+            sig_struct = sigma_sum
+        else:
+            sig_lex = self._sigma_authority(S_lex, Q_lex, lex_active, channel="lex")
+            sig_struct = self._sigma_authority(
+                S_struct,
+                Q_struct,
+                torch.stack(list(channel_active_tensors.values()), dim=0).any(dim=0),
+                channel="struct",
+            )
+        authority_active_lex = sig_lex > 1e-8
+        authority_active_struct = sig_struct > 1e-8
+        both_active = authority_active_lex & authority_active_struct
+        only_lex = authority_active_lex & ~authority_active_struct
+        only_struct = authority_active_struct & ~authority_active_lex
 
         w_struct = torch.zeros(n_pairs, device=self.device)
-        if self.uniform_weights:
-            w_struct = torch.full_like(w_struct, 0.5)
-            S_base = 0.5 * s_label + 0.5 * S_struct
-        else:
-            if torch.any(both_active):
-                w_struct = w_struct.clone()
-                w_struct[both_active] = sig_struct[both_active] / (
-                    sig_lex[both_active] + sig_struct[both_active]
-                ).clamp_min(1e-8)
-            if torch.any(only_struct):
-                w_struct = w_struct.clone()
-                w_struct[only_struct] = 1.0
+        if torch.any(both_active):
+            w_struct = w_struct.clone()
+            w_struct[both_active] = sig_struct[both_active] / (
+                sig_lex[both_active] + sig_struct[both_active]
+            ).clamp_min(1e-8)
+        if torch.any(only_struct):
+            w_struct = w_struct.clone()
+            w_struct[only_struct] = 1.0
 
-            S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
-            if torch.any(only_lex):
-                S_base = S_base.clone()
-                S_base[only_lex] = s_label[only_lex].to(dtype=S_base.dtype)
-            if torch.any(only_struct):
-                S_base = S_base.clone()
-                S_base[only_struct] = S_struct[only_struct].to(dtype=S_base.dtype)
-            if torch.any(both_active):
-                S_base = S_base.clone()
-                S_base[both_active] = (
-                    (1.0 - w_struct[both_active]) * s_label[both_active]
-                    + w_struct[both_active] * S_struct[both_active]
-                )
+        S_base = torch.full((n_pairs,), float(self.tau), device=self.device)
+        if torch.any(only_lex):
+            S_base = S_base.clone()
+            S_base[only_lex] = S_lex[only_lex].to(dtype=S_base.dtype)
+        if torch.any(only_struct):
+            S_base = S_base.clone()
+            S_base[only_struct] = S_struct[only_struct]
+        if torch.any(both_active):
+            S_base = S_base.clone()
+            S_base[both_active] = (1.0 - w_struct[both_active]) * S_lex[both_active] + w_struct[
+                both_active
+            ] * S_struct[both_active]
 
-        U_ind = (2.0 * (self.tau - (S_base - self.tau).abs())).clamp(0.0, 1.0)
-        U_dis = ((q_label * Q_struct).clamp_min(0.0).sqrt() * (s_label - S_struct).abs()).clamp(0.0, 1.0)
+        U_ind, U_dis = self._uncertainty_components(
+            S_base,
+            S_lex,
+            S_struct,
+            Q_lex,
+            Q_struct,
+        )
         U = torch.maximum(U_ind, U_dis)
-        if self.use_llm:
-            w_i = (self.beta * U).clamp(0.0, 1.0)
-            need_llm = U >= self.tau_LLM
+        would_route, gate_diagnostics = self._llm_gate_mask(
+            U_ind=U_ind,
+            U_dis=U_dis,
+            U=U,
+            S_base=S_base,
+            q_label=Q_lex,
+            Q_struct=Q_struct,
+            src_iris=src_iris,
+            tgt_iris=tgt_iris,
+            label=label,
+        )
+        oracle_mode = self.llm_experiment_enabled and str(
+            self.llm_experiment_config["gate"]["mode"]
+        ) in {"oracle", "oracle_perfect", "oracle_replay"}
+        decision_enabled = (
+            self.use_llm and not oracle_mode and self.llm_experiment_config["gate"]["mode"] != "off"
+        )
+        from exact.impl.models.component_replay import apply_judgments
+
+        component_replay = apply_judgments(self, src_iris, tgt_iris, S_base, U)
+        if component_replay is not None:
+            if oracle_mode or self.generate_llm_rationales or self.force_llm_summaries:
+                raise ValueError("Frozen component replay excludes oracle and generation roles")
+            decision_enabled = False
+        if decision_enabled:
+            w_i = (
+                torch.full_like(U, float(self.llm_experiment_config["constant_weight"]))
+                if self.llm_experiment_enabled
+                and self.llm_experiment_config["fusion_weight"] == "constant"
+                else (self.beta * U).clamp(0.0, 1.0)
+            )
+            need_llm = would_route.clone()
         else:
             w_i = torch.zeros_like(U)
             need_llm = torch.zeros_like(U, dtype=torch.bool)
+
+        if decision_enabled and self.llm_experiment_enabled:
+            groups: Dict[str, List[int]] = {}
+            for index, source in enumerate(src_iris):
+                groups.setdefault(str(source), []).append(index)
+            displayed = torch.zeros_like(need_llm)
+            comparative = self.llm_experiment_config["decision"]["mode"] != "binary"
+            limit = int(self.llm_experiment_config["decision"]["listwise_max_candidates"])
+            for indices in groups.values():
+                ordered = sorted(
+                    indices, key=lambda index: (-float(S_base[index]), str(tgt_iris[index]))
+                )[:limit]
+                displayed[ordered] = True
+                if comparative and any(bool(would_route[index]) for index in indices):
+                    need_llm[indices] = True
+            need_llm = need_llm & displayed
 
         pair_packets = [payload["packet"] for payload in pair_payloads]
         pair_briefs = list(pair_packets)
@@ -1945,35 +2106,168 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
 
         decision_idxs: List[int] = []
         brief_idxs: List[int] = []
-        if self.use_llm:
+        if decision_enabled:
             decision_idxs = torch.nonzero(need_llm).flatten().tolist()
-            brief_idxs = list(range(n_pairs)) if self.force_llm_summaries else list(decision_idxs)
-        if self.use_llm and brief_idxs:
+            brief_idxs = (
+                list(range(n_pairs))
+                if self.force_llm_summaries and not self.llm_experiment_enabled
+                else list(decision_idxs)
+            )
+        cache = getattr(self, "_numerical_cache", None)
+        if cache is not None:
+            cache.flush()
+        if (
+            decision_enabled
+            and brief_idxs
+            and self.llm_experiment_config["decision"]["evidence"] == "generated_brief"
+        ):
             brief_src = [pair_payloads[i]["src_label"] for i in brief_idxs]
             brief_tgt = [pair_payloads[i]["tgt_label"] for i in brief_idxs]
             brief_packets = [pair_packets[i] for i in brief_idxs]
-            generated_briefs = self.generate_pair_briefs_batched(brief_src, brief_tgt, brief_packets)
+            generated_briefs = self.generate_pair_briefs_batched(
+                brief_src, brief_tgt, brief_packets
+            )
             for offset, idx in enumerate(brief_idxs):
                 pair_briefs[idx] = generated_briefs[offset]
 
         p_llm = torch.zeros(n_pairs, device=self.device)
         S_final = S_base.clone()
-        if self.use_llm and decision_idxs:
+        oracle_result = None
+        if oracle_mode and self.llm_experiment_config["gate"]["mode"] == "oracle":
+            assert label is not None
+            oracle_result = analytical_oracle_ceiling(
+                S_base.detach().cpu().tolist(),
+                label,
+                threshold=self.threshold,
+            )
+            routed = tuple(bool(value) for value in would_route.detach().cpu().tolist())
+            if routed != oracle_result.routed:
+                raise RuntimeError(
+                    "oracle gate diagnostics disagree with analytical ceiling routing"
+                )
+            S_final = torch.tensor(
+                oracle_result.corrected_scores,
+                dtype=S_base.dtype,
+                device=self.device,
+            )
+        grouped_records = []
+        if oracle_mode and self.llm_experiment_config["gate"]["mode"] in {
+            "oracle_perfect",
+            "oracle_replay",
+        }:
+            payload = self._gate_artifact.payload
+            for index, (source, target) in enumerate(zip(map(str, src_iris), map(str, tgt_iris))):
+                probability = payload["decision_probs"].get(source, {}).get(target)
+                if probability is None:
+                    continue
+                if not math.isfinite(float(probability)) or not 0.0 <= float(probability) <= 1.0:
+                    raise ValueError("Oracle artifact has invalid cached probabilities")
+                p_llm[index] = float(probability)
+                if payload["fixed_fusion"]["fusion_weight"] != "source_first":
+                    weight = (
+                        float(payload["fixed_fusion"]["constant_weight"])
+                        if payload["fixed_fusion"]["fusion_weight"] == "constant"
+                        else min(1.0, max(0.0, self.beta * float(U[index])))
+                    )
+                    S_final[index] = (1.0 - weight) * S_base[index] + weight * p_llm[index]
+            if payload["fixed_fusion"]["fusion_weight"] == "source_first":
+                grouped_records = [
+                    {
+                        "source": source,
+                        "choice": payload["source_choices"][source],
+                        "valid": True,
+                        "integration": "source_first",
+                        "probabilities": payload["decision_probs"][source],
+                        "oracle_cached_replay": True,
+                    }
+                    for source in sorted(set(map(str, src_iris)) & set(payload["selected_sources"]))
+                ]
+        if (
+            decision_enabled
+            and decision_idxs
+            and self.llm_experiment_config.get("distill") == "student"
+        ):
+            from exact.impl.models.selector.llm_learning import (
+                PAIR_FEATURES,
+                predict_head,
+                validate_learning_binding,
+            )
+
+            payload = self._student_artifact
+            validate_learning_binding(payload, self, src_iris)
+            if payload["feature_schema"] != PAIR_FEATURES or payload[
+                "training_recipe"
+            ] != self.llm_experiment_config.get("student_training", "gold_teacher"):
+                raise ValueError("Student feature/training recipe mismatch")
+            features = [
+                [float(S_base[index]), float(U[index]), float(Q_lex[index]), float(Q_struct[index])]
+                for index in decision_idxs
+            ]
+            p_llm[decision_idxs] = torch.tensor(
+                predict_head(features, payload["model"]), device=self.device
+            )
+            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[need_llm] * p_llm[
+                need_llm
+            ]
+            for index in decision_idxs:
+                llm_decisions[index] = "StudentYes" if float(p_llm[index]) >= 0.5 else "StudentNo"
+        elif (
+            decision_enabled
+            and decision_idxs
+            and self.llm_experiment_config["decision"]["mode"] != "binary"
+        ):
+            p_llm, need_llm, grouped_records = self.llm_grouped_decision_probs(
+                src_iris,
+                tgt_iris,
+                [payload["src_label"] for payload in pair_payloads],
+                [payload["tgt_label"] for payload in pair_payloads],
+                pair_briefs,
+                S_base,
+                would_route,
+            )
+            decision_idxs = torch.nonzero(need_llm).flatten().tolist()
+            for idx in decision_idxs:
+                llm_decisions[idx] = "Yes" if float(p_llm[idx]) >= 0.5 else "No"
+            if self.llm_experiment_config["fusion_weight"] == "source_first":
+                # Source ranking is integrated downstream, before acceptance. Pair
+                # evidence/decomposition remains the frozen pre-LLM score.
+                w_i = torch.zeros_like(w_i)
+                for record in grouped_records:
+                    record["integration"] = "source_first"
+            else:
+                S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[
+                    need_llm
+                ] * p_llm[need_llm]
+        elif decision_enabled and decision_idxs:
             src_best = [pair_payloads[i]["src_label"] for i in decision_idxs]
             tgt_best = [pair_payloads[i]["tgt_label"] for i in decision_idxs]
             decision_briefs = [pair_briefs[i] for i in decision_idxs]
-            p_yes_needed = self.llm_yesno_probs_batched(
-                src_best,
-                tgt_best,
-                decision_briefs,
-                ["" for _ in decision_briefs],
-            )
+            if self.llm_experiment_config.get("exemplars") == "knn":
+                p_yes_needed, grouped_records = self.llm_binary_decision_probs(
+                    [src_iris[i] for i in decision_idxs],
+                    [tgt_iris[i] for i in decision_idxs],
+                    src_best,
+                    tgt_best,
+                    decision_briefs,
+                    [float(S_base[i]) for i in decision_idxs],
+                )
+            else:
+                p_yes_needed = self.llm_yesno_probs_batched(
+                    src_best,
+                    tgt_best,
+                    decision_briefs,
+                    ["" for _ in decision_briefs],
+                )
             if self.use_llm_calibration:
                 if self._llm_calibration_can_apply:
                     p_yes_needed = self._apply_llm_calibration(p_yes_needed)
-                    self._calibration_messages.append("Applied configured LLM calibration coefficients.")
+                    self._calibration_messages.append(
+                        "Applied configured LLM calibration coefficients."
+                    )
                 else:
-                    samples = self._collect_calibration_samples(decision_idxs, p_yes_needed, label)
+                    samples = self._collect_calibration_samples(
+                        decision_idxs, p_yes_needed, src_iris, tgt_iris
+                    )
                     if samples is not None:
                         probs_fit, labels_fit = samples
                         count = int(probs_fit.shape[0])
@@ -1987,59 +2281,90 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             decisions_needed = ["Yes" if float(prob) >= 0.5 else "No" for prob in p_yes_needed]
             for offset, idx in enumerate(decision_idxs):
                 llm_decisions[idx] = decisions_needed[offset]
+            S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[need_llm] * p_llm[
+                need_llm
+            ]
+
+        if component_replay is not None:
+            need_llm, p_llm, w_i, replay_manifest = component_replay
+            would_route = need_llm.clone()
+            decision_idxs = torch.nonzero(need_llm).flatten().tolist()
             S_final[need_llm] = (1.0 - w_i[need_llm]) * S_base[need_llm] + w_i[need_llm] * p_llm[need_llm]
+            gate_diagnostics = [
+                {
+                    "mode": "frozen_component_support", "would_route": bool(need_llm[idx]),
+                    "U_ind": float(U_ind[idx]), "U_dis": float(U_dis[idx]), "U": float(U[idx]),
+                    "component_request_bank": replay_manifest["request_bank_sha256"],
+                    "cached_model": replay_manifest["model_id"],
+                    "cached_observed_judgment": bool(need_llm[idx]),
+                }
+                for idx in range(n_pairs)
+            ]
+            for idx in decision_idxs:
+                llm_decisions[idx] = "Yes" if float(p_llm[idx]) >= 0.5 else "No"
 
         llm_used_mask = torch.zeros(n_pairs, dtype=torch.bool, device=self.device)
         if decision_idxs:
             llm_used_mask[decision_idxs] = True
         w_i_effective = w_i * llm_used_mask.to(w_i.dtype)
 
-        I_label = (1.0 - w_i_effective) * (1.0 - w_struct)
+        base_lex_weight = (1.0 - w_struct) * authority_active_lex.to(w_struct.dtype)
+        I_lex = (1.0 - w_i_effective) * base_lex_weight
+        I_label = I_lex * lex_label_weight
+        I_strsim = I_lex * lex_strsim_weight
         I_struct = (1.0 - w_i_effective) * w_struct
-        I_hier = I_struct * sum((struct_weights[key] for key in hier_keys), torch.zeros(n_pairs, device=self.device))
+        I_hier = I_struct * sum(
+            (struct_weights[key] for key in hier_keys),
+            torch.zeros(n_pairs, device=self.device),
+        )
         I_sim = I_struct * struct_weights["sim_obj"]
         I_diff = I_struct * struct_weights["diff"]
         I_attr = I_struct * struct_weights["attr_aux"]
         I_ctx = I_struct
         I_llm = w_i_effective
+        for idx, diagnostic in enumerate(gate_diagnostics):
+            diagnostic.update(
+                {
+                    "invoked": bool(llm_used_mask[idx]),
+                    "mix_weight": float(w_i_effective[idx]),
+                    "llm_probability": (float(p_llm[idx]) if bool(llm_used_mask[idx]) else None),
+                    "score_before": float(S_base[idx]),
+                    "score_after": float(S_final[idx]),
+                    "replayed": bool(
+                        oracle_mode
+                        and oracle_result is None
+                        and str(src_iris[idx]) in self._gate_artifact.payload["decision_probs"]
+                        and str(tgt_iris[idx])
+                        in self._gate_artifact.payload["decision_probs"][str(src_iris[idx])]
+                    ),
+                    "oracle_adjustment": (
+                        float(S_final[idx] - S_base[idx]) if oracle_mode else 0.0
+                    ),
+                }
+            )
         w_c = w_struct
         struct_active_pairs = int((sigma_sum > 1e-8).sum().item())
-        llm_gated_pairs = int(need_llm.to(torch.int32).sum().item())
+        gate_count_mask = would_route if self.llm_experiment_enabled else need_llm
+        llm_gated_pairs = int(gate_count_mask.to(torch.int32).sum().item())
         brief_requested_pairs = int(len(brief_idxs))
-        decision_requested_pairs = int(len(decision_idxs))
-
-        sigma_hier = sum(
-            (sigma_tensors[key] for key in hier_keys),
-            torch.zeros(n_pairs, device=self.device),
-        )
-        omega_hier = sum(
-            (struct_weights[key] for key in hier_keys),
-            torch.zeros(n_pairs, device=self.device),
-        )
+        decision_requested_pairs = 0 if component_replay is not None else int(len(decision_idxs))
 
         result = {
             "s_label": s_label,
             "s_label_star": s_label_star,
+            "s_strsim": s_strsim,
             "s_ctx": S_struct,
             "s_hier": s_hier,
             "s_sim": s_sim,
             "s_diff": s_diff,
             "s_attr": s_attr,
             "q_label": q_label,
+            "q_lex": Q_lex,
+            "q_strsim": q_strsim,
             "q_hier": q_hier,
             "q_sim": channel_quality_tensors["sim_obj"],
             "q_diff": channel_quality_tensors["diff"],
             "q_attr": channel_quality_tensors["attr_aux"],
-            "sigma_lex": sig_lex,
-            "sigma_hier": sigma_hier,
-            "sigma_sim": sigma_tensors["sim_obj"],
-            "sigma_diff": sigma_tensors["diff"],
-            "sigma_attr": sigma_tensors["attr_aux"],
-            "sigma_struct": sig_struct,
-            "omega_hier": omega_hier,
-            "omega_sim": struct_weights["sim_obj"],
-            "omega_diff": struct_weights["diff"],
-            "omega_attr": struct_weights["attr_aux"],
             "Q_struct": Q_struct,
             "S_base": S_base,
             "S_lctx": S_base,
@@ -2053,9 +2378,9 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "U_dis": U_dis,
             "w_i": w_i,
             "need_llm": need_llm,
-            "llm_invoked": llm_used_mask,
-            "llm_gated": need_llm,
             "I_label": I_label,
+            "I_lex": I_lex,
+            "I_strsim": I_strsim,
             "I_struct": I_struct,
             "I_hier": I_hier,
             "I_sim": I_sim,
@@ -2063,11 +2388,14 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
             "I_attr": I_attr,
             "I_ctx": I_ctx,
             "I_llm": I_llm,
+            "llm_grouped_decisions": grouped_records,
             "llm_decisions": llm_decisions,
             "llm_rationales": llm_rationales,
             "llm_pair_briefs": pair_briefs,
             "llm_evidence_packets": pair_packets,
-            "llm_calibration": self._llm_calibration_payload(batch_samples=batch_calibration_samples),
+            "llm_calibration": self._llm_calibration_payload(
+                batch_samples=batch_calibration_samples
+            ),
             "llm_summary_stats": self.llm_summary_stats(),
             "llm_decision_stats": self.llm_decision_stats(),
             "llm_summaries": {
@@ -2094,51 +2422,192 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                 "llm_gated_pairs": int(llm_gated_pairs),
                 "brief_requested_pairs": int(brief_requested_pairs),
                 "decision_requested_pairs": int(decision_requested_pairs),
+                **({"cached_judgment_pairs": len(decision_idxs)} if component_replay is not None else {}),
             },
         }
+        result["graph_features"] = graph_features
+        result["graph_head"] = graph_diagnostics
+        if "graph" in struct_weights:
+            result["s_graph"] = channel_score_tensors["graph"]
+            result["I_graph"] = I_struct * struct_weights["graph"]
+        graph_controls: Dict[str, Any] = {}
+        if getattr(dataset, "graph_control_manifests", None):
+            from exact.impl.models.graph_head import graph_control_evidence
+
+            graph_controls = graph_control_evidence(dataset)
+        result["kind_evidence"] = {
+            "source": {
+                iri: features.get("experiment_evidence")
+                for iri, features in src_feature_map.items()
+            },
+            "target": {
+                iri: features.get("experiment_evidence")
+                for iri, features in tgt_feature_map.items()
+            },
+            "graph_controls": graph_controls,
+        }
+        result["fusion_channels"] = {
+            "label": {"score": s_label, "quality": q_label, "active": label_active},
+            "strsim": {"score": s_strsim, "quality": q_strsim, "active": strsim_active},
+            **{
+                key: {
+                    "score": value,
+                    "quality": channel_quality_tensors[key],
+                    "active": channel_active_tensors[key],
+                }
+                for key, value in channel_score_tensors.items()
+            },
+        }
+        if self.llm_experiment_enabled or component_replay is not None:
+            result["llm_gate_diagnostics"] = gate_diagnostics
+        if oracle_mode and oracle_result is not None:
+            result["oracle_diagnostic"] = {
+                "oracle_only": True,
+                "deployable": False,
+                "llm_invocations": oracle_result.llm_invocations,
+                "routed": list(oracle_result.routed),
+                "baseline_predictions": list(oracle_result.baseline_predictions),
+                "labels": list(oracle_result.labels),
+            }
+
+        if oracle_mode and oracle_result is None:
+            result["oracle_diagnostic"] = {
+                "oracle_only": True,
+                "deployable": False,
+                "llm_invocations": 0,
+                "protocol": self._gate_artifact.payload["protocol"],
+                "selected_sources": self._gate_artifact.payload["selected_sources"],
+                "interpretation": self._gate_artifact.payload["interpretation"],
+            }
 
         if self.return_explanations:
             explanations = []
             for idx, payload in enumerate(pair_payloads):
                 family_scores = {
-                    family: float(payload["hierarchy"][family]["score"])
-                    for family in family_names
+                    family: float(payload["hierarchy"][family]["score"]) for family in family_names
                 }
                 family_qualities = {
                     family: float(payload["hierarchy"][family]["quality"])
                     for family in family_names
                 }
                 family_weights = {
-                    family: float(struct_weights[f"hier__{family}"][idx])
-                    for family in family_names
+                    family: float(struct_weights[f"hier__{family}"][idx]) for family in family_names
                 }
-                hier_internal_weight = sum((struct_weights[key][idx] for key in hier_keys), torch.tensor(0.0, device=self.device))
+                hier_internal_weight = sum(
+                    (struct_weights[key][idx] for key in hier_keys),
+                    torch.tensor(0.0, device=self.device),
+                )
                 family_importances = {
                     family: float(I_struct[idx] * struct_weights[f"hier__{family}"][idx])
                     for family in family_names
                 }
                 family_contribs = {
-                    family: float(I_struct[idx] * struct_weights[f"hier__{family}"][idx] * (channel_score_tensors[f"hier__{family}"][idx] - self.tau))
+                    family: float(
+                        I_struct[idx]
+                        * struct_weights[f"hier__{family}"][idx]
+                        * (channel_score_tensors[f"hier__{family}"][idx] - self.tau)
+                    )
                     for family in family_names
                 }
+                experiment_diagnostics = self._experiment_diagnostics_for_pair(
+                    payload,
+                    gate_diagnostic=(
+                        gate_diagnostics[idx]
+                        if self.llm_experiment_enabled or component_replay is not None else None
+                    ),
+                )
+                if self.diff_enabled and self.diff_config.get("controlled_perturbations"):
+                    experiment_diagnostics["difference_replay"] = {
+                        "channels": [
+                            {
+                                "name": name,
+                                **{key: float(tensor[idx]) for key, tensor in fields.items()},
+                            }
+                            for name, fields in result["fusion_channels"].items()
+                        ],
+                        "S_base": float(S_base[idx]),
+                        "U": float(U[idx]),
+                    }
+                kind_source = src_feature_map[src_iris[idx]].get("experiment_evidence")
+                kind_target = tgt_feature_map[tgt_iris[idx]].get("experiment_evidence")
+                if getattr(self, "_anchor_manifest", None):
+                    experiment_diagnostics["anchors"] = {
+                        key: self._anchor_manifest[key]
+                        for key in (
+                            "inventory_sha256",
+                            "origin",
+                            "diagnostic",
+                            "query_self_support",
+                        )
+                    }
+                if graph_diagnostics:
+                    experiment_diagnostics["graph_head"] = graph_diagnostics[idx]
+                if kind_source or kind_target:
+                    experiment_diagnostics["kind_evidence"] = {
+                        "source": kind_source,
+                        "target": kind_target,
+                        "graph_controls": graph_controls,
+                    }
                 explanations.append(
                     {
-                        "explanation_schema_version": 3,
+                        "explanation_schema_version": 4,
+                        "reconstruction": {
+                            "score_stage": "pair_pre_selector",
+                            "baseline": float(self.tau),
+                            "score": float(S_final[idx]),
+                            "component_names": [
+                                "C_label",
+                                "C_strsim",
+                                "C_struct",
+                                "C_llm",
+                                "C_oracle",
+                            ],
+                            "llm_score_delta": float(S_final[idx] - S_base[idx]),
+                        },
+                        **(
+                            {"experiment_diagnostics": experiment_diagnostics}
+                            if experiment_diagnostics
+                            else {}
+                        ),
                         "src_iri": src_iris[idx],
                         "tgt_iri": tgt_iris[idx],
+                        "kind": dataset.entity_kind_for(
+                            src_iris[idx], "src", warn_unknown=False
+                        ).value,
+                        "src_kind": dataset.entity_kind_for(
+                            src_iris[idx], "src", warn_unknown=False
+                        ).value,
+                        "tgt_kind": dataset.entity_kind_for(
+                            tgt_iris[idx], "tgt", warn_unknown=False
+                        ).value,
                         "models": {
                             "lexical_model": self.lexical_model_name if self.use_lexical else None,
                             "context_model": self.context_model_name if self.use_context else None,
                             "llm_model": None,
-                            "llm_summary_model": self._last_summary_backend_meta.get("model") if self.use_llm else None,
-                            "llm_decision_model": self._last_decision_backend_meta.get("model") if self.use_llm else None,
-                            "llm_rationale_model": self._last_rationale_backend_meta.get("model") if self.use_llm else None,
-                            "llm_local_fallback_model": self.llm_model_name if self.use_llm else None,
+                            "llm_summary_model": (
+                                self._last_summary_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_decision_model": (
+                                self._last_decision_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_rationale_model": (
+                                self._last_rationale_backend_meta.get("model")
+                                if self.use_llm
+                                else None
+                            ),
+                            "llm_local_fallback_model": (
+                                self.llm_model_name if self.use_llm else None
+                            ),
                         },
                         "llm_calibration": self._llm_calibration_payload(batch_samples=0),
                         "confidences": {
                             "s_label": float(s_label[idx]),
                             "s_label_star": float(s_label_star[idx]),
+                            "s_strsim": float(s_strsim[idx]),
                             "s_hier": float(s_hier[idx]),
                             "s_sim": float(s_sim[idx]),
                             "s_diff": float(s_diff[idx]),
@@ -2153,6 +2622,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         },
                         "qualities": {
                             "q_label": float(q_label[idx]),
+                            "q_lex": float(Q_lex[idx]),
+                            "q_strsim": float(q_strsim[idx]),
                             "q_hier": float(q_hier[idx]),
                             "q_sim": float(channel_quality_tensors["sim_obj"][idx]),
                             "q_diff": float(channel_quality_tensors["diff"][idx]),
@@ -2160,7 +2631,13 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                             "family_qualities": family_qualities,
                         },
                         "weights": {
-                            "w_label": float((1.0 - w_struct[idx]).item()),
+                            "w_lex": float(base_lex_weight[idx]),
+                            "lex_authority": float(sig_lex[idx]),
+                            "struct_authority": float(sig_struct[idx]),
+                            "w_label": float((base_lex_weight[idx] * lex_label_weight[idx]).item()),
+                            "w_strsim": float(
+                                (base_lex_weight[idx] * lex_strsim_weight[idx]).item()
+                            ),
                             "w_struct": float(w_struct[idx]),
                             "w_hier": float(hier_internal_weight.item()),
                             "w_sim": float(struct_weights["sim_obj"][idx]),
@@ -2175,6 +2652,8 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         },
                         "importances": {
                             "I_label": float(I_label[idx]),
+                            "I_lex": float(I_lex[idx]),
+                            "I_strsim": float(I_strsim[idx]),
                             "I_struct": float(I_struct[idx]),
                             "I_hier": float(I_hier[idx]),
                             "I_sim": float(I_sim[idx]),
@@ -2186,17 +2665,47 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         },
                         "contributions": {
                             "C_label": float(I_label[idx] * (s_label[idx] - self.tau)),
+                            "C_strsim": float(I_strsim[idx] * (s_strsim[idx] - self.tau)),
                             "C_struct": float(I_struct[idx] * (S_struct[idx] - self.tau)),
-                            "C_hier": float(sum((family_contribs[family] for family in family_names), 0.0)),
-                            "C_sim": float(I_struct[idx] * struct_weights["sim_obj"][idx] * (s_sim[idx] - self.tau)),
-                            "C_diff": float(I_struct[idx] * struct_weights["diff"][idx] * (s_diff[idx] - self.tau)),
-                            "C_attr": float(I_struct[idx] * struct_weights["attr_aux"][idx] * (s_attr[idx] - self.tau)),
-                            "C_llm": float(I_llm[idx] * (p_llm[idx] - S_base[idx])),
+                            "C_hier": float(
+                                sum(
+                                    (family_contribs[family] for family in family_names),
+                                    0.0,
+                                )
+                            ),
+                            "C_sim": float(
+                                I_struct[idx]
+                                * struct_weights["sim_obj"][idx]
+                                * (s_sim[idx] - self.tau)
+                            ),
+                            "C_diff": float(
+                                I_struct[idx]
+                                * struct_weights["diff"][idx]
+                                * (s_diff[idx] - self.tau)
+                            ),
+                            "C_attr": float(
+                                I_struct[idx]
+                                * struct_weights["attr_aux"][idx]
+                                * (s_attr[idx] - self.tau)
+                            ),
+                            "C_graph": (
+                                float(
+                                    I_struct[idx]
+                                    * struct_weights["graph"][idx]
+                                    * (channel_score_tensors["graph"][idx] - self.tau)
+                                )
+                                if "graph" in struct_weights
+                                else 0.0
+                            ),
+                            "C_llm": float(I_llm[idx] * (p_llm[idx] - self.tau)),
+                            "C_oracle": (float(S_final[idx] - S_base[idx]) if oracle_mode else 0.0),
                             "family_contributions": family_contribs,
                         },
                         "prediction": {
                             "global_match": bool(S_final[idx] >= self.threshold),
-                            "ground_truth": label[idx] if label is not None and idx < len(label) else None,
+                            "ground_truth": (
+                                label[idx] if label is not None and idx < len(label) else None
+                            ),
                             "llm_decision": llm_decisions[idx],
                             "llm_rationale": llm_rationales[idx],
                             "threshold_positive": bool(S_final[idx] >= self.threshold),
@@ -2228,24 +2737,38 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                         },
                         "context_triples": {
                             "hierarchy_source": {
-                                family: [item["triple"] for item in payload["hierarchy"][family].get("src_selected", [])]
+                                family: [
+                                    item["triple"]
+                                    for item in payload["hierarchy"][family].get("src_selected", [])
+                                ]
                                 for family in family_names
                             },
                             "hierarchy_target": {
-                                family: [item["triple"] for item in payload["hierarchy"][family].get("tgt_selected", [])]
+                                family: [
+                                    item["triple"]
+                                    for item in payload["hierarchy"][family].get("tgt_selected", [])
+                                ]
                                 for family in family_names
                             },
-                            "similarity_source": [item["triple"] for item in payload["sim"].get("src_selected", [])],
-                            "similarity_target": [item["triple"] for item in payload["sim"].get("tgt_selected", [])],
-                            "difference_source": [item["triple"] for item in payload["diff"].get("src_selected", [])],
-                            "difference_target": [item["triple"] for item in payload["diff"].get("tgt_selected", [])],
+                            "similarity_source": [
+                                item["triple"] for item in payload["sim"].get("src_selected", [])
+                            ],
+                            "similarity_target": [
+                                item["triple"] for item in payload["sim"].get("tgt_selected", [])
+                            ],
+                            "difference_source": [
+                                item["triple"] for item in payload["diff"].get("src_selected", [])
+                            ],
+                            "difference_target": [
+                                item["triple"] for item in payload["diff"].get("tgt_selected", [])
+                            ],
                         },
                         "attributes": {
                             "source": list(payload["attr"].get("src_selected", [])),
                             "target": list(payload["attr"].get("tgt_selected", [])),
                         },
                         "cross_side_provenance": self._build_cross_side_provenance(
-                            float(s_label[idx]),
+                            float(S_lex[idx]),
                             payload["hierarchy"],
                             payload["sim"],
                             payload["diff"],
@@ -2257,11 +2780,16 @@ class PairAdaptiveSemanticScorer(SemanticScorer):
                             "source": pair_briefs[idx],
                             "target": "",
                         },
+                        "evidence_counts": payload["evidence_counts"],
                         "triple_attributions": {
                             "hierarchy": {
                                 family: {
-                                    "source": list(payload["hierarchy"][family].get("src_selected", [])),
-                                    "target": list(payload["hierarchy"][family].get("tgt_selected", [])),
+                                    "source": list(
+                                        payload["hierarchy"][family].get("src_selected", [])
+                                    ),
+                                    "target": list(
+                                        payload["hierarchy"][family].get("tgt_selected", [])
+                                    ),
                                 }
                                 for family in family_names
                             },

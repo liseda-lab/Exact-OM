@@ -1,0 +1,103 @@
+descriptor_version: 1
+name: conference
+provider: http
+provider_version: "1"
+description: OAEI 2025 Conference ontologies and reference alignments.
+upstream:
+  revision: "2025"
+  urls:
+    - url: https://oaei.ontologymatching.org/2025/conference/data/conference.zip
+      filename: conference.zip
+      sha256: 78688cda05857b594be188db6831abc5d890d2e38d6602e0cd8d3c82ecb24546
+      extract: true
+      destination: ontologies
+    - url: https://oaei.ontologymatching.org/2025/conference/data/reference-alignment.zip
+      filename: reference-alignment.zip
+      sha256: 782e0175253d817288e1f7ed29f738a7fa9e57a8b9c77bb3b11c12b80405d4bf
+      extract: true
+      destination: references
+tasks:
+  cmt-conference: &cmt_conference
+    source: ontologies/cmt.owl
+    target: ontologies/Conference.owl
+    refs: {test: {path: references/cmt-conference.rdf, transform: alignment_rdf_to_tsv}}
+  cmt-confOf:
+    source: ontologies/cmt.owl
+    target: ontologies/confOf.owl
+    refs: {test: {path: references/cmt-confOf.rdf, transform: alignment_rdf_to_tsv}}
+  cmt-edas:
+    source: ontologies/cmt.owl
+    target: ontologies/edas.owl
+    refs: {test: {path: references/cmt-edas.rdf, transform: alignment_rdf_to_tsv}}
+  cmt-ekaw:
+    source: ontologies/cmt.owl
+    target: ontologies/ekaw.owl
+    refs: {test: {path: references/cmt-ekaw.rdf, transform: alignment_rdf_to_tsv}}
+  cmt-iasted:
+    source: ontologies/cmt.owl
+    target: ontologies/iasted.owl
+    refs: {test: {path: references/cmt-iasted.rdf, transform: alignment_rdf_to_tsv}}
+  cmt-sigkdd:
+    source: ontologies/cmt.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/cmt-sigkdd.rdf, transform: alignment_rdf_to_tsv}}
+  conference-confOf:
+    source: ontologies/Conference.owl
+    target: ontologies/confOf.owl
+    refs: {test: {path: references/conference-confOf.rdf, transform: alignment_rdf_to_tsv}}
+  conference-edas:
+    source: ontologies/Conference.owl
+    target: ontologies/edas.owl
+    refs: {test: {path: references/conference-edas.rdf, transform: alignment_rdf_to_tsv}}
+  conference-ekaw:
+    source: ontologies/Conference.owl
+    target: ontologies/ekaw.owl
+    refs: {test: {path: references/conference-ekaw.rdf, transform: alignment_rdf_to_tsv}}
+  conference-iasted:
+    source: ontologies/Conference.owl
+    target: ontologies/iasted.owl
+    refs: {test: {path: references/conference-iasted.rdf, transform: alignment_rdf_to_tsv}}
+  conference-sigkdd:
+    source: ontologies/Conference.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/conference-sigkdd.rdf, transform: alignment_rdf_to_tsv}}
+  confOf-edas:
+    source: ontologies/confOf.owl
+    target: ontologies/edas.owl
+    refs: {test: {path: references/confOf-edas.rdf, transform: alignment_rdf_to_tsv}}
+  confOf-ekaw:
+    source: ontologies/confOf.owl
+    target: ontologies/ekaw.owl
+    refs: {test: {path: references/confOf-ekaw.rdf, transform: alignment_rdf_to_tsv}}
+  confOf-iasted:
+    source: ontologies/confOf.owl
+    target: ontologies/iasted.owl
+    refs: {test: {path: references/confOf-iasted.rdf, transform: alignment_rdf_to_tsv}}
+  confOf-sigkdd:
+    source: ontologies/confOf.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/confOf-sigkdd.rdf, transform: alignment_rdf_to_tsv}}
+  edas-ekaw:
+    source: ontologies/edas.owl
+    target: ontologies/ekaw.owl
+    refs: {test: {path: references/edas-ekaw.rdf, transform: alignment_rdf_to_tsv}}
+  edas-iasted:
+    source: ontologies/edas.owl
+    target: ontologies/iasted.owl
+    refs: {test: {path: references/edas-iasted.rdf, transform: alignment_rdf_to_tsv}}
+  edas-sigkdd:
+    source: ontologies/edas.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/edas-sigkdd.rdf, transform: alignment_rdf_to_tsv}}
+  ekaw-iasted:
+    source: ontologies/ekaw.owl
+    target: ontologies/iasted.owl
+    refs: {test: {path: references/ekaw-iasted.rdf, transform: alignment_rdf_to_tsv}}
+  ekaw-sigkdd:
+    source: ontologies/ekaw.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/ekaw-sigkdd.rdf, transform: alignment_rdf_to_tsv}}
+  iasted-sigkdd:
+    source: ontologies/iasted.owl
+    target: ontologies/sigkdd.owl
+    refs: {test: {path: references/iasted-sigkdd.rdf, transform: alignment_rdf_to_tsv}}

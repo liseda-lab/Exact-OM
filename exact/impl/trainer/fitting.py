@@ -1,0 +1,900 @@
+"""One shared encoder pass over a separate training pool, then small CPU head fits."""
+
+from __future__ import annotations
+
+import copy
+import json
+import logging
+import os
+from ast import literal_eval
+from pathlib import Path
+
+import pandas as pd
+import torch
+
+from exact.impl.models.selector.feature_contract import (
+    SPECIFICITY_FEATURES,
+    restore_specificity_metadata,
+)
+from exact.impl.models.selector.fitting import (
+    fingerprint,
+    freeze_json,
+    safe_training_labels,
+)
+from exact.utils.data import read_table
+
+from .audit_io import _semantic_collate_fn
+
+
+def source_batches(frame, batch_size):
+    """Pack complete contiguous source groups without changing source semantics."""
+    batch = []
+    columns = [column for column in ("Src", "SrcKind") if column in frame]
+    for _, group in frame.groupby(columns, sort=False):
+        indices = list(group.index)
+        if batch and len(batch) + len(indices) > batch_size:
+            yield batch
+            batch = []
+        batch.extend(indices)
+    if batch:
+        yield batch
+
+
+def _validate_budgeted_selector_fit(payload, membership):
+    """Reject fitted artifacts whose actual groups or OOF splits exceed the budget."""
+    if membership["requested_groups"] is None:
+        return
+    selected = set(membership["selected_sources"])
+    provenance = payload["fit_provenance"]
+    if set(provenance["training_sources"]) != selected:
+        raise ValueError("Fitted training sources differ from the selected label budget")
+    if provenance["application"].get("training_budget") != membership:
+        raise ValueError("Fitted artifact is not bound to the selected label budget")
+    if "folds" in payload:
+        heldout_groups = []
+        for fold in payload["folds"]:
+            train, heldout = set(fold["train_sources"]), set(fold["heldout_sources"])
+            if train & heldout or train | heldout != selected:
+                raise ValueError("Fitted OOF split differs from the selected label budget")
+            heldout_groups.extend(heldout)
+        if set(heldout_groups) != selected or len(heldout_groups) != len(selected):
+            raise ValueError("Fitted OOF coverage differs from the selected label budget")
+    else:
+        source_folds = {}
+        for row in payload["oof_predictions"]:
+            previous = source_folds.setdefault(row["source"], row["fold"])
+            if previous != row["fold"]:
+                raise ValueError("Calibration OOF split divides a source group")
+        if set(source_folds) != selected:
+            raise ValueError("Calibration OOF coverage differs from the selected label budget")
+
+
+class TrainingPoolMixin:
+    def fit_relation_head(self):
+        config = getattr(self, "relation_config", {})
+        if config.get("relation_prediction") not in {"learned_three_way", "semantic_then_learned"}:
+            return
+        if getattr(self, "_relation_head_fitted", False):
+            return
+        from exact.io.relation_head import fit_relation_artifact, typed_reference_frame
+
+        artifact = config.get("relation_artifact")
+        training_file = config.get("relation_training_file")
+        if training_file:
+            if getattr(self, "supervision_config", {}).get("label_budget") is not None:
+                raise ValueError("Source label budgets do not define typed relation training units")
+            typed = typed_reference_frame(training_file)
+            artifact = artifact or self.output_dir / "fitting" / "relation_head.json"
+            state = fit_relation_artifact(
+                typed[["Src", "Tgt"]],
+                typed,
+                self.dataset.source,
+                self.dataset.target,
+                artifact,
+                application={
+                    "dataset_signature": self.dataset.dataset_signature,
+                    "source_ids": sorted(
+                        set(
+                            getattr(self.dataset, "eligible_source_iris", None)
+                            or self.dataset.dataframe.Src.astype(str)
+                        )
+                    ),
+                },
+                seed=getattr(self.model, "request_seed", None) or 17,
+            )
+            self.relation_fit_report = {
+                "artifact": str(artifact),
+                "fit_identity": state["fit_identity"],
+                "relation_counts": state["relation_counts"],
+                "folds": state["folds"],
+            }
+        elif not artifact or not Path(artifact).is_file():
+            raise ValueError(
+                "Learned relation typing requires a fitted artifact or disjoint typed training file"
+            )
+        self.relation_artifact = artifact
+        self._relation_head_fitted = True
+
+    def fit_training_pool(self, *, batch_size=8):
+        from exact.utils.frozen_inference import frozen_application
+
+        if frozen_application(self.dataset):
+            if any(
+                getattr(self, key, None)
+                for key in (
+                    "training_candidates_file_path",
+                    "training_reference_file_path",
+                    "fitting_fusion_config",
+                    "fitting_graph_config",
+                    "fitting_llm_config",
+                )
+            ) or getattr(self, "relation_config", {}).get("relation_training_file"):
+                raise ValueError("Frozen inference cannot fit or read training inputs")
+            self._training_pool_fitted = True
+            return
+        if getattr(self.dataset, "transfer_artifact", None) is not None:
+            from exact.utils.artifact_transfer import validate_transfer
+
+            manifest = validate_transfer(self.dataset)
+            if any(
+                getattr(model, "nil_config", {}).get("training_source_labels")
+                for model in getattr(self, "models", [])[1:]
+            ):
+                raise ValueError("Transferred NIL cannot consume recipient training source labels")
+            if any(
+                getattr(self, key, None)
+                for key in ("fitting_fusion_config", "fitting_graph_config", "fitting_llm_config")
+            ):
+                raise ValueError("Donor transfer cannot fit missing recipient artifacts")
+            if getattr(self, "relation_config", {}).get("relation_training_file"):
+                raise ValueError("Donor transfer cannot fit recipient relation labels")
+            self.transfer_report = {"recipient_refit": False, "artifacts": manifest["artifacts"]}
+            self._training_pool_fitted = True
+            return
+        self.fit_relation_head()
+        if getattr(self, "_training_pool_fitted", False):
+            return
+        path = getattr(self, "training_candidates_file_path", None)
+        if not path:
+            return
+        consumers = [
+            model
+            for model in self.models[1:]
+            if hasattr(model, "fit_training_artifact") and model.training_reference_file_path
+        ]
+        nil_consumers = [
+            model
+            for model in self.models[1:]
+            if getattr(model, "nil_config", {}).get("mode") == "fitted"
+            and model.nil_config.get("training_source_labels")
+        ]
+        pending = any(
+            getattr(self, key, None)
+            for key in ("fitting_fusion_config", "fitting_graph_config", "fitting_llm_config")
+        )
+        if not consumers and not pending and not nil_consumers:
+            return
+        seed = getattr(self.model, "request_seed", consumers[0].request_seed if consumers else 17)
+        supervision = getattr(self, "supervision_config", {})
+        if nil_consumers and supervision.get("label_budget") is not None:
+            raise ValueError("Positive-source label budgets do not define NIL training units")
+        policy = supervision.get("negative_label_policy", "unknown")
+        if (consumers or pending) and policy not in {"complete_reference", "confirmed_negatives"}:
+            raise ValueError(
+                "Supervised fitting lacks a safe negative-label policy: a known positive does not establish other candidate negatives"
+            )
+        raw = read_table(Path(path))
+        if len(raw.columns) == 3 and any("cand" in str(column).lower() for column in raw.columns):
+            # Bio-ML's middle column is reporting gold, never a candidate feature.
+            rows = [
+                (str(source), str(target))
+                for source, _, candidates in raw.itertuples(index=False, name=None)
+                for target in literal_eval(str(candidates))
+            ]
+            raw = pd.DataFrame(rows, columns=["Src", "Tgt"])
+        else:
+            raw = raw[
+                [
+                    column
+                    for column in (
+                        "Src",
+                        "Tgt",
+                        "SrcKind",
+                        "TgtKind",
+                        "cand_sim",
+                        "confirmed_label",
+                    )
+                    if column in raw
+                ]
+            ].copy()
+        if not {"Src", "Tgt"}.issubset(raw):
+            raise ValueError(
+                "Training candidate pool must provide Src/Tgt or a Bio-ML candidate list"
+            )
+        raw = raw.drop_duplicates(["Src", "Tgt"]).sort_values(["Src", "Tgt"]).reset_index(drop=True)
+        reporting_sources = set(
+            getattr(self.dataset, "eligible_source_iris", None)
+            or self.dataset.dataframe.Src.astype(str)
+        )
+        if set(raw.Src.astype(str)) & reporting_sources:
+            raise ValueError("Training candidate pool overlaps reporting source groups")
+        application = {
+            "dataset_signature": getattr(self.dataset, "dataset_signature", None),
+            "source_ids": sorted(reporting_sources),
+            "negative_label_policy": policy,
+            "entity_kinds": [
+                getattr(kind, "value", kind)
+                for kind in getattr(self.dataset, "_entity_kinds", ("class",))
+            ],
+        }
+        reference_path = getattr(self, "training_reference_file_path", None)
+        if reference_path:
+            table = read_table(Path(reference_path))
+            reference = {
+                (str(source), str(target))
+                for source, target in table.iloc[:, :2].itertuples(index=False, name=None)
+            }
+        elif consumers:
+            reference = consumers[0]._load_training_reference_pairs(getattr(self, "logger", None))
+        else:
+            raise ValueError("Train-only fitting requires an explicit training reference")
+        router_requested = (getattr(self, "fitting_llm_config", None) or {}).get("gate", {}).get(
+            "mode"
+        ) == "learned"
+        original_counts = raw.groupby("Src").size() if router_requested else None
+        if not nil_consumers:
+            raw, reference = safe_training_labels(raw, reference, application)
+        if router_requested:
+            labeled = safe_training_labels(raw, reference, application)[0] if nil_consumers else raw
+            labeled_counts = labeled.groupby("Src").size()
+            application["fully_labeled_training_sources"] = sorted(
+                str(source)
+                for source, count in original_counts.items()
+                if int(labeled_counts.get(source, 0)) == int(count)
+            )
+        from .study_training import (
+            export_component_training,
+            load_train_judgments,
+            prepare_native_features,
+            record_component_fit,
+            replay_train_judgments,
+            structured_training_packet,
+        )
+
+        train_judgments = load_train_judgments(
+            self.model,
+            raw,
+            application,
+            pool_path=path,
+            reference_path=reference_path
+            or (consumers[0].training_reference_file_path if consumers else None),
+        )
+        if train_judgments is not None:
+            if getattr(self, "fitting_llm_config", None) or nil_consumers:
+                raise ValueError("Frozen TRAIN judgments cannot be combined with LLM/NIL fitting")
+            selected = set(train_judgments["source_ids"])
+            raw = raw[raw.Src.astype(str).isin(selected)].reset_index(drop=True)
+            reference = {(source, target) for source, target in reference if source in selected}
+        from exact.runtime.numerical_cache import (
+            publish_training_reference,
+            shared_training_scores,
+            training_content_contract,
+            training_score_reference,
+        )
+
+        primitive = training_content_contract(self.model, prepare_templates=True)
+        structured_train_facts = os.getenv("EXACT_COMPONENT_TRAIN_FACTS") == "1"
+        identity = fingerprint(
+            self._json_safe_value(
+                {
+                    **({"component_train_facts": 1} if structured_train_facts else {}),
+                    "pairs": raw.to_dict("records"),
+                    "reference": sorted(reference),
+                    "negative_label_policy": policy,
+                    "batch_size": int(batch_size),
+                    "dataset": (
+                        primitive["dataset"]
+                        if primitive
+                        else getattr(self.dataset, "cache_fingerprint", None)
+                    ),
+                    "model": primitive
+                    or (
+                        self.model.runtime_fingerprint_payload()
+                        if hasattr(self.model, "runtime_fingerprint_payload")
+                        else type(self.model).__name__
+                    ),
+                }
+            )
+        )
+        cache_dir = self.output_dir / "fitting" / identity
+        frame_path = cache_dir / "training_scores.json"
+        frame_source = frame_path
+        if not frame_path.exists():
+            shared_reference = training_score_reference(
+                self.model, identity, application, batch_size
+            )
+            if shared_reference is not None:
+                frame_source = Path(shared_reference["aggregate_uri"])
+                publish_training_reference(
+                    cache_dir / "training_scores.reference.json", shared_reference
+                )
+            else:
+                shared_rows = shared_training_scores(self.model, identity, application, batch_size)
+                if shared_rows is not None:
+                    freeze_json(frame_path, {"identity": identity, "rows": shared_rows})
+        if frame_source.exists():
+            saved = json.loads(frame_source.read_text())
+            if saved.get("identity") != identity:
+                raise ValueError("Training aggregate identity mismatch")
+            training = pd.DataFrame(saved["rows"])
+        else:
+            view = copy.copy(self.dataset)
+            view._candidates = raw.copy()
+            if hasattr(view, "_annotate_candidate_similarity_stats"):
+                view._annotate_candidate_similarity_stats()
+            view._df = prepare_native_features(view, primitive)
+            view._df[view.default_kind] = True
+            if hasattr(view, "_invalidate_active_dataframe_cache"):
+                view._invalidate_active_dataframe_cache()
+            records, consumed_shards = [], []
+            # Train-only head fitting never requests decision/brief/rationale calls.
+            original_llm = getattr(self.model, "use_llm", False)
+            original_scoring_role = getattr(self.model, "_numerical_scoring_role", None)
+            original_dataset = getattr(self.model, "_attached_dataset", None)
+            self.model._attached_dataset = view
+            self.model.use_llm = False
+            self.model._numerical_scoring_role = "train"
+            try:
+                for indices in source_batches(view._df, int(batch_size)):
+                    source_ids = list(view._df.iloc[indices].Src.astype(str).unique())
+                    shard = cache_dir / (fingerprint(source_ids) + ".json")
+                    consumed_shards.append(shard)
+                    if shard.exists():
+                        records.extend(json.loads(shard.read_text())["rows"])
+                        continue
+                    batch = _semantic_collate_fn([view[index] for index in indices])
+                    with torch.no_grad():
+                        output = self.model.forward(
+                            src_iris=batch["src_iri"],
+                            tgt_iris=batch["tgt_iri"],
+                            src_label_lists=batch["src_labels"],
+                            tgt_label_lists=batch["tgt_labels"],
+                            src_contexts=batch.get("src_contexts"),
+                            tgt_contexts=batch.get("tgt_contexts"),
+                        )
+                    # Transfer each result vector once, rather than synchronizing
+                    # the GPU separately for every scalar in every training pair.
+                    score_columns = {
+                        key: values.detach().cpu().tolist()
+                        for key, values in output.items()
+                        if isinstance(values, torch.Tensor)
+                        and values.ndim == 1
+                        and len(values) == len(indices)
+                    }
+                    fusion_columns = {
+                        name: {
+                            field: values.detach().cpu().tolist()
+                            for field, values in channel.items()
+                        }
+                        for name, channel in output.get("fusion_channels", {}).items()
+                    }
+                    rows = []
+                    for offset, index in enumerate(indices):
+                        row = {
+                            "Src": str(batch["src_iri"][offset]),
+                            "Tgt": str(batch["tgt_iri"][offset]),
+                            "SrcKind": str(batch.get("src_kind", ["class"] * len(indices))[offset]),
+                            "TgtKind": str(batch.get("tgt_kind", ["class"] * len(indices))[offset]),
+                        }
+                        row.update(
+                            {key: float(values[offset]) for key, values in score_columns.items()}
+                        )
+                        row["src_label_text"] = " | ".join(batch["src_labels"][offset])
+                        row["tgt_label_text"] = " | ".join(batch["tgt_labels"][offset])
+                        row["llm_evidence_packet"] = output.get(
+                            "llm_evidence_packets", [""] * len(indices)
+                        )[offset]
+                        if output.get("graph_features"):
+                            row["graph_features"] = output["graph_features"][offset]
+                        if "confirmed_label" in raw:
+                            label = raw.iloc[index].confirmed_label
+                            row["confirmed_label"] = None if pd.isna(label) else float(label)
+                        row["fusion_channels"] = {
+                            name: {
+                                field: float(values[offset]) for field, values in channel.items()
+                            }
+                            for name, channel in fusion_columns.items()
+                        }
+                        explanations = output.get("explanations", [])
+                        if structured_train_facts:
+                            if offset >= len(explanations):
+                                raise ValueError(
+                                    "Component TRAIN facts require native explanations"
+                                )
+                            row["llm_structured_evidence_packet"] = structured_training_packet(
+                                explanations[offset]
+                            )
+                            row["selected_labels"] = explanations[offset]["selected_labels"]
+                        if offset < len(explanations):
+                            row["selector_evidence_items"] = (
+                                self._selector_evidence_items_for_record(explanations[offset])
+                                if hasattr(self, "_selector_evidence_items_for_record")
+                                else []
+                            )
+                        row.update(
+                            {
+                                column: value
+                                for column, value in view._df.iloc[index].items()
+                                if str(column).startswith("cand_") or column in SPECIFICITY_FEATURES
+                            }
+                        )
+                        rows.append(row)
+                    freeze_json(
+                        shard, {"source_ids": source_ids, "rows": rows}, max_bytes=256 * 1024**2
+                    )
+                    records.extend(rows)
+            finally:
+                self.model._attached_dataset = original_dataset
+                self.model.use_llm = original_llm
+                if original_scoring_role is None:
+                    del self.model._numerical_scoring_role
+                else:
+                    self.model._numerical_scoring_role = original_scoring_role
+            freeze_json(frame_path, {"identity": identity, "rows": records})
+            # The durable aggregate contains these exact rows; retain shards only
+            # while this pass is unfinished, and avoid a second shared-cache copy.
+            try:
+                for shard in consumed_shards:
+                    shard.unlink(missing_ok=True)
+            except OSError as error:
+                logging.getLogger(__name__).warning(
+                    "Training aggregate is durable; retaining redundant shards after cleanup failed: %s",
+                    error,
+                )
+            training = pd.DataFrame(records)
+        training_score_reference(
+            self.model, identity, application, batch_size, aggregate_path=frame_source
+        )
+        if train_judgments is not None:
+            application = {
+                **application,
+                "component_train_judgments": {
+                    key: train_judgments[key]
+                    for key in ("sha256", "model_id", "policy", "source_ids", "provenance")
+                },
+            }
+        from exact.impl.models.selector.label_budget import select_label_budget
+
+        budget_reference, membership = select_label_budget(
+            training,
+            reference,
+            budget=supervision.get("label_budget"),
+            seed=seed,
+            selection=supervision.get("label_selection", "passive"),
+        )
+        self._training_effective_units = {**membership, "binding": application}
+        if supervision.get("label_budget") is not None:
+            # Bound the actual rows before any learner can promote confirmed
+            # positives back into the reference. Keep complete candidate groups,
+            # including their permitted negatives; raw score caches stay shared.
+            selected_sources = set(membership["selected_sources"])
+            training = training[training.Src.astype(str).isin(selected_sources)].copy()
+            training = training.reset_index(drop=True)
+            if set(training.Src.astype(str)) != selected_sources:
+                raise ValueError("Training score cache is missing selected label-budget sources")
+            application = {**application, "training_budget": membership}
+            cache_dir = cache_dir / ("labels-" + fingerprint(membership))
+        # Earlier numerical aggregates omitted ontology metadata. Restore only
+        # those columns through the same feature API used during inference; raw
+        # scores and their immutable cache identity remain reusable unchanged.
+        training = restore_specificity_metadata(training, self.dataset)
+        if train_judgments is not None:
+            # Numeric evidence is reusable, but every affected descendant fit is
+            # bound to the actual probabilities, model, policy and source support.
+            cache_dir = cache_dir / ("judgments-" + train_judgments["sha256"])
+        freeze_json(cache_dir / "label_budget.json", membership)
+        freeze_json(cache_dir / "training_units.json", self._training_effective_units)
+        graph_config = getattr(self, "fitting_graph_config", None)
+        if graph_config:
+            from exact.impl.models.graph_head import fit_graph_artifact
+            from exact.impl.models.pair_adaptive_experiments import (
+                JsonExperimentArtifact,
+            )
+
+            graph_application = {
+                **application,
+                "negative_label_policy": graph_config.get("negative_label_policy") or policy,
+            }
+            artifact = graph_config.get("artifact") or cache_dir / "graph.json"
+            payload = fit_graph_artifact(
+                training, budget_reference, artifact, application=graph_application, seed=seed
+            )
+            self.model.graph_config = {**graph_config, "artifact": str(artifact)}
+            self.model._graph_artifact = JsonExperimentArtifact.load(
+                artifact, expected_mode="inductive", kind="graph head"
+            )
+            oof = {(row["Src"], row["Tgt"]): row["score"] for row in payload["oof_predictions"]}
+            training = training[
+                training.Src.astype(str).isin({source for source, _ in oof})
+            ].reset_index(drop=True)
+            for index, row in training.iterrows():
+                channels = dict(row.fusion_channels)
+                active = float(row.graph_features["active"])
+                channels["graph"] = {
+                    "score": oof[(row.Src, row.Tgt)],
+                    "quality": active,
+                    "active": active,
+                }
+                training.at[index, "fusion_channels"] = channels
+            self._replay_training_fusion(training)
+        fusion_config = getattr(self, "fitting_fusion_config", None)
+        if fusion_config:
+            from exact.impl.models.pair_adaptive_experiments import (
+                JsonExperimentArtifact,
+            )
+            from exact.impl.models.selector.fusion_fitting import fit_fusion_artifact
+
+            artifact = fusion_config.get("artifact") or cache_dir / "fusion.json"
+            placement = (
+                self.model.strsim_config["placement"] if self.model.strsim_enabled else "off"
+            )
+            payload = fit_fusion_artifact(
+                training,
+                budget_reference,
+                artifact,
+                mode=fusion_config["mode"],
+                application=application,
+                seed=seed,
+                strsim_placement=placement,
+                neutral_fp16_lexical=bool(getattr(self.model, "fp16", False)),
+                input_views=getattr(self, "component_fold_inputs", {}).get("fusion"),
+            )
+            record_component_fit(
+                self.output_dir, "fusion", artifact, payload, reference=budget_reference
+            )
+            self.model.fusion_config = {**fusion_config, "artifact": str(artifact)}
+            self.model._fusion_artifact = JsonExperimentArtifact.load(
+                artifact, expected_mode=fusion_config["mode"], kind="fusion"
+            )
+            self.model._validate_fusion_artifact_contract(fusion_config["mode"])
+            if fusion_config["mode"] == "analytic_fitted":
+                self.model.tau = payload["parameters"]["tau"]
+                self.model.gamma = payload["parameters"]["gamma"]
+            oof = {(row["Src"], row["Tgt"]): row for row in payload["oof_predictions"]}
+            for index, row in training.iterrows():
+                if (row.Src, row.Tgt) in oof:
+                    for name, value in oof[(row.Src, row.Tgt)].items():
+                        if name not in {"Src", "Tgt"}:
+                            training.at[index, name] = value
+            self._refresh_training_uncertainty(training)
+        training = replay_train_judgments(training, train_judgments)
+        llm_config = getattr(self, "fitting_llm_config", None)
+        if llm_config:
+            from exact.impl.models.pair_adaptive_experiments import (
+                JsonExperimentArtifact,
+            )
+            from exact.impl.models.selector.llm_learning import fit_llm_artifacts
+
+            if llm_config["gate"]["mode"] == "learned" and any(
+                selector.enabled for selector in consumers
+            ):
+                raise ValueError(
+                    "Benefit-router fitting currently requires fixed pair-threshold acceptance without an additional selector; full-selector counterfactual outcomes must be supplied separately"
+                )
+            fitting_frame = (
+                training[training.Src.astype(str).isin({source for source, _ in budget_reference})]
+                .copy()
+                .reset_index(drop=True)
+            )
+            learned = fit_llm_artifacts(
+                self.model,
+                fitting_frame,
+                budget_reference,
+                cache_dir,
+                config=llm_config,
+                application=application,
+            )
+            for key in ("exemplars", "exemplar_count", "distill", "student_training"):
+                self.model.llm_experiment_config[key] = llm_config[key]
+            for key in ("exemplar_artifact", "distill_artifact"):
+                if key in learned:
+                    self.model.llm_experiment_config[key] = learned[key]
+            self.model._exemplar_artifact = learned.get(
+                "exemplars", getattr(self.model, "_exemplar_artifact", None)
+            )
+            self.model._student_artifact = learned.get(
+                "student", getattr(self.model, "_student_artifact", None)
+            )
+            if "router" in learned:
+                self.model.llm_experiment_config["gate"] = {
+                    **llm_config["gate"],
+                    "artifact": learned["gate_artifact"],
+                }
+                self.model._gate_artifact = JsonExperimentArtifact.load(
+                    learned["gate_artifact"], expected_mode="learned", kind="LLM gate"
+                )
+            if "student" in learned:
+                oof = {
+                    (row["source"], str(fitting_frame.iloc[row["index"]].Tgt)): row["score"]
+                    for row in learned["student"]["oof_predictions"]
+                }
+                for index, row in training.iterrows():
+                    if (row.Src, row.Tgt) in oof:
+                        weight = (
+                            llm_config["constant_weight"]
+                            if llm_config["fusion_weight"] == "constant"
+                            else min(1.0, self.model.beta * row.U)
+                        )
+                        training.at[index, "S_final"] = (1 - weight) * row.S_base + weight * oof[
+                            (row.Src, row.Tgt)
+                        ]
+        self.component_training_export = export_component_training(
+            training,
+            output_dir=self.output_dir,
+            cache_dir=cache_dir,
+            application=application,
+            pool_path=path,
+            reference_path=reference_path
+            or (consumers[0].training_reference_file_path if consumers else None),
+        )
+        if os.getenv("EXACT_COMPONENT_LOCAL_QUERY_RANK") == "1":
+            if (
+                self.component_training_export is None
+                or nil_consumers
+                or any(
+                    selector.enabled or selector.matching_calibration["mode"] != "none"
+                    for selector in consumers
+                )
+            ):
+                raise ValueError(
+                    "Original-query ranking requires exported TRAIN and disabled native selection"
+                )
+            # The study adapter fits/applies the sole local head per original
+            # query. Native source-union selection would duplicate a different task.
+            consumers = []
+            from exact.impl.trainer.study_training import publish_component_folds
+
+            publish_component_folds(
+                self.output_dir,
+                local_selector={
+                    "native_fit": "skipped",
+                    "owner": "original_query_cpu_ranker",
+                    "actual_fold_provenance": "fitting/local-query-ranker.json",
+                    "reason": "source_union_fitting_is_not_the_original_local_query_task",
+                },
+            )
+        for selector in nil_consumers:
+            from exact.impl.models.selector.nil_head import fit_nil_artifact
+
+            labels = read_table(Path(selector.nil_config["training_source_labels"]))
+            artifact = selector.nil_config.get("artifact") or cache_dir / "natural_nil.json"
+            fit_nil_artifact(
+                training,
+                labels,
+                reference,
+                artifact,
+                application={
+                    **application,
+                    "nil_label_semantics": selector.nil_config.get("label_semantics"),
+                },
+                seed=seed,
+            )
+            selector.nil_config["artifact"] = str(artifact)
+        for selector in consumers:
+            reference = selector._load_training_reference_pairs(getattr(self, "logger", None))
+            if not reference:
+                raise ValueError("Separate training candidates require a training reference")
+            reference = reference & budget_reference
+            selector_training = training.copy()
+            if selector.matching_calibration["mode"] != "none":
+                fitted_calibrator = selector.fit_score_calibration_artifact(
+                    training,
+                    reference,
+                    selector.matching_calibration["artifact"],
+                    application=application,
+                    input_views=getattr(self, "component_fold_inputs", {}).get("calibration"),
+                )
+                _validate_budgeted_selector_fit(fitted_calibrator, membership)
+                record_component_fit(
+                    self.output_dir,
+                    "calibration",
+                    selector.matching_calibration["artifact"],
+                    fitted_calibrator,
+                    reference=reference,
+                )
+                oof = {
+                    (row["source"], row["target"]): row["probability"]
+                    for row in fitted_calibrator["oof_predictions"]
+                }
+                selector_training = selector_training[
+                    selector_training.apply(lambda row: (row.Src, row.Tgt) in oof, axis=1)
+                ].copy()
+                selector_training["S_final"] = [
+                    oof[(row.Src, row.Tgt)] for row in selector_training.itertuples()
+                ]
+                selector_training["S_pair_final"] = selector_training.S_final
+            if selector.strategy == "calibrated_rank_accept" or selector.rerank_config.get(
+                "artifact"
+            ):
+                artifact = selector.rerank_config.get("artifact") or cache_dir / "selector.json"
+                fitted_selector = selector.fit_training_artifact(
+                    selector_training,
+                    reference,
+                    artifact,
+                    application=application,
+                    logger=getattr(self, "logger", None),
+                    input_views=getattr(self, "component_fold_inputs", {}).get("selector"),
+                )
+                _validate_budgeted_selector_fit(fitted_selector, membership)
+                record_component_fit(
+                    self.output_dir, "selector", artifact, fitted_selector, reference=reference
+                )
+        self._checkpoint_fingerprint_payload = self._build_checkpoint_fingerprint_payload()
+        self._checkpoint_fingerprint = self._hash_checkpoint_fingerprint_payload(
+            self._checkpoint_fingerprint_payload
+        )
+        self._training_pool_fitted = True
+
+    def _replay_training_fusion(self, training):
+        from exact.impl.models.selector.fusion_fitting import fusion_scores
+
+        names = sorted(training.iloc[0].fusion_channels) + ["lex", "struct"]
+        channels = tuple(
+            torch.tensor(
+                [
+                    [row.get(name, {}).get(field, 0.0) for name in names]
+                    for row in training.fusion_channels
+                ],
+                dtype=torch.float64,
+            )
+            for field in ("score", "quality", "active")
+        )
+        placement = self.model.strsim_config["placement"] if self.model.strsim_enabled else "off"
+        values = fusion_scores(
+            channels,
+            names,
+            (torch.tensor(self.model.tau), torch.tensor(self.model.gamma), torch.ones(len(names))),
+            mode="analytic_fitted",
+            strsim_placement=placement,
+            return_components=True,
+        )
+        for name, column in values.items():
+            training[name] = column.tolist()
+        self._refresh_training_uncertainty(training)
+
+    def _refresh_training_uncertainty(self, training):
+        if hasattr(self.model, "_uncertainty_components"):
+            columns = [
+                torch.tensor(training[name].tolist(), dtype=torch.float64)
+                for name in ("S_base", "s_label_star", "S_struct", "q_lex", "Q_struct")
+            ]
+            u_ind, u_dis = self.model._uncertainty_components(*columns)
+            training["U"] = torch.maximum(u_ind, u_dis).tolist()
+
+    def prepare_population_gate(self, *, batch_size=8):
+        """Freeze exact-budget selection from an unlabeled, decision-off first pass."""
+        config = getattr(self, "fitting_gate_config", None)
+        if not config:
+            return
+        import time
+
+        from exact.impl.models.pair_adaptive_experiments import JsonExperimentArtifact
+        from exact.impl.models.selector.llm_gate import select_inference_gate_artifact
+
+        started = time.perf_counter()
+        frame = self.dataset._active_dataframe().reset_index(drop=True)
+        signature = getattr(self.dataset, "dataset_signature", None)
+        identity = fingerprint(
+            self._json_safe_value(
+                {
+                    "dataset": signature,
+                    "pairs": frame[["Src", "Tgt"]].values.tolist(),
+                    "model": self.model.runtime_fingerprint_payload(),
+                    "policy": config,
+                }
+            )
+        )
+        directory = self.output_dir / "routing" / identity
+        records = []
+        original_llm = self.model.use_llm
+        self.model.use_llm = False
+        try:
+            for indices in source_batches(frame, int(batch_size)):
+                source_ids = sorted(set(frame.iloc[indices].Src.astype(str)))
+                shard = directory / (fingerprint(source_ids) + ".json")
+                if shard.exists():
+                    records.extend(json.loads(shard.read_text())["rows"])
+                    continue
+                batch = _semantic_collate_fn([self.dataset[index] for index in indices])
+                with torch.no_grad():
+                    output = self.model.forward(
+                        src_iris=batch["src_iri"],
+                        tgt_iris=batch["tgt_iri"],
+                        src_label_lists=batch["src_labels"],
+                        tgt_label_lists=batch["tgt_labels"],
+                        src_contexts=batch.get("src_contexts"),
+                        tgt_contexts=batch.get("tgt_contexts"),
+                        src_ctx_raw=batch.get("src_ctx_raw_triples"),
+                        tgt_ctx_raw=batch.get("tgt_ctx_raw_triples"),
+                    )
+                rows = [
+                    {
+                        "source_iri": str(source),
+                        "target_iri": str(target),
+                        "score": float(output["S_base"][offset]),
+                        "U": float(output["U"][offset]),
+                    }
+                    for offset, (source, target) in enumerate(
+                        zip(batch["src_iri"], batch["tgt_iri"])
+                    )
+                ]
+                freeze_json(
+                    shard, {"source_ids": source_ids, "rows": rows}, max_bytes=256 * 1024**2
+                )
+                records.extend(rows)
+        finally:
+            self.model.use_llm = original_llm
+        universe = (
+            getattr(self.dataset, "eligible_source_iris", None)
+            or getattr(self, "source_universe", None)
+            or sorted(set(self.dataset.dataframe.Src.astype(str)))
+        )
+        artifact = config.get("artifact") or directory / "selection.json"
+        if config["mode"] == "forced_sample":
+            from exact.impl.models.selector.llm_gate import fit_forced_sample_artifact
+
+            strata = (
+                json.loads(Path(config["strata_artifact"]).read_text())
+                if config.get("strata_artifact")
+                else None
+            )
+            if strata is not None and strata.get("dataset_signature") != signature:
+                raise ValueError("Forced-source strata differ from the bound development dataset")
+            payload = fit_forced_sample_artifact(
+                records,
+                source_strata=strata["source_strata"] if strata else None,
+                strata_provenance=strata["provenance"] if strata else None,
+                sample_size=config["forced_sample_size"],
+                seed=self.model.request_seed,
+                task_id=str(signature),
+                entity_kind="|".join(
+                    sorted({str(kind) for kind in getattr(self.dataset, "entity_kinds", ["class"])})
+                ),
+                dataset_signature=signature,
+            )
+            payload["selected_count"] = payload["sample_size"]
+            payload["no_candidate_sources"] = sorted(
+                set(universe) - {row["source_iri"] for row in records}
+            )
+        else:
+            payload = select_inference_gate_artifact(
+                records,
+                mode=config["mode"],
+                fraction=config["quantile_fraction"],
+                dataset_signature=signature,
+                source_universe=universe,
+            )
+        freeze_json(artifact, payload)
+        self.model.llm_experiment_config["gate"] = {**config, "artifact": str(artifact)}
+        self.model._gate_artifact = JsonExperimentArtifact.load(
+            artifact, expected_mode=config["mode"], kind="LLM gate"
+        )
+        self.model._validate_gate_artifact_contract(config["mode"])
+        self._gate_prepass = {
+            "seconds": time.perf_counter() - started,
+            "rows": len(records),
+            "selection_artifact": str(artifact),
+            "eligible_sources": len(set(row["source_iri"] for row in records)),
+            "selected_count": payload["selected_count"],
+            "no_candidate_sources": payload["no_candidate_sources"],
+            "evidence_reuse": "shared_persistent_encoder_cache",
+        }
+        freeze_json(
+            directory / "prepass.json",
+            {key: value for key, value in self._gate_prepass.items() if key != "seconds"},
+        )
+        self.fitting_gate_config = None
+        self._checkpoint_fingerprint_payload = self._build_checkpoint_fingerprint_payload()
+        self._checkpoint_fingerprint = self._hash_checkpoint_fingerprint_payload(
+            self._checkpoint_fingerprint_payload
+        )

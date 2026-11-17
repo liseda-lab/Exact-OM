@@ -1,19 +1,31 @@
 from __future__ import annotations
 
+import time
 from collections import defaultdict
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from copy import copy
+from typing import Any, Dict, List, Optional, Tuple
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
-import torch
-import time
 
-from org.semanticweb.owlapi.model import IRI
-from org.semanticweb.owlapi.search import EntitySearcher
-
-from exact.impl.datasets.contextgraph import ContextDataset
+from exact.core.entities.kinds import EntityKind
 from exact.core.entities.ontology import OntologyGraph
+from exact.impl.annotation_semantics import (
+    annotate_literal,
+    deduplicate_annotations,
+    validate_annotation_semantics,
+)
+from exact.impl.datasets.contextgraph import ContextDataset
+from exact.impl.graph_controls import shuffle_relations
+from exact.utils.formatting import safe_mean
+
+# The native projector emits these accepted RDFS annotation predicates as QNames.
+# Reconcile only its declared spellings; display labels never imply identity.
+_PROJECTED_ANNOTATION_IRIS = {
+    "rdfs:comment": "http://www.w3.org/2000/01/rdf-schema#comment",
+    "rdfs:label": "http://www.w3.org/2000/01/rdf-schema#label",
+}
 
 
 class PairAdaptiveContextDataset(ContextDataset):
@@ -33,9 +45,13 @@ class PairAdaptiveContextDataset(ContextDataset):
         max_diff_triples: int = 24,
         max_attr_items: int = 12,
         pair_adaptive_feature_log_every: int = 1000,
+        annotation_semantics: Optional[Dict[str, Dict[str, Any]]] = None,
+        annotation_provenance_dedup: bool = False,
         **kwargs: Any,
     ):
         super().__init__(**kwargs)
+        self.annotation_semantics = validate_annotation_semantics(annotation_semantics or {})
+        self.annotation_provenance_dedup = bool(annotation_provenance_dedup)
         self.projection_include_literals = bool(projection_include_literals)
         self.hierarchical_relation_families = hierarchical_relation_families or {}
         self.hierarchy_max_depth = int(hierarchy_max_depth)
@@ -44,8 +60,11 @@ class PairAdaptiveContextDataset(ContextDataset):
         self.max_diff_triples = int(max_diff_triples)
         self.max_attr_items = int(max_attr_items)
         self.pair_adaptive_feature_log_every = max(1, int(pair_adaptive_feature_log_every))
-        self._entity_feature_cache: Dict[Tuple[str, str], Dict[str, Any]] = {}
-        self._direct_superclass_cache: Dict[Tuple[str, str], List[str]] = {}
+        self._property_extra_cache = {}
+        self._shuffled_graph_cache = {}
+        self.graph_control_manifests = {}
+        self._entity_feature_cache: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+        self._direct_superclass_cache: Dict[Tuple[str, str, str], List[str]] = {}
         self._hierarchy_axiom_targets_cache: Dict[Tuple[str, str], List[Tuple[str, str]]] = {}
         self._relation_family_cache: Dict[str, Optional[str]] = {}
         self._normalized_relation_families: Dict[str, Dict[str, set[str]]] = {}
@@ -70,6 +89,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         payload = super()._cache_fingerprint_payload()
         payload.update(
             {
+                "evidence_schema": 7,
+                "annotation_semantics": self.annotation_semantics,
+                "annotation_provenance_dedup": self.annotation_provenance_dedup,
                 "projection_include_literals": self.projection_include_literals,
                 "hierarchical_relation_families": self.hierarchical_relation_families,
                 "hierarchy_max_depth": self.hierarchy_max_depth,
@@ -86,8 +108,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         if self._source_graph is None:
             self.log("Loading source graph for pair-adaptive dataset…", level="info")
             self._source_graph = OntologyGraph(
-                self.source.ontology,
-                self.source_reasoner,
+                self.source,
                 only_taxonomy=False,
                 include_literals=self.projection_include_literals,
             )
@@ -98,8 +119,7 @@ class PairAdaptiveContextDataset(ContextDataset):
         if self._target_graph is None:
             self.log("Loading target graph for pair-adaptive dataset…", level="info")
             self._target_graph = OntologyGraph(
-                self.target.ontology,
-                self.target_reasoner,
+                self.target,
                 only_taxonomy=False,
                 include_literals=self.projection_include_literals,
             )
@@ -121,115 +141,25 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._relation_family_cache[rel_iri] = None
         return None
 
-    def _direct_superclass_iris(self, iri: str, graph: OntologyGraph, side: str) -> List[str]:
-        cache_key = (side, iri)
+    def _direct_superclass_iris(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind = EntityKind.CLASS,
+    ) -> List[str]:
+        del graph
+        cache_key = (side, kind.value, iri)
         cached = self._direct_superclass_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        reasoner = self.source_reasoner if side == "src" else self.target_reasoner
-        ontology = self.source.ontology if side == "src" else self.target.ontology
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        out: List[str] = []
-        try:
-            superset = reasoner.getSuperClasses(owl_class, True).getFlattened()
-            for sup in superset:
-                if not sup.isOWLThing():
-                    out.append(str(sup.getIRI().toString()))
-        except Exception:
-            pass
+        source = self.source if side == "src" else self.target
+        out = source.direct_parents(iri, kind)
         self._direct_superclass_cache[cache_key] = list(out)
         return out
 
-    def _ontology_for_side(self, side: str):
-        return self.source.ontology if side == "src" else self.target.ontology
-
-    @staticmethod
-    def _iter_java_items(value: Any) -> Iterable[Any]:
-        if value is None:
-            return []
-        try:
-            iterator = value.iterator()
-            out: List[Any] = []
-            while iterator.hasNext():
-                out.append(iterator.next())
-            return out
-        except Exception:
-            try:
-                return list(value)
-            except Exception:
-                return []
-
-    @staticmethod
-    def _named_class_iri(expr: Any) -> Optional[str]:
-        if expr is None:
-            return None
-        try:
-            if expr.isOWLClass():
-                return str(expr.asOWLClass().getIRI().toString())
-        except Exception:
-            pass
-        try:
-            owl_class = expr.asOWLClass()
-            return str(owl_class.getIRI().toString())
-        except Exception:
-            return None
-
-    @staticmethod
-    def _property_iri(prop_expr: Any) -> Optional[str]:
-        if prop_expr is None:
-            return None
-        try:
-            named = prop_expr.getNamedProperty()
-            return str(named.getIRI().toString())
-        except Exception:
-            pass
-        try:
-            if not prop_expr.isAnonymous():
-                return str(prop_expr.asOWLObjectProperty().getIRI().toString())
-        except Exception:
-            pass
-        try:
-            return str(prop_expr.toStringID())
-        except Exception:
-            return None
-
-    def _iter_hierarchy_targets(
-        self,
-        expr: Any,
-        graph: OntologyGraph,
-    ) -> List[Tuple[str, str]]:
-        out: List[Tuple[str, str]] = []
-        named_iri = self._named_class_iri(expr)
-        if named_iri:
-            out.append(("is_a", named_iri))
-            return out
-
-        expr_type = ""
-        try:
-            expr_type = str(expr.getClassExpressionType().toString())
-        except Exception:
-            expr_type = ""
-
-        if "Intersection" in expr_type or hasattr(expr, "getOperandsAsList") or hasattr(expr, "getOperands"):
-            operands = []
-            try:
-                operands = self._iter_java_items(expr.getOperandsAsList())
-            except Exception:
-                operands = self._iter_java_items(getattr(expr, "getOperands", lambda: [])())
-            for operand in operands:
-                out.extend(self._iter_hierarchy_targets(operand, graph))
-
-        if hasattr(expr, "getProperty") and hasattr(expr, "getFiller"):
-            prop_iri = self._property_iri(expr.getProperty())
-            filler_iri = self._named_class_iri(expr.getFiller())
-            family = self._relation_family(graph, prop_iri or "")
-            if family and filler_iri:
-                out.append((family, filler_iri))
-            else:
-                out.extend(self._iter_hierarchy_targets(expr.getFiller(), graph))
-
-        return out
+    def _source_for_side(self, side: str):
+        return self.source if side == "src" else self.target
 
     def _hierarchy_axiom_targets(
         self,
@@ -241,34 +171,20 @@ class PairAdaptiveContextDataset(ContextDataset):
         cached = self._hierarchy_axiom_targets_cache.get(cache_key)
         if cached is not None:
             return list(cached)
-        ontology = self._ontology_for_side(side)
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        out: List[Tuple[str, str]] = []
+        source = self._source_for_side(side)
+        family_properties: Dict[str, List[str]] = {"is_a": []}
+        for family, cfg in self.hierarchical_relation_families.items():
+            family_properties[family] = list(cfg.get("iri_aliases") or [])
+        for relation_iri in graph.get_relations(human_readable=False):
+            family = self._relation_family(graph, relation_iri)
+            if family:
+                family_properties.setdefault(family, []).append(relation_iri)
 
-        try:
-            for axiom in self._iter_java_items(ontology.getSubClassAxiomsForSubClass(owl_class)):
-                try:
-                    out.extend(self._iter_hierarchy_targets(axiom.getSuperClass(), graph))
-                except Exception:
-                    continue
-        except Exception:
-            pass
-
-        try:
-            for axiom in self._iter_java_items(ontology.getEquivalentClassesAxioms(owl_class)):
-                expressions = []
-                try:
-                    expressions = self._iter_java_items(axiom.getClassExpressionsAsList())
-                except Exception:
-                    expressions = self._iter_java_items(axiom.getClassExpressions())
-                for expr in expressions:
-                    named = self._named_class_iri(expr)
-                    if named and named == iri:
-                        continue
-                    out.extend(self._iter_hierarchy_targets(expr, graph))
-        except Exception:
-            pass
+        out = [
+            (family, target)
+            for family, targets in source.hierarchy_bundle(iri, family_properties).items()
+            for target in targets
+        ]
 
         deduped: List[Tuple[str, str]] = []
         seen = set()
@@ -281,7 +197,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         self._hierarchy_axiom_targets_cache[cache_key] = list(deduped)
         return deduped
 
-    def _hierarchy_bundle(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, List[Dict[str, Any]]]:
+    def _class_hierarchy_bundle(
+        self, iri: str, graph: OntologyGraph, side: str
+    ) -> Dict[str, List[Dict[str, Any]]]:
         out: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
         frontier = [(iri, 0)]
         seen = {iri}
@@ -289,7 +207,7 @@ class PairAdaptiveContextDataset(ContextDataset):
             node, depth = frontier.pop(0)
             if depth >= self.hierarchy_max_depth:
                 continue
-            for sup in self._direct_superclass_iris(node, graph, side):
+            for sup in self._direct_superclass_iris(node, graph, side, EntityKind.CLASS):
                 if sup in seen:
                     continue
                 seen.add(sup)
@@ -305,7 +223,9 @@ class PairAdaptiveContextDataset(ContextDataset):
                 )
 
         family_frontier = [(iri, 0)]
-        family_seen = {(family, iri) for family in self.hierarchical_relation_families if family != "is_a"}
+        family_seen = {
+            (family, iri) for family in self.hierarchical_relation_families if family != "is_a"
+        }
         while family_frontier:
             node, depth = family_frontier.pop(0)
             if depth >= self.hierarchy_max_depth:
@@ -321,7 +241,11 @@ class PairAdaptiveContextDataset(ContextDataset):
                 spec = 1.0 / float(depth + 1)
                 out[family].append(
                     {
-                        "triple": (graph.get_labels(node)[0], family, graph.get_labels(target_iri)[0]),
+                        "triple": (
+                            graph.get_labels(node)[0],
+                            family,
+                            graph.get_labels(target_iri)[0],
+                        ),
                         "specificity": spec,
                         "subject_iri": node,
                         "object_iri": target_iri,
@@ -332,6 +256,106 @@ class PairAdaptiveContextDataset(ContextDataset):
             triples.sort(key=lambda item: float(item.get("specificity", 0.0)), reverse=True)
             out[family] = triples[: self.max_hierarchy_triples_per_family]
         return dict(out)
+
+    def _property_hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        triples: List[Dict[str, Any]] = []
+        frontier = [(iri, 0)]
+        seen = {iri}
+        while frontier:
+            node, depth = frontier.pop(0)
+            if depth >= self.hierarchy_max_depth:
+                continue
+            for parent in self._direct_superclass_iris(node, graph, side, kind):
+                if parent in seen:
+                    continue
+                seen.add(parent)
+                frontier.append((parent, depth + 1))
+                triples.append(
+                    {
+                        "triple": (
+                            graph.get_labels(node)[0],
+                            "subPropertyOf",
+                            graph.get_labels(parent)[0],
+                        ),
+                        "specificity": 1.0 / float(depth + 1),
+                        "subject_iri": node,
+                        "object_iri": parent,
+                    }
+                )
+        triples.sort(key=lambda item: float(item.get("specificity", 0.0)), reverse=True)
+        return {"is_a": triples[: self.max_hierarchy_triples_per_family]}
+
+    def _individual_hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        source = self._source_for_side(side)
+        triples: List[Dict[str, Any]] = []
+        seen: set[str] = set()
+        for type_iri in source.direct_parents(iri, EntityKind.INDIVIDUAL):
+            if type_iri in seen:
+                continue
+            seen.add(type_iri)
+            triples.append(
+                {
+                    "triple": (
+                        graph.get_labels(iri)[0],
+                        "rdf:type",
+                        graph.get_labels(type_iri)[0],
+                    ),
+                    "specificity": 1.0,
+                    "subject_iri": iri,
+                    "object_iri": type_iri,
+                    "type_closure": False,
+                }
+            )
+            for parent in source.direct_parents(type_iri, EntityKind.CLASS):
+                if parent in seen:
+                    continue
+                seen.add(parent)
+                triples.append(
+                    {
+                        "triple": (
+                            graph.get_labels(iri)[0],
+                            "rdf:type",
+                            graph.get_labels(parent)[0],
+                        ),
+                        "specificity": 0.5,
+                        "subject_iri": iri,
+                        "object_iri": parent,
+                        "type_closure": True,
+                    }
+                )
+        triples.sort(
+            key=lambda item: (
+                -float(item.get("specificity", 0.0)),
+                str(item.get("object_iri", "")),
+            )
+        )
+        return {"is_a": triples[: self.max_hierarchy_triples_per_family]}
+
+    def _hierarchy_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        if kind == EntityKind.CLASS:
+            return self._class_hierarchy_bundle(iri, graph, side)
+        if kind in {EntityKind.OBJECT_PROPERTY, EntityKind.DATA_PROPERTY}:
+            return self._property_hierarchy_bundle(iri, graph, side, kind)
+        if kind == EntityKind.INDIVIDUAL:
+            return self._individual_hierarchy_bundle(iri, graph, side)
+        return {}
 
     def _hierarchy_family_names(self) -> List[str]:
         family_names = list(self.hierarchical_relation_families.keys() or [])
@@ -362,45 +386,115 @@ class PairAdaptiveContextDataset(ContextDataset):
         triples.sort(key=lambda item: item["score"], reverse=True)
         return triples[: self.max_object_triples]
 
-    def _annotation_bundle(self, iri: str, graph: OntologyGraph, side: str) -> List[Dict[str, Any]]:
-        ontology = self.source.ontology if side == "src" else self.target.ontology
-        factory = ontology.getOWLOntologyManager().getOWLDataFactory()
-        owl_class = factory.getOWLClass(IRI.create(iri))
-        label_prop = str(factory.getRDFSLabel().getIRI().toString())
-        items: List[Dict[str, Any]] = []
-        seen = set()
-        try:
-            annotations = EntitySearcher.getAnnotations(owl_class, ontology)
-            iterator = annotations.iterator()
-            while iterator.hasNext():
-                ann = iterator.next()
-                prop_iri = str(ann.getProperty().getIRI().toString())
-                if prop_iri == label_prop:
-                    continue
-                value = ann.getValue()
-                if not value.isLiteral():
-                    continue
-                literal = str(value.asLiteral().get().getLiteral()).strip()
-                if not literal:
-                    continue
-                prop_label = graph.get_labels(prop_iri)[0]
-                dedupe_key = (prop_label, literal)
-                if dedupe_key in seen:
-                    continue
-                seen.add(dedupe_key)
-                items.append(
+    def _property_object_bundle(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+    ) -> List[Dict[str, Any]]:
+        """Add property schema evidence to the normal projected neighborhood."""
+
+        source = self._source_for_side(side)
+        triples: List[Dict[str, Any]] = []
+        property_label = graph.get_labels(iri)[0]
+        for relation, targets in (
+            ("domain", source.property_domains(iri)),
+            ("range", source.property_ranges(iri)),
+        ):
+            for target_iri in targets:
+                triples.append(
                     {
-                        "prop": prop_label,
-                        "value": literal,
-                        "text": f"{prop_label}: {literal}",
-                        "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
-                        "entity_iri": iri,
+                        "triple": (
+                            property_label,
+                            relation,
+                            graph.get_labels(target_iri)[0],
+                        ),
+                        "rel_iri": relation,
+                        "score": 1.0,
+                        "subject_iri": iri,
+                        "object_iri": target_iri,
+                        "property_schema": True,
                     }
                 )
-        except Exception:
-            pass
+        triples.extend(self._object_bundle(iri, graph))
+        deduplicated: List[Dict[str, Any]] = []
+        seen: set[Tuple[str, str, str]] = set()
+        for item in triples:
+            key = tuple(str(value) for value in item.get("triple", ()))
+            if len(key) != 3:
+                continue
+            if key in seen:
+                original = next(
+                    row
+                    for row in deduplicated
+                    if tuple(str(value) for value in row.get("triple", ())) == key
+                )
+                original.setdefault("grouped_semantic_features", []).append(
+                    {
+                        field: item[field]
+                        for field in ("subject_iri", "object_iri", "rel_iri")
+                        if field in item
+                    }
+                )
+                continue
+            seen.add(key)
+            deduplicated.append(item)
+        deduplicated.sort(
+            key=lambda item: (
+                -float(item.get("score", 0.0)),
+                tuple(str(value) for value in item.get("triple", ())),
+            )
+        )
+        return deduplicated[: self.max_object_triples]
+
+    def _annotation_bundle(self, iri: str, graph: OntologyGraph, side: str) -> List[Dict[str, Any]]:
+        source = self.source if side == "src" else self.target
+        items: List[Dict[str, Any]] = []
+        seen = set()
+        for value in source.attributes(iri):
+            literal = value.value.strip()
+            if not value.is_literal or not literal:
+                continue
+            prop_label = graph.get_labels(value.property_iri)[0]
+            dedupe_key = (value.property_iri, literal, value.datatype, value.lang)
+            if dedupe_key in seen:
+                original = next(
+                    item
+                    for item in items
+                    if (item["prop_iri"], item["value"], item.get("datatype"), item.get("language"))
+                    == dedupe_key
+                )
+                original.setdefault("grouped_semantic_features", []).append(
+                    {
+                        "entity_iri": iri,
+                        "prop_iri": value.property_iri,
+                        "literal_lexical_form": value.value,
+                        "value": literal,
+                        "datatype": value.datatype,
+                        "language": value.lang,
+                    }
+                )
+                continue
+            seen.add(dedupe_key)
+            items.append(
+                {
+                    "prop": prop_label,
+                    "prop_iri": value.property_iri,
+                    "literal_lexical_form": value.value,
+                    "datatype": value.datatype,
+                    "language": value.lang,
+                    "value": literal,
+                    "text": f"{prop_label}: {literal}",
+                    "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
+                    "entity_iri": iri,
+                }
+            )
 
         if self.projection_include_literals:
+            # Projection drops literal language/datatype. A projected copy adds no
+            # evidence when the native annotation already supplies its property/value;
+            # keep distinct native terms, and use projection only for missing values.
+            native_literals = {(item["prop_iri"], item["value"]) for item in items}
             for src, rel, dst in graph.get_raw_neighborhood(iri, self.n_hops):
                 if self._relation_family(graph, rel) is not None:
                     continue
@@ -415,45 +509,198 @@ class PairAdaptiveContextDataset(ContextDataset):
                 if not literal:
                     continue
                 prop_label = graph.get_labels(rel)[0]
-                dedupe_key = (prop_label, literal)
-                if dedupe_key in seen:
+                property_iri = _PROJECTED_ANNOTATION_IRIS.get(rel, rel)
+                dedupe_key = (property_iri, literal, None, None)
+                if (property_iri, literal) in native_literals or dedupe_key in seen:
                     continue
                 seen.add(dedupe_key)
                 items.append(
                     {
                         "prop": prop_label,
+                        "prop_iri": rel,
                         "value": literal,
                         "text": f"{prop_label}: {literal}",
                         "weight": min(1.0, max(0.1, len(literal.split()) / 12.0)),
                         "entity_iri": iri,
                     }
                 )
+        items = [annotate_literal(item, self.annotation_semantics) for item in items]
+        if self.annotation_provenance_dedup:
+            items = deduplicate_annotations(items)
         items.sort(key=lambda item: item["weight"], reverse=True)
         return items[: self.max_attr_items]
 
-    def get_entity_features(self, iri: str, side: str) -> Dict[str, Any]:
-        key = (side, iri)
+    def _base_entity_features(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, Any]:
+        labels = graph.get_labels(iri)
+        return {
+            "kind": kind.value,
+            "labels": labels[:] if self.all_labels else [labels[0]],
+            "hierarchy": self._hierarchy_bundle(iri, graph, side, kind),
+            "attributes": self._annotation_bundle(iri, graph, side),
+        }
+
+    def _bundle_for_class(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, EntityKind.CLASS)
+        features["object_triples"] = self._object_bundle(iri, graph)
+        return features
+
+    def _property_experiment_extras(self, side: str) -> Dict[str, Dict[str, list]]:
+        """Index asserted inverse/characteristic facts and bounded usage once per side."""
+        if side in self._property_extra_cache:
+            return self._property_extra_cache[side]
+        source = self._source_for_side(side)
+        graph = self.source_graph if side == "src" else self.target_graph
+        extras = defaultdict(lambda: {"signature": [], "usage": []})
+        from exact.io.sources.evidence import property_schema_evidence
+
+        for row in property_schema_evidence(source):
+            iri, target = row["subject_iri"], row["object_iri"]
+            extras[iri]["signature"].append(
+                {
+                    **{
+                        key: value
+                        for key, value in row.items()
+                        if key not in {"relation_label", "object_label"}
+                    },
+                    "triple": (
+                        graph.get_labels(iri)[0],
+                        row["relation_label"],
+                        row["object_label"] or graph.get_labels(target)[0],
+                    ),
+                    "score": 1.0,
+                    "property_schema": True,
+                }
+            )
+        for edge in sorted(graph.edges or [], key=lambda edge: edge.astuple()):
+            usage = extras[edge.rel]["usage"]
+            if len(usage) >= min(8, self.max_object_triples):
+                continue
+            usage.append(
+                {
+                    "triple": tuple(graph.get_labels(value)[0] for value in edge.astuple()),
+                    "rel_iri": edge.rel,
+                    "subject_iri": edge.src,
+                    "object_iri": edge.dst,
+                    "score": graph.edge_ic_norm(edge.astuple()),
+                    "evidence_group": "usage",
+                }
+            )
+        self._property_extra_cache[side] = dict(extras)
+        return self._property_extra_cache[side]
+
+    def shuffled_object_bundle(self, iri: str, side: str, seed: int) -> List[Dict[str, Any]]:
+        """Score relation controls from a cached shuffled graph, keeping types unchanged."""
+        if seed is None:
+            raise ValueError("relations_shuffled requires an explicit request_seed")
+        key = (side, int(seed))
+        if key not in self._shuffled_graph_cache:
+            original = self.source_graph if side == "src" else self.target_graph
+            kinds = {
+                entity: kind.value
+                for kind in EntityKind
+                if kind.value != "annotation_property"
+                for entity in self._source_for_side(side).entities(kind)
+            }
+            edges, manifest = shuffle_relations(original.edges or [], seed=seed, kinds=kinds)
+            graph = copy(original)
+            graph.edges = edges
+            graph.out_edges = graph._build_out_edges()
+            graph.graph = graph._build_graph(edges)
+            for field in (
+                "_node_ic_cache",
+                "_edge_ic_cache",
+                "_edge_ic_max_cache",
+                "_incident_edge_cache",
+                "_rel_adj_cache",
+                "_edge_cost_cache",
+                "_example_triples_cache",
+            ):
+                setattr(graph, field, None)
+            graph._raw_neighborhood_cache = {}
+            graph._context_subgraph_cache = {}
+            self._shuffled_graph_cache[key] = graph
+            self.graph_control_manifests[f"{side}:{seed}"] = manifest
+        return self._object_bundle(iri, self._shuffled_graph_cache[key])
+
+    def _bundle_for_property(
+        self,
+        iri: str,
+        graph: OntologyGraph,
+        side: str,
+        kind: EntityKind,
+    ) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, kind)
+        features["object_triples"] = self._property_object_bundle(iri, graph, side)
+        return features
+
+    def _bundle_for_individual(self, iri: str, graph: OntologyGraph, side: str) -> Dict[str, Any]:
+        features = self._base_entity_features(iri, graph, side, EntityKind.INDIVIDUAL)
+        features["object_triples"] = self._object_bundle(iri, graph)
+        return features
+
+    def get_entity_features(
+        self,
+        iri: str,
+        side: str,
+        kind: EntityKind | str | None = None,
+    ) -> Dict[str, Any]:
+        resolved_kind = EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
+        key = (side, resolved_kind.value, iri)
         cached = self._entity_feature_cache.get(key)
         if cached is not None:
             return cached
         graph = self.source_graph if side == "src" else self.target_graph
-        feats = {
-            "labels": graph.get_labels(iri)[:] if self.all_labels else [graph.get_labels(iri)[0]],
-            "hierarchy": self._hierarchy_bundle(iri, graph, side),
-            "object_triples": self._object_bundle(iri, graph),
-            "attributes": self._annotation_bundle(iri, graph, side),
-        }
+        if resolved_kind == EntityKind.CLASS:
+            feats = self._bundle_for_class(iri, graph, side)
+        elif resolved_kind in {
+            EntityKind.OBJECT_PROPERTY,
+            EntityKind.DATA_PROPERTY,
+        }:
+            feats = self._bundle_for_property(iri, graph, side, resolved_kind)
+        elif resolved_kind == EntityKind.INDIVIDUAL:
+            feats = self._bundle_for_individual(iri, graph, side)
+        else:
+            raise ValueError(f"Feature extraction is not implemented for {resolved_kind.value!r}")
+        from exact.io.sources.feature_provenance import FeatureProvenance
+
+        if not hasattr(self, "_feature_provenance"):
+            self._feature_provenance = {}
+        if side not in self._feature_provenance:
+            self._feature_provenance[side] = FeatureProvenance(self._source_for_side(side))
+        provenance = self._feature_provenance[side]
+        for family, items in feats.get("hierarchy", {}).items():
+            predicates = (self.hierarchical_relation_families.get(family) or {}).get(
+                "iri_aliases", []
+            )
+            feats["hierarchy"][family] = [
+                provenance.enrich(
+                    item, kind=resolved_kind.value, family=family, predicates=predicates
+                )
+                for item in items
+            ]
+        for channel in ("object_triples", "attributes"):
+            feats[channel] = [
+                provenance.enrich(item, kind=resolved_kind.value) for item in feats.get(channel, [])
+            ]
         self._entity_feature_cache[key] = feats
         return feats
 
-    def has_entity_features_cached(self, iri: str, side: str) -> bool:
-        return (side, iri) in self._entity_feature_cache
+    def has_entity_features_cached(
+        self,
+        iri: str,
+        side: str,
+        kind: EntityKind | str | None = None,
+    ) -> bool:
+        resolved_kind = EntityKind(kind) if kind is not None else self.entity_kind_for(iri, side)
+        return (side, resolved_kind.value, iri) in self._entity_feature_cache
 
-    @staticmethod
-    def _safe_mean(values: List[float]) -> float:
-        if not values:
-            return 0.0
-        return float(sum(values) / max(1, len(values)))
+    _safe_mean = staticmethod(safe_mean)
 
     def _entity_pool_metrics(self, feats: Dict[str, Any]) -> Dict[str, float]:
         hierarchy = feats.get("hierarchy", {}) or {}
@@ -492,45 +739,73 @@ class PairAdaptiveContextDataset(ContextDataset):
 
     def _pair_adaptive_metric_columns(self) -> List[str]:
         cols = [
-            "src_hier_total_count", "tgt_hier_total_count",
-            "src_hier_is_empty", "tgt_hier_is_empty",
-            "src_obj_count", "tgt_obj_count",
-            "src_obj_relation_count", "tgt_obj_relation_count",
-            "src_obj_ic_mean", "tgt_obj_ic_mean",
-            "src_obj_ic_max", "tgt_obj_ic_max",
-            "src_obj_is_empty", "tgt_obj_is_empty",
-            "src_attr_count", "tgt_attr_count",
-            "src_attr_weight_mean", "tgt_attr_weight_mean",
-            "src_attr_is_empty", "tgt_attr_is_empty",
+            "src_hier_total_count",
+            "tgt_hier_total_count",
+            "src_hier_is_empty",
+            "tgt_hier_is_empty",
+            "src_obj_count",
+            "tgt_obj_count",
+            "src_obj_relation_count",
+            "tgt_obj_relation_count",
+            "src_obj_ic_mean",
+            "tgt_obj_ic_mean",
+            "src_obj_ic_max",
+            "tgt_obj_ic_max",
+            "src_obj_is_empty",
+            "tgt_obj_is_empty",
+            "src_attr_count",
+            "tgt_attr_count",
+            "src_attr_weight_mean",
+            "tgt_attr_weight_mean",
+            "src_attr_is_empty",
+            "tgt_attr_is_empty",
         ]
         for family in self._hierarchy_family_names():
-            cols.extend([
-                f"src_hier_{family}_count",
-                f"tgt_hier_{family}_count",
-            ])
+            cols.extend(
+                [
+                    f"src_hier_{family}_count",
+                    f"tgt_hier_{family}_count",
+                ]
+            )
         return cols
 
-    def get_features(self, df) -> "DataFrame":
+    def get_features(self, df) -> "pd.DataFrame":
         self.log("Generating labels for pair-adaptive dataset…", level="info")
         src_iris: List[str] = df["Src"].tolist()
         tgt_iris: List[str] = df["Tgt"].tolist()
-        usrc = list(dict.fromkeys(src_iris))
-        utgt = list(dict.fromkeys(tgt_iris))
+        src_kinds = [
+            EntityKind(value)
+            for value in df.get(
+                "SrcKind", pd.Series(EntityKind.CLASS.value, index=df.index)
+            ).tolist()
+        ]
+        tgt_kinds = [
+            EntityKind(value)
+            for value in df.get(
+                "TgtKind", pd.Series(EntityKind.CLASS.value, index=df.index)
+            ).tolist()
+        ]
+        src_keys = list(zip(src_iris, src_kinds))
+        tgt_keys = list(zip(tgt_iris, tgt_kinds))
+        usrc = list(dict.fromkeys(src_keys))
+        utgt = list(dict.fromkeys(tgt_keys))
 
         build_started = time.time()
 
-        def _build_feature_map(iris: List[str], side: str) -> Dict[str, Dict[str, Any]]:
-            total = len(iris)
+        def _build_feature_map(
+            entities: List[Tuple[str, EntityKind]], side: str
+        ) -> Dict[Tuple[str, EntityKind], Dict[str, Any]]:
+            total = len(entities)
             progress_every = max(1, int(self.pair_adaptive_feature_log_every))
             label = "source" if side == "src" else "target"
-            feat_map: Dict[str, Dict[str, Any]] = {}
+            feat_map: Dict[Tuple[str, EntityKind], Dict[str, Any]] = {}
             side_started = time.time()
             self.log(
                 f"Pair-adaptive feature build starting for {label}: {total} unique entities",
                 level="info",
             )
-            for idx, iri in enumerate(iris, start=1):
-                feat_map[iri] = self.get_entity_features(iri, side)
+            for idx, (iri, kind) in enumerate(entities, start=1):
+                feat_map[(iri, kind)] = self.get_entity_features(iri, side, kind)
                 if idx == total or idx % progress_every == 0:
                     elapsed = time.time() - side_started
                     rate = idx / elapsed if elapsed > 1e-8 else 0.0
@@ -545,20 +820,14 @@ class PairAdaptiveContextDataset(ContextDataset):
 
         src_feat_map = _build_feature_map(usrc, "src")
         tgt_feat_map = _build_feature_map(utgt, "tgt")
-        src_lab_map = {iri: src_feat_map[iri]["labels"] for iri in usrc}
-        tgt_lab_map = {iri: tgt_feat_map[iri]["labels"] for iri in utgt}
-        src_pool_metrics_map = {
-            iri: self._entity_pool_metrics(src_feat_map[iri])
-            for iri in usrc
-        }
-        tgt_pool_metrics_map = {
-            iri: self._entity_pool_metrics(tgt_feat_map[iri])
-            for iri in utgt
-        }
+        src_lab_map = {key: src_feat_map[key]["labels"] for key in usrc}
+        tgt_lab_map = {key: tgt_feat_map[key]["labels"] for key in utgt}
+        src_pool_metrics_map = {key: self._entity_pool_metrics(src_feat_map[key]) for key in usrc}
+        tgt_pool_metrics_map = {key: self._entity_pool_metrics(tgt_feat_map[key]) for key in utgt}
 
         df = df.copy()
-        df["SrcLabels"] = [src_lab_map[iri] for iri in src_iris]
-        df["TgtLabels"] = [tgt_lab_map[iri] for iri in tgt_iris]
+        df["SrcLabels"] = [src_lab_map[key] for key in src_keys]
+        df["TgtLabels"] = [tgt_lab_map[key] for key in tgt_keys]
         df["SrcCtx"] = [[] for _ in src_iris]
         df["TgtCtx"] = [[] for _ in tgt_iris]
         df["SrcCtxRaw"] = [[] for _ in src_iris]
@@ -571,40 +840,66 @@ class PairAdaptiveContextDataset(ContextDataset):
         ]
 
         src_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(src_lab_map[iri])
-            for iri in usrc
+            key: self._compute_metrics_for_label_list(src_lab_map[key]) for key in usrc
         }
         tgt_label_metrics_map = {
-            iri: self._compute_metrics_for_label_list(tgt_lab_map[iri])
-            for iri in utgt
+            key: self._compute_metrics_for_label_list(tgt_lab_map[key]) for key in utgt
         }
-        for key in ["n_labels", "char_len", "word_len", "max_label_words", "avg_label_words", "is_empty"]:
-            df[f"src_lab_{key}"] = [src_label_metrics_map[iri][key] for iri in src_iris]
-            df[f"tgt_lab_{key}"] = [tgt_label_metrics_map[iri][key] for iri in tgt_iris]
+        for key in [
+            "n_labels",
+            "char_len",
+            "word_len",
+            "max_label_words",
+            "avg_label_words",
+            "is_empty",
+        ]:
+            df[f"src_lab_{key}"] = [
+                src_label_metrics_map[entity_key][key] for entity_key in src_keys
+            ]
+            df[f"tgt_lab_{key}"] = [
+                tgt_label_metrics_map[entity_key][key] for entity_key in tgt_keys
+            ]
         for key in ["n_triples", "char_len", "word_len", "tok_len"]:
             df[f"src_ctx_{key}"] = 0.0
             df[f"tgt_ctx_{key}"] = 0.0
         df["src_ctx_is_empty"] = 1.0
         df["tgt_ctx_is_empty"] = 1.0
         for key in sorted(src_pool_metrics_map[usrc[0]].keys()) if usrc else []:
-            df[f"src_{key}"] = [src_pool_metrics_map[iri][key] for iri in src_iris]
+            df[f"src_{key}"] = [src_pool_metrics_map[entity_key][key] for entity_key in src_keys]
         for key in sorted(tgt_pool_metrics_map[utgt[0]].keys()) if utgt else []:
-            df[f"tgt_{key}"] = [tgt_pool_metrics_map[iri][key] for iri in tgt_iris]
+            df[f"tgt_{key}"] = [tgt_pool_metrics_map[entity_key][key] for entity_key in tgt_keys]
         self.log(
             f"Pair-adaptive feature generation finished in {time.time() - build_started:.2f}s",
             level="info",
         )
         return df
 
-    def save_feature_metrics(self, df: Optional["DataFrame"] = None, filename: str = "feature_metrics.csv"):
+    def save_feature_metrics(
+        self, df: Optional["pd.DataFrame"] = None, filename: str = "feature_metrics.csv"
+    ):
         if df is None:
             df = self.dataframe
         cols = [
-            "Src", "Tgt",
-            "cand_sim", "cand_sim_src_mean", "cand_sim_prob",
-            "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
-            "src_lab_n_labels", "src_lab_char_len", "src_lab_word_len", "src_lab_max_label_words", "src_lab_avg_label_words", "src_lab_is_empty",
-            "tgt_lab_n_labels", "tgt_lab_char_len", "tgt_lab_word_len", "tgt_lab_max_label_words", "tgt_lab_avg_label_words", "tgt_lab_is_empty",
+            "Src",
+            "Tgt",
+            "cand_sim",
+            "cand_sim_src_mean",
+            "cand_sim_prob",
+            "cand_share_top",
+            "cand_share_rest",
+            "cand_share_log_ratio",
+            "src_lab_n_labels",
+            "src_lab_char_len",
+            "src_lab_word_len",
+            "src_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "src_lab_is_empty",
+            "tgt_lab_n_labels",
+            "tgt_lab_char_len",
+            "tgt_lab_word_len",
+            "tgt_lab_max_label_words",
+            "tgt_lab_avg_label_words",
+            "tgt_lab_is_empty",
         ]
         cols.extend(self._pair_adaptive_metric_columns())
         cols = [col for col in cols if col in df.columns]
@@ -615,34 +910,54 @@ class PairAdaptiveContextDataset(ContextDataset):
 
     def supported_plot_metrics(self) -> List[str]:
         metrics = [
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_lab_char_len", "tgt_lab_char_len",
-            "src_lab_max_label_words", "tgt_lab_max_label_words",
-            "src_lab_avg_label_words", "tgt_lab_avg_label_words",
-            "cand_sim", "cand_sim_src_mean", "cand_sim_prob",
-            "cand_share_top", "cand_share_rest", "cand_share_log_ratio",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_lab_char_len",
+            "tgt_lab_char_len",
+            "src_lab_max_label_words",
+            "tgt_lab_max_label_words",
+            "src_lab_avg_label_words",
+            "tgt_lab_avg_label_words",
+            "cand_sim",
+            "cand_sim_src_mean",
+            "cand_sim_prob",
+            "cand_share_top",
+            "cand_share_rest",
+            "cand_share_log_ratio",
         ]
         metrics.extend(self._pair_adaptive_metric_columns())
         return metrics
 
     def default_plot_metrics(self) -> List[str]:
         metrics = [
-            "src_lab_n_labels", "tgt_lab_n_labels",
-            "src_lab_word_len", "tgt_lab_word_len",
-            "src_hier_total_count", "tgt_hier_total_count",
-            "src_obj_count", "tgt_obj_count",
-            "src_obj_relation_count", "tgt_obj_relation_count",
-            "src_obj_ic_mean", "tgt_obj_ic_mean",
-            "src_attr_count", "tgt_attr_count",
-            "src_attr_weight_mean", "tgt_attr_weight_mean",
-            "cand_sim", "cand_sim_src_mean",
+            "src_lab_n_labels",
+            "tgt_lab_n_labels",
+            "src_lab_word_len",
+            "tgt_lab_word_len",
+            "src_hier_total_count",
+            "tgt_hier_total_count",
+            "src_obj_count",
+            "tgt_obj_count",
+            "src_obj_relation_count",
+            "tgt_obj_relation_count",
+            "src_obj_ic_mean",
+            "tgt_obj_ic_mean",
+            "src_attr_count",
+            "tgt_attr_count",
+            "src_attr_weight_mean",
+            "tgt_attr_weight_mean",
+            "cand_sim",
+            "cand_sim_src_mean",
         ]
         for family in self._hierarchy_family_names():
-            metrics.extend([
-                f"src_hier_{family}_count",
-                f"tgt_hier_{family}_count",
-            ])
+            metrics.extend(
+                [
+                    f"src_hier_{family}_count",
+                    f"tgt_hier_{family}_count",
+                ]
+            )
         return metrics
 
     def plot_feature_distributions(
@@ -657,7 +972,10 @@ class PairAdaptiveContextDataset(ContextDataset):
         df = self.dataframe
         selected = self._resolve_plot_metrics(which, df)
         if not selected:
-            self.log("No pair-adaptive dataset plot metrics available; skipping feature plots.", level="warning")
+            self.log(
+                "No pair-adaptive dataset plot metrics available; skipping feature plots.",
+                level="warning",
+            )
             return
         plot_dir = (self.plot_dir / "features").resolve()
         plot_dir.mkdir(parents=True, exist_ok=True)
@@ -668,7 +986,10 @@ class PairAdaptiveContextDataset(ContextDataset):
                 self.log(f"Skipping empty pair-adaptive metric '{col}'.", level="info")
                 continue
             if int(series.nunique(dropna=True)) <= 1:
-                self.log(f"Skipping non-informative pair-adaptive plot '{col}' (constant values).", level="info")
+                self.log(
+                    f"Skipping non-informative pair-adaptive plot '{col}' (constant values).",
+                    level="info",
+                )
                 continue
             plt.figure(figsize=(7, 5))
             sns.histplot(series, bins=bins, kde=kde, stat="probability", alpha=alpha)
@@ -681,7 +1002,9 @@ class PairAdaptiveContextDataset(ContextDataset):
             plt.close()
             self.log(f"Saved plot: {out}", level="debug")
 
-    def log_sanity_examples(self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs) -> None:
+    def log_sanity_examples(
+        self, n: int = 6, max_ctx_show: int = 3, max_label_show: int = 5, **kwargs
+    ) -> None:
         df = self.dataframe
         if df is None or df.empty:
             self.log("Dataset empty; no pair-adaptive sanity examples.", level="warning")
@@ -700,7 +1023,9 @@ class PairAdaptiveContextDataset(ContextDataset):
         if len(problematic) < n:
             rest = df.drop(problematic.index)
             if not rest.empty:
-                extra = rest.sample(min(n - len(problematic), len(rest)), random_state=self.request_seed)
+                extra = rest.sample(
+                    min(n - len(problematic), len(rest)), random_state=self.request_seed
+                )
                 problematic = pd.concat([problematic, extra])
         show = problematic.head(n)
         family_names = self._hierarchy_family_names()
@@ -726,12 +1051,10 @@ class PairAdaptiveContextDataset(ContextDataset):
             _show_lines("TGT labels", list(tgt_feats.get("labels", [])), max_label_show)
 
             src_family_counts = {
-                family: int(row.get(f"src_hier_{family}_count", 0))
-                for family in family_names
+                family: int(row.get(f"src_hier_{family}_count", 0)) for family in family_names
             }
             tgt_family_counts = {
-                family: int(row.get(f"tgt_hier_{family}_count", 0))
-                for family in family_names
+                family: int(row.get(f"tgt_hier_{family}_count", 0)) for family in family_names
             }
             self.log(f"  SRC hierarchy counts: {src_family_counts}", level="info")
             self.log(f"  TGT hierarchy counts: {tgt_family_counts}", level="info")

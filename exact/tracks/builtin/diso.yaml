@@ -1,0 +1,91 @@
+descriptor_version: 1
+name: diso
+provider: hf
+provider_version: "1"
+description: DISO-OAEI 2026 global reference tasks and NIL-bearing local candidate pools.
+upstream:
+  repo_id: OAEI-ML/diso-oaei
+  revision: v2026
+tasks:
+  brick-smartenv:
+    source: ontologies/brick.owl
+    target: ontologies/smartenv.owl
+    refs:
+      test:
+        path: references/repaired_silver/brick-smartenv.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/brick-smartenv.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  city-brick:
+    source: ontologies/city.owl
+    target: ontologies/brick.owl
+    refs:
+      test:
+        path: references/repaired_silver/city-brick.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/city-brick.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  jc3iedm-brick:
+    source: ontologies/jc3iedm.owl
+    target: ontologies/brick.owl
+    refs:
+      test:
+        path: references/repaired_silver/jc3iedm-brick.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/jc3iedm-brick.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  jc3iedm-facility:
+    source: ontologies/jc3iedm.owl
+    target: ontologies/facility.owl
+    refs:
+      test:
+        path: references/repaired_silver/jc3iedm-facility.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/jc3iedm-facility.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  jc3iedm-mio:
+    source: ontologies/jc3iedm.owl
+    target: ontologies/mio.owl
+    refs:
+      test:
+        path: references/repaired_silver/jc3iedm-mio.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/jc3iedm-mio.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  thinkhome-brick:
+    source: ontologies/thinkhome.owl
+    target: ontologies/brick.owl
+    refs:
+      test:
+        path: references/repaired_silver/thinkhome-brick.silver.rdf
+        transform: alignment_rdf_to_tsv
+    extras:
+      unrepaired_reference:
+        path: references/unrepaired_silver/thinkhome-brick.silver.unrepaired.rdf
+        transform: alignment_rdf_to_tsv
+  stix-d3fend:
+    source: ontologies/stix.owl
+    target: ontologies/d3fend.owl
+    refs: {}
+    candidates:
+      path: pools/stix-d3fend/pools.jsonl
+      transform: pools_jsonl_to_cands_tsv
+    extras: {nil: true}
+  uco-stix:
+    source: ontologies/uco.owl
+    target: ontologies/stix.owl
+    refs: {}
+    candidates:
+      path: pools/uco-stix/pools.jsonl
+      transform: pools_jsonl_to_cands_tsv
+    extras: {nil: true}

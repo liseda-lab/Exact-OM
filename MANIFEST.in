@@ -1,0 +1,18 @@
+include README.md LICENSE CHANGELOG.md CONTRIBUTING.md MIGRATION.md
+recursive-include docs *.md
+recursive-include exact *.yaml *.json *.owl *.tsv *.txt
+recursive-include tests *.py *.json *.jsonl *.yaml *.yml *.owl *.tsv *.csv *.nt *.ttl *.trig
+recursive-include scripts *.py *.yml
+recursive-include explanations_visualizer *.ts *.tsx *.css *.json *.ico *.md
+recursive-include exact_inspect/static *
+prune explanations_visualizer/node_modules
+prune explanations_visualizer/.next
+prune explanations_visualizer/out
+prune explanations_visualizer/test-results
+prune explanations_visualizer/playwright-report
+global-exclude *.pyc *.tsbuildinfo
+exclude explanations_visualizer/next-env.d.ts
+exclude BioML-data-and-evaluation.zip
+prune data
+prune exports
+prune .worktrees

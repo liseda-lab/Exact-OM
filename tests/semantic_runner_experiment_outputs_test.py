@@ -1,0 +1,561 @@
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+import pytest
+import torch
+
+from exact.core.contracts.model import IModel
+from exact.impl.trainer import SemanticAlignmentRunner
+
+
+class _FixtureDataset:
+    dataset_signature = "runner-experiment-output-test"
+    cache_fingerprint = "runner-experiment-output-candidates-v1"
+
+    def __len__(self) -> int:
+        return 2
+
+    def __getitem__(self, index: int) -> dict[str, Any]:
+        return {
+            "src_iri": f"https://example.org/source/{index}",
+            "tgt_iri": f"https://example.org/target/{index}",
+            "src_kind": "class",
+            "tgt_kind": "class",
+            "src_labels": [f"source {index}"],
+            "tgt_labels": [f"target {index}"],
+            "src_ctx_triples": [],
+            "tgt_ctx_triples": [],
+            "label": index == 0,
+        }
+
+
+class _FixtureModel(IModel):
+    def __init__(self, emit_experiment_outputs: bool, **kwargs: Any) -> None:
+        super().__init__()
+        self.emit_experiment_outputs = bool(emit_experiment_outputs)
+
+    def runtime_fingerprint_payload(self, **kwargs: Any) -> dict[str, Any]:
+        return {
+            "model": "runner-experiment-output-fixture-v1",
+            "emit_experiment_outputs": self.emit_experiment_outputs,
+        }
+
+    def runtime_fingerprint(self) -> str:
+        payload = json.dumps(self.runtime_fingerprint_payload(), sort_keys=True)
+        return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+    def forward(self, *, src_iris: list[str], **kwargs: Any) -> dict[str, Any]:
+        count = len(src_iris)
+        output: dict[str, Any] = {"S_final": torch.tensor([0.9, 0.4][:count], dtype=torch.float32)}
+        if not self.emit_experiment_outputs:
+            return output
+        output.update(
+            {
+                "s_strsim": torch.tensor([0.88, 0.33][:count]),
+                "q_lex": torch.tensor([0.77, 0.22][:count]),
+                "q_strsim": torch.tensor([0.66, 0.11][:count]),
+                "I_lex": torch.tensor([0.55, 0.44][:count]),
+                "I_strsim": torch.tensor([0.45, 0.34][:count]),
+                "llm_gate_diagnostics": [
+                    {
+                        "would_route": True,
+                        "threshold": 0.7,
+                        "statistic_name": "U",
+                        "statistic": 0.8,
+                        "mode": "quantile",
+                        "invoked": False,
+                        "tags": {"b", "a"},
+                        "nested": {"non_finite": float("nan"), "tensor": torch.tensor(2)},
+                    },
+                    {
+                        "mode": "analytic",
+                        "statistic_name": "U",
+                        "statistic": 0.9,
+                        "threshold": 0.5,
+                        "would_route": True,
+                        "invoked": True,
+                    },
+                ][:count],
+            }
+        )
+        return output
+
+
+def test_binary_experimental_judgment_keeps_oversized_source_group_whole(tmp_path):
+    import pandas as pd
+
+    class Dataset(_FixtureDataset):
+        def __init__(self):
+            self._df = pd.DataFrame({"Src": ["s"] * 7 + ["other"],
+                                     "Tgt": [str(i) for i in range(8)]})
+
+        @property
+        def dataframe(self):
+            return self._df
+
+        def _active_dataframe(self):
+            return self._df
+
+        def _invalidate_active_dataframe_cache(self):
+            pass
+
+        def __len__(self):
+            return len(self._df)
+
+        def __getitem__(self, index):
+            row = self._df.iloc[index]
+            return {"src_iri": row.Src, "tgt_iri": row.Tgt,
+                    "src_labels": [row.Src], "tgt_labels": [row.Tgt]}
+
+    class Model(_FixtureModel):
+        def __init__(self, **kwargs):
+            super().__init__(False, **kwargs)
+            self.llm_experiment_enabled = True
+            self.llm_experiment_config = {"decision": {"mode": "binary"}, "gate": {"mode": "off"}}
+            self.groups = []
+
+        def forward(self, *, src_iris, **kwargs):
+            self.groups.append(src_iris)
+            return {"S_final": torch.full((len(src_iris),), 0.8)}
+
+    runner = SemanticAlignmentRunner(dataset=Dataset(), model=Model,
+                                     device=torch.device("cpu"), output_dir=tmp_path)
+    runner.predict(local_alignment=True, batch_size=2, num_workers=0, enable_checkpoints=False,
+                   cache_persist_policy="never", log_every=100)
+    assert sorted(map(len, runner.model.groups)) == [1, 7]
+    assert len(runner._candidate_rows) == 8
+
+
+class _BackendUsageModel(_FixtureModel):
+    def __init__(self, **kwargs: Any) -> None:
+        super().__init__(emit_experiment_outputs=False, **kwargs)
+        self.calls = 0
+        self.request_seed = 17
+        self.llm_temperature = 0.2
+        self.llm_top_p = 0.8
+        self.llm_do_sample = False
+        self.max_total_tokens_llm_summary = 256
+        self.max_total_tokens_llm_decision = 384
+        self.max_total_tokens_llm_rationale = 512
+        self.max_new_tokens_llm = 32
+        self.max_new_tokens_llm_rationale = 48
+        self.hosted_decision_logit_bias = 40.0
+        self._local_llm_profile_name = "local-profile"
+        self._llm_router = SimpleNamespace(
+            routing=SimpleNamespace(
+                profile_for_task=lambda task: "hosted-profile",
+                fallback_for_task=lambda task: "local-profile",
+            ),
+            profiles={
+                "hosted-profile": SimpleNamespace(
+                    backend="openrouter",
+                    model="vendor/requested-model@v1",
+                    revision="1" * 40,
+                    tokenizer="vendor/tokenizer@r3",
+                    api_base="https://api-user:api-password@api.example.test/v1?secret=yes",
+                ),
+                "local-profile": SimpleNamespace(
+                    backend="local_hf",
+                    model="vendor/local-model@r4",
+                    revision="3" * 40,
+                    tokenizer="vendor/local-tokenizer@r4",
+                    api_base=None,
+                    endpoint_identity="local:cpu",
+                ),
+            },
+        )
+
+    def forward(self, *, src_iris: list[str], **kwargs: Any) -> dict[str, Any]:
+        self.calls += 1
+        prompt_sha1 = f"{self.calls:040x}"
+        common_hosted = {
+            "backend": "openrouter",
+            "profile": "hosted-profile",
+            "requested_profile": "hosted-profile",
+            "requested_model": "vendor/requested-model@v1",
+            "requested_revision": "1" * 40,
+            "effective_model": "vendor/effective-model@r2",
+            "resolved_revision": "2" * 40,
+            "tokenizer": "vendor/tokenizer@r3",
+            "provider": {"name": "safe-provider", "api_key": "provider-secret"},
+            "endpoint": (
+                "https://api-user:api-password@api.example.test/v1/chat/completions"
+                "?api_key=query-secret#debug"
+            ),
+            "endpoint_identity": "openrouter:api.example.test/v1/chat/completions",
+            "request_seed": 17,
+            "request_time": "2026-08-28T12:00:00+00:00",
+            "decoding": {
+                "temperature": 0.2,
+                "top_p": 0.8,
+                "max_tokens": 32,
+                "messages": ["never persist this prompt"],
+            },
+            "prompt_hash": "a" * 40,
+            "cache_key_hash": "b" * 64,
+            "usage": {
+                "calls": 1,
+                "prompt_tokens": 10,
+                "completion_tokens": 2,
+                "total_tokens": 12,
+            },
+            "request_debug": {
+                "prompt_sha1": prompt_sha1,
+                "prompt": "never persist this debug prompt",
+                "request_payload": {"Authorization": "Bearer debug-secret"},
+            },
+            "headers": {"Authorization": "Bearer header-secret"},
+            "api_key_env": "SECRET_API_KEY_ENV",
+            "api_key_path": "/secret/key/path",
+            "fallback_error": "provider payload secret",
+        }
+        return {
+            "S_final": torch.full((len(src_iris),), 0.9, dtype=torch.float32),
+            "backend_usage": {
+                "summary": common_hosted,
+                "decision": {
+                    "backend": "local_hf",
+                    "profile": "hosted-profile",
+                    "model": "vendor/local-model@r4",
+                    "provider": {"name": "huggingface", "api_key": "local-secret"},
+                    "runtime_endpoint_identity": "local:cpu",
+                    "request_seed": 17,
+                    "request_timestamp": "2026-08-28T12:00:00+00:00",
+                    "prompt_sha256": "d" * 64,
+                    "cache_identity": "e" * 64,
+                    "usage": {
+                        "call_count": 1,
+                        "input_tokens": 4,
+                        "output_tokens": 1,
+                        "total_tokens": 5,
+                    },
+                    "fallback_triggered": True,
+                    "decision_scoring_mode": "chat_logprobs_binary_head",
+                },
+                "rationale": {
+                    **common_hosted,
+                    "decoding": {
+                        "temperature": 0.2,
+                        "top_p": 0.8,
+                        "max_tokens": 48,
+                    },
+                    "usage": {
+                        "request_count": 1,
+                        "prompt_tokens": 6,
+                        "completion_tokens": 3,
+                        "total_tokens": 9,
+                    },
+                },
+            },
+        }
+
+
+class _BackendUsageWithoutTotalsModel(_BackendUsageModel):
+    def forward(self, *, src_iris: list[str], **kwargs: Any) -> dict[str, Any]:
+        output = super().forward(src_iris=src_iris, **kwargs)
+        for metadata in output["backend_usage"].values():
+            usage = dict(metadata["usage"])
+            usage.pop("total_tokens")
+            metadata["usage"] = usage
+        return output
+
+
+def _run(tmp_path: Path, *, emit: bool) -> SemanticAlignmentRunner:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_FixtureModel,
+        model_params={"emit_experiment_outputs": emit},
+        device=torch.device("cpu"),
+        output_dir=tmp_path,
+    )
+    runner.predict(
+        threshold=0.0,
+        local_alignment=True,
+        batch_size=2,
+        num_workers=0,
+        mixed_precision=False,
+        enable_checkpoints=False,
+        audit_shards_enabled=False,
+        audit_shard_compression="none",
+        cache_persist_policy="never",
+        log_every=100,
+    )
+    return runner
+
+
+def test_runner_conditionally_persists_experiment_outputs_and_canonical_gate_json(
+    tmp_path: Path,
+) -> None:
+    runner = _run(tmp_path / "experiment", emit=True)
+    first, second = runner._candidate_rows
+
+    assert first["s_strsim"] == pytest.approx(0.88)
+    assert first["q_lex"] == pytest.approx(0.77)
+    assert first["q_strsim"] == pytest.approx(0.66)
+    assert first["I_lex"] == pytest.approx(0.55)
+    assert first["I_strsim"] == pytest.approx(0.45)
+    assert first["llm_gate_mode"] == "quantile"
+    assert first["llm_gate_would_route"] is True
+    assert first["llm_gate_invoked"] is False
+    assert first["llm_gate_outcome"] == "routed_not_invoked"
+    assert second["llm_gate_outcome"] == "invoked"
+
+    diagnostic = json.loads(first["llm_gate_diagnostics"])
+    assert diagnostic["nested"] == {"non_finite": None, "tensor": 2}
+    assert diagnostic["tags"] == ["a", "b"]
+    assert first["llm_gate_diagnostics"] == json.dumps(
+        diagnostic,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+    baseline = _run(tmp_path / "baseline", emit=False)
+    for row in baseline._candidate_rows:
+        assert "s_strsim" not in row
+        assert "q_lex" not in row
+        assert "q_strsim" not in row
+        assert "I_lex" not in row
+        assert "I_strsim" not in row
+        assert "llm_gate_diagnostics" not in row
+        assert "llm_gate_outcome" not in row
+
+
+def test_runner_persists_deduplicated_sanitized_llm_backend_provenance(
+    tmp_path: Path,
+) -> None:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "llm-provenance",
+    )
+    predictions, _ = runner.predict(
+        threshold=0.0,
+        local_alignment=True,
+        batch_size=1,
+        num_workers=0,
+        mixed_precision=False,
+        enable_checkpoints=False,
+        audit_shards_enabled=False,
+        audit_shard_compression="none",
+        cache_persist_policy="never",
+        log_every=100,
+    )
+    paths = runner.save_results(predictions, save_json=False, save_stats_csv=False)
+    stats = json.loads(paths["run_stats_json"].read_text(encoding="utf-8"))
+    usage = stats["llm_usage"]
+    identities = usage["backend_identities"]
+
+    assert list(identities) == ["summary", "decision", "rationale"]
+    assert all(len(identities[task]) == 1 for task in identities)
+    summary = identities["summary"][0]
+    assert summary == {
+        "backend": "openrouter",
+        "profile": "hosted-profile",
+        "requested_profile": "hosted-profile",
+        "requested_model": "vendor/requested-model@v1",
+        "requested_revision": "1" * 40,
+        "effective_model": "vendor/effective-model@r2",
+        "resolved_revision": "2" * 40,
+        "provider": "safe-provider",
+        "endpoint": "https://api.example.test/v1/chat/completions",
+        "endpoint_identity": "openrouter:api.example.test/v1/chat/completions",
+        "tokenizer": "vendor/tokenizer@r3",
+        "request_seed": 17,
+        "request_time": "2026-08-28T12:00:00+00:00",
+        "decoding": {
+            "max_tokens": 32,
+            "temperature": 0.2,
+            "top_p": 0.8,
+        },
+        "prompt_hashes": [f"{1:040x}", f"{2:040x}", "a" * 40],
+        "cache_hashes": ["b" * 64],
+    }
+    decision = identities["decision"][0]
+    assert decision["profile"] == "local-profile"
+    assert decision["requested_profile"] == "hosted-profile"
+    assert decision["requested_model"] == "vendor/requested-model@v1"
+    assert decision["requested_revision"] == "1" * 40
+    assert decision["effective_model"] == "vendor/local-model@r4"
+    assert decision["resolved_revision"] == "3" * 40
+    assert decision["provider"] == "huggingface"
+    assert decision["endpoint_identity"] == "local:cpu"
+    assert decision["tokenizer"] == "vendor/local-tokenizer@r4"
+    assert decision["prompt_hashes"] == ["d" * 64]
+    assert decision["cache_hashes"] == ["e" * 64]
+    assert decision["request_time"] == "2026-08-28T12:00:00+00:00"
+    assert decision["decoding"]["scoring_mode"] == "local_next_token_logits"
+
+    expected_by_task = {
+        "summary": {"calls": 2, "input_tokens": 20, "output_tokens": 4, "total_tokens": 24},
+        "decision": {"calls": 2, "input_tokens": 8, "output_tokens": 2, "total_tokens": 10},
+        "rationale": {"calls": 2, "input_tokens": 12, "output_tokens": 6, "total_tokens": 18},
+    }
+    for task, expected in expected_by_task.items():
+        task_usage = usage["by_task"][task]
+        assert task_usage["observation_count"] == 2
+        assert {field: task_usage[field] for field in expected} == expected
+        for field, value in expected.items():
+            assert task_usage["counter_availability"][field] == {
+                "status": "available",
+                "observation_count": 2,
+                "reported_observations": 2,
+                "value": value,
+            }
+
+    expected_totals = {
+        "calls": 6,
+        "input_tokens": 40,
+        "output_tokens": 12,
+        "total_tokens": 52,
+    }
+    assert {field: usage[field] for field in expected_totals} == expected_totals
+    for field, value in expected_totals.items():
+        assert usage["counter_availability"][field] == {
+            "status": "available",
+            "observation_count": 6,
+            "reported_observations": 6,
+            "value": value,
+        }
+
+    serialized = json.dumps(stats["llm_usage"], sort_keys=True)
+    for forbidden in (
+        "never persist",
+        "provider-secret",
+        "local-secret",
+        "api-password",
+        "query-secret",
+        "debug-secret",
+        "header-secret",
+        "SECRET_API_KEY_ENV",
+        "/secret/key/path",
+        "provider payload secret",
+        "Authorization",
+    ):
+        assert forbidden not in serialized
+
+    baseline = _run(tmp_path / "baseline-stats", emit=False)
+    baseline_stats = baseline._compute_run_stats(baseline.results_df)
+    assert "llm_usage" not in baseline_stats
+    assert baseline_stats["observed_execution"] == {
+        "device_type": "cpu",
+        "device": "cpu",
+    }
+    assert baseline_stats["coverage"] == pytest.approx(1.0)
+    assert baseline_stats["abstention_rate"] == pytest.approx(0.0)
+    assert baseline_stats["decision_source_counts"] == {
+        "declared": None,
+        "observed": 2,
+        "accepted": 2,
+        "unscored": 0,
+    }
+
+
+def test_runner_does_not_infer_hosted_resolved_revision_from_requested_profile(
+    tmp_path: Path,
+) -> None:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "unresolved-hosted-revision",
+    )
+    enriched = runner._enrich_llm_backend_metadata(
+        "summary",
+        {
+            "backend": "openrouter",
+            "profile": "hosted-profile",
+            "model": "vendor/requested-model@v1",
+            "provider": "safe-provider",
+            "endpoint": "chat/completions",
+        },
+    )
+    identity = runner._sanitize_llm_backend_identity(enriched)
+
+    assert identity is not None
+    assert identity["requested_revision"] == "1" * 40
+    assert "resolved_revision" not in identity
+
+
+def test_runner_marks_missing_llm_token_totals_unavailable_without_inferring_them(
+    tmp_path: Path,
+) -> None:
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageWithoutTotalsModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "llm-provenance-no-totals",
+    )
+    predictions, _ = runner.predict(
+        threshold=0.0,
+        local_alignment=True,
+        batch_size=1,
+        num_workers=0,
+        mixed_precision=False,
+        enable_checkpoints=False,
+        audit_shards_enabled=False,
+        audit_shard_compression="none",
+        cache_persist_policy="never",
+        log_every=100,
+    )
+    paths = runner.save_results(predictions, save_json=False, save_stats_csv=False)
+    usage = json.loads(paths["run_stats_json"].read_text(encoding="utf-8"))["llm_usage"]
+
+    assert usage["calls"] == 6
+    assert usage["input_tokens"] == 40
+    assert usage["output_tokens"] == 12
+    assert "total_tokens" not in usage
+    assert usage["counter_availability"]["total_tokens"] == {
+        "status": "unavailable",
+        "observation_count": 6,
+        "reported_observations": 0,
+    }
+    for task in ("summary", "decision", "rationale"):
+        task_usage = usage["by_task"][task]
+        assert "total_tokens" not in task_usage
+        assert task_usage["counter_availability"]["total_tokens"] == {
+            "status": "unavailable",
+            "observation_count": 2,
+            "reported_observations": 0,
+        }
+
+
+def test_hosted_decoding_reports_actual_admission_policy(tmp_path, monkeypatch):
+    policy = tmp_path / "prompt-policy.json"
+    policy.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "max_input_tokens": 12288,
+                "max_input_bytes": 32768,
+                "max_output_tokens": 1024,
+                "chat_overhead_tokens": 128,
+            }
+        )
+    )
+    digest = hashlib.sha256(policy.read_bytes()).hexdigest()
+    monkeypatch.setenv("EXACT_LLM_PROMPT_POLICY_PATH", str(policy))
+    monkeypatch.setenv("EXACT_LLM_PROMPT_POLICY_SHA256", digest)
+    runner = SemanticAlignmentRunner(
+        dataset=_FixtureDataset(),
+        model=_BackendUsageModel,
+        device=torch.device("cpu"),
+        output_dir=tmp_path / "metadata",
+    )
+    for task in ("decision", "summary", "rationale"):
+        hosted = runner._llm_decoding_defaults(task, "openrouter")
+        assert "max_input_tokens" not in hosted
+        assert hosted["input_admission_tokens"] == 12288
+        assert hosted["max_input_bytes"] == 32768
+        assert hosted["prompt_policy_sha256"] == digest
+        assert hosted["provider_exact_token_count"] is False
+        local = runner._llm_decoding_defaults(task, "local_hf")
+        assert local["max_input_tokens"] in {256, 384, 512}
+        assert "prompt_policy_sha256" not in local

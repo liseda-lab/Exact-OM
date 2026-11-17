@@ -1,33 +1,24 @@
-*.jar
-*.DS_Store
-*.pyc
-
-# Local secrets and run scratch artifacts
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+/build/
+/dist/
+/site/
+/runs/
+/data/
+/exports/
+/.worktrees/
+/.env
 /api_key
-/mapping_example*.json
-
-# Matcha folder
-
-/matcha_dl/impl/matcha/matcha/*
-!/matcha_dl/impl/matcha/matcha/*.py
-
-# Data folder
-
-/data/*
-!/data/*.py
-
-# Experiments folder
-
-/exp/*
-
-# Paper folder
-
-/Paper/*
-
-# Ignore dist folder
-
-/dist/*
-
-# Ignore mypy cache
-
-/.mypy_cache/*
+/exact_inspect/static/
+/explanations_visualizer/node_modules/
+/explanations_visualizer/.next/
+/explanations_visualizer/out/
+/explanations_visualizer/next-env.d.ts
+/explanations_visualizer/*.tsbuildinfo
+/explanations_visualizer/test-results/
+/explanations_visualizer/playwright-report/

@@ -1,0 +1,3 @@
+{"Src":"https://example.org/source/A","Tgt":"https://example.org/target/alpha","confidences":{"S_final":0.91},"prediction":{"threshold_positive":true,"saved_alignment_member":true,"rationale_positive":true,"rationale_decision_label":"Match"}}
+{"Src":"https://example.org/source/A","Tgt":"https://example.org/target/beta","confidences":{"S_final":0.31},"prediction":{"threshold_positive":false,"saved_alignment_member":false,"rationale_positive":false,"rationale_decision_label":"No match"}}
+{"Src":"https://example.org/source/B","Tgt":"https://example.org/target/gamma","confidences":{"S_final":0.78},"prediction":{"threshold_positive":true,"saved_alignment_member":true,"rationale_positive":true,"rationale_decision_label":"Match"}}

@@ -8,7 +8,13 @@ import torch
 
 
 def _load_selector_module():
-    module_path = Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "candidate_set_selector.py"
+    module_path = (
+        Path(__file__).resolve().parents[1]
+        / "exact"
+        / "impl"
+        / "models"
+        / "candidate_set_selector.py"
+    )
     spec = importlib.util.spec_from_file_location("candidate_set_selector_module", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -16,7 +22,9 @@ def _load_selector_module():
 
 
 def _load_runner_module():
-    module_path = Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+    module_path = (
+        Path(__file__).resolve().parents[1] / "exact" / "impl" / "trainer" / "semantic_runner.py"
+    )
     spec = importlib.util.spec_from_file_location("semantic_runner_module", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -24,7 +32,9 @@ def _load_runner_module():
 
 
 def _load_dataset_module_or_skip():
-    module_path = Path(__file__).resolve().parents[1] / "exact" / "core" / "contracts" / "dataset.py"
+    module_path = (
+        Path(__file__).resolve().parents[1] / "exact" / "core" / "contracts" / "dataset.py"
+    )
     spec = importlib.util.spec_from_file_location("dataset_contract_module", module_path)
     module = importlib.util.module_from_spec(spec)
     try:
@@ -317,7 +327,11 @@ def test_llm_equivalent_choice_boosts_ambiguous_candidate():
     )
     df = _base_df()
 
-    out = selector.forward(df, primary_model=FakePrimary(), results_json=[_record("s1", "t_good"), _record("s1", "t_bad")])
+    out = selector.forward(
+        df,
+        primary_model=FakePrimary(),
+        results_json=[_record("s1", "t_good"), _record("s1", "t_bad")],
+    )
     scored = out["candidate_df"].set_index("Tgt")
 
     assert scored.loc["t_good", "S_select"] > scored.loc["t_bad", "S_select"]
@@ -349,10 +363,19 @@ def test_calibrated_selector_learns_rank_accept_from_training_reference(tmp_path
     scored = out["candidate_df"].set_index(["Src", "Tgt"])
 
     assert scored.loc[("s_eval", "t_gold_eval"), "selection_winner"]
-    assert scored.loc[("s_eval", "t_gold_eval"), "S_select"] == scored.loc[("s_eval", "t_gold_eval"), "P_match"]
-    assert scored.loc[("s_eval", "t_gold_eval"), "P_match"] >= scored.loc[("s_eval", "t_gold_eval"), "selection_accept_threshold"]
+    assert (
+        scored.loc[("s_eval", "t_gold_eval"), "S_select"]
+        == scored.loc[("s_eval", "t_gold_eval"), "P_match"]
+    )
+    assert (
+        scored.loc[("s_eval", "t_gold_eval"), "P_match"]
+        >= scored.loc[("s_eval", "t_gold_eval"), "selection_accept_threshold"]
+    )
     assert scored.loc[("s_eval", "t_bad_eval"), "S_select"] == 0.0
-    assert scored.loc[("s_eval", "t_gold_eval"), "P_rank"] > scored.loc[("s_eval", "t_bad_eval"), "P_rank"]
+    assert (
+        scored.loc[("s_eval", "t_gold_eval"), "P_rank"]
+        > scored.loc[("s_eval", "t_bad_eval"), "P_rank"]
+    )
 
 
 def test_calibrated_selector_uses_source_disjoint_oof_calibration(tmp_path):
@@ -665,7 +688,9 @@ def test_calibrated_selector_excludes_exact_prefiltered_train_sources(tmp_path):
         },
     )
 
-    selector.forward(_selector_training_df(include_candidate_miss=True), dataset=dataset, threshold=0.7)
+    selector.forward(
+        _selector_training_df(include_candidate_miss=True), dataset=dataset, threshold=0.7
+    )
 
     assert selector._calibration_meta["n_reference_pairs"] == 2
     assert selector._calibration_meta["n_calibration_reference_pairs"] == 1
@@ -912,7 +937,9 @@ def test_p_match_score_mode_keeps_raw_monotonic_scores():
 
     assert selector._final_selector_score(0.95, accept_threshold=0.50, score_threshold=0.70) == 0.95
     assert selector._final_selector_score(0.72, accept_threshold=0.70, score_threshold=0.70) == 0.72
-    assert selector._final_selector_score(0.80, accept_threshold=0.70, score_threshold=0.70) > selector._final_selector_score(0.72, accept_threshold=0.70, score_threshold=0.70)
+    assert selector._final_selector_score(
+        0.80, accept_threshold=0.70, score_threshold=0.70
+    ) > selector._final_selector_score(0.72, accept_threshold=0.70, score_threshold=0.70)
 
 
 def test_calibrated_llm_veto_cannot_switch_winner(tmp_path):
@@ -967,7 +994,10 @@ def test_runner_uses_selector_accept_threshold_for_raw_p_match_scores():
         }
     )
 
-    assert runner_module.SemanticAlignmentRunner._effective_alignment_threshold(candidate_df, 0.7) == 0.5
+    assert (
+        runner_module.SemanticAlignmentRunner._effective_alignment_threshold(candidate_df, 0.7)
+        == 0.5
+    )
 
 
 def test_target_conflict_resolver_preserves_exact_mapping():

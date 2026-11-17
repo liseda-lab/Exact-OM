@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rdf:RDF
+  xmlns="http://knowledgeweb.semanticweb.org/heterogeneity/alignment#"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <Alignment>
+    <onto1><Ontology><location>source.owl</location></Ontology></onto1>
+    <onto2><Ontology><location>target.owl</location></Ontology></onto2>
+    <map>
+      <Cell>
+        <entity1 rdf:resource="https://example.org/source#A" />
+        <entity2 rdf:resource="https://example.org/target#A" />
+        <measure>1.0</measure>
+      </Cell>
+    </map>
+  </Alignment>
+</rdf:RDF>

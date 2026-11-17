@@ -1,11 +1,15 @@
 import importlib.util
+import json
+import sqlite3
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 import torch
 
-
-_MODULE_PATH = Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+_MODULE_PATH = (
+    Path(__file__).resolve().parents[1] / "exact" / "impl" / "models" / "semantic_scorer.py"
+)
 _SPEC = importlib.util.spec_from_file_location("semantic_scorer_module", _MODULE_PATH)
 _MODULE = importlib.util.module_from_spec(_SPEC)
 assert _SPEC is not None and _SPEC.loader is not None
@@ -14,7 +18,21 @@ SemanticScorer = _MODULE.SemanticScorer
 
 
 class _DummyHosted:
-    def chat_completion(self, profile, messages, max_tokens, temperature=None, top_p=None, stop=None, logprobs=None, top_logprobs=None, logit_bias=None, provider=None, seed=None):
+    def chat_completion(
+        self,
+        profile,
+        messages,
+        max_tokens,
+        temperature=None,
+        top_p=None,
+        stop=None,
+        logprobs=None,
+        top_logprobs=None,
+        logit_bias=None,
+        provider=None,
+        seed=None,
+        role="unspecified",
+    ):
         user_text = messages[-1]["content"]
         if "Source entity: src" not in user_text:
             raise AssertionError(f"Unexpected user prompt: {user_text}")
@@ -39,7 +57,7 @@ class _DummyHosted:
         }
 
 
-def test_hosted_chat_binary_head_returns_binary_probability():
+def _hosted_scorer():
     scorer = object.__new__(SemanticScorer)
     scorer.use_llm = True
     scorer.device = torch.device("cpu")
@@ -75,12 +93,23 @@ def test_hosted_chat_binary_head_returns_binary_probability():
         "provider": "unit-test-provider",
         "error": None,
     }
-    scorer._hosted_decision_logit_bias = lambda profile: ({"11": 20.0, "12": 20.0}, {"A": [11], "B": [12]})
+    scorer._hosted_decision_logit_bias = lambda profile: (
+        {"11": 20.0, "12": 20.0},
+        {"A": [11], "B": [12]},
+    )
     scorer._record_hosted_decision_chat_debug = lambda *args, **kwargs: None
-    scorer._ensure_local_llm = lambda: (_ for _ in ()).throw(AssertionError("Local fallback was not expected"))
+    scorer._ensure_local_llm = lambda: (_ for _ in ()).throw(
+        AssertionError("Local fallback was not expected")
+    )
     scorer.llm_decision_batch_size = 8
     scorer.request_seed = 123
+    return scorer
 
+
+def test_hosted_chat_binary_head_returns_binary_probability(monkeypatch):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
     probs = scorer.llm_yesno_probs_batched(
         ["src"],
         ["tgt"],
@@ -93,10 +122,201 @@ def test_hosted_chat_binary_head_returns_binary_probability():
     assert scorer._last_decision_backend_meta["endpoint"] == "chat/completions"
     assert scorer._last_decision_backend_meta["decision_probe_passed"] is True
     assert scorer._last_decision_backend_meta["provider"] == "unit-test-provider"
-    assert scorer._last_decision_backend_meta["decision_scoring_mode"] == "chat_logprobs_binary_head"
+    assert (
+        scorer._last_decision_backend_meta["decision_scoring_mode"] == "chat_logprobs_binary_head"
+    )
     assert scorer.llm_decision_stats()["hosted_attempted"] == 1
     assert scorer.llm_decision_stats()["hosted_scored"] == 1
     assert scorer.llm_decision_stats()["local_fallbacks"] == 0
+
+
+def test_binary_teacher_retains_ordered_costs_without_changing_prompts(monkeypatch):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {"exemplars": "off"}
+    seen = []
+    original = scorer._llm_router.hosted.chat_completion
+
+    def hosted(**kwargs):
+        seen.append(kwargs["messages"])
+        return {**original(**kwargs), "id": "response", "usage": {"total_tokens": 19}}
+
+    scorer._llm_router.hosted.chat_completion = hosted
+    baseline = scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["facts"], [""])
+    probabilities, records = scorer.llm_binary_decision_probs(
+        ["source"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+    )
+    assert torch.equal(baseline, probabilities)
+    assert seen[0] == seen[1]
+    assert records[0]["pair_probabilities"] == {"target": float(probabilities[0])}
+    assert records[0]["calls"][0]["usage"]["total_tokens"] == 19
+    assert records[0]["calls"][0]["response_id"] == "response"
+    assert records[0]["calls"][0]["target"] == "target"
+
+
+def test_binary_exemplars_reach_hosted_prompt_and_reject_training_query(monkeypatch):
+    from exact.impl.models.selector.llm_learning import (
+        EXEMPLAR_RENDERING,
+        teacher_identity,
+    )
+
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {
+        "decision": {"mode": "binary"},
+        "exemplars": "knn",
+        "exemplar_count": 3,
+    }
+    scorer._llm_router.routing = SimpleNamespace(
+        decision_profile="hosted", default_profile="hosted"
+    )
+    scorer._llm_router.profiles["hosted"].backend = "openrouter"
+    scorer._llm_router.profiles["hosted"].revision = "fixture-revision"
+    scorer._attached_dataset = SimpleNamespace(dataset_signature="fixture")
+    scorer._get_hosted_decision_tokenizer = lambda profile: SimpleNamespace(
+        encode=lambda text, **kwargs: list(range((len(text) + 3) // 4))
+    )
+    scorer._exemplar_artifact = {
+        "schema_version": 1,
+        "exemplar_rendering": dict(EXEMPLAR_RENDERING),
+        "training_sources": ["train1", "train2", "train3", "train4"],
+        "application": {"dataset_signature": "fixture"},
+        "teacher_binding": teacher_identity(scorer),
+        "examples": [
+            {
+                "source": source,
+                "features": [0.6, 0.6, 0.0, 1.0],
+                "candidates": [
+                    {
+                        "target": source + "target",
+                        "equivalent": True,
+                        "evidence": json.dumps(
+                            {
+                                "source_label": source,
+                                "target_label": source + "target",
+                                "facts": [
+                                    {"side": "source", "triple": [source, "is", "training fact"]}
+                                ],
+                            }
+                        ),
+                    }
+                ],
+            }
+            for source in ["train1", "train2", "train3", "train4"]
+        ],
+    }
+    seen = []
+    original = scorer._llm_router.hosted.chat_completion
+
+    def hosted(**kwargs):
+        seen.append(kwargs["messages"][-1]["content"])
+        return original(**kwargs)
+
+    scorer._llm_router.hosted.chat_completion = hosted
+    _, records = scorer.llm_binary_decision_probs(
+        ["heldout"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+    )
+    assert records[0]["exemplar_sources"] == ["train1", "train2", "train3"]
+    assert "Training-only examples" in seen[0]
+    assert "training fact" in seen[0] and "train4" not in seen[0]
+    with pytest.raises(ValueError, match="overlaps training"):
+        scorer.llm_binary_decision_probs(["train1"], ["target"], ["src"], ["tgt"], ["facts"], [0.6])
+    assert len(seen) == 1
+    scorer._exemplar_artifact.pop("exemplar_rendering")
+    with pytest.raises(ValueError, match="rendering identity changed"):
+        scorer.llm_binary_decision_probs(
+            ["heldout"], ["target"], ["src"], ["tgt"], ["facts"], [0.6]
+        )
+    assert len(seen) == 1
+
+
+@pytest.mark.parametrize("experiment_mode", ["0", "1"])
+@pytest.mark.parametrize("stage", ["probe", "decision"])
+def test_prompt_budget_errors_propagate_without_fallback_or_error_wrapping(
+    monkeypatch, experiment_mode, stage
+):
+    from exact.llm.prompt_budget import PromptBudgetError
+
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", experiment_mode)
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
+    error = PromptBudgetError("fixture oversized input")
+
+    def fail(**kwargs):
+        raise error
+
+    scorer._llm_router.hosted.chat_completion = fail
+    if stage == "probe":
+        scorer._probe_hosted_decision_profile = (
+            SemanticScorer._probe_hosted_decision_profile.__get__(scorer)
+        )
+    with pytest.raises(PromptBudgetError) as caught:
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["src summary"], ["tgt summary"])
+    assert caught.value is error
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 0
+
+
+def test_binary_teacher_rejects_unobserved_probabilities(monkeypatch):
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_config = {"exemplars": "off"}
+    monkeypatch.setattr(
+        scorer, "llm_yesno_probs_batched", lambda *args, **kwargs: torch.tensor([0.8])
+    )
+    with pytest.raises(ValueError, match="observed hosted response"):
+        scorer.llm_binary_decision_probs(["s"], ["t"], ["src"], ["tgt"], ["facts"], [0.6])
+
+
+def _inject_hosted_failure(scorer, failure):
+    if failure == "probe":
+        scorer._probe_hosted_decision_profile = lambda profile: {
+            "passed": False,
+            "error": "fixture probe unavailable",
+        }
+    else:
+
+        def locked(**kwargs):
+            raise sqlite3.OperationalError("database is locked")
+
+        scorer._llm_router.hosted.chat_completion = locked
+        scorer._record_hosted_decision_request_debug = lambda *args, **kwargs: "fixture"
+
+
+@pytest.mark.parametrize("failure", ["probe", "request"])
+@pytest.mark.parametrize(
+    "global_mode,selector_enabled", [(True, False), (False, True), (True, True)]
+)
+def test_experiment_failure_preserves_hosted_backend_without_local_fallback(
+    monkeypatch, failure, global_mode, selector_enabled
+):
+    monkeypatch.setenv("EXACT_EXPERIMENT_MODE", "1" if global_mode else "0")
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = selector_enabled
+    _inject_hosted_failure(scorer, failure)
+
+    with pytest.raises(RuntimeError, match="experiment stage paused") as error:
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["source"], ["target"])
+
+    if failure == "request":
+        assert isinstance(error.value.__cause__.__cause__, sqlite3.OperationalError)
+    else:
+        assert "fixture probe unavailable" in str(error.value)
+    assert scorer._last_decision_backend_meta["backend"] == "openrouter"
+    assert scorer._last_decision_backend_meta["fallback_triggered"] is False
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 0
+
+
+@pytest.mark.parametrize("failure", ["probe", "request"])
+def test_production_hosted_failure_still_reaches_local_fallback(monkeypatch, failure):
+    monkeypatch.delenv("EXACT_EXPERIMENT_MODE", raising=False)
+    scorer = _hosted_scorer()
+    scorer.llm_experiment_enabled = False
+    _inject_hosted_failure(scorer, failure)
+    # The existing fake loader raises instead of downloading a local model.
+    with pytest.raises(AssertionError, match="Local fallback was not expected"):
+        scorer.llm_yesno_probs_batched(["src"], ["tgt"], ["source"], ["target"])
+    assert scorer._last_decision_backend_meta["backend"] == "local_hf"
+    assert scorer._last_decision_backend_meta["fallback_triggered"] is True
+    assert scorer.llm_decision_stats()["local_fallbacks"] == 1
 
 
 def test_clean_summary_text_drops_fence_only_response():
@@ -104,8 +324,12 @@ def test_clean_summary_text_drops_fence_only_response():
 
 
 def test_clean_rationale_text_keeps_only_complete_sentences():
-    text = '```json\n{"rationale":"First sentence. Second sentence. Third sentence without ending"\n'
-    cleaned = SemanticScorer._parse_structured_text(text, "rationale", SemanticScorer._clean_rationale_text)
+    text = (
+        '```json\n{"rationale":"First sentence. Second sentence. Third sentence without ending"\n'
+    )
+    cleaned = SemanticScorer._parse_structured_text(
+        text, "rationale", SemanticScorer._clean_rationale_text
+    )
     assert cleaned == "First sentence. Second sentence."
 
 

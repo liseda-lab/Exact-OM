@@ -1,0 +1,6 @@
+SrcEntity	TgtEntity	TgtCandidates
+http://example.org/mini/src#Heart	http://example.org/mini/tgt#CardiacOrgan	['http://example.org/mini/tgt#CardiacOrgan', 'http://example.org/mini/tgt#BodyOrgan']
+http://example.org/mini/src#Lung	http://example.org/mini/tgt#PulmonaryOrgan	['http://example.org/mini/tgt#PulmonaryOrgan', 'http://example.org/mini/tgt#CardiacOrgan']
+http://example.org/mini/src#Kidney	http://example.org/mini/tgt#RenalOrgan	['http://example.org/mini/tgt#RenalOrgan', 'http://example.org/mini/tgt#BodyOrgan']
+http://example.org/mini/src#Patient	http://example.org/mini/tgt#CareRecipient	['http://example.org/mini/tgt#CareRecipient', 'http://example.org/mini/tgt#Human']
+http://example.org/mini/src#ChestPain	http://example.org/mini/tgt#ThoracicPain	['http://example.org/mini/tgt#ThoracicPain', 'http://example.org/mini/tgt#PainFinding']

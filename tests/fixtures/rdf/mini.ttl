@@ -1,0 +1,42 @@
+@prefix ex: <http://example.org/rdf/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:Entity a owl:Class ;
+  rdfs:label "Entity"@en .
+
+ex:Organ a owl:Class ;
+  rdfs:subClassOf ex:Entity ;
+  rdfs:label "Organ"@en .
+
+ex:Heart a owl:Class ;
+  rdfs:subClassOf ex:Organ ;
+  rdfs:label "Heart"@en ;
+  skos:altLabel "Cardiac organ"@en ;
+  ex:description "A muscular pump"@en .
+
+ex:Atrium a owl:Class ;
+  rdfs:subClassOf ex:Heart ;
+  rdfs:label "Atrium"@en ;
+  ex:partOf ex:Heart .
+
+ex:Deprecated a owl:Class ;
+  rdfs:label "Deprecated concept" ;
+  owl:deprecated true .
+
+ex:Person a owl:Class ;
+  rdfs:label "Person" .
+
+ex:alice a owl:NamedIndividual, ex:Person ;
+  rdfs:label "Alice" ;
+  ex:identifier "A-1"^^xsd:string .
+
+ex:partOf a owl:ObjectProperty ;
+  rdfs:domain ex:Entity ;
+  rdfs:range ex:Entity .
+
+ex:description a owl:DatatypeProperty .
+ex:identifier a owl:DatatypeProperty .

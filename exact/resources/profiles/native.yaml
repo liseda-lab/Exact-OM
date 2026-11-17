@@ -1,0 +1,387 @@
+config_version: 2
+dataset:
+  all_labels: true
+  annotation_provenance_dedup: false
+  annotation_semantics: {}
+  candidate_share_k: 2
+  delimiter: '
+
+    '
+  drop_exact_match_sources: false
+  filter_exact_matches: true
+  filter_ignored_alignment_classes: true
+  hierarchical_relation_families:
+    has_part:
+      iri_aliases:
+      - http://purl.obolibrary.org/obo/BFO_0000051
+      label_seeds:
+      - has part
+    is_a:
+      iri_aliases:
+      - http://www.w3.org/2000/01/rdf-schema#subClassOf
+      label_seeds:
+      - subclass of
+      - is a
+      - type of
+      - kind of
+    part_of:
+      iri_aliases:
+      - http://purl.obolibrary.org/obo/BFO_0000050
+      label_seeds:
+      - part of
+      - component of
+  hierarchy_max_depth: 2
+  legacy:
+    add_connectivity_bridges: true
+    best_path_method: dp
+    bridge_max_hops: null
+    context_hop_penalty: 0.1
+    context_method: greedy
+    context_safety: 0.8
+    context_token_ratio: 1.3
+    only_taxonomy: false
+  max_attr_items: 12
+  max_diff_triples: 24
+  max_hierarchy_triples_per_family: 6
+  max_input_tokens_context: 256
+  max_object_triples: 48
+  n_hops: 1
+  num_workers: 2
+  pair_adaptive_feature_log_every: 1000
+  projection_include_literals: true
+  projector:
+    backend: native
+    profile: mowl-d993536-v1
+  reasoner: asserted
+  verbalization_mode: deterministic
+  which:
+  - src_hier_total_count
+  - tgt_hier_total_count
+  - src_hier_is_a_count
+  - tgt_hier_is_a_count
+  - src_hier_part_of_count
+  - tgt_hier_part_of_count
+  - src_hier_has_part_count
+  - tgt_hier_has_part_count
+  - src_obj_count
+  - tgt_obj_count
+  - src_obj_relation_count
+  - tgt_obj_relation_count
+  - src_obj_ic_mean
+  - tgt_obj_ic_mean
+  - src_attr_count
+  - tgt_attr_count
+  - src_attr_weight_mean
+  - tgt_attr_weight_mean
+  - src_lab_n_labels
+  - tgt_lab_n_labels
+  - src_lab_word_len
+  - tgt_lab_word_len
+  - src_lab_avg_label_words
+  - tgt_lab_avg_label_words
+  - cand_sim
+  - cand_sim_src_mean
+candidates:
+  adaptive_k:
+    criterion: gap
+    enabled: false
+    entropy: 0.75
+    gap: 0.05
+    k_max: 20
+    k_min: 20
+  aliases:
+    accepted_property_terms:
+    - alt
+    - label
+    - name
+    - pref
+    - synonym
+    - term
+    - title
+    default_priority: 0.3
+    default_property_cap: 4
+    exact_priority: 0.0
+    exact_properties:
+    - p90
+    - has exact synonym
+    exact_property_cap: 8
+    max_tokens: 12
+    overall_cap: 12
+    preferred_priority: 0.05
+    preferred_properties:
+    - p107
+    - p108
+    preferred_property_cap: 2
+    priority_length_cap: 6
+    priority_length_divisor: 30.0
+    priority_length_target: 3
+    rejected_properties:
+    - nhc0
+    - p97
+    - p106
+    - p207
+    - p322
+    - p325
+    - p363
+    - iao0000115
+    - iao0000231
+    rejected_property_terms:
+    - alternativeid
+    - comment
+    - created
+    - creator
+    - curator
+    - date
+    - definition
+    - deprecated
+    - description
+    - editor
+    - format
+    - id
+    - identifier
+    - namespace
+    - note
+    - provenance
+    - review
+    - reviewer
+    - semantic
+    - slim
+    - source
+    - status
+    - subset
+    - type
+    - version
+    - xref
+    related_priority: 0.15
+    related_properties:
+    - has related synonym
+    - has narrow synonym
+    - has broad synonym
+    related_property_cap: 4
+  cross_encoder:
+    artifact: null
+    mode: 'off'
+    top_k: 20
+    training: null
+  encode_batch_size: 512
+  encoder: sentence-transformers/all-MiniLM-L6-v2
+  encoder_finetune:
+    artifact: null
+    mode: 'off'
+    negative_policy: complete_reference
+    training: null
+  encoder_revision: 1110a243fdf4706b3f48f1d95db1a4f5529b4d41
+  fusion:
+    blend_gram_weight: 0.35
+    blend_token_weight: 0.65
+    df_ceiling_floor: 10
+    df_ceiling_ratio: 0.2
+    gram_weight: 0.85
+    lexical_channel_weight: 1.0
+    mode: max
+    rrf_constant: 60.0
+    semantic_channel_weight: 1.0
+    token_weight: 1.0
+    weighted_lexical: 0.5
+    weighted_semantic: 0.5
+  multi_view:
+    mode: labels
+  retrieval_strategy: hybrid
+  search_batch_size: 4096
+  top_k: 20
+  use_amp: true
+pipeline:
+- name: PairAdaptiveSemanticScorer
+  params:
+    beta: 0.8
+    gamma: 2.0
+    tau: 0.5
+    context_model_name: BAAI/bge-large-en-v1.5
+    context_model_revision: d4aa6901d3a41ba39fb536a557fa166f842b0e09
+    lexical_model_name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+    lexical_model_revision: 090663c3ae57bf35ffe4d0d468a2a88d03051a4d
+    fp16_inference: true
+    use_context: true
+    use_lexical: true
+    label_pair_pooling: max
+    pooling_method: mean
+    max_input_tokens_lexical: 32
+    max_input_tokens_context: 256
+    max_input_tokens_hier: 128
+    max_input_tokens_sim: 256
+    max_input_tokens_diff: 256
+    max_input_tokens_attr_item: 96
+    use_llm: false
+    llm_model_name: null
+    force_llm_summaries: false
+    generate_llm_rationales: false
+    return_explanations: true
+- name: CandidateSetSelector
+  params:
+    calibration:
+      accept_objective: f1
+      background_negative_weight: 0.02
+      background_negative_weight_grid:
+      - 0.02
+      - 0.05
+      - 0.1
+      - 0.2
+      - 0.4
+      enabled: auto
+      exact_prefiltered_negative_weight: 1.0
+      exact_prefiltered_source_policy: hard_negative
+      f_beta: 1.5
+      l2: 0.001
+      learning_rate: 0.05
+      max_epochs: 200
+      min_positive_sources: 50
+      min_precision: null
+      min_recall: null
+      threshold_grid_step: 0.005
+      validation_folds: 5
+      validation_fraction: 0.2
+    enabled: true
+    eps: 1.0e-06
+    global_only: true
+    llm:
+      ambiguity_margin: 0.08
+      enabled: false
+      max_candidates: 5
+      min_confidence: 0.75
+      mode: false
+      trigger_acceptance_margin: 0.025
+      trigger_rank_margin: 0.03
+    no_match_threshold: 0.55
+    replace_final_score: true
+    score_mode: p_match
+    strategy: calibrated_rank_accept
+    support_weight: 0.6
+    temperature: 0.75
+    use_no_match: true
+matching:
+  channels:
+    attr:
+      bank: full
+      enabled: false
+      polarity: support_only
+      provenance_dedup: false
+      signed_property_allowlist: []
+    attribute_information_word_cap: 20
+    attribute_property_weights:
+      comment: 0.6
+      definition: 1.0
+      identifier: 0.8
+      other: 0.5
+    attribute_score_floor: 0.5
+    diff:
+      controlled_perturbations: false
+      dump_components: false
+      enabled: false
+      formulation: normalised
+      incompatibilities: []
+      relation_interpretation: null
+    difference_per_relation_cap: 3
+    graph:
+      artifact: null
+      dump_profile: false
+      hierarchy_removal: 0.0
+      mode: 'off'
+      negative_label_policy: null
+      shuffled: false
+    hier:
+      depth: 2
+      enabled: false
+      mode: labels
+      overlap_weight: 0.5
+      siblings: false
+    hierarchy_embedding_weight: 0.5
+    hierarchy_support_weight: 0.5
+    instance:
+      anchors: false
+      annotations: true
+      characteristics: true
+      enabled: false
+      hierarchy: true
+      labels: true
+      literals: true
+      relations: true
+      relations_shuffled: false
+      signature: true
+      types: true
+      usage: true
+    lex:
+      deduplicate_labels: false
+      enabled: false
+      entropy_temperature: 1.0
+      entropy_top_m: 5
+      quality: margin
+    property:
+      anchors: false
+      annotations: true
+      characteristics: true
+      enabled: false
+      hierarchy: true
+      labels: true
+      literals: true
+      relations: true
+      relations_shuffled: false
+      signature: true
+      types: true
+      usage: true
+    similarity_embedding_weight: 0.5
+    similarity_per_relation_cap: 2
+    similarity_support_weight: 0.5
+    stability_factor: 2.0
+    strsim:
+      abbreviation: 'off'
+      enabled: false
+      isub_weight: 1.0
+      jaro_winkler_weight: 1.0
+      placement: channel
+      token_set_weight: 1.0
+    uncertainty_disagreement_quality_power: 0.5
+    uncertainty_indecision_scale: 2.0
+  fusion:
+    artifact: null
+    beta: 0.8
+    enabled: false
+    gamma: 2.0
+    llm_pivot: 0.5
+    mode: analytic_shipped
+    scope: global
+    sigma_mode: full
+    tau: 0.5
+  entity_kinds:
+  - class
+  calibration:
+    artifact: null
+    mode: platt
+    threshold_mode: fixed
+  nil:
+    artifact: null
+    label_semantics: unknown
+    mode: 'off'
+    pool_miss_candidate_labels: null
+    pool_miss_development_reference: null
+    ranking_scale: joint_accept_probability
+    training_source_labels: null
+  cardinality: 1
+  target_cardinality: 1
+  threshold: 0.7
+selector:
+  accept_model: logistic
+  accept_training: winner_plus_runnerup
+  emit_candidate_scores: false
+  enabled: true
+  label_free_mode: current_fallback
+  rerank:
+    artifact: null
+    features: current
+    mode: current
+    model: current_linear
+  runtime_enabled: null
+  runtime_global_only: null
+  tuning:
+    count_reference_miss_as: fp_fn
+run:
+  seed: 17

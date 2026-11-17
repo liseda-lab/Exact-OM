@@ -1,42 +1,38 @@
 import argparse
-import os
-from pathlib import Path
+from typing import Optional, Sequence
 
-from exact import init_jvm
+from exact.delivery.common import (
+    execute_alignment,
+    prepare_alignment_namespace,
+    warn_ignored_jvm,
+)
 
 
-def run_alignment(args):
-    from exact.core.actions.alignment import AlignmentAction
+def run_alignment(args) -> None:
+    invocation = getattr(args, "_exact_invocation", None) or prepare_alignment_namespace(args)
+    execute_alignment(invocation)
 
-    AlignmentAction.run(
-        source_file_path=Path(args.source_ontology_file).resolve(),
-        target_file_path=Path(args.target_ontology_file).resolve(),
-        output_dir_path=Path(args.output_dir).resolve(),
-        configs_file_path=Path(args.config_file).resolve() if args.config_file else None,
-        training_reference_file_path=Path(args.training_reference_file).resolve() if args.training_reference_file else None,
-        full_reference_file_path=Path(args.full_reference_file).resolve() if args.full_reference_file else None,
-        candidates_file_path=Path(args.candidates_file).resolve() if args.candidates_file else None,
-        log_file_path=Path(args.output_dir).resolve() / "exact.log" if args.save_logs else None,
-        run_eval=args.run_eval,
-        device=args.device
+
+def parse_arguments(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Compute an alignment with shared Java-free OWL snapshots; select "
+            "dataset.reasoner/projector in YAML (elk/hermit require exact-om[reasoning])"
+        )
     )
-
-
-def parse_arguments():
-    parser = argparse.ArgumentParser(description="Compute the alignment between two ontologies")
     parser.add_argument(
         "--source_ontology_file",
         "-s",
         type=str,
-        required=True,
-        help="Please provide the path to the source ontology file",
+        required=False,
+        help="Source ontology path; optional when supplied by the config data block",
     )
     parser.add_argument(
         "--target_ontology_file",
         "-t",
         type=str,
-        required=True,
-        help="Please provide the path to the target ontology file",
+        required=False,
+        help="Target ontology path; optional when supplied by the config data block",
     )
     parser.add_argument(
         "--output_dir",
@@ -71,7 +67,10 @@ def parse_arguments():
         "-y",
         type=str,
         required=False,
-        help="Please provide the path to the yaml configuration file",
+        help=(
+            "YAML configuration path, including dataset.reasoner and "
+            "dataset.projector selections"
+        ),
     )
     parser.add_argument(
         "--save_logs",
@@ -80,63 +79,63 @@ def parse_arguments():
         help="Whether to save logs",
     )
     parser.add_argument(
-        '--run_eval',
-        '-e',
-        action='store_true',
-        help='Whether to run evaluation',
+        "--run_eval",
+        "-e",
+        action="store_true",
+        help="Whether to run evaluation",
     )
     parser.add_argument(
         "--jvm_heap_size",
         "-m",
         type=str,
         required=False,
-        help="JVM heap size",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--device",
         "-d",
         type=int,
         required=False,
-        help="GPU device ID to use (leave empty for CPU)"
+        help="GPU device ID to use (leave empty for CPU)",
     )
-    return parser.parse_args()
+    parser.add_argument(
+        "--input-format",
+        choices=["auto", "owl", "rdf", "csv-kg"],
+        help="Input adapter for both source and target (default: infer from each path)",
+    )
+    parser.add_argument(
+        "--source-options",
+        nargs="+",
+        metavar="KEY=VALUE|YAML",
+        help="Source adapter key=value options, or one YAML mapping file",
+    )
+    parser.add_argument(
+        "--target-options",
+        nargs="+",
+        metavar="KEY=VALUE|YAML",
+        help="Target adapter key=value options, or one YAML mapping file",
+    )
+    parser.add_argument(
+        "--output-formats",
+        nargs="+",
+        metavar="FORMAT",
+        help="Alignment writers, such as tsv-global, oaei-rdf, typed-tsv, or json",
+    )
+    parser.add_argument(
+        "--relation-prediction",
+        choices=["none", "hierarchy_heuristic"],
+        help="Post-scoring relation typing mode",
+    )
+    return parser.parse_args(argv)
 
 
-def main():
-    args = parse_arguments()
-
-    if not Path(args.source_ontology_file).exists():
-        raise Exception(f"Source ontology file {args.source_ontology_file} does not exist")
-    if not Path(args.target_ontology_file).exists():
-        raise Exception(f"Target ontology file {args.target_ontology_file} does not exist")
-    if args.training_reference_file and not Path(args.training_reference_file).exists():
-        raise Exception(f"Training reference file {args.training_reference_file} does not exist")
-    if args.full_reference_file and not Path(args.full_reference_file).exists():
-        raise Exception(f"Full reference file {args.full_reference_file} does not exist")
-    if args.candidates_file and not Path(args.candidates_file).exists():
-        raise Exception(f"Candidates file {args.candidates_file} does not exist")
-    if not Path(args.output_dir).exists():
-        Path(args.output_dir).mkdir(parents=True)
-
-    if args.config_file:
-        config_file = Path(args.config_file)
-        if not config_file.exists():
-            raise Exception(f"Configuration file {args.config_file} does not exist")
-        
-    if args.jvm_heap_size:
-        if args.jvm_heap_size.isdigit():
-            args.jvm_heap_size += 'G'
-        elif not (args.jvm_heap_size[:-1].isdigit() and args.jvm_heap_size[-1].lower() == 'g'):
-            raise Exception(f"JVM heap size {args.jvm_heap_size} is not valid, please provide a valid format")
-    else:
-        args.jvm_heap_size = '32G'
-
-    print(f"[exact-cli] init_jvm heap={args.jvm_heap_size}", flush=True)
-
-    init_jvm(args.jvm_heap_size)
-
+def main(argv: Optional[Sequence[str]] = None):
+    args = parse_arguments(argv)
+    warn_ignored_jvm(args.jvm_heap_size, "--jvm_heap_size/-m")
+    args._exact_invocation = prepare_alignment_namespace(args)
     run_alignment(args)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

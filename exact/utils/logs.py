@@ -1,21 +1,18 @@
+import io
 import logging
 import os
 import sys
 import threading
-import io
 import time
-from contextlib import contextmanager, redirect_stdout, redirect_stderr
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Optional, Sequence
+from typing import TYPE_CHECKING, Mapping, Optional, Sequence
 
+from exact.utils.formatting import format_duration
 
-def format_duration(total_seconds: float) -> str:
-    seconds = max(0, int(round(total_seconds)))
-    days, remainder = divmod(seconds, 86400)
-    hours, remainder = divmod(remainder, 3600)
-    minutes, seconds = divmod(remainder, 60)
-    return f"{days}d:{hours:02d}:{minutes:02d}:{seconds:02d}"
+if TYPE_CHECKING:
+    from exact.utils.timing import TimingLedger
 
 
 def categorize_log_message(message: str) -> str:
@@ -24,7 +21,7 @@ def categorize_log_message(message: str) -> str:
         return text[1 : text.index("]")].strip() or "runtime"
     category_patterns = (
         ("progress", ("progress:", " eta ", "current=", "missing=")),
-        ("setup", ("configuration", "seed", "jvm", "logging", "device")),
+        ("setup", ("configuration", "seed", "logging", "device")),
         ("dataset", ("dataset", "ontology", "candidate generation", "sanity")),
         ("alignment", ("alignment", "semantic alignment", "inference", "prefilter")),
         ("selector", ("candidate-set selector", "target conflict resolver")),
@@ -69,7 +66,9 @@ def configure_exact_logger(
         handler.setLevel(level)
         handler.setFormatter(formatter)
 
-    if stream and not any(getattr(handler, "_exact_stream_handler", False) for handler in logger.handlers):
+    if stream and not any(
+        getattr(handler, "_exact_stream_handler", False) for handler in logger.handlers
+    ):
         stream_handler = logging.StreamHandler()
         stream_handler.setLevel(level)
         stream_handler.setFormatter(formatter)
@@ -116,8 +115,7 @@ class RunProgressLogger:
             for task in tasks
         ]
         self.estimates_seconds = {
-            task.key: self._estimate_seconds(task, estimates_minutes or {})
-            for task in self.tasks
+            task.key: self._estimate_seconds(task, estimates_minutes or {}) for task in self.tasks
         }
         self.min_log_interval_seconds = max(0.0, float(min_log_interval_seconds))
         self.bar_width = max(8, int(bar_width))
@@ -167,7 +165,9 @@ class RunProgressLogger:
     def finish(self, key: str, detail: Optional[str] = None, force: bool = True) -> None:
         now = time.perf_counter()
         started = self.current_started_at if self.current_key == key else None
-        elapsed = max(0.0, now - started) if started is not None else self.estimates_seconds.get(key, 1.0)
+        elapsed = (
+            max(0.0, now - started) if started is not None else self.estimates_seconds.get(key, 1.0)
+        )
         self.completed_seconds[key] = elapsed
         self.fractions[key] = 1.0
         previous_current = self.current_key
@@ -264,7 +264,24 @@ class RunProgressLogger:
         return "[" + ("#" * filled) + ("-" * (self.bar_width - filled)) + "]"
 
 
-def summarize_progress_estimates(recorded_timings: Mapping[str, float]) -> dict[str, float]:
+def summarize_progress_estimates(
+    recorded_timings: Optional[Mapping[str, float]] = None,
+    *,
+    ledger: Optional["TimingLedger"] = None,
+    config_fingerprint: Optional[str] = None,
+) -> dict[str, float]:
+    """Build minute estimates for :class:`RunProgressLogger`.
+
+    Ledger estimates are stored in seconds and converted here.  The optional
+    mapping remains for callers reading a pre-ledger ``times.txt`` file.
+    """
+
+    if ledger is not None:
+        recorded_timings = {
+            stage: seconds / 60.0
+            for stage, seconds in ledger.estimates(config_fingerprint=config_fingerprint).items()
+        }
+    recorded_timings = recorded_timings or {}
     estimates = {
         "Setup": 0.2,
         "Dataset": 5.0,
@@ -296,10 +313,12 @@ def summarize_progress_estimates(recorded_timings: Mapping[str, float]) -> dict[
             estimates[task_key] = recorded_timings[timing_key]
     return estimates
 
+
 class TqdmLogger(io.TextIOBase):
     """
     A file‐like object for tqdm that redirects all writes into self.log.
     """
+
     def __init__(self, logger_fn, level="debug"):
         super().__init__()
         self.logger_fn = logger_fn
@@ -314,12 +333,13 @@ class TqdmLogger(io.TextIOBase):
         # tqdm may call flush(); we don't need to do anything special
         pass
 
+
 @contextmanager
 def capture_stdout(logger_fn, level="info"):
     """
     Captures:
       1) Python-level writes (print(), tqdm without file=)
-      2) C-level writes to fd 1 & 2 (so Java System.out/err via JPype/JYPe)
+      2) C-level writes to file descriptors 1 and 2
     and redirects them into logger_fn(message, level).
     """
     # --- 1) Set up a pipe for C-level FD redirection
