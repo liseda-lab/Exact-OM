@@ -75,7 +75,7 @@ export function AppHeader({ active }: { active: NavKey }) {
       </header>
       {profile === "public_demo" && (
         <div className="demo-banner" role="note">
-          Public demo of a fixed development bundle. Importing bundles and study features are not available here.
+          Explore the prepared examples, compare candidates and browse the ontologies. Bundle uploads are disabled in this public demo.
         </div>
       )}
       {help && <HelpDialog onClose={() => setHelp(false)} />}

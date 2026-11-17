@@ -179,7 +179,7 @@ docker run --rm -p 127.0.0.1:10000:10000 \
 This image installs the pinned Python 3.12 dependencies in
 `deploy/render/exact_inspect_prepared_requirements.txt` and copies only
 `exact_inspect/`. It contains no `exact` matcher package, PyTorch, Transformers or
-ontology parser. It runs the prepared CLI/API without a frontend build. The
+ontology parser. The image builds and includes the exploration frontend. The
 mounted package must have `audience: "development_demo"` for its default hosted
 profile. Health is `/api/v1/health`.
 

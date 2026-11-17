@@ -8,6 +8,12 @@ It supports OWL and RDF sources, descriptor-driven CSV knowledge graphs, class/p
 individual matching, global alignment and local ranking, reproducible dataset tracks, multiple
 output formats, and built-in or OAEI Bio-ML evaluation.
 
+## Explore results
+
+Try the [Exact Explain public demo](https://exact-explain.lasige.di.fc.ul.pt/) or
+[install the complete viewer locally](docs/guides/explanation-local-install.md)
+with bundle import, comparison, ontology browsing and evidence inspection.
+
 ## Install
 
 Exact-OM supports Python 3.10–3.12 and runs on CPU. A CUDA-enabled PyTorch installation is

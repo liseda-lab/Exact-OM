@@ -1,0 +1,13 @@
+services:
+  exact-explain:
+    build:
+      context: ../..
+      dockerfile: deploy/render/exact_inspect_prepared.Dockerfile
+    command: ["--profile", "local_app", "--library-dir", "/library", "--host", "0.0.0.0", "--port", "10000"]
+    ports:
+      - "127.0.0.1:8000:10000"
+    volumes:
+      - exact-library:/library
+    restart: unless-stopped
+volumes:
+  exact-library:
