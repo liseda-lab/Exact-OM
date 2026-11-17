@@ -74,10 +74,72 @@ space for indexes and exports. Large ontologies can take substantial time to
 prepare; page requests use the prepared indexes.
 
 `--run-dir` accepts a standard **`exact align` run directory**, including
-`run_manifest.json`. Standalone `exact score`, `exact decisions`, `exact acceptance`
-or `exact rank` output directories are a different format and are rejected.
-They require a separate adapter before they can become inspection bundles.
-Renaming a file or passing a mapping TSV does not supply the missing evidence.
+`run_manifest.json`. For the production Exact 2.0 staged pipeline, use the stage
+arguments below. Do not rename files or pass a mapping TSV as a run directory.
+
+### Production global alignment
+
+After the [global pipeline](pipeline.md#global-matching) completes:
+
+```console
+exact-inspect prepare --source-ontology source.owl --target-ontology target.owl \
+  --native-dir native --scored-pairs scored.jsonl \
+  --decision-plan decisions/plan.json --acceptance-dir full-alignment \
+  --model-manifest acceptance/model.json --output prepared/global
+```
+
+For the partial policy, use `--acceptance-dir partial-alignment` and a separate
+preparation output directory. A retained historical acceptance model uses its
+`retained.json` manifest instead of `model.json`. Neither preparation nor serving
+loads the trained model or recomputes acceptance.
+
+For a no-LLM run whose acceptance input was `native/pairs.jsonl`, omit both
+`--scored-pairs` and `--decision-plan`. To inspect native evidence before acceptance,
+omit the acceptance and model arguments too; final membership will be unavailable.
+A decision plan alone is insufficient: an applied decision result and its receipt
+are required to show applied model contributions.
+
+### Production local ranking
+
+After [local ranking](ranking.md) completes:
+
+```console
+exact-inspect prepare --source-ontology source.owl --target-ontology target.owl \
+  --native-dir test-native --scored-pairs test-scored.jsonl \
+  --decision-plan test-decisions/plan.json --rankings rankings.tsv \
+  --queries test.cands.tsv --model-manifest rank-model.json \
+  --output prepared/local
+```
+
+Use the exact original application queries and model JSON passed to `exact rank
+apply`. JSON query IDs, repeated sources, empty queries and the saved candidate
+order are preserved. The source picker shows separate query entries. The displayed
+ranking score is the saved query score; pair scores remain available in Scores.
+A local ranking does not become an accepted alignment. Training labels and model
+parameters are not included in the portable inspection bundle.
+
+### Required production files
+
+| Stage | Files to keep together |
+| --- | --- |
+| Native scoring | `identity.json`, `complete.json`, `pairs.jsonl`, `sources.txt`, `anchors.json`, and every output listed in `complete.json` |
+| Applied decisions, when used | Scored JSONL, its `.receipt.json`, `plan.json` and adjacent `requests.jsonl` |
+| Global acceptance | `completion.json`, `mappings.csv`, `alignment.rdf`, and the matching model JSON manifest |
+| Local ranking | Ranking TSV, adjacent `.scores.json` and `.receipt.json`, original queries, and the matching model JSON |
+
+Preparation checks the receipt chain, ontology hashes, model identity, output
+membership, scores and query counts before publishing a bundle. A missing,
+changed or mismatched companion produces an error. Keep the original stage files
+until preparation finishes; they are not needed to serve or import the resulting
+portable bundle. No credentials, decision cache, encoder weights or model pickle
+are needed for this import.
+
+The trace distinguishes evidence reconstructed from saved stage artifacts from
+individual events recorded by `exact align`. It shows actual final membership or
+query rank, but does not invent threshold failures, conflict-resolution decisions,
+NIL decisions or an unrecorded execution history. An empty evidence panel means
+no selected ontology facts were retained for that pair; preparation does not
+create new matching evidence.
 
 For a small offline example, first run the [README demonstration](https://github.com/liseda-lab/Exact-OM#offline-demonstration),
 then prepare its outputs:

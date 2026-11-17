@@ -45,6 +45,7 @@ DECISION_TABLES = {
     ),
     "sources": ("id", "iri", "kind", "payload"),
 }
+QUERY_DECISION_TABLES = {name: (*columns, "query_id") for name, columns in DECISION_TABLES.items()}
 _MAX_SCHEMA_OBJECTS = 64
 _MAX_ROW_BYTES = 64 * 1024 * 1024
 _MAX_RESULT_BYTES = 16 * 1024 * 1024

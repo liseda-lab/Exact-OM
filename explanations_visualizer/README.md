@@ -36,6 +36,30 @@ active Python environment needs the package's `viz` and test dependencies; set
 change the default port (19818), or `EXACT_UI_BROWSER=chrome` to use installed
 Chrome instead of Playwright Chromium. Tests never contact a hosted study.
 
+To qualify the production staged importer, run from the repository root with the
+full Python/native dependencies installed:
+
+```console
+python -m pytest -q tests/inspect_staged_pipeline_test.py --basetemp /tmp/exact-staged-check
+```
+
+The test computes real native scores with a tiny local encoder, applies cached
+test decisions, fits/applies global acceptance and local ranking, then verifies
+the API and ZIP round trip. The cache responses are deterministic test doubles;
+this does not qualify Elephant inference or matching quality. It makes no network
+or hosted-service requests. Its `staged_pipeline_paths.json` records the exported
+archives. From this directory, run the browser checks once with each archive
+(`global_full` and `local_ranking`):
+
+```console
+EXACT_UI_STAGED_ARCHIVE=/absolute/path/to/export.zip npm run test:e2e
+```
+
+These tests exercise the actual prepared production output, including separate
+repeated-source queries, empty queries, score/trace views, original facts, graphs,
+browse/back navigation and library import. They start their own temporary local
+service and leave deployed services untouched.
+
 From the repository root, `python scripts/build_frontend.py` installs the lockfile,
 exports the pages and copies them into the Python package. Use `--skip-install`
 only after `npm ci`. Wheel and source-distribution checks require the built assets

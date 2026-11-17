@@ -85,8 +85,9 @@ decision traces, scores and a local bundle library. A release wheel includes the
 built app; install it with the `viz` extra and run `exact-inspect serve`.
 For a source checkout, build the frontend first as described in the
 [local installation guide](docs/local-tool.md). The app accepts prepared bundles
-and standard `exact align` runs; standalone staged scoring/ranking directories
-need an adapter and are not accepted as inspection bundles.
+and prepares both standard `exact align` runs and the production Exact 2.0
+stages: native scores, applied decisions, global acceptance and local rankings.
+Use the stage arguments in the guide to retain their evidence and receipt chain.
 
 Ontology repair, participant/admin study services, private deployment scripts,
 and historical experiments remain outside this production release.

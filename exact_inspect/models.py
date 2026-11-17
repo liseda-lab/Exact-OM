@@ -137,6 +137,7 @@ class RankedOutput(WireModel):
 
     mode: Literal["local_ranking"]
     query_id: int = Field(ge=0)
+    query_position: int | None = Field(default=None, ge=0)
     candidate_count: int = Field(ge=1)
     rank: int = Field(ge=1)
     saved_output_member: Literal[True]
@@ -379,6 +380,8 @@ class Candidate(WireModel):
     """A typed candidate summary without graphs or an unqualified raw scorer payload."""
 
     pair_id: str
+    output_mode: Literal["global_acceptance", "local_ranking", "native_scores"] | None = None
+    ranking: RankedOutput | None = None
     source: EntityRef
     target: EntityRef
     # Accepted from indexed legacy adapters, but never serialized onto the public wire.
@@ -397,6 +400,8 @@ class Candidate(WireModel):
 
     @model_validator(mode="after")
     def check_scores_and_membership(self):
+        if self.ranking and self.saved_alignment_member is not None:
+            raise ValueError("A local ranking has no accepted alignment membership")
         if any(s.name in {"nil_rank", "candidate_joint_rank", "cand_rank"} for s in self.scores):
             raise ValueError("Ordinal ranks cannot be represented as scores")
         if self.saved_alignment_member is not None and (

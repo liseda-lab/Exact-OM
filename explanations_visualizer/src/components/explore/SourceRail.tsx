@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconSearch, SideMarker } from "@/components/common/Icons";
-import { formatScore, orderDescription, primaryScore, type OrderBasis } from "@/components/explore/candidates";
+import { formatScore, orderDescription, primaryScore, scoreLabel, type OrderBasis } from "@/components/explore/candidates";
+import { sourceIsSelected } from "@/lib/compareNavigation";
 import { curie, KIND_NAMES } from "@/lib/iri";
 import { useLabels } from "@/lib/labels";
 import type { Candidate, EntityKind, EntityRef, SourceSummary } from "@/lib/types";
@@ -20,6 +21,7 @@ export function SourcePicker({
   canLoadMore,
   selectedIri,
   selectedKind,
+  selectedQueryId,
   onSelect,
   header,
   heading = true,
@@ -34,6 +36,7 @@ export function SourcePicker({
   canLoadMore: boolean;
   selectedIri: string | null;
   selectedKind: EntityKind;
+  selectedQueryId: number | null;
   onSelect: (source: SourceSummary) => void;
   /** Controls shown under the heading. */
   header?: React.ReactNode;
@@ -49,12 +52,12 @@ export function SourcePicker({
   const collapsed = narrow && !open && Boolean(selectedIri);
   const ontology = sources[0]?.entity.ontology_version_id;
   const label = useLabels(ontology, [...sources.map((source) => source.entity.iri), ...(selectedIri ? [selectedIri] : [])]);
-  const index = sources.findIndex((source) => source.entity.iri === selectedIri && source.entity.kind === selectedKind);
+  const index = sources.findIndex((source) => sourceIsSelected(source, selectedIri, selectedKind, selectedQueryId));
   const visible = useMemo(() => {
     const needle = filter.trim().toLowerCase();
     if (!needle) return sources;
     return sources.filter((source) => {
-      const text = `${label(source.entity.iri)?.value ?? ""} ${source.entity.iri} ${curie(source.entity.iri)}`.toLowerCase();
+      const text = `${label(source.entity.iri)?.value ?? ""} ${source.entity.iri} ${curie(source.entity.iri)} ${source.query_id == null ? "" : `Query ${source.query_id}`}`.toLowerCase();
       return text.includes(needle);
     });
   }, [filter, sources, label]);
@@ -76,7 +79,7 @@ export function SourcePicker({
             <SideMarker side="source" size="0.875rem" />
             <span className="source-item-text">
               <span className="source-item-label">{label(selectedIri!)?.value ?? curie(selectedIri!)}</span>
-              <span className="iri">{curie(selectedIri!)}</span>
+              <span className="iri">{curie(selectedIri!)} · {KIND_NAMES[selectedKind]}{selectedQueryId !== null ? ` · Query ${selectedQueryId}` : ""}</span>
             </span>
           </span>
           <button type="button" className="btn btn-sm" aria-expanded={false} onClick={() => setOpen(true)}>
@@ -100,17 +103,17 @@ export function SourcePicker({
           <SideMarker side="source" size="0.875rem" />
           <span className="source-item-text">
             <span className="source-item-label">{label(selectedIri)?.value ?? curie(selectedIri)}</span>
-            <span className="iri">{curie(selectedIri)}</span>
+            <span className="iri">{curie(selectedIri)} · {KIND_NAMES[selectedKind]}{selectedQueryId !== null ? ` · Query ${selectedQueryId}` : ""}</span>
             <span className="meta">Selected · not in the sources loaded below</span>
           </span>
         </div>
       )}
       <ul className="source-list" aria-label="Sources in this run">
         {visible.map((source) => {
-          const current = source.entity.iri === selectedIri && source.entity.kind === selectedKind;
+          const current = sourceIsSelected(source, selectedIri, selectedKind, selectedQueryId);
           const text = label(source.entity.iri);
           return (
-            <li key={source.entity_id}>
+            <li key={`${source.entity_id}|${source.query_id ?? ""}`}>
               <button
                 type="button"
                 className={current ? "source-item current" : "source-item"}
@@ -123,7 +126,7 @@ export function SourcePicker({
                 <SideMarker side="source" size="0.875rem" />
                 <span className="source-item-text">
                   <span className="source-item-label">{text?.value ?? (text?.status === "loading" ? "Loading label…" : curie(source.entity.iri))}</span>
-                  <span className="iri">{curie(source.entity.iri)} · {KIND_NAMES[source.entity.kind]}</span>
+                  <span className="iri">{curie(source.entity.iri)} · {KIND_NAMES[source.entity.kind]}{source.query_id != null ? ` · Query ${source.query_id}` : ""}</span>
                 </span>
               </button>
             </li>
@@ -226,7 +229,7 @@ export function CandidateList({
                   <span className="candidate-label">{text?.value ?? (text?.status === "loading" ? "Loading label…" : "No label in scope")}</span>
                   <span className="iri">{curie(candidate.target.iri)}</span>
                   <span className="candidate-meta">
-                    {score ? <span>Matching score {formatScore(score.value)}</span> : <span>No score recorded</span>}
+                    {score ? <span>{scoreLabel(score)} {formatScore(score.value)}</span> : <span>No score recorded</span>}
                     {candidate.saved_alignment_member === true && <span className="member-flag">In saved alignment</span>}
                   </span>
                 </span>

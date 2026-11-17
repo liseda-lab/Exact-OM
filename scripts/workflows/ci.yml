@@ -26,7 +26,7 @@ jobs:
       - run: python -m pip install torch==2.7.0 --index-url https://download.pytorch.org/whl/cpu
       - run: python -m pip install '.[dev,docs,reasoning,viz]'
       - run: ruff check exact exact_inspect scripts
-      - run: pytest -q -m 'not requires_data and not slow and not requires_llm and not requires_cuda and not requires_openrouter'
+      - run: pytest -q --basetemp /tmp/exact-tests -m 'not requires_data and not slow and not requires_llm and not requires_cuda and not requires_openrouter'
       - run: mkdocs build --strict
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
@@ -40,7 +40,12 @@ jobs:
       - name: Local app browser checks
         if: matrix.python == '3.12'
         working-directory: explanations_visualizer
-        run: npm run test:e2e
+        run: |
+          npm run test:e2e
+          for mode in global_full local_ranking; do
+            staged_archive=$(python -c 'import json, pathlib, sys; paths=list(pathlib.Path("/tmp/exact-tests").rglob("staged_pipeline_paths.json")); assert len(paths)==1; print(json.loads(paths[0].read_text())["archives"][sys.argv[1]])' "$mode")
+            EXACT_UI_STAGED_ARCHIVE="$staged_archive" npm run test:e2e
+          done
       - run: python -m build
       - run: python -m twine check dist/*
       - run: python scripts/check_distribution.py dist

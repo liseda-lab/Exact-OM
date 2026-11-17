@@ -7,13 +7,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ErrorNote, Skeleton } from "@/components/common/ErrorNote";
 import { IconChevronLeft, IconChevronRight } from "@/components/common/Icons";
-import { formatScore, orderCandidates, primaryScore } from "@/components/explore/candidates";
+import { formatScore, orderCandidates, primaryScore, scoreHelpText, scoreLabel } from "@/components/explore/candidates";
 import { DecisionTrace, ScoresPanel } from "@/components/explore/DecisionTrace";
 import { ontologyName, useExplore } from "@/components/explore/ExploreContext";
 import { ReviewPanel } from "@/components/explore/ReviewPanel";
 import { CandidateList, SourcePicker } from "@/components/explore/SourceRail";
 import { PairWorkspace, type Focus, type PairNavigation, type RevealRequest } from "@/components/workspace/PairWorkspace";
 import { getJson } from "@/lib/api";
+import { choiceParams, comparisonBrowseParams, needsLinkedPair, resolveComparison, sourceParams } from "@/lib/compareNavigation";
 import { curie } from "@/lib/iri";
 import { savedChoiceFor, type SavedChoice } from "@/lib/sourceSelection";
 import type { Candidate, EntityKind, EntityRef, Page, PairTrace, SourceSummary } from "@/lib/types";
@@ -58,7 +59,6 @@ export function CompareView() {
   const [params, setParams] = useUrlState();
   const runId = params.get("run") ?? state.runs[0]?.run_id ?? null;
   const run = state.runs.find((item) => item.run_id === runId) ?? null;
-  const sourceIri = params.get("source");
   const pairId = params.get("pair");
   const tab = params.get("details");
   const packageId = state.health?.package_id ?? null;
@@ -86,34 +86,31 @@ export function CompareView() {
     }
   }, [runId, sourceCursor]);
 
-  const requestedKind = params.get("sk");
-  const source = allSources.find((item) => item.entity.iri === sourceIri && (!requestedKind || item.entity.kind === kindOf(requestedKind))) ?? null;
-  // A linked source beyond the loaded pages keeps its typed kind from the URL.
-  const sourceKind = requestedKind ? kindOf(requestedKind) : source?.entity.kind ?? "class";
+  // A pair identifies its query even when the URL also names a repeated source.
+  // Wait for that identity before requesting candidates from any query.
+  const linked = useAsync<PairTrace>(needsLinkedPair(params) && runId ? `linked|${runId}|${pairId}` : null, (signal) =>
+    getJson<PairTrace>(`/api/v1/runs/${encodeURIComponent(runId!)}/pair`, { pair_id: pairId! }, signal),
+  );
+  const { sourceIri, sourceKind, queryId, source, waitingForPair, invalidQuery, updates } = resolveComparison(params, allSources, runId, linked.data);
+  useEffect(() => {
+    if (updates) setParams(updates, "replace");
+  }, [updates, setParams]);
   useEffect(() => {
     if (state.phase !== "ready" || !runId || sourceIri || pairId) return;
     const saved = savedChoiceFor(readChoice(), packageId, runId);
-    if (saved) setParams({ source: saved.source, sk: saved.source_kind, pair: saved.pair }, "replace");
-    else if (allSources[0]) setParams({ source: allSources[0].entity.iri, sk: allSources[0].entity.kind, pair: null }, "replace");
+    if (saved) setParams(choiceParams(saved), "replace");
+    else if (allSources[0]) setParams(sourceParams(allSources[0]), "replace");
   }, [state.phase, runId, sourceIri, pairId, packageId, allSources, setParams]);
-
-  // A link that names a pair without its source: the run's own record says which source it is.
-  const linked = useAsync<PairTrace>(!sourceIri && pairId && runId ? `linked|${runId}|${pairId}` : null, (signal) =>
-    getJson<PairTrace>(`/api/v1/runs/${encodeURIComponent(runId!)}/pair`, { pair_id: pairId! }, signal),
-  );
-  useEffect(() => {
-    if (!sourceIri && linked.data && linked.data.pair_id === pairId) setParams({ source: linked.data.source.iri, sk: linked.data.source.kind }, "replace");
-  }, [sourceIri, pairId, linked.data, setParams]);
 
   // Candidates: the backend pages by pair identity, so a first bounded load is sorted by the
   // recorded rank and the remainder stays one explicit "load more" away.
-  const candidateKey = runId && sourceIri ? `cands|${runId}|${sourceKind}|${sourceIri}` : null;
+  const candidateKey = runId && sourceIri && sources.data && !waitingForPair && !invalidQuery ? `cands|${runId}|${sourceKind}|${sourceIri}|${queryId}` : null;
   const first = useAsync<{ items: Candidate[]; cursor: string | null; total: number | null }>(candidateKey, async (signal) => {
     const items: Candidate[] = [];
     let cursor: string | null = null;
     let total: number | null = null;
     for (let pageIndex = 0; pageIndex < FIRST_LOAD_PAGES; pageIndex += 1) {
-      const page: Page<Candidate> = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId!)}/candidates`, { source: sourceIri!, source_kind: sourceKind, limit: PAGE, cursor }, signal);
+      const page: Page<Candidate> = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId!)}/candidates`, { source: sourceIri!, source_kind: sourceKind, query_id: queryId, limit: PAGE, cursor }, signal);
       items.push(...page.items);
       total = page.total_count;
       cursor = page.next_cursor;
@@ -140,7 +137,7 @@ export function CompareView() {
     const base = continued ?? { key: candidateKey, items: [], cursor, loading: false, error: null };
     setMore({ ...base, loading: true, error: null });
     try {
-      const page = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId)}/candidates`, { source: sourceIri, source_kind: sourceKind, limit: PAGE, cursor }, controller.signal);
+      const page = await getJson<Page<Candidate>>(`/api/v1/runs/${encodeURIComponent(runId)}/candidates`, { source: sourceIri, source_kind: sourceKind, query_id: queryId, limit: PAGE, cursor }, controller.signal);
       if (!controller.signal.aborted && candidateRead.current === controller)
         setMore({ key: candidateKey, items: [...base.items, ...page.items], cursor: page.next_cursor, loading: false, error: null });
     } catch (error) {
@@ -148,7 +145,7 @@ export function CompareView() {
     } finally {
       if (candidateRead.current === controller) candidateRead.current = null;
     }
-  }, [runId, sourceIri, sourceKind, cursor, continued, candidateKey]);
+  }, [runId, sourceIri, sourceKind, queryId, cursor, continued, candidateKey]);
   const loaded = useMemo(() => [...(first.data?.items ?? []), ...(continued?.items ?? [])], [first.data, continued]);
   const { ordered, basis } = useMemo(() => orderCandidates(loaded), [loaded]);
   const candidate = ordered.find((item) => item.pair_id === pairId) ?? null;
@@ -173,18 +170,18 @@ export function CompareView() {
 
   // Deliberate choices are kept for this exact package and run only.
   const remember = useCallback(
-    (iri: string, kind: EntityKind, pair: string | null) => {
-      if (packageId && runId) writeChoice({ package_id: packageId, run_id: runId, source: iri, source_kind: kind, pair });
+    (iri: string, kind: EntityKind, pair: string | null, query: number | null = queryId) => {
+      if (packageId && runId) writeChoice({ package_id: packageId, run_id: runId, source: iri, source_kind: kind, query_id: query, pair });
     },
-    [packageId, runId],
+    [packageId, runId, queryId],
   );
   const choosePair = useCallback(
     (item: Candidate) => {
       cancelCandidateRead();
       remember(item.source.iri, item.source.kind, item.pair_id);
-      setParams({ pair: item.pair_id, ht: null, htk: null });
+      setParams({ pair: item.pair_id, q: queryId?.toString() ?? null, ht: null, htk: null });
     },
-    [remember, setParams, cancelCandidateRead],
+    [remember, setParams, cancelCandidateRead, queryId],
   );
 
   const sourceEntity = candidate?.source ?? source?.entity ?? null;
@@ -222,31 +219,9 @@ export function CompareView() {
   // Phones read top to bottom: the review belongs after the comparison, not before it.
   const narrow = useNarrow();
   const openBrowse = useCallback(() => {
-    const next = new URLSearchParams();
-    if (runId) next.set("run", runId);
-    if (sourceEntity) {
-      next.set("s", navigation.source?.iri ?? sourceEntity.iri);
-      next.set("sk", navigation.source?.kind ?? sourceEntity.kind);
-      next.set("pin_sk", sourceEntity.kind);
-      next.set("from_sk", sourceEntity.kind);
-      next.set("pin_s", sourceEntity.iri);
-    }
-    if (targetEntity) {
-      next.set("t", navigation.target?.iri ?? targetEntity.iri);
-      next.set("tk", navigation.target?.kind ?? targetEntity.kind);
-      next.set("pin_tk", targetEntity.kind);
-      next.set("pin_t", targetEntity.iri);
-    }
-    if (sourceIri) next.set("from_source", sourceIri);
-    if (pairId) next.set("from_pair", pairId);
-    // The comparison's own view comes back unchanged: source kind, list, tab and each side's
-    // independent hierarchy focus (spec 24 HR2 §5).
-    for (const key of ["sk", "list", "details", "hs", "hsk", "ht", "htk"]) {
-      const value = params.get(key);
-      if (value) next.set(`from_${key}`, value);
-    }
+    const next = comparisonBrowseParams(params, { runId, source: sourceEntity, target: targetEntity, queryId, sourceFocus: navigation.source, targetFocus: navigation.target });
     window.location.assign(`/browse/?${next.toString()}`);
-  }, [runId, sourceEntity, targetEntity, sourceIri, pairId, navigation, params]);
+  }, [runId, sourceEntity, targetEntity, navigation, params, queryId]);
 
   if (!state.runs.length) {
     return (
@@ -278,17 +253,18 @@ export function CompareView() {
           canLoadMore={Boolean(sourceCursor)}
           selectedIri={sourceIri}
           selectedKind={sourceKind}
+          selectedQueryId={queryId}
           onSelect={(item) => {
             cancelCandidateRead();
-            remember(item.entity.iri, item.entity.kind, null);
-            setParams({ source: item.entity.iri, sk: item.entity.kind, pair: null, hs: null, hsk: null, ht: null, htk: null });
+            remember(item.entity.iri, item.entity.kind, null, item.query_id ?? null);
+            setParams(sourceParams(item));
           }}
         >
         </SourcePicker>
         <CandidateList
           candidates={ordered}
           basis={basis}
-          loading={first.loading}
+          loading={first.loading || (waitingForPair && !linked.error)}
           error={first.error ?? continued?.error}
           onRetry={continued?.error ? loadMoreCandidates : first.reload}
           selectedPair={candidate?.pair_id ?? null}
@@ -302,22 +278,23 @@ export function CompareView() {
       </aside>
 
       <div className="compare-main" id="main" tabIndex={-1}>
-        {!candidate && !pairNotFound && (first.loading || sources.loading || (!sourceIri && !linked.error && !(sources.data && !allSources.length)) || pairMissing) && (
+        {!candidate && !pairNotFound && (first.loading || sources.loading || (waitingForPair && !linked.error) || (!sourceIri && !linked.error && !(sources.data && !allSources.length)) || pairMissing) && (
           <div aria-busy="true">
             {pairMissing && <p className="meta">Finding the linked pair among this source&apos;s candidates…</p>}
             <Skeleton lines={6} />
           </div>
         )}
-        {!sourceIri && linked.error ? (
+        {waitingForPair && linked.error ? (
           <div className="note note-warn" role="alert">
             <p>The linked pair was not found in this run.</p>
             <div className="note-actions">
-              <button type="button" className="btn btn-sm" onClick={() => setParams({ pair: null })}>
+              <button type="button" className="btn btn-sm" onClick={() => setParams({ source: null, sk: null, q: null, pair: null })}>
                 Browse all sources
               </button>
             </div>
           </div>
         ) : null}
+        {invalidQuery && <p className="note note-warn" role="alert">The query in this link is invalid. Choose a source query from the list.</p>}
         {pairNotFound && (
           <div className="note note-warn" role="alert">
             <p>The linked pair is not among this source&apos;s {ordered.length} loaded candidates in this run.</p>
@@ -333,7 +310,7 @@ export function CompareView() {
         )}
         {!candidate && !first.loading && first.data && !ordered.length && (
           <div className="note">
-            <p>No candidate pair is available for this source.</p>
+            <p>{queryId === null ? "No candidate pair is available for this source." : `No candidate pair is available for query ${queryId}.`}</p>
           </div>
         )}
         {candidate && pair && sourceEntity && targetEntity && (
@@ -365,7 +342,7 @@ export function CompareView() {
                   <div className="pair-header">
                     <div className="pair-heading">
                       <span className="meta">
-                        Candidate {index + 1} of {ordered.length}
+                        {queryId !== null && <>Query {queryId} · </>}Candidate {index + 1} of {ordered.length}
                         {complete ? "" : " loaded"}
                       </span>
                       <h1 className="pair-question">
@@ -393,7 +370,7 @@ export function CompareView() {
                         <>
                           {" · "}
                           <button type="button" className="link-btn score-help" aria-expanded={scoreHelp} onClick={() => setScoreHelp((value) => !value)}>
-                            matching score {formatScore(score.value)}
+                            {scoreLabel(score)} {formatScore(score.value)}
                           </button>
                         </>
                       ) : null}
@@ -404,7 +381,7 @@ export function CompareView() {
                     </button>
                     {scoreHelp && score && (
                       <p className="meta matcher-bar-note">
-                        {score.calibration_status === "validated" ? "A calibrated score." : "A matching score ranks candidates for this source. It is not a probability of being correct."}
+                        {scoreHelpText(score)}
                       </p>
                     )}
                   </div>

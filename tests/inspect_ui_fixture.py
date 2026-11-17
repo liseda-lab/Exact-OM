@@ -146,10 +146,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", required=True, type=Path)
     parser.add_argument("--port", required=True, type=int)
+    parser.add_argument("--input-archive", type=Path, help="Serve an existing production-test export")
     args = parser.parse_args()
     with tempfile.TemporaryDirectory(prefix="exact-ui-fixture-") as directory:
         root = Path(directory)
-        manifest = create_fixture(root)
+        if args.input_archive:
+            from exact_inspect.artifacts import BundleLibrary
+            library = BundleLibrary(root / "library")
+            imported = library.import_archive(args.input_archive)
+            manifest = library.select(imported.package_id)
+        else:
+            manifest = create_fixture(root)
         export_archive(manifest, args.archive)
         try:
             uvicorn.run(

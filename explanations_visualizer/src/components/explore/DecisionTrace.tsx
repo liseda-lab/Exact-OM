@@ -162,7 +162,7 @@ export function DecisionTrace({ trace }: { trace: PairTrace }) {
 
 /** The concise default label: the final decision score is "Matching score"; others keep their recorded names. */
 function scoreName(name: string): string {
-  const labels: Record<string, string> = { S_final: "Matching score", S_base: "Base pair score", S_pair_final: "Pair score after model signal", S_struct: "Structural evidence", p_llm: "Model signal", rank_utility: "Ranking utility", s_label: "Label similarity", s_hier: "Hierarchy support", s_attr: "Attribute support", s_sim: "Relational similarity", s_diff: "Difference compatibility", s_strsim: "Structural similarity" };
+  const labels: Record<string, string> = { S_rank: "Ranking score", P_match: "Acceptance score", w_llm: "Model mixture weight", S_final: "Matching score", S_base: "Base pair score", S_pair_final: "Pair score after model signal", S_struct: "Structural evidence", p_llm: "Model signal", rank_utility: "Ranking utility", s_label: "Label similarity", s_hier: "Hierarchy support", s_attr: "Attribute support", s_sim: "Relational similarity", s_diff: "Difference compatibility", s_strsim: "Structural similarity" };
   return labels[name] ?? name;
 }
 

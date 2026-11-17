@@ -24,6 +24,23 @@ def build_parser():
     prepare.add_argument("--source-ontology", type=Path)
     prepare.add_argument("--target-ontology", type=Path)
     prepare.add_argument("--run-dir", type=Path)
+    prepare.add_argument(
+        "--native-dir", type=Path, help="Completed production exact score directory"
+    )
+    prepare.add_argument("--scored-pairs", type=Path, help="Optional exact decisions apply JSONL")
+    prepare.add_argument("--decision-plan", type=Path)
+    prepare.add_argument("--acceptance-dir", type=Path, help="Completed exact acceptance output")
+    prepare.add_argument(
+        "--rankings", type=Path, help="exact rank apply TSV with scores/receipt sidecars"
+    )
+    prepare.add_argument(
+        "--queries", type=Path, help="Original application queries used by exact rank"
+    )
+    prepare.add_argument(
+        "--model-manifest",
+        type=Path,
+        help="Acceptance model.json/retained.json or local rank model JSON",
+    )
     prepare.add_argument("--output", type=Path, required=True)
     prepare.add_argument(
         "--template",
@@ -43,7 +60,21 @@ def prepare_bundle(args):
     from .preparation import Preparation, bind_execution_lock
 
     if args.template:
-        if args.source_ontology or args.target_ontology or args.run_dir:
+        if any(
+            getattr(args, key)
+            for key in (
+                "source_ontology",
+                "target_ontology",
+                "run_dir",
+                "native_dir",
+                "scored_pairs",
+                "decision_plan",
+                "acceptance_dir",
+                "rankings",
+                "queries",
+                "model_manifest",
+            )
+        ):
             raise ValueError("Use --template or explicit ontology/run arguments, not both")
         template = json.loads(args.template.read_bytes())
         input_root = args.template.resolve().parent
@@ -58,12 +89,34 @@ def prepare_bundle(args):
                 {"name": "Target ontology", "root": {"path": str(args.target_ontology.resolve())}},
             ],
         }
-        if args.run_dir:
+        stages = {
+            key: str(getattr(args, key).resolve())
+            for key in (
+                "native_dir",
+                "scored_pairs",
+                "decision_plan",
+                "acceptance_dir",
+                "rankings",
+                "queries",
+                "model_manifest",
+            )
+            if getattr(args, key)
+        }
+        if args.run_dir and stages:
+            raise ValueError("Use --run-dir or production stage arguments, not both")
+        if stages:
+            template["run"] = {
+                "format": "exact-staged/1",
+                "staged": stages,
+                "source_ontology": "Source ontology",
+                "target_ontology": "Target ontology",
+            }
+        elif args.run_dir:
             layout = RunLayout.open(args.run_dir)
             if not layout.manifest_path.is_file():
                 raise ValueError(
-                    "Expected an `exact align` run with run_manifest.json. Staged score, "
-                    "decisions, acceptance and rank directories are not inspection bundles."
+                    "Expected an `exact align` run with run_manifest.json. For production "
+                    "outputs use --native-dir and the relevant stage arguments."
                 )
             template["run"] = {
                 "binding": {"path": str(layout.manifest_path)},

@@ -113,12 +113,27 @@ class ExecutionLock(WireModel):
                 "run_id",
                 "source_root_sha256",
                 "target_root_sha256",
+                "format",
+                "staged",
             }
-            if set(self.run) - allowed or not (allowed - {"run_id"}).issubset(self.run):
+            required = allowed - {"run_id", "format", "staged"}
+            if set(self.run) - allowed or not required.issubset(self.run):
                 raise ValueError(
                     "Run binding requires complete input hashes and artifact inventory"
                 )
             InputBinding.model_validate(self.run["binding"])
+            if self.run.get("format") not in (None, "exact-staged/1"):
+                raise ValueError("Unsupported run input format")
+            if self.run.get("format") == "exact-staged/1":
+                staged = self.run.get("staged")
+                if not isinstance(staged, dict) or "native_complete" not in staged:
+                    raise ValueError("Staged runs require a bound companion inventory")
+                for item in staged.values():
+                    InputBinding.model_validate(item)
+                if self.run["binding"] != staged["native_complete"] or sorted(
+                    map(canonical_hash, self.run["files"])
+                ) != sorted(map(canonical_hash, staged.values())):
+                    raise ValueError("Staged run inventory differs from its file bindings")
             if not self.run["files"]:
                 raise ValueError("Run binding must pin every consumed file")
             for entry in self.run["files"]:
@@ -257,6 +272,12 @@ def bind_execution_lock(template: dict[str, Any], *, input_root: Path) -> Execut
         runtime[package], hashes[package] = installed, digest
     run = value.get("run")
     if run:
+        if run.get("format") == "exact-staged/1":
+            from .staged import bind_staged
+
+            run["staged"] = bind_staged(run["staged"], input_root=input_root)
+            run["binding"] = run["staged"]["native_complete"]
+            run["files"] = list(run["staged"].values())
         run["binding"] = bind(run["binding"])
         if "files" not in run:
             directory = Path(run["binding"]["path"]).parent
@@ -545,6 +566,20 @@ class Preparation:
             imported = destination / "run"
             if imported.exists():
                 shutil.rmtree(imported)
+            if run.get("format") == "exact-staged/1":
+                from .staged import import_staged
+
+                import_staged(
+                    run["staged"],
+                    imported,
+                    source=source,
+                    target=target,
+                    run_id=run.get("run_id"),
+                    evidence_resolver=lambda item, entity: context_by_id[
+                        entity["ontology_version_id"]
+                    ].resolve_feature(item, entity),
+                )
+                return
             import_run(
                 input_path.parent,
                 imported,

@@ -44,6 +44,8 @@ export function eventMeaning(event: TraceEventLike): { text: string; known: bool
   }
   if (code === "exact_match_protected") return { text: "Skipped: matched by exact matching", known: true };
   if (code === "prefilter_removed") return { text: "Not run: another candidate was chosen by exact matching", known: true };
+  const production: Record<string, string> = { staged_candidate_recorded: "Candidate recorded by native scoring", staged_decision_applied: "Saved model response applied to the pair score", staged_decision_not_requested: "This pair was outside the saved decision requests", staged_acceptance_selected: "Included in the saved global alignment", staged_acceptance_not_selected: "Not included in the saved global alignment", local_ranking_applied: "Position read from the saved query ranking", default_equivalence: "Equivalence is the saved output convention" };
+  if (production[code]) return { text: production[code], known: true };
   if (stage === "selection" && status === "completed") {
     if (outcome === "selected") return { text: "Selected among this source's candidates", known: true };
     if (outcome === "not_selected") return { text: "Not selected among this source's candidates", known: true };

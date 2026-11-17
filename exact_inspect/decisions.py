@@ -21,7 +21,7 @@ from .contracts import (
     file_hash,
 )
 from .evidence_metadata import exact_match_basis, pair_evidence_metadata
-from .sqlite_safety import DECISION_TABLES, readonly_connection
+from .sqlite_safety import DECISION_TABLES, QUERY_DECISION_TABLES, readonly_connection
 
 _SCORE_MEANINGS = {
     "S_rank": "Saved local-ranking score; not a probability of semantic equivalence.",
@@ -837,6 +837,8 @@ class DecisionStore:
     def __init__(self, directory: Path, *, verified_database=None):
         self.directory = Path(directory)
         self._manifest = read_metadata(self.directory / "decisions.manifest.json")
+        if self._manifest.get("database_schema") not in (None, "exact-decision-index/2"):
+            raise DomainError("invalid_manifest", "Unsupported decision index schema", 422)
         if (
             self._manifest.get("implementation") in {"decision-adapter/6", "decision-adapter/7"}
             or "dependency_inventory_hash" in self._manifest
@@ -878,7 +880,8 @@ class DecisionStore:
             raise DomainError(
                 "artifact_conflict", "Decision package changed after verification.", 409
             )
-        with readonly_connection(self.database, DECISION_TABLES) as connection:
+        schema = QUERY_DECISION_TABLES if self._manifest.get("database_schema") else DECISION_TABLES
+        with readonly_connection(self.database, schema) as connection:
             yield connection
 
     def _page(self, table, column, where, params, *, limit, cursor, policy_hash):
@@ -928,13 +931,40 @@ class DecisionStore:
         )
 
     def candidates(
-        self, source_iri: str, source_kind="class", *, limit=20, cursor=None, policy_hash=None
+        self,
+        source_iri: str,
+        source_kind="class",
+        *,
+        query_id=None,
+        limit=20,
+        cursor=None,
+        policy_hash=None,
     ):
+        if self._manifest.get("query_scoped") and query_id is None:
+            raise DomainError("query_required", "Choose an original ranking query", 422)
+        if query_id is not None and (
+            type(query_id) is not int or query_id < 0 or not self._manifest.get("query_scoped")
+        ):
+            raise DomainError("invalid_query", "This run does not contain that ranking query", 422)
+        if query_id is not None:
+            with self._connect() as connection:
+                known = connection.execute(
+                    "SELECT 1 FROM sources WHERE query_id=? AND iri=? AND kind=?",
+                    (query_id, source_iri, source_kind),
+                ).fetchone()
+            if known is None:
+                raise DomainError(
+                    "unknown_query", "No saved query has that source and identity", 404
+                )
         return self._page(
             "pairs",
             "candidate",
-            "source=? AND source_kind=?",
-            (source_iri, source_kind),
+            "source=? AND source_kind=?" + (" AND query_id=?" if query_id is not None else ""),
+            (
+                (source_iri, source_kind, query_id)
+                if query_id is not None
+                else (source_iri, source_kind)
+            ),
             limit=limit,
             cursor=cursor,
             policy_hash=policy_hash or canonical_hash("exploration"),

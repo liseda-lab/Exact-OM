@@ -274,12 +274,17 @@ export interface Candidate {
   nil: Record<string, string | number | boolean>;
   saved_alignment_member: boolean | null;
   membership_provenance: { status: string; artifact_hash: string | null };
+  output_mode?: "global_acceptance" | "local_ranking" | "native_scores" | null;
+  ranking?: PairTrace["ranking"];
   status: Availability;
   decision_status: Availability;
   evidence_status?: Availability | null;
 }
 
 export interface SourceSummary {
+  query_id?: number;
+  query_position?: number;
+  candidate_count?: number;
   entity_id: string;
   entity: EntityRef;
   source_decision?: Record<string, unknown>;
@@ -309,7 +314,7 @@ export interface PairTrace {
   relation_basis: "default_convention" | "graph_closure_with_anchors" | "recorded_other" | "unavailable";
   assumption_refs: string[];
   /** A saved local ranking is a candidate ordering, not an accepted alignment. */
-  ranking?: { mode: "local_ranking"; query_id: number; candidate_count: number; rank: number; saved_output_member: boolean; artifact_ref: string };
+  ranking?: { mode: "local_ranking"; query_id: number; query_position?: number | null; candidate_count: number; rank: number; saved_output_member: boolean; artifact_ref: string } | null;
   /** Recorded completeness and matcher comparisons for the pair's selected evidence. */
   evidence_metadata?: PairEvidenceMetadata | null;
 }

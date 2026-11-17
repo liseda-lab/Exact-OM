@@ -688,6 +688,7 @@ def create_prepared_app(
         run_id: str,
         source: str,
         source_kind: EntityKind = "class",
+        query_id: int | None = Query(None, ge=0),
         limit: int = Query(20, ge=1, le=100),
         cursor: str | None = None,
     ):
@@ -696,6 +697,7 @@ def create_prepared_app(
             active.run(run_id).candidates(
                 source,
                 source_kind=source_kind,
+                query_id=query_id,
                 limit=limit,
                 cursor=cursor,
                 policy_hash=active.policy.policy_hash,

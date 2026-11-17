@@ -47,7 +47,7 @@ def export_policy_run(
         ):
             target.execute(schema)
         for row in original.execute("SELECT * FROM sources"):
-            target.execute("INSERT INTO sources VALUES (?,?,?,?)", row)
+            target.execute("INSERT INTO sources VALUES (" + ",".join("?" for _ in row) + ")", row)
         for row in original.execute("SELECT * FROM pairs"):
             candidate, trace, items = json.loads(row[5]), json.loads(row[6]), json.loads(row[7])
             safe = filter_evidence_items(items, contexts, policy, physically_filtered=True)
@@ -70,8 +70,8 @@ def export_policy_run(
                 else "not_exported"
             )
             target.execute(
-                "INSERT INTO pairs VALUES (?,?,?,?,?,?,?,?)",
-                (*row[:5], json.dumps(candidate), json.dumps(trace), json.dumps(safe)),
+                "INSERT INTO pairs VALUES (" + ",".join("?" for _ in row) + ")",
+                (*row[:5], json.dumps(candidate), json.dumps(trace), json.dumps(safe), *row[8:]),
             )
             pair_count += 1
             retained += len(safe)
@@ -90,6 +90,7 @@ def export_policy_run(
             }
         ),
         "counts": {
+            **manifest.get("counts", {}),
             "pairs": pair_count,
             "selected_evidence": retained,
             "scope": "prepared_visibility_policy",

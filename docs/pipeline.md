@@ -90,3 +90,11 @@ decision stages stream their outputs.
 Frozen historical models can be imported with the explicit compatibility
 commands in [acceptance](acceptance.md). Model files, licensed ontologies and
 private benchmark references are not shipped in the package.
+
+## Inspect the results
+
+Use [Exact Explain](local-tool.md#production-global-alignment) to prepare the
+completed stages as a portable local browser app. Global imports retain saved
+alignment membership; local imports retain each original query and its ranking.
+Keep the native outputs and downstream receipt files together. Opening the app
+does not rerun the matcher, load a model, or contact a provider.
