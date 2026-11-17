@@ -158,6 +158,24 @@ def test_declared_case_components_and_prepared_scope_both_bound_events(policy):
         accepted(policy, event(type="tab_open", component_id="details", element_id="hierarchy"))
 
 
+@pytest.mark.parametrize("tab,component", [("trace", "decision_trace"), ("scores", "scores")])
+def test_decision_tabs_require_both_publication_and_workspace_admission(policy, tab, component):
+    _, state, study = policy
+    payload = event(type="tab_open", component_id="details", element_id=tab)
+    with pytest.raises(StudyError, match="workspace"):
+        accepted(policy, payload)
+    study["workspace_scopes"][0]["components"].append("decisions")
+    with pytest.raises(StudyError, match="publication"):
+        accepted(policy, payload)
+    study["components"].append(component)
+    accepted(policy, payload)
+    state["assignment"]["presentations"][0]["condition"] = "ontology_baseline"
+    with pytest.raises(StudyError, match="baseline"):
+        accepted(policy, payload)
+    with pytest.raises(StudyError, match="workspace"):
+        accepted(policy, synthetic_event(type="tab_open", component_id="details", element_id=tab))
+
+
 @pytest.mark.parametrize("action", ["rank_add", "rank_remove", "rank_move", "submit"])
 def test_practice_rank_and_submit_observations_are_synthetic(policy, action):
     payload = synthetic_event(type=action, component_id="ranking")

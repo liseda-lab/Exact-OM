@@ -120,6 +120,14 @@ ACTION_RESOURCES = {
     },
     "comparison_open": ("comparison", {"pair_comparison"}),
 }
+TAB_RESOURCES = {
+    "hierarchy": ACTION_RESOURCES["hierarchy_expand"],
+    "evidence": ACTION_RESOURCES["table_open"],
+    "graph": ACTION_RESOURCES["graph_open"],
+    "comparison": ACTION_RESOURCES["comparison_open"],
+    "trace": ("decisions", {"decision_trace"}),
+    "scores": ("decisions", {"scores"}),
+}
 
 
 def _element_alias(value):
@@ -159,7 +167,7 @@ def _element_scope(case, event, *, synthetic=False, lessons=()):
         "response_type_change": {"ranked_candidates", "none_of_these", "insufficient_evidence"},
         "revision": {"undo"},
         "copy_iri": {"source", "target"},
-        "tab_open": {"hierarchy", "evidence", "graph", "comparison"},
+        "tab_open": set(TAB_RESOURCES),
         "external_resource_link": resources,
     }
     if action in targets and element not in targets[action]:
@@ -314,14 +322,7 @@ def _scope(store, state, study, event):
     _element_scope(case, event, synthetic=scope != "case", lessons=lessons)
     requirement = ACTION_RESOURCES.get(action)
     if action == "tab_open" and event.get("element_id"):
-        requirement = ACTION_RESOURCES.get(
-            {
-                "hierarchy": "hierarchy_expand",
-                "evidence": "table_open",
-                "graph": "graph_open",
-                "comparison": "comparison_open",
-            }[event["element_id"]]
-        )
+        requirement = TAB_RESOURCES[event["element_id"]]
     if requirement:
         resource, components = requirement
         workspace = next(
