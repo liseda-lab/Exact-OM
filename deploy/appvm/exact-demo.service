@@ -21,6 +21,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
+InaccessiblePaths=/home/pcotovio/exact-study/study.env /home/pcotovio/exact-study/production-20261114/private /home/pcotovio/exact-study/descriptions-20261114/private
 UMask=0077
 
 [Install]

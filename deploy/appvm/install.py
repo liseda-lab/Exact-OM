@@ -5,7 +5,14 @@ Adapted from liseda_cluster's temporary-admin-access.py: NOTAFTER, visudo,
 root-owned grant, explicit revoke. This grant cannot run arbitrary root commands.
 """
 
-import argparse, datetime, os, pwd, shutil, socket, subprocess, tempfile
+import argparse
+import datetime
+import json
+import os
+import pwd
+import socket
+import subprocess
+import tempfile
 from pathlib import Path
 
 
@@ -19,6 +26,16 @@ def main():
         raise SystemExit("Choose 1–24 hours")
     if pwd.getpwnam("pcotovio").pw_uid != 1000:
         raise SystemExit("Unexpected account UID")
+    evidence = Path("/home/pcotovio/exact-demo/private")
+    api = json.loads((evidence / "api-verification.json").read_text())
+    routing = json.loads((evidence / "routing-verification.json").read_text())
+    browser = json.loads((evidence / "browser-verification.json").read_text())
+    if (
+        api["pairs_checked"] != 50
+        or not routing["study_pages_and_assets_identical"]
+        or browser["failed"]
+    ):
+        raise SystemExit("Demo acceptance has not passed")
     src = Path(__file__).resolve().parent
     root = Path("/var/lib/exact-demo-deploy")
     root.mkdir(mode=0o700, exist_ok=True)
@@ -36,7 +53,7 @@ def main():
         os.chown(target, 0, 0)
         target.chmod(mode)
     Path("/etc/nginx/conf.d/exact-demo-limits.conf").write_text(
-        "limit_req_zone $binary_remote_addr zone=exact_demo:1m rate=10r/s;\n"
+        "limit_req_zone $binary_remote_addr zone=exact_demo:1m rate=30r/s;\n"
     )
     expiry = (
         datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(hours=a.hours)

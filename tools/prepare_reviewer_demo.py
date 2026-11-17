@@ -18,11 +18,11 @@ from exact_inspect.artifacts import (
 )
 from exact_inspect.contracts import canonical_hash, file_hash
 from exact_inspect.decisions import (
+    DEPENDENCY_INVENTORY_SCHEMA,
     _missing_event,
     dependency_inventory_hash,
-    DEPENDENCY_INVENTORY_SCHEMA,
 )
-from exact_inspect.models import Candidate, PairResponse, GeneratedExplanationResponse
+from exact_inspect.models import Candidate, GeneratedExplanationResponse, PairResponse
 
 STAGES = (
     "retrieval",
