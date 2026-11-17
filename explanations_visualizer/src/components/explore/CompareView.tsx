@@ -472,9 +472,11 @@ export function CompareView() {
                   <div className="matcher-bar">
                     <span className="origin-tag origin-matcher">Matcher</span>
                     <span>
-                      {selection?.status === "completed" ? (selection.outcome === "selected" ? "Selected" : selection.outcome === "not_selected" ? "Not selected" : `Selection: ${selection.outcome.replace(/_/g, " ")}`) : "Selection not recorded"}
-                      {" · "}
-                      {candidate.saved_alignment_member === true ? <strong>in saved alignment</strong> : candidate.saved_alignment_member === false ? "not in saved alignment" : "saved alignment unknown"}
+                      {trace.data?.ranking ? <>Ranked {trace.data.ranking.rank} of {trace.data.ranking.candidate_count} in the original run</> : <>
+                        {selection?.status === "completed" ? (selection.outcome === "selected" ? "Selected" : selection.outcome === "not_selected" ? "Not selected" : `Selection: ${selection.outcome.replace(/_/g, " ")}`) : "Selection not recorded"}
+                        {" · "}
+                        {candidate.saved_alignment_member === true ? <strong>in saved alignment</strong> : candidate.saved_alignment_member === false ? "not in saved alignment" : "saved alignment unknown"}
+                      </>}
                       {score ? (
                         <>
                           {" · "}

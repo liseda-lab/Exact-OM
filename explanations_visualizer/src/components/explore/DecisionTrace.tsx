@@ -81,6 +81,8 @@ function EventRow({ event, index }: { event: TraceEvent; index: number }) {
                 <dd className="mono">{event.implementation_id}</dd>
               </div>
             )}
+            <div><dt>Provenance</dt><dd>{event.provenance_status.replace(/_/g, " ")}</dd></div>
+            {event.artifact_refs.length > 0 && <div><dt>Original artifacts</dt><dd className="mono">{event.artifact_refs.map((ref) => <div key={ref}>{ref}</div>)}</dd></div>}
           </dl>
         )}
       </div>
@@ -132,7 +134,10 @@ export function DecisionTrace({ trace }: { trace: PairTrace }) {
             <dt>Selection</dt>
             <dd>{selection ? eventMeaning(selection).text : "No selection record"}</dd>
           </div>
-          <div>
+          {trace.ranking ? <>
+            <div><dt>Original rank</dt><dd>{trace.ranking.rank} of {trace.ranking.candidate_count}</dd></div>
+            <div><dt>Saved output</dt><dd>Candidate ranking</dd></div>
+          </> : <><div>
             <dt>Saved alignment</dt>
             <dd>{trace.saved_alignment_member === null ? "Not known" : trace.saved_alignment_member ? "Included" : "Not included"}</dd>
           </div>
@@ -142,7 +147,7 @@ export function DecisionTrace({ trace }: { trace: PairTrace }) {
               {trace.relation ? RELATION_NAMES[trace.relation] : "None recorded"}
               {trace.relation && BASIS_NAMES[trace.relation_basis] ? <span className="meta block">{BASIS_NAMES[trace.relation_basis]}</span> : null}
             </dd>
-          </div>
+          </div></>}
         </dl>
       </div>
       <h3 className="subhead">Recorded sequence</h3>
@@ -157,7 +162,8 @@ export function DecisionTrace({ trace }: { trace: PairTrace }) {
 
 /** The concise default label: the final decision score is "Matching score"; others keep their recorded names. */
 function scoreName(name: string): string {
-  return name === "S_final" ? "Matching score" : name;
+  const labels: Record<string, string> = { S_final: "Matching score", S_base: "Base pair score", S_pair_final: "Pair score after model signal", S_struct: "Structural evidence", p_llm: "Model signal", rank_utility: "Ranking utility", s_label: "Label similarity", s_hier: "Hierarchy support", s_attr: "Attribute support", s_sim: "Relational similarity", s_diff: "Difference compatibility", s_strsim: "Structural similarity" };
+  return labels[name] ?? name;
 }
 
 export function ScoresPanel({ candidate }: { candidate: Candidate }) {

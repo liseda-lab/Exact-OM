@@ -50,6 +50,18 @@ export function eventMeaning(event: TraceEventLike): { text: string; known: bool
     if (outcome === "abstained") return { text: "The selector abstained", known: true };
   }
   const known: Record<string, string> = {
+    native_pair_scores_recorded: "Pair scores recorded from the ontology evidence",
+    local_exact_anchor_no_pair_score: "Exact-match anchor used without pair scoring",
+    local_exact_anchor_not_fused: "Exact-match anchor kept without model-score fusion",
+    local_model_signal_applied: "Recorded local model signal contributed to the pair score",
+    local_model_signal_no_score_change: "Recorded local model signal was used; the pair score was unchanged",
+    local_model_signal_not_applied: "No model signal was applied to this pair",
+    local_query_ranked: "Ranked within the original candidate set",
+    local_ranking_no_threshold: "No acceptance threshold in this ranking run",
+    local_ranking_no_cardinality: "Candidates were ranked without an alignment cardinality limit",
+    ranked_submission_written: "Included in the saved candidate ranking",
+    local_ranking_no_relation: "This ranking run did not assign mapping relations",
+    local_ranking_no_repair: "This ranking run did not perform alignment repair",
     candidate_pool_generated: "Candidate pool generated for this run",
     provided_candidate_pool: "Taken from the saved candidate pool",
     threshold_passed: "Score met the threshold",

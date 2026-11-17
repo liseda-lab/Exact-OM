@@ -19,6 +19,7 @@ from pathlib import Path
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--hours", type=int, default=4)
+    p.add_argument("--evidence-dir", type=Path, default=Path("/home/pcotovio/exact-demo/private"))
     a = p.parse_args()
     if os.geteuid() != 0 or socket.gethostname().split(".")[0] != "exact-explain":
         raise SystemExit("Run with sudo on AppVM only")
@@ -26,12 +27,13 @@ def main():
         raise SystemExit("Choose 1–24 hours")
     if pwd.getpwnam("pcotovio").pw_uid != 1000:
         raise SystemExit("Unexpected account UID")
-    evidence = Path("/home/pcotovio/exact-demo/private")
+    evidence = a.evidence_dir
     api = json.loads((evidence / "api-verification.json").read_text())
     routing = json.loads((evidence / "routing-verification.json").read_text())
     browser = json.loads((evidence / "browser-verification.json").read_text())
     if (
         api["pairs_checked"] != 50
+        or api.get("restored_trace_pairs") != 50
         or not routing["study_pages_and_assets_identical"]
         or browser["failed"]
     ):

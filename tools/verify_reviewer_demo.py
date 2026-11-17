@@ -6,12 +6,13 @@ import sqlite3
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections import Counter
 from pathlib import Path
 
 from exact_inspect.contracts import canonical_hash
 
 
-def verify(origin, assets, publication):
+def verify(origin, assets, publication, decisions):
     def get(path, **query):
         with urllib.request.urlopen(
             origin + path + ("?" + urllib.parse.urlencode(query) if query else ""), timeout=60
@@ -32,6 +33,7 @@ def verify(origin, assets, publication):
             raise AssertionError("Exposed " + path)
 
     d = json.loads(publication.read_bytes())["definition"]
+    recovery = json.loads(decisions.read_bytes())
     health = get("/api/v1/health")
     assert health["profile"] == "public_demo"
     run = get("/api/v1/runs")["items"]
@@ -42,6 +44,7 @@ def verify(origin, assets, publication):
     checked = 0
     seen = set()
     explanations = 0
+    features = Counter()
     for row in sources["items"]:
         entity = row["entity"]
         case = next(c for c in d["cases"] if c["source"] == entity)
@@ -63,8 +66,51 @@ def verify(origin, assets, publication):
                 )
                 trace = get(prefix + "/pair", pair_id=c["candidate_id"])
                 assert trace["source"] == entity and trace["target"] == c["entity"]
+                recovered = recovery["cases"][case["case_id"]]
+                saved = next(
+                    x for x in recovered["candidates"] if x["candidate_id"] == c["candidate_id"]
+                )
+                assert trace["ranking"]["rank"] == c["display_position"]
+                assert trace["ranking"]["candidate_count"] == recovered["candidate_count"] == 100
+                assert trace["ranking"]["artifact_ref"] == "sha256:" + recovery["submission_sha256"]
+                assert trace["saved_alignment_member"] is None and trace["relation"] is None
+                assert a["decision_status"] == "available"
+                events = {e["stage"]: e for e in trace["events"]}
+                assert len(events) == 10 and all(
+                    e["status"] != "not_recorded" and e["artifact_refs"] for e in events.values()
+                )
+                assert (events["prefilter"]["reason_code"] == "exact_match_protected") == saved[
+                    "protected_exact"
+                ]
+                assert events["selection"]["reason_code"] == "local_query_ranked"
+                for stage in ["threshold", "cardinality", "relation_typing", "repair"]:
+                    assert events[stage]["status"] == "not_run"
+                score_values = {s["name"]: s["value"] for s in a["scores"]}
+                for k in [
+                    "S_base",
+                    "S_struct",
+                    "s_label",
+                    "s_hier",
+                    "s_attr",
+                    "s_sim",
+                    "s_diff",
+                    "s_strsim",
+                ]:
+                    assert score_values.get(k) == saved["native_scores"].get(k)
+                assert score_values.get("rank_utility") == saved["utility"]
+                if saved["applied"]:
+                    assert score_values["S_pair_final"] == saved["applied"]["S_pair_final"]
+                    assert score_values.get("p_llm") == saved["applied"]["p_llm"]
+                    assert (events["llm_signal"]["status"] == "completed") == saved["applied"][
+                        "cached_response_reused"
+                    ]
+                    features["model_signal_applied"] += saved["applied"]["cached_response_reused"]
                 evidence = get(prefix + "/pair-evidence", pair_id=c["candidate_id"], limit=100)
                 assert evidence["total_count"] > 0
+                features.update({"evidence_items": evidence["total_count"]})
+                meta = trace["evidence_metadata"]
+                features.update({"evidence_" + k: v for k, v in meta["counts"].items()})
+                features["pairs_with_recorded_bridges"] += meta["bridge_status"] == "recorded"
                 assert not any(
                     k in json.dumps([a, trace, evidence])
                     for k in ["acceptable_candidate_ids", "reference_target", "reference_rank"]
@@ -108,15 +154,18 @@ def verify(origin, assets, publication):
         "reference_answers_absent": True,
         "import_endpoints_disabled": True,
         "hierarchy_bases_checked": True,
+        "restored_trace_pairs": checked,
+        "ranking_is_not_alignment": True,
+        "feature_audit": dict(features),
     }
 
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--origin", default="http://127.0.0.1:8011")
-    for k in ["assets", "publication", "report"]:
+    for k in ["assets", "publication", "report", "decisions"]:
         p.add_argument("--" + k, type=Path, required=True)
     a = p.parse_args()
-    r = verify(a.origin, a.assets, a.publication)
+    r = verify(a.origin, a.assets, a.publication, a.decisions)
     a.report.write_text(json.dumps(r, indent=2) + "\n")
     print(json.dumps(r))

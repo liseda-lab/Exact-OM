@@ -5,6 +5,13 @@ import { eventMeaning, groupTrace, routeSummary, stageName } from "./trace.ts";
 
 const e = (stage: string, status: string, outcome: string, reason_code: string) => ({ stage, status, outcome, reason_code });
 
+test("local ranking describes ordering and model usage without asserting accepted mappings", () => {
+  assert.equal(eventMeaning(e("selection", "completed", "retained", "local_query_ranked")).text, "Ranked within the original candidate set");
+  assert.equal(eventMeaning(e("llm_signal", "not_run", "not_applicable", "local_model_signal_not_applied")).text, "No model signal was applied to this pair");
+  assert.equal(eventMeaning(e("extraction", "completed", "retained", "ranked_submission_written")).text, "Included in the saved candidate ranking");
+  assert.match(eventMeaning(e("threshold", "not_run", "not_applicable", "local_ranking_no_threshold")).text, /No acceptance threshold/);
+});
+
 test("the prefilter stage reads as Exact matching and its producer codes map one to one (21 F03)", () => {
   assert.equal(stageName("prefilter"), "Exact matching");
   assert.equal(eventMeaning(e("prefilter", "completed", "retained", "exact_match_protected")).text, "Matched by exact matching");

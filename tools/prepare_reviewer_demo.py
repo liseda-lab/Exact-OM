@@ -19,23 +19,10 @@ from exact_inspect.artifacts import (
 from exact_inspect.contracts import canonical_hash, file_hash
 from exact_inspect.decisions import (
     DEPENDENCY_INVENTORY_SCHEMA,
-    _missing_event,
     dependency_inventory_hash,
 )
-from exact_inspect.models import Candidate, GeneratedExplanationResponse, PairResponse
-
-STAGES = (
-    "retrieval",
-    "prefilter",
-    "pair_scoring",
-    "llm_signal",
-    "selection",
-    "threshold",
-    "cardinality",
-    "extraction",
-    "relation_typing",
-    "repair",
-)
+from exact_inspect.models import Candidate, GeneratedExplanationResponse
+from tools.reviewer_decision_trace import recovered_pair
 
 # Owner-reviewed cases, selected for information, clinical diversity and challenge.
 # The two rank-4 cases are the only two available in the deployed 40-source pool.
@@ -55,7 +42,7 @@ SELECTION = frozenset(
 )
 
 
-def prepare(assets, publication, catalogue, name, report):
+def prepare(assets, publication, catalogue, name, report, decisions):
     assets = assets.resolve()
     old = json.loads(publication.read_bytes())
     d = old["definition"]
@@ -64,6 +51,14 @@ def prepare(assets, publication, catalogue, name, report):
     if set(SELECTION) - {c["case_id"] for c in d["cases"]}:
         raise ValueError("Demo cases must belong to the deployed revision")
     cat = json.loads(catalogue.read_bytes())
+    recovery = json.loads(decisions.read_bytes())
+    if (
+        recovery["schema"] != "exact-reviewer-decision-recovery/1"
+        or recovery["native_sha256"] != cat["native_result"]["sha256"]
+    ):
+        raise ValueError("Decision recovery must refer to the study's original native run")
+    if set(recovery["cases"]) != SELECTION:
+        raise ValueError("Decision recovery must cover exactly the selected ten cases")
     selected = {c["case_id"]: c for c in cat["cases"] if c["case_id"] in SELECTION}
     assert set(selected) == SELECTION
     assert sorted(c["reference_rank"] for c in selected.values()) == [1, 1, 2, 2, 3, 3, 4, 4, 5, 5]
@@ -147,15 +142,9 @@ def prepare(assets, publication, catalogue, name, report):
                             (c["candidate_id"],),
                         ).fetchone()[0]
                     )
-                    scores = [
-                        dict(
-                            name="S_final",
-                            stage="selection",
-                            value=c["score"],
-                            meaning="Recorded final Exact 2.0 candidate ranking score.",
-                            calibration_status="not_established",
-                        )
-                    ]
+                    scores, trace = recovered_pair(
+                        recovery, case, c, name, metadata["evidence_metadata"]
+                    )
                     candidate = Candidate.model_validate(
                         dict(
                             pair_id=c["candidate_id"],
@@ -175,26 +164,7 @@ def prepare(assets, publication, catalogue, name, report):
                             saved_alignment_member=None,
                             membership_provenance={"status": "unavailable", "artifact_hash": None},
                             status="available",
-                            decision_status="not_exported",
-                        )
-                    ).model_dump(mode="json")
-                    # The study records scores and evidence, not the full pipeline event history.
-                    # Preserve that distinction rather than inventing stage decisions.
-                    trace = PairResponse.model_validate(
-                        dict(
-                            artifact_type="pair_decision_trace",
-                            contract_version="exact-explain/1.0",
-                            run_id=name,
-                            pair_id=c["candidate_id"],
-                            source=source,
-                            target=c["entity"],
-                            events=[_missing_event(s) for s in STAGES],
-                            saved_alignment_member=None,
-                            relation=None,
-                            relation_basis="unavailable",
-                            assumption_refs=[],
-                            evidence_metadata=metadata["evidence_metadata"],
-                            fixture_provenance="Recorded Exact 2.0 run; curated reviewer demonstration.",
+                            decision_status="available",
                         )
                     ).model_dump(mode="json")
                     db.execute(
@@ -219,11 +189,18 @@ def prepare(assets, publication, catalogue, name, report):
                 }
             )
             print(json.dumps({"prepared_case": cid}), flush=True)
-    dependencies = {"published-study": file_hash(publication)}
+    dependencies = {
+        "published-study": file_hash(publication),
+        "decision-recovery": file_hash(decisions),
+        **{
+            f"original-artifact-{i}": "sha256:" + sha
+            for i, sha in enumerate(sorted(set(recovery["verified_artifacts"].values())))
+        },
+    }
     manifest = dict(
         contract_version="exact-explain/1.0",
         artifact_type="run_decision_package",
-        implementation="study-demo-adapter/1",
+        implementation="study-demo-adapter/2",
         run_id=name,
         revision=canonical_hash(dependencies),
         source_ontology_version_id=source["ontology_version_id"],
@@ -284,8 +261,8 @@ def prepare(assets, publication, catalogue, name, report):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
-    for key in ["assets", "publication", "catalogue", "report"]:
+    for key in ["assets", "publication", "catalogue", "report", "decisions"]:
         p.add_argument("--" + key, type=Path, required=True)
     p.add_argument("--name", default="reviewer-demo-20261117")
     a = p.parse_args()
-    prepare(a.assets, a.publication, a.catalogue, a.name, a.report)
+    prepare(a.assets, a.publication, a.catalogue, a.name, a.report, a.decisions)

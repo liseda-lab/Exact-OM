@@ -308,6 +308,8 @@ export interface PairTrace {
   relation: "equivalent" | "source_narrower" | "source_broader" | "not_equivalent" | "unresolved" | null;
   relation_basis: "default_convention" | "graph_closure_with_anchors" | "recorded_other" | "unavailable";
   assumption_refs: string[];
+  /** A saved local ranking is a candidate ordering, not an accepted alignment. */
+  ranking?: { mode: "local_ranking"; query_id: number; candidate_count: number; rank: number; saved_output_member: boolean; artifact_ref: string };
   /** Recorded completeness and matcher comparisons for the pair's selected evidence. */
   evidence_metadata?: PairEvidenceMetadata | null;
 }

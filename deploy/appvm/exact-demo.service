@@ -8,7 +8,7 @@ User=pcotovio
 WorkingDirectory=/home/pcotovio/exact-demo/release
 Environment=PYTHONDONTWRITEBYTECODE=1
 Environment=PYTHONUNBUFFERED=1
-Environment=EXACT_DEMO_PACKAGE=/home/pcotovio/exact-study/assets/reviewer-demo-20261117-package.json
+Environment=EXACT_DEMO_PACKAGE=/home/pcotovio/exact-study/assets/reviewer-demo-traces-20261117-package.json
 Environment=EXACT_DEMO_FRONTEND=/home/pcotovio/exact-demo/release/explanations_visualizer/out
 ExecStart=/home/pcotovio/Exact-OM/.venv/bin/python -m uvicorn deploy.appvm.demo_server:app --factory --host 127.0.0.1 --port 8010 --limit-concurrency 24 --no-access-log
 Restart=on-failure
