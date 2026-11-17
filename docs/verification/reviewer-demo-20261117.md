@@ -2,9 +2,11 @@
 
 ## Scope and current state
 
-Prepared and acceptance-tested on AppVM; public activation is pending the owner's
-one-time sudo bootstrap. The active study has not been restarted, republished or
-modified. Its process remains PID 230372, started 14 November at 16:50:50 UTC.
+Deployed at <https://exact-explain.lasige.di.fc.ul.pt/> on 17 November 2026.
+Public verification completed at 11:56 UTC. The active study has not been
+restarted, republished or modified. Its process remains PID 230372, started
+14 November at 16:50:50 UTC. The temporary deployment grant was revoked after
+verification, and passwordless activation was independently confirmed unavailable.
 
 The demo uses only the latest deployed study revision,
 `exact2-ncit-doid-production-20261114-r2`, including its description corrections.
@@ -96,6 +98,16 @@ benchmark.
   bookmark navigation, every visible generated-text citation and focus return,
   graph controls/style persistence, ten-source pool, themes, responsive layout and
   browse. No browser errors. A dark-mode screenshot was visually inspected.
+- The same four browser tests passed against the public HTTPS site after activation
+  (18.2 seconds). Public study/admin pages and all referenced scripts/styles were
+  byte-identical to the unchanged study upstream; authentication responses also
+  matched. Demo home/assets and disabled imports passed public routing checks.
+  The public routing script initially retained the stopped staging port; correcting
+  that address made it exercise the public site, where all assertions passed.
+- Both services remained active with zero restarts. The demo started at 11:50:42
+  UTC as PID 259308. Context verification filled the demo's bounded filesystem
+  cache during startup; the memory controller reported no OOM or OOM kills.
+  This is a functional deployment check, not a concurrent-load benchmark.
 - Frontend production build, TypeScript checks and all 144 unit tests passed.
 - Native `local_app` HTTP smoke check passed Library rendering and import-job
   creation using a temporary library. No live library or study data was changed.
@@ -105,6 +117,11 @@ benchmark.
 
 A test harness initially needed unavailable `httpx2`; verification used a real
 short-lived HTTP server instead, without installing anything into the study venv.
+Final private receipts are `~/exact-demo/private/activation-verification.json`,
+`public-routing-verification.json` and `public-browser-verification.json`; browser
+output is retained in `public-browser.log`. The temporary staging services were
+stopped. Local combined development storage measured 51.49 GB, below the 100 GB
+budget; existing ontology databases were reused without duplication.
 
 ## Temporary deployment access
 
@@ -113,6 +130,10 @@ validation and revocation approach is adapted in `deploy/appvm/install.py` and
 `maintenance.py`, with a narrower grant: only fixed `activate`, `rollback` and
 `revoke` commands of a root-owned helper, not unrestricted root access. Default
 expiry is four hours, bounded to 1–24 hours. The helper cannot restart the study.
+
+The owner completed this bootstrap, the agent activated the tested release, and
+the grant was removed at 11:56 UTC on 17 November. The commands below document
+renewal for future maintenance; no passwordless deployment grant remains active.
 
 Once acceptance receipts are present, the owner runs from their own terminal:
 
